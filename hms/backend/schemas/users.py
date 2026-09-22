@@ -1,4 +1,4 @@
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
@@ -20,7 +20,12 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     mobile: Optional[str] = None
+    mobile_country_code: Optional[str] = None
     status: Optional[bool] = None
+    password: Optional[str] = None  # admin reset; hashed before storage, never returned
+
+    # username / user_type are immutable via this endpoint — identity and
+    # privilege class shouldn't change silently on an edit.
 
 class UserInDBBase(UserBase):
     id: int
@@ -50,6 +55,35 @@ class Role(RoleBase):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+class RoleWithPermissions(Role):
+    permission_codes: List[str] = []
+    user_count: int = 0
+
+
+class RolePermissionSet(BaseModel):
+    """Bulk replace a role's privileges. Empty list = strip the role."""
+    permission_codes: List[str]
+
+
+class RoleWithUserCount(Role):
+    user_count: int = 0
+
+
+class UserRoleOut(BaseModel):
+    """A role assignment on a user."""
+    id: int
+    role_id: int
+    role_code: str
+    role_name: str
+    scope_type: str
+    scope_id: Optional[int] = None
+    assigned_at: Optional[datetime] = None
+
+
+class UserWithRoles(User):
+    roles: List[UserRoleOut] = []
 
 # Permissions
 class PermissionBase(BaseModel):

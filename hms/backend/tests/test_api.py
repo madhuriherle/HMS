@@ -12,7 +12,7 @@ Covers the fixes in this pass:
 """
 
 import re
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -654,6 +654,643 @@ def _dummy_state(client, headers):
     )
     assert state.status_code == 200, state.text
     return state.json()["id"]
+
+
+# ─────────────── masters: geography & membership types ───────────────
+
+def _create_district(client, headers, state_id, name):
+    response = client.post(
+        "/api/v1/masters/districts",
+        headers=headers,
+        json={"state_id": state_id, "name_en": name},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def _create_taluk(client, headers, district_id, name):
+    response = client.post(
+        "/api/v1/masters/taluks",
+        headers=headers,
+        json={"district_id": district_id, "name_en": name},
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def test_state_full_lifecycle(client, admin_headers):
+    created = client.post(
+        "/api/v1/masters/states", headers=admin_headers, json={"name_en": "Test Nadu", "code": "TN-X"}
+    )
+    assert created.status_code == 200, created.text
+    state = created.json()
+
+    # duplicate name is rejected
+    dup = client.post(
+        "/api/v1/masters/states", headers=admin_headers, json={"name_en": "Test Nadu"}
+    )
+    assert dup.status_code == 409, dup.text
+
+    # get one works
+    got = client.get(f"/api/v1/masters/states/{state['id']}", headers=admin_headers)
+    assert got.status_code == 200, got.text
+    assert got.json()["name_en"] == "Test Nadu"
+
+    # update works
+    upd = client.put(
+        f"/api/v1/masters/states/{state['id']}", headers=admin_headers, json={"name_kn": "ಟೆಸ್ಟ್ ನಾಡು"}
+    )
+    assert upd.status_code == 200, upd.text
+    assert upd.json()["name_kn"] == "ಟೆಸ್ಟ್ ನಾಡು"
+
+    # rename to another state's name is rejected
+    client.post("/api/v1/masters/states", headers=admin_headers, json={"name_en": "Other Nadu"})
+    clash = client.put(
+        f"/api/v1/masters/states/{state['id']}", headers=admin_headers, json={"name_en": "Other Nadu"}
+    )
+    assert clash.status_code == 409, clash.text
+
+    # delete blocked while districts exist
+    district = _create_district(client, admin_headers, state["id"], "Test District")
+    blocked = client.delete(f"/api/v1/masters/states/{state['id']}", headers=admin_headers)
+    assert blocked.status_code == 409, blocked.text
+
+    # delete blocked while postal codes reference the district
+    pc = client.post(
+        "/api/v1/masters/postal-codes",
+        headers=admin_headers,
+        json={"pincode": "580001", "state_id": state["id"], "district_id": district["id"]},
+    )
+    assert pc.status_code == 200, pc.text
+    blocked2 = client.delete(f"/api/v1/masters/districts/{district['id']}", headers=admin_headers)
+    assert blocked2.status_code == 409, blocked2.text
+
+    # taluk references checked on postal code create
+    bad_taluk = client.post(
+        "/api/v1/masters/postal-codes",
+        headers=admin_headers,
+        json={"pincode": "580002", "state_id": state["id"], "district_id": district["id"], "taluk_id": 999999},
+    )
+    assert bad_taluk.status_code == 400, bad_taluk.text
+
+    # clean up in hierarchy order
+    assert client.delete(f"/api/v1/masters/postal-codes/{pc.json()['id']}", headers=admin_headers).status_code == 200
+    assert client.delete(f"/api/v1/masters/districts/{district['id']}", headers=admin_headers).status_code == 200
+    assert client.delete(f"/api/v1/masters/states/{state['id']}", headers=admin_headers).status_code == 200
+
+    # gone from the list afterwards
+    listing = client.get("/api/v1/masters/states", headers=admin_headers, params={"search": "Test Nadu"})
+    assert listing.json()["total"] == 0
+
+
+def test_district_taluk_crud_and_hierarchy(client, admin_headers):
+    state = client.post(
+        "/api/v1/masters/states", headers=admin_headers, json={"name_en": "Hier Nadu"}
+    ).json()
+    district = _create_district(client, admin_headers, state["id"], "Hier District")
+    taluk = _create_taluk(client, admin_headers, district["id"], "Hier Taluk")
+
+    # duplicate district in the same state rejected
+    dup_d = client.post(
+        "/api/v1/masters/districts",
+        headers=admin_headers,
+        json={"state_id": state["id"], "name_en": "Hier District"},
+    )
+    assert dup_d.status_code == 409, dup_d.text
+
+    # duplicate taluk in the same district rejected, other district fine
+    dup_t = client.post(
+        "/api/v1/masters/taluks",
+        headers=admin_headers,
+        json={"district_id": district["id"], "name_en": "Hier Taluk"},
+    )
+    assert dup_t.status_code == 409, dup_t.text
+
+    # unknown parents rejected
+    assert client.post(
+        "/api/v1/masters/districts", headers=admin_headers, json={"state_id": 999999, "name_en": "X"}
+    ).status_code == 400
+    assert client.post(
+        "/api/v1/masters/taluks", headers=admin_headers, json={"district_id": 999999, "name_en": "X"}
+    ).status_code == 400
+
+    # taluk update + move to a new district
+    district2 = _create_district(client, admin_headers, state["id"], "Hier District 2")
+    moved = client.put(
+        f"/api/v1/masters/taluks/{taluk['id']}",
+        headers=admin_headers,
+        json={"district_id": district2["id"], "name_en": "Hier Taluk Moved"},
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["district_id"] == district2["id"]
+
+    # taluk delete blocked while referenced by postal code
+    pc = client.post(
+        "/api/v1/masters/postal-codes",
+        headers=admin_headers,
+        json={
+            "pincode": "581001",
+            "state_id": state["id"],
+            "district_id": district2["id"],
+            "taluk_id": taluk["id"],
+        },
+    )
+    assert pc.status_code == 200, pc.text
+    blocked = client.delete(f"/api/v1/masters/taluks/{taluk['id']}", headers=admin_headers)
+    assert blocked.status_code == 409, blocked.text
+
+    assert client.delete(f"/api/v1/masters/postal-codes/{pc.json()['id']}", headers=admin_headers).status_code == 200
+    assert client.delete(f"/api/v1/masters/taluks/{taluk['id']}", headers=admin_headers).status_code == 200
+
+    # postal-code update revalidates the taluk/district pairing
+    pc2 = client.post(
+        "/api/v1/masters/postal-codes",
+        headers=admin_headers,
+        json={"pincode": "581002", "state_id": state["id"], "district_id": district["id"]},
+    )
+    assert pc2.status_code == 200, pc2.text
+    mismatch = client.put(
+        f"/api/v1/masters/postal-codes/{pc2.json()['id']}",
+        headers=admin_headers,
+        json={"taluk_id": taluk["id"]},  # taluk lives in district2, not district
+    )
+    assert mismatch.status_code == 400, mismatch.text
+
+    filters = client.get(
+        "/api/v1/masters/postal-codes",
+        headers=admin_headers,
+        params={"pincode": "581", "state_id": state["id"], "district_id": district["id"]},
+    )
+    assert filters.status_code == 200, filters.text
+    assert filters.json()["total"] == 1
+
+
+def test_postal_code_template_and_validation(client, admin_headers):
+    tpl = client.get("/api/v1/masters/postal-codes/template", headers=admin_headers)
+    assert tpl.status_code == 200, tpl.text
+    assert "postal_codes_template.csv" in tpl.headers["Content-Disposition"]
+    assert b"pincode,post_office_name,state_id,district_id,taluk_id" in tpl.content
+
+    bad_pin = client.post(
+        "/api/v1/masters/postal-codes",
+        headers=admin_headers,
+        json={"pincode": "5810", "state_id": 1, "district_id": 1},
+    )
+    assert bad_pin.status_code == 422, bad_pin.text
+
+    assert client.get(
+        "/api/v1/masters/postal-codes/999999", headers=admin_headers
+    ).status_code == 404
+
+
+def test_postal_code_import_validation_and_upsert(client, admin_headers):
+    state = client.post(
+        "/api/v1/masters/states", headers=admin_headers, json={"name_en": "Import Nadu"}
+    ).json()
+    district = _create_district(client, admin_headers, state["id"], "Import District")
+    taluk = _create_taluk(client, admin_headers, district["id"], "Import Taluk")
+
+    csv_content = (
+        "pincode,post_office_name,state_id,district_id,taluk_id\n"
+        "577001,Office A,{s},{d},{t}\n"
+        "577001,Office B,{s},{d},\n"
+        "57700,Office C,{s},{d},{t}\n"          # invalid pincode
+        "577002,Office D,999999,{d},\n"          # unknown state
+        "577003,Office E,{s},999999,\n"          # unknown district
+        "577004,Office F,{s},{d},999999\n"       # taluk from another district
+        "577001,Office A,{s},{d},\n"             # duplicate in-file, updates first
+    ).format(s=state["id"], d=district["id"], t=taluk["id"])
+
+    first = client.post(
+        "/api/v1/imports/postal-codes/import",
+        headers=admin_headers,
+        files={"file": ("pincodes.csv", csv_content.encode("utf-8"), "text/csv")},
+    )
+    assert first.status_code == 200, first.text
+    body = first.json()
+    assert body["inserted"] == 2, body
+    assert body["skipped"] == 4, body
+
+    # second import updates geography instead of duplicating
+    csv_update = (
+        "pincode,post_office_name,state_id,district_id\n"
+        "577001,Office A,{s},{d}\n"
+    ).format(s=state["id"], d=district["id"])
+    second = client.post(
+        "/api/v1/imports/postal-codes/import",
+        headers=admin_headers,
+        files={"file": ("pincodes.csv", csv_update.encode("utf-8"), "text/csv")},
+    )
+    assert second.status_code == 200, second.text
+    assert second.json()["updated"] == 1, second.json()
+
+    listing = client.get(
+        "/api/v1/masters/postal-codes",
+        headers=admin_headers,
+        params={"pincode": "577001"},
+    )
+    offices = {row["post_office_name"] for row in listing.json()["data"]}
+    assert offices == {"Office A", "Office B"}
+
+    # name-based import resolves geography by name
+    csv_names = (
+        "pincode,post_office_name,state_name_en,district_name_en,taluk_name_en\n"
+        "577005,Office G,Import Nadu,Import District,Import Taluk\n"
+    )
+    third = client.post(
+        "/api/v1/imports/postal-codes/import",
+        headers=admin_headers,
+        files={"file": ("pincodes.csv", csv_names.encode("utf-8"), "text/csv")},
+    )
+    assert third.status_code == 200, third.text
+    assert third.json()["inserted"] == 1, third.json()
+
+
+def test_membership_type_price_history_flow(client, admin_headers):
+    mt = _create_membership_type(client, admin_headers, "TST_PRICE", "Pricey Type")
+    mt_id = mt["id"]
+
+    # new type has no price
+    got = client.get(f"/api/v1/masters/membership-types/{mt_id}", headers=admin_headers)
+    assert got.status_code == 200, got.text
+    assert got.json()["current_price"] is None
+    assert client.get(
+        f"/api/v1/masters/membership-types/{mt_id}/prices/current", headers=admin_headers
+    ).status_code == 404
+
+    # set first price
+    p1 = client.post(
+        f"/api/v1/masters/membership-types/{mt_id}/prices",
+        headers=admin_headers,
+        json={"amount": 100, "change_reason": "initial price"},
+    )
+    assert p1.status_code == 200, p1.text
+    p1_id = p1.json()["id"]
+    assert p1.json()["effective_to"] is None
+
+    # current price reflects it
+    cur = client.get(
+        f"/api/v1/masters/membership-types/{mt_id}/prices/current", headers=admin_headers
+    )
+    assert cur.status_code == 200, cur.text
+    assert float(cur.json()["amount"]) == 100.0
+
+    # raise the price — old row closes, new row opens (explicit future effective date)
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    p2 = client.post(
+        f"/api/v1/masters/membership-types/{mt_id}/prices",
+        headers=admin_headers,
+        json={"amount": 250, "change_reason": "AGM revision", "effective_from": tomorrow},
+    )
+    assert p2.status_code == 200, p2.text
+    p2_id = p2.json()["id"]
+
+    # price history shows both rows, newest effective first
+    history = client.get(
+        f"/api/v1/masters/membership-types/{mt_id}/prices", headers=admin_headers
+    )
+    assert history.status_code == 200, history.text
+    rows = history.json()["data"]
+    assert len(rows) == 2
+    assert rows[0]["id"] == p2_id
+    assert rows[0]["effective_to"] is None
+    assert rows[1]["id"] == p1_id
+    assert rows[1]["effective_to"] is not None  # closed by the new price
+    assert rows[1]["change_reason"] == "initial price"
+
+    # type listing includes the current price
+    listing = client.get(
+        "/api/v1/masters/membership-types", headers=admin_headers, params={"search": "Pricey"}
+    )
+    item = [t for t in listing.json()["data"] if t["id"] == mt_id][0]
+    assert float(item["current_price"]) == 250.0
+
+    # negative amount rejected
+    neg = client.post(
+        f"/api/v1/masters/membership-types/{mt_id}/prices",
+        headers=admin_headers,
+        json={"amount": -5},
+    )
+    assert neg.status_code == 422, neg.text
+
+    # same-day reprice updates today's row in place instead of adding a duplicate
+    same_day = client.post(
+        f"/api/v1/masters/membership-types/{mt_id}/prices",
+        headers=admin_headers,
+        json={"amount": 125, "change_reason": "typo fix"},
+    )
+    assert same_day.status_code == 200, same_day.text
+    assert same_day.json()["id"] == p2_id or same_day.json()["id"] == p1_id
+    history_after = client.get(
+        f"/api/v1/masters/membership-types/{mt_id}/prices", headers=admin_headers
+    )
+    assert history_after.json()["total"] == 2  # still two rows, no duplicate
+
+    # price correction on a closed row works
+    fix = client.put(
+        f"/api/v1/masters/membership-types/{mt_id}/prices/{p1_id}",
+        headers=admin_headers,
+        json={"amount": 110},
+    )
+    assert fix.status_code == 200, fix.text
+    assert float(fix.json()["amount"]) == 110.0
+
+    # delete blocked while members hold this type
+    member = _create_member(client, admin_headers, "9000000040", "TypeHolder")
+    from db.session import SessionLocal
+    from models.members import MemberMembership
+
+    with SessionLocal() as db:
+        db.add(MemberMembership(
+            member_id=member["id"], membership_type_id=mt_id,
+            applied_at=datetime.now(timezone.utc), status="ACTIVE",
+        ))
+        db.commit()
+
+    blocked = client.delete(f"/api/v1/masters/membership-types/{mt_id}", headers=admin_headers)
+    assert blocked.status_code == 409, blocked.text
+
+    # duplicate code rejected
+    dup = client.post(
+        "/api/v1/masters/membership-types",
+        headers=admin_headers,
+        json={"code": "TST_PRICE", "name_en": "Another"},
+    )
+    assert dup.status_code == 409, dup.text
+
+
+def test_membership_type_delete_unused_succeeds(client, admin_headers):
+    mt = _create_membership_type(client, admin_headers, "TST_DELTYPE", "Deletable Type")
+    deleted = client.delete(
+        f"/api/v1/masters/membership-types/{mt['id']}", headers=admin_headers
+    )
+    assert deleted.status_code == 200, deleted.text
+    assert client.get(
+        f"/api/v1/masters/membership-types/{mt['id']}", headers=admin_headers
+    ).status_code == 404
+
+
+# ─────────────── users: roles & privileges ───────────────
+
+def test_role_lifecycle_with_privilege_configuration(client, admin_headers):
+    role = client.post(
+        "/api/v1/users/roles",
+        headers=admin_headers,
+        json={"name": "Masters Manager", "code": "MASTERS_MGR"},
+    )
+    assert role.status_code == 200, role.text
+    role_id = role.json()["id"]
+
+    # detail starts empty
+    detail = client.get(f"/api/v1/users/roles/{role_id}", headers=admin_headers)
+    assert detail.status_code == 200, detail.text
+    body = detail.json()
+    assert body["permission_codes"] == []
+    assert body["user_count"] == 0
+
+    # bulk-configure privileges in one call
+    configured = client.put(
+        f"/api/v1/users/roles/{role_id}/permissions",
+        headers=admin_headers,
+        json={"permission_codes": ["masters.write", "members.write", "imports.write"]},
+    )
+    assert configured.status_code == 200, configured.text
+    conf_body = configured.json()
+    assert sorted(conf_body["granted"]) == ["imports.write", "masters.write", "members.write"]
+    assert sorted(conf_body["permission_codes"]) == ["imports.write", "masters.write", "members.write"]
+
+    # unknown permission code rejected
+    unknown = client.put(
+        f"/api/v1/users/roles/{role_id}/permissions",
+        headers=admin_headers,
+        json={"permission_codes": ["masters.write", "nope.write"]},
+    )
+    assert unknown.status_code == 400, unknown.text
+
+    # re-sync with a different set revokes the absent ones
+    resync = client.put(
+        f"/api/v1/users/roles/{role_id}/permissions",
+        headers=admin_headers,
+        json={"permission_codes": ["masters.write"]},
+    )
+    assert resync.status_code == 200, resync.text
+    assert sorted(resync.json()["revoked"]) == ["imports.write", "members.write"]
+    assert resync.json()["permission_codes"] == ["masters.write"]
+
+    # roles listing carries permission_codes + user_count
+    listing = client.get("/api/v1/users/roles", headers=admin_headers)
+    row = [r for r in listing.json()["data"] if r["id"] == role_id][0]
+    assert row["permission_codes"] == ["masters.write"]
+    assert row["user_count"] == 0
+
+    # delete blocked while a user holds the role
+    staff = client.post(
+        "/api/v1/users/",
+        headers=admin_headers,
+        json={"name": "Role Holder", "username": "role_holder", "password": "holderpass1", "user_type": "STAFF"},
+    )
+    assert staff.status_code == 200, staff.text
+    staff_id = staff.json()["id"]
+    assigned = client.post(
+        f"/api/v1/users/{staff_id}/assign-role",
+        headers=admin_headers,
+        params={"role_id": role_id},
+    )
+    assert assigned.status_code == 200, assigned.text
+
+    blocked = client.delete(f"/api/v1/users/roles/{role_id}", headers=admin_headers)
+    assert blocked.status_code == 409, blocked.text
+
+    # deactivating an in-use role is blocked too
+    deactivate = client.put(
+        f"/api/v1/users/roles/{role_id}", headers=admin_headers, json={"status": False}
+    )
+    assert deactivate.status_code == 409, deactivate.text
+
+    # remove the assignment, then delete succeeds
+    removed = client.delete(
+        f"/api/v1/users/{staff_id}/roles/{role_id}", headers=admin_headers
+    )
+    assert removed.status_code == 200, removed.text
+    assert client.delete(f"/api/v1/users/roles/{role_id}", headers=admin_headers).status_code == 200
+    assert client.get(f"/api/v1/users/roles/{role_id}", headers=admin_headers).status_code == 404
+
+
+def test_user_role_assignment_scopes_and_removal(client, admin_headers):
+    role = client.post(
+        "/api/v1/users/roles",
+        headers=admin_headers,
+        json={"name": "Scoped Role", "code": "SCOPED_ROLE"},
+    )
+    assert role.status_code == 200, role.text
+    role_id = role.json()["id"]
+
+    staff = client.post(
+        "/api/v1/users/",
+        headers=admin_headers,
+        json={"name": "Scoped User", "username": "scoped_user", "password": "scopedpass1", "user_type": "STAFF"},
+    )
+    assert staff.status_code == 200, staff.text
+    staff_id = staff.json()["id"]
+
+    # scoped assignment without scope_id rejected
+    no_scope = client.post(
+        f"/api/v1/users/{staff_id}/assign-role",
+        headers=admin_headers,
+        params={"role_id": role_id, "scope_type": "DISTRICT"},
+    )
+    assert no_scope.status_code == 400, no_scope.text
+
+    # GLOBAL with a scope_id rejected
+    bad_global = client.post(
+        f"/api/v1/users/{staff_id}/assign-role",
+        headers=admin_headers,
+        params={"role_id": role_id, "scope_id": "3"},
+    )
+    assert bad_global.status_code == 400, bad_global.text
+
+    # unknown scope value rejected
+    bad_type = client.post(
+        f"/api/v1/users/{staff_id}/assign-role",
+        headers=admin_headers,
+        params={"role_id": role_id, "scope_type": "GALAXY"},
+    )
+    assert bad_type.status_code == 400, bad_type.text
+
+    # unknown scope target rejected
+    missing = client.post(
+        f"/api/v1/users/{staff_id}/assign-role",
+        headers=admin_headers,
+        params={"role_id": role_id, "scope_type": "STATE", "scope_id": "999999"},
+    )
+    assert missing.status_code == 400, missing.text
+
+    # valid GLOBAL assignment shows up in user detail and roles listing
+    state = client.post("/api/v1/masters/states", headers=admin_headers, json={"name_en": "Scope Nadu"}).json()
+    ok = client.post(
+        f"/api/v1/users/{staff_id}/assign-role",
+        headers=admin_headers,
+        params={"role_id": role_id, "scope_type": "STATE", "scope_id": state["id"]},
+    )
+    assert ok.status_code == 200, ok.text
+
+    detail = client.get(f"/api/v1/users/{staff_id}", headers=admin_headers)
+    assert detail.status_code == 200, detail.text
+    roles = detail.json()["roles"]
+    assert len(roles) == 1
+    assert roles[0]["role_code"] == "SCOPED_ROLE"
+    assert roles[0]["scope_type"] == "STATE"
+    assert roles[0]["scope_id"] == state["id"]
+
+    listed = client.get(f"/api/v1/users/{staff_id}/roles", headers=admin_headers)
+    assert listed.status_code == 200, listed.text
+    assert listed.json()[0]["role_name"] == "Scoped Role"
+
+    # removing an unassigned role 404s
+    assert client.delete(
+        f"/api/v1/users/{staff_id}/roles/999999", headers=admin_headers
+    ).status_code == 404
+
+
+def test_user_update_password_reset_and_guards(client, admin_headers):
+    staff = client.post(
+        "/api/v1/users/",
+        headers=admin_headers,
+        json={"name": "Resettable", "username": "resettable", "password": "oldpass123", "user_type": "STAFF"},
+    )
+    assert staff.status_code == 200, staff.text
+    staff_id = staff.json()["id"]
+
+    # weak reset password rejected
+    weak = client.put(
+        f"/api/v1/users/{staff_id}", headers=admin_headers, json={"password": "short"}
+    )
+    assert weak.status_code == 400, weak.text
+
+    # strong reset works and old password stops working
+    reset = client.put(
+        f"/api/v1/users/{staff_id}", headers=admin_headers, json={"password": "brandnew456"}
+    )
+    assert reset.status_code == 200, reset.text
+
+    old_login = client.post(
+        "/api/v1/auth/login", data={"username": "resettable", "password": "oldpass123"}
+    )
+    assert old_login.status_code == 401, old_login.text
+    new_login = client.post(
+        "/api/v1/auth/login", data={"username": "resettable", "password": "brandnew456"}
+    )
+    assert new_login.status_code == 200, new_login.text
+
+    # admin cannot deactivate themselves
+    self_deactivate = client.put(
+        "/api/v1/users/1", headers=admin_headers, json={"status": False}
+    )
+    assert self_deactivate.status_code == 400, self_deactivate.text
+
+    # deactivating another user works
+    other = client.put(
+        f"/api/v1/users/{staff_id}", headers=admin_headers, json={"status": False}
+    )
+    assert other.status_code == 200, other.text
+    assert other.json()["status"] is False
+
+    # deleting the user clears their role assignments
+    role = client.post(
+        "/api/v1/users/roles", headers=admin_headers, json={"name": "Doomed Holder", "code": "DOOMED_HOLDER"}
+    )
+    role_id = role.json()["id"]
+    client.post(f"/api/v1/users/{staff_id}/assign-role", headers=admin_headers, params={"role_id": role_id})
+
+    deleted = client.delete(f"/api/v1/users/{staff_id}", headers=admin_headers)
+    assert deleted.status_code == 200, deleted.text
+
+    # role is free again (assignment was cleaned up), so it can be deleted
+    assert client.delete(f"/api/v1/users/roles/{role_id}", headers=admin_headers).status_code == 200
+
+    # user detail 404s afterwards
+    assert client.get(f"/api/v1/users/{staff_id}", headers=admin_headers).status_code == 404
+
+
+def test_superadmin_protections(client, admin_headers):
+    # cannot delete the SUPERADMIN account (even by itself)
+    assert client.delete("/api/v1/users/1", headers=admin_headers).status_code == 409
+
+    # SUPERADMIN cannot be deactivated via update either
+    assert client.put("/api/v1/users/1", headers=admin_headers, json={"status": False}).status_code in (400, 409)
+
+    # a second superadmin's last role cannot be stripped (never fully unprivileged)
+    sa2 = client.post(
+        "/api/v1/users/",
+        headers=admin_headers,
+        json={"name": "SA Two", "username": "sa_two", "password": "satwopass1", "user_type": "SUPERADMIN"},
+    )
+    assert sa2.status_code == 200, sa2.text
+    sa2_id = sa2.json()["id"]
+
+    role = client.post(
+        "/api/v1/users/roles", headers=admin_headers, json={"name": "SA Guard", "code": "SA_GUARD"}
+    )
+    role_id = role.json()["id"]
+    assigned = client.post(f"/api/v1/users/{sa2_id}/assign-role", headers=admin_headers, params={"role_id": role_id})
+    assert assigned.status_code == 200, assigned.text
+
+    # stripping their only role is blocked — a superadmin is never left unprivileged
+    removed = client.delete(f"/api/v1/users/{sa2_id}/roles/{role_id}", headers=admin_headers)
+    assert removed.status_code == 409, removed.text
+    assert "last role" in removed.json()["detail"]
+
+    # with a second role assigned, removing the first one works
+    role2 = client.post(
+        "/api/v1/users/roles", headers=admin_headers, json={"name": "SA Guard 2", "code": "SA_GUARD_2"}
+    )
+    role2_id = role2.json()["id"]
+    client.post(f"/api/v1/users/{sa2_id}/assign-role", headers=admin_headers, params={"role_id": role2_id})
+    removed_now = client.delete(f"/api/v1/users/{sa2_id}/roles/{role_id}", headers=admin_headers)
+    assert removed_now.status_code == 200, removed_now.text
+
+
+# ─────────────── response shapes ───────────────
 
 
 # ─────────────── response shapes ───────────────

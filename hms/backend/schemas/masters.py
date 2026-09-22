@@ -1,6 +1,6 @@
 from typing import Optional, List
-from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from datetime import date as date_type, datetime
+from pydantic import BaseModel, ConfigDict, field_validator
 
 class StateBase(BaseModel):
     name_en: str
@@ -82,6 +82,14 @@ class PostalCodeBase(BaseModel):
     taluk_id: Optional[int] = None
     status: bool = True
 
+    @field_validator("pincode")
+    @classmethod
+    def _validate_pincode(cls, v: str) -> str:
+        v = v.strip()
+        if not (len(v) == 6 and v.isdigit()):
+            raise ValueError("pincode must be exactly 6 digits")
+        return v
+
 
 class PostalCodeCreate(PostalCodeBase):
     pass
@@ -126,6 +134,42 @@ class MembershipType(MembershipTypeBase):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+# ── Membership price schemas ──
+class MembershipTypePriceBase(BaseModel):
+    membership_type_id: int
+    amount: float
+    currency: str = "INR"
+    effective_from: date_type
+    effective_to: Optional[date_type] = None
+    change_reason: Optional[str] = None
+
+
+class MembershipTypePriceCreate(BaseModel):
+    amount: float
+    currency: str = "INR"
+    effective_from: Optional[date_type] = None  # defaults to today
+    change_reason: Optional[str] = None
+
+
+class MembershipTypePriceUpdate(BaseModel):
+    amount: Optional[float] = None
+    currency: Optional[str] = None
+    effective_from: Optional[date_type] = None
+    effective_to: Optional[date_type] = None
+    change_reason: Optional[str] = None
+
+
+class MembershipTypePrice(MembershipTypePriceBase):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MembershipTypeWithPrice(MembershipType):
+    current_price: Optional[float] = None
+    current_price_id: Optional[int] = None
 
 
 class DocumentTypeBase(BaseModel):

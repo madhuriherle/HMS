@@ -1,9 +1,13 @@
 from crud.base import CRUDBase
-from models.masters import State, District, Taluk, PostalCode, MembershipType, DocumentType, ServiceType, HmsSetting
+from models.masters import (
+    State, District, Taluk, PostalCode, MembershipType, MembershipTypePrice,
+    DocumentType, ServiceType, HmsSetting,
+)
 from schemas.masters import (
     StateCreate, StateUpdate, DistrictCreate, DistrictUpdate, 
     TalukCreate, TalukUpdate, PostalCodeCreate, PostalCodeUpdate,
-    MembershipTypeCreate, MembershipTypeUpdate, DocumentTypeCreate, DocumentTypeUpdate,
+    MembershipTypeCreate, MembershipTypeUpdate, MembershipTypePriceCreate, MembershipTypePriceUpdate,
+    DocumentTypeCreate, DocumentTypeUpdate,
     ServiceTypeCreate, ServiceTypeUpdate, HmsSettingCreate, HmsSettingUpdate
 )
 
@@ -22,6 +26,9 @@ class CRUDPostalCode(CRUDBase[PostalCode, PostalCodeCreate, PostalCodeUpdate]):
 class CRUDMembershipType(CRUDBase[MembershipType, MembershipTypeCreate, MembershipTypeUpdate]):
     pass
 
+class CRUDMembershipTypePrice(CRUDBase[MembershipTypePrice, MembershipTypePriceCreate, MembershipTypePriceUpdate]):
+    pass
+
 class CRUDDocumentType(CRUDBase[DocumentType, DocumentTypeCreate, DocumentTypeUpdate]):
     pass
 
@@ -36,6 +43,7 @@ district = CRUDDistrict(District)
 taluk = CRUDTaluk(Taluk)
 postal_code = CRUDPostalCode(PostalCode)
 membership_type = CRUDMembershipType(MembershipType)
+membership_type_price = CRUDMembershipTypePrice(MembershipTypePrice)
 document_type = CRUDDocumentType(DocumentType)
 service_type = CRUDServiceType(ServiceType)
 hms_setting = CRUDHmsSetting(HmsSetting)
