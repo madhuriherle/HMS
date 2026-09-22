@@ -1,0 +1,7309 @@
+# HMS MMA – Complete Database Table List
+
+Havyaka MahaSabha Membership Management App · PostgreSQL · React JS + FastAPI · Scope: 21-09-2026
+
+Here is the consolidated database table list for your HMS MMA system, organized module-wise. This includes the tables needed for membership registration, approvals, receipts, magazine delivery, reports, WhatsApp notifications, events, affiliations, associates, press/media, and managing committee.
+
+
+## 1. Masters
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+1
+
+|
+
+`states`
+
+|
+
+Manage states
+
+|
+|
+
+2
+
+|
+
+`districts`
+
+|
+
+Manage districts mapped to states
+
+|
+|
+
+3
+
+|
+
+`taluks`
+
+|
+
+Manage taluks mapped to districts
+
+|
+|
+
+4
+
+|
+
+`postal_codes`
+
+|
+
+Manage Indian PIN codes and map them to geographic masters
+
+|
+|
+
+5
+
+|
+
+`membership_types`
+
+|
+
+Membership categories such as Poshaka and Mahaposhaka
+
+|
+|
+
+6
+
+|
+
+`membership_type_prices`
+
+|
+
+Membership prices with effective dates and price history
+
+|
+|
+
+7
+
+|
+
+`hms_settings`
+
+|
+
+General application settings
+
+|
+|
+
+8
+
+|
+
+`document_types`
+
+|
+
+KYC and supporting document types
+
+|
+|
+
+9
+
+|
+
+`service_types`
+
+|
+
+Magazine, temple, Mangalya, hall and other services
+
+|
+
+## 2. Users, roles and privileges
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+10
+
+|
+
+`users`
+
+|
+
+Staff and member login accounts
+
+|
+|
+
+11
+
+|
+
+`roles`
+
+|
+
+Define user roles
+
+|
+|
+
+12
+
+|
+
+`permissions`
+
+|
+
+Define individual privileges
+
+|
+|
+
+13
+
+|
+
+`role_permissions`
+
+|
+
+Map privileges to roles
+
+|
+|
+
+14
+
+|
+
+`user_roles`
+
+|
+
+Assign roles to users
+
+|
+
+## 3. Membership management
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+15
+
+|
+
+`members`
+
+|
+
+Core personal details and member identity
+
+|
+|
+
+16
+
+|
+
+`member_memberships`
+
+|
+
+Membership enrollment, number, type and status
+
+|
+|
+
+17
+
+|
+
+`member_documents`
+
+|
+
+Member KYC and uploaded documents
+
+|
+|
+
+18
+
+|
+
+`member_approval_history`
+
+|
+
+Registration, approval, rejection and activation history
+
+|
+|
+
+19
+
+|
+
+`member_profile_change_requests`
+
+|
+
+Profile changes submitted for approval
+
+|
+|
+
+20
+
+|
+
+`member_profile_history`
+
+|
+
+Approved changes to member information
+
+|
+|
+
+21
+
+|
+
+`membership_type_change_requests`
+
+|
+
+Requests to change or upgrade membership type
+
+|
+|
+
+22
+
+|
+
+`membership_type_history`
+
+|
+
+Previous and new membership type, price and transaction history
+
+|
+|
+
+23
+
+|
+
+`member_deletion_requests`
+
+|
+
+Soft-delete and permanent-delete requests with reasons
+
+|
+|
+
+24
+
+|
+
+`member_kyc_requests`
+
+|
+
+Secure KYC update links, submissions and status
+
+|
+
+## 4. Receipts and payments
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+25
+
+|
+
+`receipts`
+
+|
+
+Online and offline receipt records
+
+|
+|
+
+26
+
+|
+
+`receipt_items`
+
+|
+
+Individual charges or line items within a receipt
+
+|
+|
+
+27
+
+|
+
+`receipt_allocations`
+
+|
+
+Assign receipts and allocated amounts to members and memberships
+
+|
+|
+
+28
+
+|
+
+`payment_transactions`
+
+|
+
+Online payment transactions and payment status
+
+|
+|
+
+29
+
+|
+
+`receipt_cancellations`
+
+|
+
+Receipt cancellation and reversal history
+
+|
+|
+
+30
+
+|
+
+`refund_transactions`
+
+|
+
+Refund records, where refunds are supported
+
+|
+
+## 5. Magazine delivery and label printing
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+31
+
+|
+
+`magazine_subscriptions`
+
+|
+
+Member magazine delivery enrollment and delivery status
+
+|
+|
+
+32
+
+|
+
+`magazine_delivery_pauses`
+
+|
+
+Pause and resume requests with dates and notes
+
+|
+|
+
+33
+
+|
+
+`magazine_returns`
+
+|
+
+Record returned magazines against members and delivery cycles
+
+|
+|
+
+34
+
+|
+
+`magazine_delivery_batches`
+
+|
+
+Organize delivery or label-printing batches
+
+|
+|
+
+35
+
+|
+
+`magazine_label_batches`
+
+|
+
+Track generated label batches, filters and generation details
+
+|
+|
+
+36
+
+|
+
+`magazine_label_batch_items`
+
+|
+
+Store the recipients included in each generated label batch
+
+|
+
+## 6. Reports
+
+Most reports can be generated directly from the membership, receipt, magazine, and activity tables above. The following optional tables support saved report configurations and exports.
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+37
+
+|
+
+`saved_reports`
+
+|
+
+Store reusable report configurations and selected fields
+
+|
+|
+
+38
+
+|
+
+`report_export_logs`
+
+|
+
+Track report generation, export format, user and timestamp
+
+|
+
+
+## 7. WhatsApp notifications
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+39
+
+|
+
+`notification_templates`
+
+|
+
+Approved WhatsApp templates, language and provider template IDs
+
+|
+|
+
+40
+
+|
+
+`notification_campaigns`
+
+|
+
+Individual or bulk notification campaigns and recipient filters
+
+|
+|
+
+41
+
+|
+
+`notification_recipients`
+
+|
+
+Recipient numbers, member mapping and per-recipient status
+
+|
+|
+
+42
+
+|
+
+`notification_messages`
+
+|
+
+Message content, sending attempts and provider response references
+
+|
+|
+
+43
+
+|
+
+`notification_delivery_logs`
+
+|
+
+Sent, delivered, failed and read status updates where provided by the provider
+
+|
+|
+
+44
+
+|
+
+`notification_import_batches`
+
+|
+
+Track CSV recipient imports and validation results
+
+|
+
+## 8. Activity management
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+45
+
+|
+
+`user_activity_logs`
+
+|
+
+User actions such as login, logout, create, edit, approve and delete
+
+|
+|
+
+46
+
+|
+
+`member_activity_logs`
+
+|
+
+Member timeline, services used and changes to membership details
+
+|
+
+## 9. Events and guest participation
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+47
+
+|
+
+`events`
+
+|
+
+Event title, dates, location, description and invitation copy
+
+|
+|
+
+48
+
+|
+
+`event_participants`
+
+|
+
+Guests, honourable persons and their event roles
+
+|
+|
+
+49
+
+|
+
+`event_member_links`
+
+|
+
+Link event participants to HMS members when applicable
+
+|
+|
+
+50
+
+|
+
+`event_attachments`
+
+|
+
+Invitation files, images and other event documents
+
+|
+
+## 10. Affiliation groups
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+51
+
+|
+
+`affiliations`
+
+|
+
+Affiliate group details and contact information
+
+|
+|
+
+52
+
+|
+
+`affiliation_contacts`
+
+|
+
+Contact persons for affiliate groups
+
+|
+|
+
+53
+
+|
+
+`affiliation_magazine_settings`
+
+|
+
+Magazine delivery enable/disable settings for affiliations
+
+|
+
+## 11. Associates
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+54
+
+|
+
+`associates`
+
+|
+
+Register people associated with the Mahasabha who are not members
+
+|
+|
+
+55
+
+|
+
+`associate_magazine_settings`
+
+|
+
+Magazine delivery preferences for associates
+
+|
+
+## 12. Press and media
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+56
+
+|
+
+`press_media`
+
+|
+
+Register press and media contacts or organizations
+
+|
+|
+
+57
+
+|
+
+`press_media_magazine_settings`
+
+|
+
+Magazine delivery preferences for press and media
+
+|
+
+## 13. Managing committee
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+58
+
+|
+
+`committee_categories`
+
+|
+
+Categories such as Bengaluru Kshetra and temple committees
+
+|
+|
+
+59
+
+|
+
+`committee_subcategories`
+
+|
+
+Subcategories within each committee category
+
+|
+|
+
+60
+
+|
+
+`committee_members`
+
+|
+
+Committee person, role/designation, term and display settings
+
+|
+|
+
+61
+
+|
+
+`committee_member_links`
+
+|
+
+Link committee members to existing HMS member profiles
+
+|
+|
+
+62
+
+|
+
+`committee_terms`
+
+|
+
+Committee term dates and current/historical term management
+
+|
+
+
+## 14. Supporting system tables
+
+|
+No.
+
+|
+
+PostgreSQL table
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+63
+
+|
+
+`refresh_tokens`
+
+|
+
+Track refresh tokens and revocation for authentication
+
+|
+|
+
+64
+
+|
+
+`password_reset_tokens`
+
+|
+
+Manage password reset requests
+
+|
+|
+
+65
+
+|
+
+`file_attachments`
+
+|
+
+Common file metadata for uploaded documents, if using centralized file management
+
+|
+|
+
+66
+
+|
+
+`approval_workflows`
+
+|
+
+Configure approval stages and rules, if workflows need to be administrator-configurable
+
+|
+|
+
+67
+
+|
+
+`approval_actions`
+
+|
+
+Record approval decisions, reviewers, notes and timestamps across supported request types
+
+|
+|
+
+68
+
+|
+
+`number_sequences`
+
+|
+
+Manage receipt numbers, membership numbers and other sequential identifiers
+
+|
+|
+
+69
+
+|
+
+`system_error_logs`
+
+|
+
+Track application-level errors and diagnostic references, subject to log-retention rules
+
+|
+
+## 15. Overall table count
+
+Proposed database tables
+
+# 69
+
+PostgreSQL
+
+This is a proposed comprehensive table inventory. Some supporting tables are optional and can be combined or omitted depending on the final business rules and implementation decisions.
+
+### Important relationship rules
+
+* `members` is the central person record. Receipts, memberships, KYC requests, service records, and activity history should reference it using foreign keys.
+
+* `member_memberships` references `membership_types`; price history references `membership_type_prices`.
+
+* `receipt_allocations` connects receipts to members and, when relevant, their membership transactions.
+
+* Magazine label generation should combine eligible members, affiliates, associates and press/media recipients while applying delivery preferences, pause periods, receipt requirements and return indicators.
+
+* Committee and event participants should link to `members` when the person is an existing member, without duplicating their personal details unnecessarily.
+
+* Approval and audit records should retain the actor, decision, timestamp and reason. Sensitive records should not be permanently erased without checking retention and audit requirements.
+
+Recommended next step: Finalize the relationships, constraints, and status values for these tables, then create the PostgreSQL ER diagram and SQLAlchemy models before beginning the FastAPI endpoints and React screens.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Understood. For HMS MMA, every table should have standard audit columns, not just the main membership tables.
+
+We'll use a consistent audit structure across all PostgreSQL tables, including master tables, transaction tables, approval requests, activity logs, notification tables, and mapping tables.
+
+## 1. Standard audit columns for every table
+
+|
+Column
+
+|
+
+PostgreSQL type
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+`created_at`
+
+|
+
+`TIMESTAMPTZ NOT NULL`
+
+|
+
+Date and time the record was created
+
+|
+|
+
+`created_by`
+
+|
+
+`BIGINT NULL`
+
+|
+
+User ID who created the record
+
+|
+|
+
+`updated_at`
+
+|
+
+`TIMESTAMPTZ NULL`
+
+|
+
+Date and time the record was last updated
+
+|
+|
+
+`updated_by`
+
+|
+
+`BIGINT NULL`
+
+|
+
+User ID who last updated the record
+
+|
+|
+
+`deleted_at`
+
+|
+
+`TIMESTAMPTZ NULL`
+
+|
+
+Date and time of soft deletion
+
+|
+|
+
+`deleted_by`
+
+|
+
+`BIGINT NULL`
+
+|
+
+User ID who soft-deleted the record
+
+|
+|
+
+`is_deleted`
+
+|
+
+`BOOLEAN NOT NULL DEFAULT FALSE`
+
+|
+
+Soft-deletion indicator
+
+|
+
+For tables that must never be edited or deleted, such as immutable audit history, the update and deletion columns can still exist but remain `NULL` or `FALSE`. This keeps the schema consistent while the application enforces append-only behavior.
+
+
+## 2. Common PostgreSQL audit definition
+
+Apply these columns to all 69 tables listed below.
+
+SQL
+
+```
+created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+created_by  BIGINT NULL REFERENCES users(id),
+updated_at  TIMESTAMPTZ NULL,
+updated_by  BIGINT NULL REFERENCES users(id),
+deleted_at  TIMESTAMPTZ NULL,
+deleted_by  BIGINT NULL REFERENCES users(id),
+is_deleted  BOOLEAN NOT NULL DEFAULT FALSE
+```
+
+Implementation notes:
+
+* `created_by` and `updated_by` reference the user who performed the action. They may be `NULL` for system-generated records or during initial system setup.
+
+* `updated_at` and `updated_by` should be updated together whenever a record changes.
+
+* For soft deletion, set `deleted_at`, `deleted_by`, and `is_deleted = TRUE`.
+
+* For permanent deletion, apply retention and dependency rules before removing data.
+
+* The application should enforce audit behavior centrally in SQLAlchemy services or event handlers. Do not rely only on React to provide audit values.
+
+* For audit logs, record the actual actor and event details, and restrict updates and deletes.
+
+
+# Part B — Complete table and column definitions
+
+The following is the complete proposed business-column inventory. Every table inherits the seven common audit columns above, so they are not repeated in each row.
+
+Notation: `PK` = primary key, `FK` = foreign key, `UQ` = unique, `NULL` = optional. All IDs use `BIGINT GENERATED BY DEFAULT AS IDENTITY` unless otherwise stated.
+
+## 3. Masters
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`states`
+
+|
+
+`id PK`, `name_en VARCHAR(100)`, `name_kn VARCHAR(150) NULL`, `code VARCHAR(20) NULL`, `country_code CHAR(3) DEFAULT 'IND'`, `status BOOLEAN DEFAULT TRUE`
+
+|
+|
+
+`districts`
+
+|
+
+`id PK`, `state_id FK → states.id`, `name_en VARCHAR(100)`, `name_kn VARCHAR(150) NULL`, `code VARCHAR(20) NULL`, `status BOOLEAN DEFAULT TRUE`
+
+|
+|
+
+`taluks`
+
+|
+
+`id PK`, `district_id FK → districts.id`, `name_en VARCHAR(100)`, `name_kn VARCHAR(150) NULL`, `code VARCHAR(20) NULL`, `status BOOLEAN DEFAULT TRUE`
+
+|
+|
+
+`postal_codes`
+
+|
+
+`id PK`, `pincode CHAR(6)`, `post_office_name VARCHAR(150) NULL`, `state_id FK → states.id`, `district_id FK → districts.id`, `taluk_id FK → taluks.id NULL`, `status BOOLEAN DEFAULT TRUE`
+
+|
+|
+
+`membership_types`
+
+|
+
+`id PK`, `code VARCHAR(30) UQ`, `name_en VARCHAR(100)`, `name_kn VARCHAR(150) NULL`, `description TEXT NULL`, `status BOOLEAN DEFAULT TRUE`
+
+|
+|
+
+`membership_type_prices`
+
+|
+
+`id PK`, `membership_type_id FK`, `amount NUMERIC(12,2)`, `currency CHAR(3) DEFAULT 'INR'`, `effective_from DATE`, `effective_to DATE NULL`, `change_reason TEXT NULL`
+
+|
+|
+
+`hms_settings`
+
+|
+
+`id PK`, `setting_key VARCHAR(150) UQ`, `setting_value JSONB`, `data_type VARCHAR(30)`, `description TEXT NULL`
+
+|
+|
+
+`document_types`
+
+|
+
+`id PK`, `code VARCHAR(50) UQ`, `name_en VARCHAR(100)`, `name_kn VARCHAR(150) NULL`, `is_required BOOLEAN DEFAULT FALSE`, `status BOOLEAN DEFAULT TRUE`
+
+|
+|
+
+`service_types`
+
+|
+
+`id PK`, `code VARCHAR(50) UQ`, `name_en VARCHAR(100)`, `name_kn VARCHAR(150) NULL`, `description TEXT NULL`, `status BOOLEAN DEFAULT TRUE`
+
+|
+
+## 4. Users, roles and privileges
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`users`
+
+|
+
+`id PK`, `name VARCHAR(150)`, `username VARCHAR(100) UQ`, `email VARCHAR(191) NULL`, `mobile VARCHAR(20) NULL`, `password_hash VARCHAR(255)`, `user_type VARCHAR(30)`, `member_id FK → members.id NULL`, `status BOOLEAN DEFAULT TRUE`, `last_login_at TIMESTAMPTZ NULL`
+
+|
+|
+
+`roles`
+
+|
+
+`id PK`, `name VARCHAR(100)`, `code VARCHAR(50) UQ`, `description TEXT NULL`, `status BOOLEAN DEFAULT TRUE`
+
+|
+|
+
+`permissions`
+
+|
+
+`id PK`, `module VARCHAR(80)`, `name VARCHAR(100)`, `code VARCHAR(120) UQ`, `description TEXT NULL`
+
+|
+|
+
+`role_permissions`
+
+|
+
+`id PK`, `role_id FK → roles.id`, `permission_id FK → permissions.id`, `UNIQUE(role_id, permission_id)`
+
+|
+|
+
+`user_roles`
+
+|
+
+`id PK`, `user_id FK → users.id`, `role_id FK → roles.id`, `assigned_by FK → users.id NULL`, `assigned_at TIMESTAMPTZ`, `UNIQUE(user_id, role_id)`
+
+|
+
+## 5. Membership
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`members`
+
+|
+
+`id PK`, `member_code VARCHAR(30) UQ NULL`, `first_name_en VARCHAR(100)`, `middle_name_en VARCHAR(100) NULL`, `last_name_en VARCHAR(100) NULL`, `full_name_kn VARCHAR(250) NULL`, `gender VARCHAR(20) NULL`, `date_of_birth DATE NULL`, `mobile VARCHAR(20) NULL`, `alternate_mobile VARCHAR(20) NULL`, `email VARCHAR(191) NULL`, `address_line1 VARCHAR(255) NULL`, `address_line2 VARCHAR(255) NULL`, `locality VARCHAR(150) NULL`, `pincode_id FK NULL`, `state_id FK NULL`, `district_id FK NULL`, `taluk_id FK NULL`, `photo_path TEXT NULL`, `registration_source VARCHAR(20)`, `registration_status VARCHAR(20)`, `approval_status VARCHAR(20)`, `member_status VARCHAR(20)`, `approved_by FK → users.id NULL`, `approved_at TIMESTAMPTZ NULL`
+
+|
+|
+
+`member_memberships`
+
+|
+
+`id PK`, `member_id FK`, `membership_type_id FK`, `price_id FK → membership_type_prices.id NULL`, `membership_number VARCHAR(30) UQ NULL`, `applied_at TIMESTAMPTZ`, `activated_at TIMESTAMPTZ NULL`, `expires_at TIMESTAMPTZ NULL`, `status VARCHAR(20)`
+
+|
+|
+
+`member_documents`
+
+|
+
+`id PK`, `member_id FK`, `document_type_id FK`, `file_path TEXT`, `original_filename VARCHAR(255)`, `mime_type VARCHAR(100) NULL`, `file_size BIGINT NULL`, `verification_status VARCHAR(20)`, `verified_by FK → users.id NULL`, `verified_at TIMESTAMPTZ NULL`
+
+|
+|
+
+`member_approval_history`
+
+|
+
+`id PK`, `member_id FK`, `action VARCHAR(30)`, `old_status VARCHAR(30) NULL`, `new_status VARCHAR(30)`, `reason TEXT NULL`, `acted_by FK → users.id NULL`, `acted_at TIMESTAMPTZ`
+
+|
+|
+
+`member_profile_change_requests`
+
+|
+
+`id PK`, `member_id FK`, `requested_by FK → users.id NULL`, `source VARCHAR(20)`, `old_values JSONB`, `new_values JSONB`, `status VARCHAR(20)`, `reviewed_by FK → users.id NULL`, `reviewed_at TIMESTAMPTZ NULL`, `review_note TEXT NULL`
+
+|
+|
+
+`member_profile_history`
+
+|
+
+`id PK`, `member_id FK`, `field_name VARCHAR(100)`, `old_value TEXT NULL`, `new_value TEXT NULL`, `change_request_id FK → member_profile_change_requests.id NULL`, `changed_by FK → users.id NULL`, `changed_at TIMESTAMPTZ`
+
+|
+|
+
+`membership_type_change_requests`
+
+|
+
+`id PK`, `member_id FK`, `current_membership_id FK → member_memberships.id`, `requested_type_id FK → membership_types.id`, `requested_price_id FK → membership_type_prices.id NULL`, `reason TEXT NULL`, `status VARCHAR(20)`, `reviewed_by FK → users.id NULL`, `reviewed_at TIMESTAMPTZ NULL`, `review_note TEXT NULL`
+
+|
+|
+
+`membership_type_history`
+
+|
+
+`id PK`, `member_id FK`, `membership_id FK → member_memberships.id`, `old_type_id FK → membership_types.id NULL`, `new_type_id FK → membership_types.id`, `old_price NUMERIC(12,2) NULL`, `new_price NUMERIC(12,2)`, `receipt_id FK → receipts.id NULL`, `changed_by FK → users.id NULL`, `changed_at TIMESTAMPTZ`, `reason TEXT NULL`
+
+|
+|
+
+`member_deletion_requests`
+
+|
+
+`id PK`, `member_id FK`, `requested_by FK → users.id`, `reason TEXT`, `deletion_type VARCHAR(20)`, `status VARCHAR(20)`, `reviewed_by FK → users.id NULL`, `reviewed_at TIMESTAMPTZ NULL`, `review_note TEXT NULL`, `executed_at TIMESTAMPTZ NULL`
+
+|
+|
+
+`member_kyc_requests`
+
+|
+
+`id PK`, `member_id FK`, `token_hash VARCHAR(255) UQ`, `sent_to VARCHAR(255)`, `sent_at TIMESTAMPTZ`, `expires_at TIMESTAMPTZ`, `submitted_at TIMESTAMPTZ NULL`, `status VARCHAR(20)`
+
+|
+
+
+## 6. Receipts and payments
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`receipts`
+
+|
+
+`id PK`, `receipt_number VARCHAR(50) UQ`, `receipt_date DATE`, `receipt_type VARCHAR(30)`, `payer_name VARCHAR(200) NULL`, `payment_mode VARCHAR(30)`, `transaction_reference VARCHAR(150) NULL`, `gross_amount NUMERIC(12,2)`, `discount_amount NUMERIC(12,2) DEFAULT 0`, `net_amount NUMERIC(12,2)`, `payment_status VARCHAR(20)`, `source VARCHAR(20)`, `notes TEXT NULL`, `cancelled_at TIMESTAMPTZ NULL`, `cancelled_by FK → users.id NULL`, `cancellation_reason TEXT NULL`
+
+|
+|
+
+`receipt_items`
+
+|
+
+`id PK`, `receipt_id FK`, `item_description VARCHAR(255)`, `quantity NUMERIC(10,2) DEFAULT 1`, `unit_price NUMERIC(12,2)`, `discount_amount NUMERIC(12,2) DEFAULT 0`, `line_total NUMERIC(12,2)`
+
+|
+|
+
+`receipt_allocations`
+
+|
+
+`id PK`, `receipt_id FK`, `member_id FK`, `membership_id FK → member_memberships.id NULL`, `allocation_type VARCHAR(30)`, `allocated_amount NUMERIC(12,2)`
+
+|
+|
+
+`payment_transactions`
+
+|
+
+`id PK`, `receipt_id FK`, `provider VARCHAR(50) NULL`, `provider_reference VARCHAR(150) NULL`, `amount NUMERIC(12,2)`, `status VARCHAR(20)`, `response_payload JSONB NULL`, `paid_at TIMESTAMPTZ NULL`
+
+|
+|
+
+`receipt_cancellations`
+
+|
+
+`id PK`, `receipt_id FK`, `reason TEXT`, `cancelled_by FK → users.id`, `cancelled_at TIMESTAMPTZ`, `reversal_reference VARCHAR(150) NULL`
+
+|
+|
+
+`refund_transactions`
+
+|
+
+`id PK`, `receipt_id FK`, `payment_transaction_id FK → payment_transactions.id NULL`, `amount NUMERIC(12,2)`, `reason TEXT`, `status VARCHAR(20)`, `provider_reference VARCHAR(150) NULL`, `refunded_at TIMESTAMPTZ NULL`, `processed_by FK → users.id NULL`
+
+|
+
+## 7. Magazine delivery and labels
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`magazine_subscriptions`
+
+|
+
+`id PK`, `member_id FK`, `service_type_id FK → service_types.id NULL`, `delivery_enabled BOOLEAN DEFAULT TRUE`, `start_date DATE`, `end_date DATE NULL`, `delivery_address JSONB NULL`, `status VARCHAR(20)`
+
+|
+|
+
+`magazine_delivery_pauses`
+
+|
+
+`id PK`, `subscription_id FK → magazine_subscriptions.id`, `pause_from DATE`, `pause_to DATE NULL`, `reason TEXT`, `status VARCHAR(20)`, `requested_by FK → users.id NULL`, `approved_by FK → users.id NULL`, `approved_at TIMESTAMPTZ NULL`, `resumed_at TIMESTAMPTZ NULL`
+
+|
+|
+
+`magazine_returns`
+
+|
+
+`id PK`, `subscription_id FK`, `member_id FK`, `issue_reference VARCHAR(100) NULL`, `return_date DATE`, `reason TEXT NULL`, `notes TEXT NULL`, `recorded_by FK → users.id NULL`
+
+|
+|
+
+`magazine_delivery_batches`
+
+|
+
+`id PK`, `batch_number VARCHAR(50) UQ`, `issue_reference VARCHAR(100)`, `batch_date DATE`, `status VARCHAR(20)`, `notes TEXT NULL`
+
+|
+|
+
+`magazine_label_batches`
+
+|
+
+`id PK`, `batch_number VARCHAR(50) UQ`, `issue_reference VARCHAR(100)`, `filters JSONB`, `language VARCHAR(10)`, `generated_at TIMESTAMPTZ NULL`, `status VARCHAR(20)`, `file_path TEXT NULL`
+
+|
+|
+
+`magazine_label_batch_items`
+
+|
+
+`id PK`, `label_batch_id FK → magazine_label_batches.id`, `recipient_type VARCHAR(30)`, `recipient_id BIGINT`, `display_name VARCHAR(255)`, `postal_address JSONB`, `return_flag BOOLEAN DEFAULT FALSE`, `sort_order INTEGER`
+
+|
+
+For `magazine_label_batch_items`, `recipient_id` is polymorphic: it refers to the relevant recipient table according to `recipient_type`. PostgreSQL cannot enforce a normal foreign key across multiple possible tables. For stronger referential integrity, consider a shared recipient registry.
+
+## 8. Reports
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`saved_reports`
+
+|
+
+`id PK`, `report_code VARCHAR(100)`, `report_name VARCHAR(200)`, `filters JSONB`, `selected_fields JSONB`, `language VARCHAR(10)`, `is_shared BOOLEAN DEFAULT FALSE`
+
+|
+|
+
+`report_export_logs`
+
+|
+
+`id PK`, `report_code VARCHAR(100)`, `filters JSONB`, `file_path TEXT NULL`, `export_format VARCHAR(20)`, `status VARCHAR(20)`, `generated_at TIMESTAMPTZ NULL`, `error_message TEXT NULL`
+
+|
+
+## 9. WhatsApp notifications
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`notification_templates`
+
+|
+
+`id PK`, `code VARCHAR(100) UQ`, `name VARCHAR(150)`, `channel VARCHAR(30)`, `language VARCHAR(10)`, `provider_template_id VARCHAR(150) NULL`, `body TEXT`, `variables JSONB NULL`, `status VARCHAR(20)`
+
+|
+|
+
+`notification_campaigns`
+
+|
+
+`id PK`, `campaign_name VARCHAR(200)`, `template_id FK → notification_templates.id`, `recipient_filters JSONB NULL`, `campaign_type VARCHAR(20)`, `scheduled_at TIMESTAMPTZ NULL`, `status VARCHAR(20)`, `started_at TIMESTAMPTZ NULL`, `completed_at TIMESTAMPTZ NULL`
+
+|
+|
+
+`notification_recipients`
+
+|
+
+`id PK`, `campaign_id FK → notification_campaigns.id`, `member_id FK → members.id NULL`, `recipient_name VARCHAR(200) NULL`, `mobile_number VARCHAR(20)`, `status VARCHAR(20)`, `error_message TEXT NULL`
+
+|
+|
+
+`notification_messages`
+
+|
+
+`id PK`, `recipient_id FK → notification_recipients.id`, `template_id FK → notification_templates.id`, `message_body TEXT`, `provider_message_id VARCHAR(150) NULL`, `attempt_count INTEGER DEFAULT 0`, `status VARCHAR(20)`, `sent_at TIMESTAMPTZ NULL`
+
+|
+|
+
+`notification_delivery_logs`
+
+|
+
+`id PK`, `message_id FK → notification_messages.id`, `provider_status VARCHAR(50)`, `provider_event_id VARCHAR(150) NULL`, `event_payload JSONB NULL`, `event_at TIMESTAMPTZ`
+
+|
+|
+
+`notification_import_batches`
+
+|
+
+`id PK`, `file_path TEXT`, `original_filename VARCHAR(255)`, `total_rows INTEGER DEFAULT 0`, `valid_rows INTEGER DEFAULT 0`, `invalid_rows INTEGER DEFAULT 0`, `status VARCHAR(20)`, `validation_errors JSONB NULL`
+
+|
+
+
+## 10. Activity management
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`user_activity_logs`
+
+|
+
+`id PK`, `user_id FK → users.id NULL`, `action VARCHAR(100)`, `module VARCHAR(80)`, `entity_type VARCHAR(100) NULL`, `entity_id BIGINT NULL`, `description TEXT NULL`, `old_values JSONB NULL`, `new_values JSONB NULL`, `ip_address INET NULL`, `user_agent TEXT NULL`, `occurred_at TIMESTAMPTZ`
+
+|
+|
+
+`member_activity_logs`
+
+|
+
+`id PK`, `member_id FK → members.id`, `activity_type VARCHAR(100)`, `description TEXT NULL`, `entity_type VARCHAR(100) NULL`, `entity_id BIGINT NULL`, `metadata JSONB NULL`, `performed_by FK → users.id NULL`, `occurred_at TIMESTAMPTZ`
+
+|
+
+## 11. Events
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`events`
+
+|
+
+`id PK`, `event_code VARCHAR(50) UQ NULL`, `title_en VARCHAR(200)`, `title_kn VARCHAR(250) NULL`, `description TEXT NULL`, `start_at TIMESTAMPTZ`, `end_at TIMESTAMPTZ NULL`, `venue VARCHAR(255) NULL`, `location JSONB NULL`, `status VARCHAR(20)`, `invitation_file_path TEXT NULL`, `notification_enabled BOOLEAN DEFAULT FALSE`
+
+|
+|
+
+`event_participants`
+
+|
+
+`id PK`, `event_id FK → events.id`, `name VARCHAR(200)`, `designation VARCHAR(200) NULL`, `participant_role VARCHAR(50)`, `organization VARCHAR(200) NULL`, `display_order INTEGER DEFAULT 0`
+
+|
+|
+
+`event_member_links`
+
+|
+
+`id PK`, `event_id FK → events.id`, `participant_id FK → event_participants.id`, `member_id FK → members.id`, `UNIQUE(event_id, participant_id, member_id)`
+
+|
+|
+
+`event_attachments`
+
+|
+
+`id PK`, `event_id FK → events.id`, `file_path TEXT`, `original_filename VARCHAR(255)`, `mime_type VARCHAR(100) NULL`, `attachment_type VARCHAR(50) NULL`, `description TEXT NULL`
+
+|
+
+## 12. Affiliations
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`affiliations`
+
+|
+
+`id PK`, `name VARCHAR(200)`, `name_kn VARCHAR(250) NULL`, `registration_number VARCHAR(100) NULL`, `address JSONB NULL`, `email VARCHAR(191) NULL`, `mobile VARCHAR(20) NULL`, `status VARCHAR(20)`, `magazine_enabled BOOLEAN DEFAULT FALSE`
+
+|
+|
+
+`affiliation_contacts`
+
+|
+
+`id PK`, `affiliation_id FK → affiliations.id`, `name VARCHAR(200)`, `designation VARCHAR(150) NULL`, `mobile VARCHAR(20) NULL`, `email VARCHAR(191) NULL`, `is_primary BOOLEAN DEFAULT FALSE`
+
+|
+|
+
+`affiliation_magazine_settings`
+
+|
+
+`id PK`, `affiliation_id FK → affiliations.id`, `delivery_enabled BOOLEAN DEFAULT FALSE`, `delivery_address JSONB NULL`, `effective_from DATE NULL`, `effective_to DATE NULL`, `notes TEXT NULL`
+
+|
+
+## 13. Associates
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`associates`
+
+|
+
+`id PK`, `name VARCHAR(200)`, `name_kn VARCHAR(250) NULL`, `mobile VARCHAR(20) NULL`, `alternate_mobile VARCHAR(20) NULL`, `email VARCHAR(191) NULL`, `address JSONB NULL`, `notes TEXT NULL`, `status VARCHAR(20)`, `magazine_enabled BOOLEAN DEFAULT FALSE`
+
+|
+|
+
+`associate_magazine_settings`
+
+|
+
+`id PK`, `associate_id FK → associates.id`, `delivery_enabled BOOLEAN DEFAULT FALSE`, `delivery_address JSONB NULL`, `effective_from DATE NULL`, `effective_to DATE NULL`, `notes TEXT NULL`
+
+|
+
+## 14. Press and media
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`press_media`
+
+|
+
+`id PK`, `organization_name VARCHAR(200)`, `contact_person VARCHAR(200) NULL`, `media_type VARCHAR(50)`, `mobile VARCHAR(20) NULL`, `email VARCHAR(191) NULL`, `address JSONB NULL`, `status VARCHAR(20)`, `magazine_enabled BOOLEAN DEFAULT FALSE`
+
+|
+|
+
+`press_media_magazine_settings`
+
+|
+
+`id PK`, `press_media_id FK → press_media.id`, `delivery_enabled BOOLEAN DEFAULT FALSE`, `delivery_address JSONB NULL`, `effective_from DATE NULL`, `effective_to DATE NULL`, `notes TEXT NULL`
+
+|
+
+
+## 15. Managing committee
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`committee_categories`
+
+|
+
+`id PK`, `code VARCHAR(50) UQ`, `name_en VARCHAR(200)`, `name_kn VARCHAR(250) NULL`, `description TEXT NULL`, `display_on_website BOOLEAN DEFAULT FALSE`, `display_order INTEGER DEFAULT 0`, `status BOOLEAN DEFAULT TRUE`
+
+|
+|
+
+`committee_subcategories`
+
+|
+
+`id PK`, `category_id FK → committee_categories.id`, `code VARCHAR(50) NULL`, `name_en VARCHAR(200)`, `name_kn VARCHAR(250) NULL`, `display_on_website BOOLEAN DEFAULT FALSE`, `display_order INTEGER DEFAULT 0`, `status BOOLEAN DEFAULT TRUE`
+
+|
+|
+
+`committee_members`
+
+|
+
+`id PK`, `category_id FK → committee_categories.id`, `subcategory_id FK → committee_subcategories.id NULL`, `member_id FK → members.id NULL`, `person_name VARCHAR(200)`, `designation_en VARCHAR(150)`, `designation_kn VARCHAR(200) NULL`, `mobile VARCHAR(20) NULL`, `email VARCHAR(191) NULL`, `term_id FK → committee_terms.id NULL`, `display_on_website BOOLEAN DEFAULT TRUE`, `display_order INTEGER DEFAULT 0`, `status VARCHAR(20)`
+
+|
+|
+
+`committee_member_links`
+
+|
+
+`id PK`, `committee_member_id FK → committee_members.id`, `member_id FK → members.id`, `UNIQUE(committee_member_id, member_id)`
+
+|
+|
+
+`committee_terms`
+
+|
+
+`id PK`, `term_name VARCHAR(150)`, `start_date DATE`, `end_date DATE NULL`, `is_current BOOLEAN DEFAULT FALSE`, `status BOOLEAN DEFAULT TRUE`
+
+|
+
+## 16. Supporting system tables
+
+|
+Table
+
+|
+
+Columns
+
+|
+| --- | --- |
+|
+
+`refresh_tokens`
+
+|
+
+`id PK`, `user_id FK → users.id`, `token_hash VARCHAR(255) UQ`, `expires_at TIMESTAMPTZ`, `revoked_at TIMESTAMPTZ NULL`, `device_info JSONB NULL`, `ip_address INET NULL`
+
+|
+|
+
+`password_reset_tokens`
+
+|
+
+`id PK`, `user_id FK → users.id`, `token_hash VARCHAR(255) UQ`, `expires_at TIMESTAMPTZ`, `used_at TIMESTAMPTZ NULL`, `request_ip INET NULL`
+
+|
+|
+
+`file_attachments`
+
+|
+
+`id PK`, `storage_disk VARCHAR(50)`, `file_path TEXT`, `original_filename VARCHAR(255)`, `mime_type VARCHAR(100) NULL`, `file_size BIGINT NULL`, `checksum VARCHAR(128) NULL`, `entity_type VARCHAR(100) NULL`, `entity_id BIGINT NULL`, `visibility VARCHAR(20)`
+
+|
+|
+
+`approval_workflows`
+
+|
+
+`id PK`, `workflow_code VARCHAR(100) UQ`, `workflow_name VARCHAR(200)`, `module VARCHAR(80)`, `configuration JSONB`, `status BOOLEAN DEFAULT TRUE`
+
+|
+|
+
+`approval_actions`
+
+|
+
+`id PK`, `workflow_id FK → approval_workflows.id NULL`, `request_type VARCHAR(100)`, `request_id BIGINT`, `stage INTEGER`, `action VARCHAR(30)`, `reviewer_id FK → users.id NULL`, `review_note TEXT NULL`, `acted_at TIMESTAMPTZ`
+
+|
+|
+
+`number_sequences`
+
+|
+
+`id PK`, `sequence_code VARCHAR(100) UQ`, `prefix VARCHAR(30) NULL`, `current_value BIGINT DEFAULT 0`, `padding_length INTEGER DEFAULT 0`, `reset_period VARCHAR(20) NULL`, `last_reset_at TIMESTAMPTZ NULL`
+
+|
+|
+
+`system_error_logs`
+
+|
+
+`id PK`, `severity VARCHAR(20)`, `error_code VARCHAR(100) NULL`, `message TEXT`, `context JSONB NULL`, `request_id VARCHAR(100) NULL`, `user_id FK → users.id NULL`, `occurred_at TIMESTAMPTZ`
+
+|
+
+
+# Part C — Important PostgreSQL design rules
+
+## 17. Constraints and relationships to finalize
+
+|
+Area
+
+|
+
+Recommended rule
+
+|
+| --- | --- |
+|
+
+Geographic masters
+
+|
+
+District belongs to one state; taluk belongs to one district
+
+|
+|
+
+Membership number
+
+|
+
+Assign only during the authorized activation process; enforce uniqueness
+
+|
+|
+
+Membership approval
+
+|
+
+Approval and activation should be separate actions if the business process requires them
+
+|
+|
+
+Membership price
+
+|
+
+Preserve historical prices and the price applicable to each transaction
+
+|
+|
+
+Receipt allocation
+
+|
+
+Allocated amounts must not exceed the receipt's net amount
+
+|
+|
+
+Membership upgrade
+
+|
+
+Record the old type, new type, applicable price and associated receipt
+
+|
+|
+
+Profile changes
+
+|
+
+Apply approved changes in a single transaction and record field-level history
+
+|
+|
+
+Deletion
+
+|
+
+Check pending requests, financial records and retention requirements before permanent deletion
+
+|
+|
+
+Magazine labels
+
+|
+
+Exclude paused or disabled subscriptions and retain a snapshot of each generated batch
+
+|
+|
+
+Notifications
+
+|
+
+Keep recipient-level status and provider delivery events
+
+|
+|
+
+Committee
+
+|
+
+Validate category/subcategory consistency and committee term dates
+
+|
+|
+
+Audit logs
+
+|
+
+Restrict modification and deletion; use append-only application permissions
+
+|
+
+## 18. Audit implementation rules
+
+One important PostgreSQL detail: if `created_by` references `users.id`, the `users` table has a self-referencing foreign key for its audit fields. This is supported, but migrations must create the users table before other tables that reference it.
+
+For activity logs, delivery logs, approval history and similar historical records, keep the common audit columns but enforce append-only behavior. A log entry's `created_at` and `created_by` describe when and by whom that log was recorded; its business event timestamp and actor fields describe the event itself.
+
+Final structure: 69 proposed tables, each with the common audit columns, with PostgreSQL foreign keys, constraints, and JSONB fields where appropriate. The next step is to turn this inventory into an ER diagram and ordered PostgreSQL migrations, resolving optional tables and business rules before implementation.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+You're right — I didn't present all 69 tables with their columns in one complete, consistent list. I split the schema across several sections, and that made it difficult to verify the table count.
+
+I'll correct that by giving you a numbered inventory of all 69 tables, with their business columns and the common audit columns applied to every table.
+
+
+## Verified count: 69 tables
+
+HMS MMA – PostgreSQL
+
+69 tables
+
+The count below matches the 13 module groups and supporting system tables in the proposed design.
+
+1–9 · Masters
+
+`states`, `districts`, `taluks`, `postal_codes`, `membership_types`, `membership_type_prices`, `hms_settings`, `document_types`, `service_types`
+
+10–14 · Users and privileges
+
+`users`, `roles`, `permissions`, `role_permissions`, `user_roles`
+
+15–24 · Membership
+
+`members`, `member_memberships`, `member_documents`, `member_approval_history`, `member_profile_change_requests`, `member_profile_history`, `membership_type_change_requests`, `membership_type_history`, `member_deletion_requests`, `member_kyc_requests`
+
+25–30 · Receipts and payments
+
+`receipts`, `receipt_items`, `receipt_allocations`, `payment_transactions`, `receipt_cancellations`, `refund_transactions`
+
+31–36 · Magazine and labels
+
+`magazine_subscriptions`, `magazine_delivery_pauses`, `magazine_returns`, `magazine_delivery_batches`, `magazine_label_batches`, `magazine_label_batch_items`
+
+37–38 · Reports
+
+`saved_reports`, `report_export_logs`
+
+39–44 · WhatsApp notifications
+
+`notification_templates`, `notification_campaigns`, `notification_recipients`, `notification_messages`, `notification_delivery_logs`, `notification_import_batches`
+
+45–46 · Activity management
+
+`user_activity_logs`, `member_activity_logs`
+
+47–50 · Events
+
+`events`, `event_participants`, `event_member_links`, `event_attachments`
+
+51–53 · Affiliations
+
+`affiliations`, `affiliation_contacts`, `affiliation_magazine_settings`
+
+54–55 · Associates
+
+`associates`, `associate_magazine_settings`
+
+56–57 · Press and media
+
+`press_media`, `press_media_magazine_settings`
+
+58–62 · Managing committee
+
+`committee_categories`, `committee_subcategories`, `committee_members`, `committee_member_links`, `committee_terms`
+
+63–69 · Supporting system
+
+`refresh_tokens`, `password_reset_tokens`, `file_attachments`, `approval_workflows`, `approval_actions`, `number_sequences`, `system_error_logs`
+
+Audit columns for all 69 tables: `created_at`, `created_by`, `updated_at`, `updated_by`, `deleted_at`, `deleted_by`, `is_deleted`.
+
+The 69-table count is verified against the proposed module breakdown. The earlier response did include the inventory, but the presentation was fragmented and some supporting definitions were less detailed than others.
+
+
+
+
+
+
+
+
+
+
+# HMS MMA – Complete Application Flow
+
+The HMS MMA (Havyaka MahaSabha Membership Management App) can be understood as a connected workflow: configure the system → register members → collect receipts → approve memberships → manage magazine delivery → handle services and events → send notifications → generate reports.
+
+The database migration provides the tables to support these modules. The flow below explains how the modules work together from a user’s point of view.
+
+
+## 1. Overall system flow
+
+## 1. Masters & System Setup
+
+Configure locations, membership types, prices, services, document types, roles and permissions.
+
+## 2. User & Access Management
+
+Create users, assign roles and control which modules each role can access.
+
+## 3. Member Registration
+
+Register members online or offline, validate duplicates, capture documents and create membership records.
+
+## 4. Receipt & Membership Approval
+
+Record payments, allocate receipts, review applications and approve memberships.
+
+## 5. Member Services & Operations
+
+Manage magazine delivery, labels, returns, KYC, profile changes, events, affiliations, associates, press and committee records.
+
+## 6. Notifications, Reports & Activity
+
+Send WhatsApp notifications, track user and member activity, and generate operational reports.
+
+## 2. Detailed module-by-module flow
+
+### Step 1 — Masters setup
+
+The administrator configures the data used throughout the application.
+
+1. Import or maintain Indian states, districts, taluks and postal codes.
+
+2. Map postal codes to their corresponding locations.
+
+3. Create membership types and configure their prices.
+
+4. Configure document types, service types and system settings.
+
+5. Create roles and permissions for administrators, staff and other users.
+
+Why this comes first: Registration forms and other modules depend on these master records.
+
+### Step 2 — User management
+
+1. Create a staff login.
+
+2. Assign one or more roles.
+
+3. Configure permissions for viewing, creating, editing, approving or deleting records.
+
+4. Record login/logout and relevant user actions in the activity log.
+
+For example, a staff member might be allowed to register members but not approve them. The application should enforce that distinction in the backend as well as the UI.
+
+### Step 3 — Member registration
+
+Registration workflow
+
+* Start registration
+
+  A member is registered online or by staff through the offline registration form.
+
+* Enter member details
+
+  Capture personal details, contact information, address, location, membership type and required documents. Support English and Kannada.
+
+* Validate the application
+
+  Check required fields and possible duplicate members before creating the record.
+
+* Create membership records
+
+  Store the person's information and the associated membership application or membership record.
+
+* Continue to receipt and approval
+
+  The application proceeds through the relevant payment and approval steps.
+
+### Step 4 — Receipt and payment flow
+
+The receipt module records payments and links them to members or other relevant transactions.
+
+1. Create an online or offline receipt.
+
+2. Record receipt items, payment information and applicable membership charges.
+
+3. Allocate the receipt to the relevant member or members.
+
+4. Maintain cancellation or refund records when applicable.
+
+5. Make receipt allocations available to reports and magazine label processing.
+
+Important distinction: A receipt records a financial transaction. Membership approval is a separate business action, so the system should not automatically treat payment as approval unless that is an explicitly configured rule.
+
+### Step 5 — Membership approval and number assignment
+
+## Approval process
+
+1. Authorized staff review the member's application and documents.
+
+2. They approve or reject the application, or return it for corrections.
+
+3. Record the decision, user, date and relevant remarks in the approval history.
+
+4. When the required approval conditions are met, assign the permanent membership number.
+
+5. Update the member's status and make the approved member available to the relevant operational modules.
+
+The application should preserve the distinction between a pending application and an approved member.
+
+### Step 6 — Member profile and ongoing changes
+
+After registration, the member profile becomes the central place for that member's information.
+
+It can bring together:
+
+* Personal and address details.
+
+* Membership type and membership history.
+
+* Receipt and payment information.
+
+* Documents and KYC records.
+
+* Magazine delivery status and returns.
+
+* Service usage and linked events.
+
+* Profile changes, approval history and activity timeline.
+
+For profile changes, a member or authorized staff member submits a change request. The request is reviewed, approved or rejected, and the profile history records the resulting change.
+
+For membership type changes, the system records the old and new types, maintains the change history, and links any required new receipt or payment.
+
+### Step 7 — KYC flow
+
+1. Create a KYC request for a member.
+
+2. Notify the member or responsible staff that documents or information are required.
+
+3. Collect and submit the requested information.
+
+4. Review the submission and approve it or request corrections.
+
+5. Retain the KYC request and its review history.
+
+KYC is an ongoing process, so it should be possible to create a new request when another verification cycle is required.
+
+### Step 8 — Magazine delivery and labels
+
+## Magazine delivery workflow
+
+1. Set up magazine delivery for eligible members, affiliations, associates or press/media records.
+
+2. Apply the delivery preferences, including start/stop settings and pauses.
+
+3. Prepare label batches using the selected district, taluk and eligible member criteria.
+
+4. Generate labels for the selected batch and track which records have been included.
+
+5. Record returned magazines and associate the return information with the relevant profile and delivery records.
+
+Example
+
+If a member's magazine delivery is paused, the pause record should include the relevant note and dates. That member should be handled according to the configured eligibility rules when the next label batch is prepared.
+
+### Step 9 — Events
+
+1. Create an event with its name, date, location and other details.
+
+2. Add guests, honorees and participating members.
+
+3. Upload invitations or supporting attachments.
+
+4. Link the event to relevant member profiles.
+
+5. Use event information as a source for notifications and event-related reporting.
+
+### Step 10 — Affiliations, associates, press/media and committee
+
+These are related operational modules, but they represent different kinds of records.
+
+|
+Module
+
+|
+
+Main workflow
+
+|
+| --- | --- |
+|
+
+Affiliations
+
+|
+
+Create an affiliate group, maintain its information and contacts, configure magazine delivery and prepare labels.
+
+|
+|
+
+Associates
+
+|
+
+Register non-member associates, maintain their details, configure delivery and prepare labels.
+
+|
+|
+
+Press & Media
+
+|
+
+Maintain press/media records, manage delivery preferences and prepare labels.
+
+|
+|
+
+Managing Committee
+
+|
+
+Configure categories and subcategories, add committee members, manage terms and control whether records appear on the website.
+
+|
+
+These records should link to their corresponding settings and relationships rather than being treated as ordinary member registrations.
+
+### Step 11 — WhatsApp notifications
+
+## Notification flow
+
+1. Configure approved message templates.
+
+2. Select recipients individually, through filters, or through a bulk recipient list.
+
+3. For imported phone numbers, upload a CSV and validate the records.
+
+4. Prepare the notification campaign and select the applicable template.
+
+5. Send the messages through the configured provider.
+
+6. Store recipient-level delivery information and message logs for tracking.
+
+For example, an approved member could receive an activation notification using the configured activation template. Individual custom messages and bulk notifications should follow the relevant template and provider requirements.
+
+### Step 12 — Reports and activity tracking
+
+Reports use data from the operational modules, including:
+
+* Unapproved members.
+
+* Approved member lists with configurable English/Kannada fields.
+
+* District, taluk, gender and membership-type reports.
+
+* Pending and generated magazine labels.
+
+* Magazine returns and delivery records.
+
+* Receipt-wise member lists and receipt reports.
+
+* Activity and event-related records.
+
+The activity area should provide two useful perspectives:
+
+* User activity: logins, logouts and relevant create, update and delete actions.
+
+* Member timeline: registration, approvals, service usage, profile changes and other significant member events.
+
+## 3. How the main records connect
+
+This is the conceptual relationship flow between the main parts of the system.
+
+Diagram options
+
+![](data\:image/svg+xml;utf8,%3Csvg%20id%3D%22mermaid-_r_171_%22%20width%3D%221570.49609375%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20class%3D%22flowchart%22%20height%3D%221012%22%20viewBox%3D%224%204.000003814697266%201570.49609375%201012%22%20role%3D%22graphics-document%20document%22%20aria-roledescription%3D%22flowchart-v2%22%3E%3Cstyle%3E%23mermaid-_r_171_%7Bfont-family%3A%22-apple-system%22%2C%22BlinkMacSystemFont%22%2C%22Segoe%20UI%22%2C%22Roboto%22%2C%22Oxygen%22%2C%22Ubuntu%22%2C%22Cantarell%22%2C%22Helvetica%20Neue%22%2C%22Arial%22%2C%22sans-serif%22%3Bfont-size%3A14px%3Bfill%3Argb\(255%2C%20255%2C%20255\)%3B%7D%40keyframes%20edge-animation-frame%7Bfrom%7Bstroke-dashoffset%3A0%3B%7D%7D%40keyframes%20dash%7Bto%7Bstroke-dashoffset%3A0%3B%7D%7D%23mermaid-_r_171_%20.edge-animation-slow%7Bstroke-dasharray%3A9%2C5!important%3Bstroke-dashoffset%3A900%3Banimation%3Adash%2050s%20linear%20infinite%3Bstroke-linecap%3Around%3B%7D%23mermaid-_r_171_%20.edge-animation-fast%7Bstroke-dasharray%3A9%2C5!important%3Bstroke-dashoffset%3A900%3Banimation%3Adash%2020s%20linear%20infinite%3Bstroke-linecap%3Around%3B%7D%23mermaid-_r_171_%20.error-icon%7Bfill%3Argb\(33%2C%2033%2C%2033\)%3B%7D%23mermaid-_r_171_%20.error-text%7Bfill%3Argb\(255%2C%20255%2C%20255\)%3Bstroke%3Argb\(255%2C%20255%2C%20255\)%3B%7D%23mermaid-_r_171_%20.edge-thickness-normal%7Bstroke-width%3A1px%3B%7D%23mermaid-_r_171_%20.edge-thickness-thick%7Bstroke-width%3A3.5px%3B%7D%23mermaid-_r_171_%20.edge-pattern-solid%7Bstroke-dasharray%3A0%3B%7D%23mermaid-_r_171_%20.edge-thickness-invisible%7Bstroke-width%3A0%3Bfill%3Anone%3B%7D%23mermaid-_r_171_%20.edge-pattern-dashed%7Bstroke-dasharray%3A3%3B%7D%23mermaid-_r_171_%20.edge-pattern-dotted%7Bstroke-dasharray%3A2%3B%7D%23mermaid-_r_171_%20.marker%7Bfill%3Argb\(205%2C%20205%2C%20205\)%3Bstroke%3Argb\(205%2C%20205%2C%20205\)%3B%7D%23mermaid-_r_171_%20.marker.cross%7Bstroke%3Argb\(205%2C%20205%2C%20205\)%3B%7D%23mermaid-_r_171_%20svg%7Bfont-family%3A%22-apple-system%22%2C%22BlinkMacSystemFont%22%2C%22Segoe%20UI%22%2C%22Roboto%22%2C%22Oxygen%22%2C%22Ubuntu%22%2C%22Cantarell%22%2C%22Helvetica%20Neue%22%2C%22Arial%22%2C%22sans-serif%22%3Bfont-size%3A14px%3B%7D%23mermaid-_r_171_%20p%7Bmargin%3A0%3B%7D%23mermaid-_r_171_%20.label%7Bfont-family%3A%22-apple-system%22%2C%22BlinkMacSystemFont%22%2C%22Segoe%20UI%22%2C%22Roboto%22%2C%22Oxygen%22%2C%22Ubuntu%22%2C%22Cantarell%22%2C%22Helvetica%20Neue%22%2C%22Arial%22%2C%22sans-serif%22%3Bcolor%3Argb\(255%2C%20255%2C%20255\)%3B%7D%23mermaid-_r_171_%20.cluster-label%20text%7Bfill%3Argb\(255%2C%20255%2C%20255\)%3B%7D%23mermaid-_r_171_%20.cluster-label%20span%7Bcolor%3Argb\(255%2C%20255%2C%20255\)%3B%7D%23mermaid-_r_171_%20.cluster-label%20span%20p%7Bbackground-color%3Atransparent%3B%7D%23mermaid-_r_171_%20.label%20text%2C%23mermaid-_r_171_%20span%7Bfill%3Argb\(255%2C%20255%2C%20255\)%3Bcolor%3Argb\(255%2C%20255%2C%20255\)%3B%7D%23mermaid-_r_171_%20.node%20rect%2C%23mermaid-_r_171_%20.node%20circle%2C%23mermaid-_r_171_%20.node%20ellipse%2C%23mermaid-_r_171_%20.node%20polygon%2C%23mermaid-_r_171_%20.node%20path%7Bfill%3Argb\(9%2C%2023%2C%2044\)%3Bstroke%3Argb\(31%2C%2078%2C%20148\)%3Bstroke-width%3A1px%3B%7D%23mermaid-_r_171_%20.rough-node%20.label%20text%2C%23mermaid-_r_171_%20.node%20.label%20text%2C%23mermaid-_r_171_%20.image-shape%20.label%2C%23mermaid-_r_171_%20.icon-shape%20.label%7Btext-anchor%3Amiddle%3B%7D%23mermaid-_r_171_%20.node%20.katex%20path%7Bfill%3A%23000%3Bstroke%3A%23000%3Bstroke-width%3A1px%3B%7D%23mermaid-_r_171_%20.rough-node%20.label%2C%23mermaid-_r_171_%20.node%20.label%2C%23mermaid-_r_171_%20.image-shape%20.label%2C%23mermaid-_r_171_%20.icon-shape%20.label%7Btext-align%3Acenter%3B%7D%23mermaid-_r_171_%20.node.clickable%7Bcursor%3Apointer%3B%7D%23mermaid-_r_171_%20.root%20.anchor%20path%7Bfill%3Argb\(205%2C%20205%2C%20205\)!important%3Bstroke-width%3A0%3Bstroke%3Argb\(205%2C%20205%2C%20205\)%3B%7D%23mermaid-_r_171_%20.arrowheadPath%7Bfill%3Argb\(205%2C%20205%2C%20205\)%3B%7D%23mermaid-_r_171_%20.edgePath%20.path%7Bstroke%3Argb\(205%2C%20205%2C%20205\)%3Bstroke-width%3A2.0px%3B%7D%23mermaid-_r_171_%20.flowchart-link%7Bstroke%3Argb\(205%2C%20205%2C%20205\)%3Bfill%3Anone%3B%7D%23mermaid-_r_171_%20.edgeLabel%7Bbackground-color%3Argb\(0%2C%200%2C%200\)%3Btext-align%3Acenter%3B%7D%23mermaid-_r_171_%20.edgeLabel%20p%7Bbackground-color%3Argb\(0%2C%200%2C%200\)%3B%7D%23mermaid-_r_171_%20.edgeLabel%20rect%7Bopacity%3A0.5%3Bbackground-color%3Argb\(0%2C%200%2C%200\)%3Bfill%3Argb\(0%2C%200%2C%200\)%3B%7D%23mermaid-_r_171_%20.labelBkg%7Bbackground-color%3Argba\(0%2C%200%2C%200%2C%200.5\)%3B%7D%23mermaid-_r_171_%20.cluster%20rect%7Bfill%3Argb\(33%2C%2033%2C%2033\)%3Bstroke%3Argba\(255%2C%20255%2C%20255%2C%200.05\)%3Bstroke-width%3A1px%3B%7D%23mermaid-_r_171_%20.cluster%20text%7Bfill%3Argb\(255%2C%20255%2C%20255\)%3B%7D%23mermaid-_r_171_%20.cluster%20span%7Bcolor%3Argb\(255%2C%20255%2C%20255\)%3B%7D%23mermaid-_r_171_%20div.mermaidTooltip%7Bposition%3Aabsolute%3Btext-align%3Acenter%3Bmax-width%3A200px%3Bpadding%3A2px%3Bfont-family%3A%22-apple-system%22%2C%22BlinkMacSystemFont%22%2C%22Segoe%20UI%22%2C%22Roboto%22%2C%22Oxygen%22%2C%22Ubuntu%22%2C%22Cantarell%22%2C%22Helvetica%20Neue%22%2C%22Arial%22%2C%22sans-serif%22%3Bfont-size%3A12px%3Bbackground%3Argb\(33%2C%2033%2C%2033\)%3Bborder%3A1px%20solid%20rgba\(255%2C%20255%2C%20255%2C%200.05\)%3Bborder-radius%3A2px%3Bpointer-events%3Anone%3Bz-index%3A100%3B%7D%23mermaid-_r_171_%20.flowchartTitleText%7Btext-anchor%3Amiddle%3Bfont-size%3A18px%3Bfill%3Argb\(255%2C%20255%2C%20255\)%3B%7D%23mermaid-_r_171_%20rect.text%7Bfill%3Anone%3Bstroke-width%3A0%3B%7D%23mermaid-_r_171_%20.icon-shape%2C%23mermaid-_r_171_%20.image-shape%7Bbackground-color%3Argb\(0%2C%200%2C%200\)%3Btext-align%3Acenter%3B%7D%23mermaid-_r_171_%20.icon-shape%20p%2C%23mermaid-_r_171_%20.image-shape%20p%7Bbackground-color%3Argb\(0%2C%200%2C%200\)%3Bpadding%3A2px%3B%7D%23mermaid-_r_171_%20.icon-shape%20rect%2C%23mermaid-_r_171_%20.image-shape%20rect%7Bopacity%3A0.5%3Bbackground-color%3Argb\(0%2C%200%2C%200\)%3Bfill%3Argb\(0%2C%200%2C%200\)%3B%7D%23mermaid-_r_171_%20.label-icon%7Bdisplay%3Ainline-block%3Bheight%3A1em%3Boverflow%3Avisible%3Bvertical-align%3A-0.125em%3B%7D%23mermaid-_r_171_%20.node%20.label-icon%20path%7Bfill%3AcurrentColor%3Bstroke%3Arevert%3Bstroke-width%3Arevert%3B%7D%23mermaid-_r_171_%20.node%20text%7Bfont-size%3A16px%3Bfont-weight%3A600%3Bletter-spacing%3A-0.32px%3Bfill%3A%2399ceff%3B%7D%23mermaid-_r_171_%20.edgeLabels%20text%7Bfont-size%3A13px%3Bfont-weight%3A600%3Bletter-spacing%3A-0.08px%3Bfill%3A%2399ceff%3B%7D%23mermaid-_r_171_%20.node%20tspan%5Bfont-weight%3D%22normal%22%5D%2C%23mermaid-_r_171_%20.edgeLabels%20tspan%5Bfont-weight%3D%22normal%22%5D%7Bfont-weight%3A600%3B%7D%23mermaid-_r_171_%20.edgeLabel%20.label%20rect%7Bopacity%3A1%3Brx%3A13px%3Bry%3A13px%3Bfill%3A%23000e1a%3Bstroke%3Argb\(26%2C%2062%2C%2095\)%3Bstroke-width%3A1px%3B%7D%23mermaid-_r_171_%20.node%20rect%2C%23mermaid-_r_171_%20.node%20circle%2C%23mermaid-_r_171_%20.node%20ellipse%2C%23mermaid-_r_171_%20.node%20polygon%2C%23mermaid-_r_171_%20.node%20path%7Bfill%3Argb\(0%2C%2040%2C%2077\)%3Bstroke%3Argba\(255%2C%20255%2C%20255%2C%200.1\)%3Bstroke-width%3A1px%3B%7D%23mermaid-_r_171_%20.node%20rect%7Brx%3A16px%3Bry%3A16px%3B%7D%23mermaid-_r_171_%20.node.mermaid-decision%20.label-container%7Bfill%3A%23000e1a%3Bstroke%3Argb\(26%2C%2062%2C%2095\)%3Bstroke-dasharray%3A2%202%3B%7D%23mermaid-_r_171_%20.edgePaths%20.flowchart-link%7Bstroke%3Argb\(26%2C%2062%2C%2095\)%3Bstroke-width%3A1px%3Bstroke-linecap%3Around%3Bstroke-linejoin%3Around%3B%7D%23mermaid-_r_171_%20.marker%7Bfill%3Argb\(26%2C%2062%2C%2095\)%3Bstroke%3Argb\(26%2C%2062%2C%2095\)%3B%7D%23mermaid-_r_171_%20.node%7Bcolor-scheme%3Adark%3B%7D%23mermaid-_r_171_%20%3Aroot%7B--mermaid-font-family%3A%22-apple-system%22%2C%22BlinkMacSystemFont%22%2C%22Segoe%20UI%22%2C%22Roboto%22%2C%22Oxygen%22%2C%22Ubuntu%22%2C%22Cantarell%22%2C%22Helvetica%20Neue%22%2C%22Arial%22%2C%22sans-serif%22%3B%7D%3C%2Fstyle%3E%3Cg%3E%3Cmarker%20id%3D%22mermaid-_r_171__flowchart-v2-pointEnd%22%20class%3D%22marker%20flowchart-v2%22%20viewBox%3D%22-5%20-5%2010%2010%22%20refX%3D%220%22%20refY%3D%220%22%20markerUnits%3D%22userSpaceOnUse%22%20markerWidth%3D%2210%22%20markerHeight%3D%2210%22%20orient%3D%22auto%22%3E%3Cpath%20d%3D%22M%200%200%20L%204%200%20M%200.8180194846605362%20-3.181980515339464%20L%204%200%20L%200.8180194846605362%203.181980515339464%22%20class%3D%22arrowMarkerPath%22%20style%3D%22stroke-width%3A%201%3B%20stroke-dasharray%3A%20none%3B%20fill%3A%20none%3B%20stroke-linecap%3A%20round%3B%20stroke-linejoin%3A%20round%3B%22%3E%3C%2Fpath%3E%3C%2Fmarker%3E%3Cmarker%20id%3D%22mermaid-_r_171__flowchart-v2-pointStart%22%20class%3D%22marker%20flowchart-v2%22%20viewBox%3D%22-5%20-5%2010%2010%22%20refX%3D%220%22%20refY%3D%220%22%20markerUnits%3D%22userSpaceOnUse%22%20markerWidth%3D%2210%22%20markerHeight%3D%2210%22%20orient%3D%22auto%22%3E%3Cpath%20d%3D%22M%200%200%20L%20-4%200%20M%20-0.8180194846605362%20-3.181980515339464%20L%20-4%200%20L%20-0.8180194846605362%203.181980515339464%22%20class%3D%22arrowMarkerPath%22%20style%3D%22stroke-width%3A%201%3B%20stroke-dasharray%3A%20none%3B%20fill%3A%20none%3B%20stroke-linecap%3A%20round%3B%20stroke-linejoin%3A%20round%3B%22%3E%3C%2Fpath%3E%3C%2Fmarker%3E%3Cmarker%20id%3D%22mermaid-_r_171__flowchart-v2-circleEnd%22%20class%3D%22marker%20flowchart-v2%22%20viewBox%3D%220%200%2010%2010%22%20refX%3D%2211%22%20refY%3D%225%22%20markerUnits%3D%22userSpaceOnUse%22%20markerWidth%3D%2211%22%20markerHeight%3D%2211%22%20orient%3D%22auto%22%3E%3Ccircle%20cx%3D%225%22%20cy%3D%225%22%20r%3D%225%22%20class%3D%22arrowMarkerPath%22%20style%3D%22stroke-width%3A%201%3B%20stroke-dasharray%3A%201%2C%200%3B%22%3E%3C%2Fcircle%3E%3C%2Fmarker%3E%3Cmarker%20id%3D%22mermaid-_r_171__flowchart-v2-circleStart%22%20class%3D%22marker%20flowchart-v2%22%20viewBox%3D%220%200%2010%2010%22%20refX%3D%22-1%22%20refY%3D%225%22%20markerUnits%3D%22userSpaceOnUse%22%20markerWidth%3D%2211%22%20markerHeight%3D%2211%22%20orient%3D%22auto%22%3E%3Ccircle%20cx%3D%225%22%20cy%3D%225%22%20r%3D%225%22%20class%3D%22arrowMarkerPath%22%20style%3D%22stroke-width%3A%201%3B%20stroke-dasharray%3A%201%2C%200%3B%22%3E%3C%2Fcircle%3E%3C%2Fmarker%3E%3Cmarker%20id%3D%22mermaid-_r_171__flowchart-v2-crossEnd%22%20class%3D%22marker%20cross%20flowchart-v2%22%20viewBox%3D%220%200%2011%2011%22%20refX%3D%2212%22%20refY%3D%225.2%22%20markerUnits%3D%22userSpaceOnUse%22%20markerWidth%3D%2211%22%20markerHeight%3D%2211%22%20orient%3D%22auto%22%3E%3Cpath%20d%3D%22M%201%2C1%20l%209%2C9%20M%2010%2C1%20l%20-9%2C9%22%20class%3D%22arrowMarkerPath%22%20style%3D%22stroke-width%3A%202%3B%20stroke-dasharray%3A%201%2C%200%3B%22%3E%3C%2Fpath%3E%3C%2Fmarker%3E%3Cmarker%20id%3D%22mermaid-_r_171__flowchart-v2-crossStart%22%20class%3D%22marker%20cross%20flowchart-v2%22%20viewBox%3D%220%200%2011%2011%22%20refX%3D%22-1%22%20refY%3D%225.2%22%20markerUnits%3D%22userSpaceOnUse%22%20markerWidth%3D%2211%22%20markerHeight%3D%2211%22%20orient%3D%22auto%22%3E%3Cpath%20d%3D%22M%201%2C1%20l%209%2C9%20M%2010%2C1%20l%20-9%2C9%22%20class%3D%22arrowMarkerPath%22%20style%3D%22stroke-width%3A%202%3B%20stroke-dasharray%3A%201%2C%200%3B%22%3E%3C%2Fpath%3E%3C%2Fmarker%3E%3C%2Fg%3E%3Cg%20class%3D%22subgraphs%22%3E%3C%2Fg%3E%3Cg%20class%3D%22nodes%22%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-A-0%22%20transform%3D%22translate\(439.1589558919271%2C%2047.599998474121094\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-125.70625305175781%22%20y%3D%22-35.599998474121094%22%20width%3D%22251.41250610351562%22%20height%3D%2271.19999694824219%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-19.599998474121094\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EMasters%3A%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Locations%2C%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Types%2C%3C%2Ftspan%3E%3C%2Ftspan%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%221em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EPrices%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-B-1%22%20transform%3D%22translate\(402.5714569091797%2C%20153.1999969482422\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-109.76250457763672%22%20y%3D%22-30%22%20width%3D%22219.52500915527344%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EMember%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Registration%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-U-2%22%20transform%3D%22translate\(151.08689626057944%2C%2053.19999694824219\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-122.36581420898438%22%20y%3D%22-30%22%20width%3D%22244.73162841796875%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EUsers%2C%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Roles%2C%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Permissions%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-C-5%22%20transform%3D%22translate\(402.5714569091797%2C%20253.1999969482422\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-66.2007942199707%22%20y%3D%22-30%22%20width%3D%22132.4015884399414%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EMember%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-D-7%22%20transform%3D%22translate\(875.3216974894206%2C%20378.7999954223633\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-127.70797729492188%22%20y%3D%22-35.599998474121094%22%20width%3D%22255.41595458984375%22%20height%3D%2271.19999694824219%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-19.599998474121094\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EMembership%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Application%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20%2F%3C%2Ftspan%3E%3C%2Ftspan%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%221em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EMembership%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-E-9%22%20transform%3D%22translate\(389.331298828125%2C%20489.99999237060547\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-120.96190643310547%22%20y%3D%22-30%22%20width%3D%22241.92381286621094%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EReceipts%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20and%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Allocations%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-F-11%22%20transform%3D%22translate\(875.3216974894206%2C%20489.99999237060547\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-129.6258087158203%22%20y%3D%22-35.599998474121094%22%20width%3D%22259.2516174316406%22%20height%3D%2271.19999694824219%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-19.599998474121094\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EApproval%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20and%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Membership%3C%2Ftspan%3E%3C%2Ftspan%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%221em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3ENumber%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-G-13%22%20transform%3D%22translate\(875.3216974894206%2C%20604.5599884033203\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-127.34017944335938%22%20y%3D%22-30%22%20width%3D%22254.68035888671875%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EApproved%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Member%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Profile%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-H-15%22%20transform%3D%22translate\(1115.6505991617837%2C%20726.7999877929688\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-121.56830596923828%22%20y%3D%22-30%22%20width%3D%22243.13661193847656%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EKYC%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20and%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Profile%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Changes%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-I-17%22%20transform%3D%22translate\(1392.7064158121743%2C%20730.5333201090494\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-115.48750305175781%22%20y%3D%22-30%22%20width%3D%22230.97500610351562%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EMagazine%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Subscription%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-J-19%22%20transform%3D%22translate\(1392.7064158121743%2C%20837.9999847412109\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-132.6665802001953%22%20y%3D%22-30%22%20width%3D%22265.3331604003906%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EDelivery%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Batches%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20and%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Labels%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-K-21%22%20transform%3D%22translate\(1436.9286092122395%2C%20977.9999847412109\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-98.89876937866211%22%20y%3D%22-30%22%20width%3D%22197.79753875732422%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EMagazine%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Returns%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-L-23%22%20transform%3D%22translate\(849.8536631266276%2C%20726.7999877929688\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-104.22862243652344%22%20y%3D%22-30%22%20width%3D%22208.45724487304688%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EEvents%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20and%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Services%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-M-24%22%20transform%3D%22translate\(1431.2022501627603%2C%20601.1999893188477\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-115.29374694824219%22%20y%3D%22-35.599998474121094%22%20width%3D%22230.58749389648438%22%20height%3D%2271.19999694824219%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-19.599998474121094\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EAffiliations%2C%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Associates%2C%3C%2Ftspan%3E%3C%2Ftspan%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%221em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EPress%2FMedia%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-N-26%22%20transform%3D%22translate\(539.9500427246094%2C%20601.1999893188477\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-129.6187515258789%22%20y%3D%22-35.599998474121094%22%20width%3D%22259.2375030517578%22%20height%3D%2271.19999694824219%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-19.599998474121094\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3ENotification%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Templates%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20and%3C%2Ftspan%3E%3C%2Ftspan%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%221em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3ECampaigns%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-O-27%22%20transform%3D%22translate\(581.368792215983%2C%20732.3999862670898\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-124.2562484741211%22%20y%3D%22-35.599998474121094%22%20width%3D%22248.5124969482422%22%20height%3D%2271.19999694824219%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-19.599998474121094\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EWhatsApp%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Messages%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20and%3C%2Ftspan%3E%3C%2Ftspan%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%221em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3ELogs%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-P-30%22%20transform%3D%22translate\(517.4675674438477%2C%20837.9999847412109\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-107.13626861572266%22%20y%3D%22-30%22%20width%3D%22214.2725372314453%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EOperational%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Records%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-Q-31%22%20transform%3D%22translate\(427.3348388671875%2C%20977.9999847412109\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-63.3392333984375%22%20y%3D%22-30%22%20width%3D%22126.678466796875%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EReports%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-R-39%22%20transform%3D%22translate\(110.29829406738281%2C%20153.1999969482422\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-98.29829406738281%22%20y%3D%22-30%22%20width%3D%22196.59658813476562%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EUser%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Activity%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Logs%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22node%20default%22%20id%3D%22flowchart-S-41%22%20transform%3D%22translate\(243.53706359863284%2C%20373.1999969482422\)%22%3E%3Crect%20class%3D%22basic%20label-container%22%20style%3D%22%22%20x%3D%22-125.79424285888672%22%20y%3D%22-30%22%20width%3D%22251.58848571777344%22%20height%3D%2260%22%3E%3C%2Frect%3E%3Cg%20class%3D%22label%22%20style%3D%22%22%20transform%3D%22translate\(0%2C%20-10.800000190734863\)%22%3E%3Crect%3E%3C%2Frect%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3Ctext%20y%3D%22-10.1%22%20style%3D%22%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3EMember%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Activity%3C%2Ftspan%3E%3Ctspan%20font-style%3D%22normal%22%20class%3D%22text-inner-tspan%22%20font-weight%3D%22normal%22%3E%20Timeline%3C%2Ftspan%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edges%20edgePaths%22%3E%3Cpath%20d%3D%22M439.1589558919271%2C83.19999694824219L439.1589558919271%2C111.19999694824219%22%20id%3D%22L_A_B_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_A_B_0%22%20data-points%3D%22W3sieCI6NDM5LjE1ODk1NTg5MTkyNzEsInkiOjgzLjE5OTk5Njk0ODI0MjE5fSx7IngiOjQzOS4xNTg5NTU4OTE5MjcxLCJ5IjoxMTUuMTk5OTk2OTQ4MjQyMTl9XQ%3D%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M191.87549845377606%2C83.19999694824219L191.87549845377603%2C96.12892913637671Q191.87549845377603%2C103.19999694824219%20198.9465662656415%2C103.19999694824219L359.20100190113766%2C103.19999694824219Q360.9839579264323%2C103.19999694824219%20362.3981714888054%2C104.2857833858691L362.3981714888054%2C104.28578338586911Q363.8123850511785%2C105.371569823496%20364.8981714888054%2C106.7857833858691L364.8981714888054%2C106.7857833858691Q365.9839579264323%2C108.19999694824219%20365.9839579264323%2C109.98295297353684L365.9839579264323%2C113.19999694824219%22%20id%3D%22L_U_B_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_U_B_0%22%20data-points%3D%22W3sieCI6MTkxLjg3NTQ5ODQ1Mzc3NjA2LCJ5Ijo4My4xOTk5OTY5NDgyNDIxOX0seyJ4IjoxOTEuODc1NDk4NDUzNzc2MDMsInkiOjEwMy4xOTk5OTY5NDgyNDIxOX0seyJ4IjozNjUuOTgzOTU3OTI2NDMyMywieSI6MTAzLjE5OTk5Njk0ODI0MjE5fSx7IngiOjM2NS45ODM5NTc5MjY0MzIzLCJ5IjoxMTcuMTk5OTk2OTQ4MjQyMTl9XQ%3D%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M402.5714569091797%2C183.1999969482422L402.5714569091797%2C211.1999969482422%22%20id%3D%22L_B_C_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_B_C_0%22%20data-points%3D%22W3sieCI6NDAyLjU3MTQ1NjkwOTE3OTcsInkiOjE4My4xOTk5OTY5NDgyNDIyfSx7IngiOjQwMi41NzE0NTY5MDkxNzk3LCJ5IjoyMTUuMTk5OTk2OTQ4MjQyMn1d%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M415.8116149902344%2C283.1999969482422L415.8116149902344%2C316.41704092294754Q415.8116149902344%2C318.1999969482422%20416.89740142786127%2C319.6142105106153L416.89740142786127%2C319.6142105106153Q417.98318786548816%2C321.0284240729884%20419.39740142786127%2C322.1142105106153L419.39740142786127%2C322.1142105106153Q420.8116149902344%2C323.1999969482422%20422.594571015529%2C323.1999969482422L868.5387414641259%2C323.1999969482422Q870.3216974894206%2C323.1999969482422%20871.7359110517937%2C324.2857833858691L871.7359110517937%2C324.2857833858691Q873.1501246141668%2C325.371569823496%20874.2359110517937%2C326.7857833858691L874.2359110517937%2C326.7857833858691Q875.3216974894206%2C328.1999969482422%20875.3216974894206%2C329.98295297353684L875.3216974894206%2C333.1999969482422%22%20id%3D%22L_C_D_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_C_D_0%22%20data-points%3D%22W3sieCI6NDE1LjgxMTYxNDk5MDIzNDQsInkiOjI4My4xOTk5OTY5NDgyNDIyfSx7IngiOjQxNS44MTE2MTQ5OTAyMzQ0LCJ5IjozMjMuMTk5OTk2OTQ4MjQyMn0seyJ4Ijo4NzUuMzIxNjk3NDg5NDIwNiwieSI6MzIzLjE5OTk5Njk0ODI0MjJ9LHsieCI6ODc1LjMyMTY5NzQ4OTQyMDYsInkiOjMzNy4xOTk5OTY5NDgyNDIyfV0%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M389.331298828125%2C283.1999969482422L389.331298828125%2C378.7999954223633L389.331298828125%2C447.99999237060547%22%20id%3D%22L_C_E_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_C_E_0%22%20data-points%3D%22W3sieCI6Mzg5LjMzMTI5ODgyODEyNSwieSI6MjgzLjE5OTk5Njk0ODI0MjJ9LHsieCI6Mzg5LjMzMTI5ODgyODEyNSwieSI6Mzc4Ljc5OTk5NTQyMjM2MzN9LHsieCI6Mzg5LjMzMTI5ODgyODEyNSwieSI6NDUxLjk5OTk5MjM3MDYwNTQ3fV0%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M875.3216974894206%2C414.3999938964844L875.3216974894206%2C442.3999938964844%22%20id%3D%22L_D_F_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_D_F_0%22%20data-points%3D%22W3sieCI6ODc1LjMyMTY5NzQ4OTQyMDYsInkiOjQxNC4zOTk5OTM4OTY0ODQ0fSx7IngiOjg3NS4zMjE2OTc0ODk0MjA2LCJ5Ijo0NDYuMzk5OTkzODk2NDg0NH1d%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M875.3216974894206%2C525.5999908447266L875.3216974894206%2C562.5599884033203%22%20id%3D%22L_F_G_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_F_G_0%22%20data-points%3D%22W3sieCI6ODc1LjMyMTY5NzQ4OTQyMDYsInkiOjUyNS41OTk5OTA4NDQ3MjY2fSx7IngiOjg3NS4zMjE2OTc0ODk0MjA2LCJ5Ijo1NjYuNTU5OTg4NDAzMzIwM31d%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M900.7897318522135%2C634.5599884033203L900.7897318522135%2C670.0170317676741Q900.7897318522135%2C671.7999877929688%20901.8755182898404%2C673.2142013553419L901.8755182898404%2C673.2142013553419Q902.9613047274673%2C674.628414917715%20904.3755182898404%2C675.7142013553419L904.3755182898404%2C675.7142013553419Q905.7897318522135%2C676.7999877929688%20907.5726878775082%2C676.7999877929688L1108.8676431364893%2C676.7999877929688Q1110.650599161784%2C676.7999877929688%201112.064812724157%2C677.8857742305956L1112.064812724157%2C677.8857742305956Q1113.4790262865301%2C678.9715606682225%201114.564812724157%2C680.3857742305956L1114.564812724157%2C680.3857742305956Q1115.650599161784%2C681.7999877929688%201115.650599161784%2C683.5829438182634L1115.650599161784%2C686.7999877929688%22%20id%3D%22L_G_H_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_G_H_0%22%20data-points%3D%22W3sieCI6OTAwLjc4OTczMTg1MjIxMzUsInkiOjYzNC41NTk5ODg0MDMzMjAzfSx7IngiOjkwMC43ODk3MzE4NTIyMTM1LCJ5Ijo2NzYuNzk5OTg3NzkyOTY4OH0seyJ4IjoxMTE1LjY1MDU5OTE2MTc4NCwieSI6Njc2Ljc5OTk4Nzc5Mjk2ODh9LHsieCI6MTExNS42NTA1OTkxNjE3ODQsInkiOjY5MC43OTk5ODc3OTI5Njg4fV0%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M951.7258005777995%2C634.5599884033203L951.7258005777994%2C649.7289199811033Q951.7258005777994%2C656.7999877929688%20958.7968683896648%2C656.7999877929688L1347.4276254362937%2C656.7999877929688Q1349.2105814615884%2C656.7999877929688%201350.6247950239615%2C657.8857742305956L1350.6247950239615%2C657.8857742305956Q1352.0390085863346%2C658.9715606682225%201353.1247950239615%2C660.3857742305956L1353.1247950239615%2C660.3857742305956Q1354.2105814615884%2C661.7999877929688%201354.2105814615884%2C663.5829438182634L1354.2105814615884%2C688.5333201090494%22%20id%3D%22L_G_I_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_G_I_0%22%20data-points%3D%22W3sieCI6OTUxLjcyNTgwMDU3Nzc5OTUsInkiOjYzNC41NTk5ODg0MDMzMjAzfSx7IngiOjk1MS43MjU4MDA1Nzc3OTk0LCJ5Ijo2NTYuNzk5OTg3NzkyOTY4OH0seyJ4IjoxMzU0LjIxMDU4MTQ2MTU4ODQsInkiOjY1Ni43OTk5ODc3OTI5Njg4fSx7IngiOjEzNTQuMjEwNTgxNDYxNTg4NCwieSI6NjkyLjUzMzMyMDEwOTA0OTR9XQ%3D%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M1392.7064158121743%2C760.5333201090494L1392.7064158121743%2C795.9999847412109%22%20id%3D%22L_I_J_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_I_J_0%22%20data-points%3D%22W3sieCI6MTM5Mi43MDY0MTU4MTIxNzQzLCJ5Ijo3NjAuNTMzMzIwMTA5MDQ5NH0seyJ4IjoxMzkyLjcwNjQxNTgxMjE3NDMsInkiOjc5OS45OTk5ODQ3NDEyMTA5fV0%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M1436.9286092122395%2C867.9999847412109L1436.9286092122395%2C935.9999847412109%22%20id%3D%22L_J_K_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_J_K_0%22%20data-points%3D%22W3sieCI6MTQzNi45Mjg2MDkyMTIyMzk1LCJ5Ijo4NjcuOTk5OTg0NzQxMjEwOX0seyJ4IjoxNDM2LjkyODYwOTIxMjIzOTUsInkiOjkzOS45OTk5ODQ3NDEyMTA5fV0%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M849.8536631266276%2C634.5599884033203L849.8536631266276%2C684.7999877929688%22%20id%3D%22L_G_L_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_G_L_0%22%20data-points%3D%22W3sieCI6ODQ5Ljg1MzY2MzEyNjYyNzYsInkiOjYzNC41NTk5ODg0MDMzMjAzfSx7IngiOjg0OS44NTM2NjMxMjY2Mjc2LCJ5Ijo2ODguNzk5OTg3NzkyOTY4OH1d%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M1431.2022501627603%2C636.7999877929688L1431.2022501627603%2C688.5333201090494%22%20id%3D%22L_M_I_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_M_I_0%22%20data-points%3D%22W3sieCI6MTQzMS4yMDIyNTAxNjI3NjAzLCJ5Ijo2MzYuNzk5OTg3NzkyOTY4OH0seyJ4IjoxNDMxLjIwMjI1MDE2Mjc2MDMsInkiOjY5Mi41MzMzMjAxMDkwNDk0fV0%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M539.9500427246094%2C636.7999877929688L539.9500427246094%2C684.7999877929688%22%20id%3D%22L_N_O_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_N_O_0%22%20data-points%3D%22W3sieCI6NTM5Ljk1MDA0MjcyNDYwOTQsInkiOjYzNi43OTk5ODc3OTI5Njg4fSx7IngiOjUzOS45NTAwNDI3MjQ2MDk0LCJ5Ijo2ODguNzk5OTg3NzkyOTY4OH1d%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M798.9175944010416%2C634.5599884033203L798.9175944010417%2C649.7289199811033Q798.9175944010417%2C656.7999877929688%20791.8465265891763%2C656.7999877929688L629.5704977326515%2C656.7999877929688Q627.7875417073568%2C656.7999877929688%20626.3733281449837%2C657.8857742305956L626.3733281449837%2C657.8857742305956Q624.9591145826106%2C658.9715606682225%20623.8733281449837%2C660.3857742305956L623.8733281449837%2C660.3857742305956Q622.7875417073568%2C661.7999877929688%20622.7875417073568%2C663.5829438182634L622.7875417073568%2C684.7999877929688%22%20id%3D%22L_G_O_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_G_O_0%22%20data-points%3D%22W3sieCI6Nzk4LjkxNzU5NDQwMTA0MTYsInkiOjYzNC41NTk5ODg0MDMzMjAzfSx7IngiOjc5OC45MTc1OTQ0MDEwNDE3LCJ5Ijo2NTYuNzk5OTg3NzkyOTY4OH0seyJ4Ijo2MjIuNzg3NTQxNzA3MzU2OCwieSI6NjU2Ljc5OTk4Nzc5Mjk2ODh9LHsieCI6NjIyLjc4NzU0MTcwNzM1NjgsInkiOjY4OC43OTk5ODc3OTI5Njg4fV0%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M517.4675674438477%2C867.9999847412109L517.4675674438477%2C881.2170287159163Q517.4675674438477%2C882.9999847412109%20516.3817810062208%2C884.414198303584L516.3817810062208%2C884.414198303584Q515.2959945685939%2C885.8284118659572%20513.8817810062208%2C886.914198303584L513.8817810062208%2C886.914198303584Q512.4675674438477%2C887.9999847412109%20510.684611418553%2C887.9999847412109L421.44994821279465%2C887.9999847412109Q419.6669921875%2C887.9999847412109%20418.2527786251269%2C889.0857711788378L418.2527786251269%2C889.0857711788378Q416.8385650627538%2C890.1715576164647%20415.7527786251269%2C891.5857711788378L415.7527786251269%2C891.5857711788378Q414.6669921875%2C892.9999847412109%20414.6669921875%2C894.7829407665056L414.6669921875%2C935.9999847412109%22%20id%3D%22L_P_Q_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_P_Q_0%22%20data-points%3D%22W3sieCI6NTE3LjQ2NzU2NzQ0Mzg0NzcsInkiOjg2Ny45OTk5ODQ3NDEyMTA5fSx7IngiOjUxNy40Njc1Njc0NDM4NDc3LCJ5Ijo4ODcuOTk5OTg0NzQxMjEwOX0seyJ4Ijo0MTQuNjY2OTkyMTg3NSwieSI6ODg3Ljk5OTk4NDc0MTIxMDl9LHsieCI6NDE0LjY2Njk5MjE4NzUsInkiOjkzOS45OTk5ODQ3NDEyMTA5fV0%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M442.29193115234375%2C283.1999969482422L442.29193115234375%2C296.41704092294754Q442.29193115234375%2C298.1999969482422%20443.37771758997064%2C299.6142105106153L443.37771758997064%2C299.6142105106153Q444.46350402759754%2C301.0284240729884%20445.87771758997064%2C302.1142105106153L445.87771758997064%2C302.1142105106153Q447.29193115234375%2C303.1999969482422%20449.0748871776384%2C303.1999969482422L1559.7130410857078%2C303.1999969482422Q1561.4959971110025%2C303.1999969482422%201562.9102106733756%2C304.2857833858691L1562.9102106733756%2C304.2857833858691Q1564.3244242357487%2C305.371569823496%201565.4102106733756%2C306.7857833858691L1565.4102106733756%2C306.7857833858691Q1566.4959971110025%2C308.1999969482422%201566.4959971110025%2C309.98295297353684L1566.4959971110025%2C378.7999954223633L1566.4959971110025%2C489.99999237060547L1566.4959971110025%2C601.1999893188477L1566.4959971110025%2C732.3999862670898L1566.4959971110025%2C837.9999847412109L1566.4959971110025%2C921.2170287159163Q1566.4959971110025%2C922.9999847412109%201565.4102106733756%2C924.414198303584L1565.4102106733756%2C924.414198303584Q1564.3244242357487%2C925.8284118659572%201562.9102106733756%2C926.914198303584L1562.9102106733756%2C926.914198303584Q1561.4959971110025%2C927.9999847412109%201559.7130410857078%2C927.9999847412109L472.12133493154465%2C927.9999847412109Q470.33837890625%2C927.9999847412109%20468.9241653438769%2C929.0857711788378L468.9241653438769%2C929.0857711788378Q467.5099517815038%2C930.1715576164647%20466.4241653438769%2C931.5857711788378L466.4241653438769%2C931.5857711788378Q465.33837890625%2C932.9999847412109%20465.33837890625%2C934.7829407665056L465.33837890625%2C937.9999847412109%22%20id%3D%22L_C_Q_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_C_Q_0%22%20data-points%3D%22W3sieCI6NDQyLjI5MTkzMTE1MjM0Mzc1LCJ5IjoyODMuMTk5OTk2OTQ4MjQyMn0seyJ4Ijo0NDIuMjkxOTMxMTUyMzQzNzUsInkiOjMwMy4xOTk5OTY5NDgyNDIyfSx7IngiOjE1NjYuNDk1OTk3MTExMDAyNSwieSI6MzAzLjE5OTk5Njk0ODI0MjJ9LHsieCI6MTU2Ni40OTU5OTcxMTEwMDI1LCJ5IjozNzguNzk5OTk1NDIyMzYzM30seyJ4IjoxNTY2LjQ5NTk5NzExMTAwMjUsInkiOjQ4OS45OTk5OTIzNzA2MDU0N30seyJ4IjoxNTY2LjQ5NTk5NzExMTAwMjUsInkiOjYwMS4xOTk5ODkzMTg4NDc3fSx7IngiOjE1NjYuNDk1OTk3MTExMDAyNSwieSI6NzMyLjM5OTk4NjI2NzA4OTh9LHsieCI6MTU2Ni40OTU5OTcxMTEwMDI1LCJ5Ijo4MzcuOTk5OTg0NzQxMjEwOX0seyJ4IjoxNTY2LjQ5NTk5NzExMTAwMjUsInkiOjkyNy45OTk5ODQ3NDEyMTA5fSx7IngiOjQ2NS4zMzgzNzg5MDYyNSwieSI6OTI3Ljk5OTk4NDc0MTIxMDl9LHsieCI6NDY1LjMzODM3ODkwNjI1LCJ5Ijo5NDEuOTk5OTg0NzQxMjEwOX1d%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M389.331298828125%2C519.9999923706055L389.331298828125%2C601.1999893188477L389.331298828125%2C732.3999862670898L389.331298828125%2C837.9999847412109L389.331298828125%2C935.9999847412109%22%20id%3D%22L_E_Q_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_E_Q_0%22%20data-points%3D%22W3sieCI6Mzg5LjMzMTI5ODgyODEyNSwieSI6NTE5Ljk5OTk5MjM3MDYwNTV9LHsieCI6Mzg5LjMzMTI5ODgyODEyNSwieSI6NjAxLjE5OTk4OTMxODg0Nzd9LHsieCI6Mzg5LjMzMTI5ODgyODEyNSwieSI6NzMyLjM5OTk4NjI2NzA4OTh9LHsieCI6Mzg5LjMzMTI5ODgyODEyNSwieSI6ODM3Ljk5OTk4NDc0MTIxMDl9LHsieCI6Mzg5LjMzMTI5ODgyODEyNSwieSI6OTM5Ljk5OTk4NDc0MTIxMDl9XQ%3D%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M1348.4842224121091%2C867.9999847412109L1348.4842224121091%2C901.2170287159163Q1348.4842224121091%2C902.9999847412109%201347.3984359744823%2C904.414198303584L1347.3984359744823%2C904.414198303584Q1346.3126495368554%2C905.8284118659572%201344.8984359744823%2C906.914198303584L1344.8984359744823%2C906.914198303584Q1343.4842224121091%2C907.9999847412109%201341.7012663868145%2C907.9999847412109L446.78564157216965%2C907.9999847412109Q445.002685546875%2C907.9999847412109%20443.5884719845019%2C909.0857711788378L443.5884719845019%2C909.0857711788378Q442.1742584221288%2C910.1715576164647%20441.0884719845019%2C911.5857711788378L441.0884719845019%2C911.5857711788378Q440.002685546875%2C912.9999847412109%20440.002685546875%2C914.7829407665056L440.002685546875%2C935.9999847412109%22%20id%3D%22L_J_Q_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_J_Q_0%22%20data-points%3D%22W3sieCI6MTM0OC40ODQyMjI0MTIxMDkxLCJ5Ijo4NjcuOTk5OTg0NzQxMjEwOX0seyJ4IjoxMzQ4LjQ4NDIyMjQxMjEwOTEsInkiOjkwNy45OTk5ODQ3NDEyMTA5fSx7IngiOjQ0MC4wMDI2ODU1NDY4NzUsInkiOjkwNy45OTk5ODQ3NDEyMTA5fSx7IngiOjQ0MC4wMDI2ODU1NDY4NzUsInkiOjkzOS45OTk5ODQ3NDEyMTA5fV0%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M110.29829406738281%2C83.19999694824219L110.29829406738281%2C111.19999694824219%22%20id%3D%22L_U_R_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_U_R_0%22%20data-points%3D%22W3sieCI6MTEwLjI5ODI5NDA2NzM4MjgxLCJ5Ijo4My4xOTk5OTY5NDgyNDIxOX0seyJ4IjoxMTAuMjk4Mjk0MDY3MzgyODEsInkiOjExNS4xOTk5OTY5NDgyNDIxOX1d%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3Cpath%20d%3D%22M362.8509826660156%2C283.1999969482422L362.8509826660156%2C296.41704092294754Q362.8509826660156%2C298.1999969482422%20361.76519622838873%2C299.6142105106153L361.76519622838873%2C299.6142105106153Q360.67940979076184%2C301.0284240729884%20359.26519622838873%2C302.1142105106153L359.26519622838873%2C302.1142105106153Q357.8509826660156%2C303.1999969482422%20356.068026640721%2C303.1999969482422L250.3200196239275%2C303.1999969482422Q248.53706359863284%2C303.1999969482422%20247.12285003625976%2C304.2857833858691L247.12285003625976%2C304.2857833858691Q245.70863647388666%2C305.371569823496%20244.62285003625976%2C306.7857833858691L244.62285003625976%2C306.7857833858691Q243.53706359863284%2C308.1999969482422%20243.53706359863284%2C309.98295297353684L243.53706359863284%2C331.1999969482422%22%20id%3D%22L_C_S_0%22%20class%3D%22edge-thickness-normal%20edge-pattern-solid%20edge-thickness-normal%20edge-pattern-solid%20flowchart-link%22%20style%3D%22%3B%22%20data-edge%3D%22true%22%20data-et%3D%22edge%22%20data-id%3D%22L_C_S_0%22%20data-points%3D%22W3sieCI6MzYyLjg1MDk4MjY2NjAxNTYsInkiOjI4My4xOTk5OTY5NDgyNDIyfSx7IngiOjM2Mi44NTA5ODI2NjYwMTU2LCJ5IjozMDMuMTk5OTk2OTQ4MjQyMn0seyJ4IjoyNDMuNTM3MDYzNTk4NjMyODQsInkiOjMwMy4xOTk5OTY5NDgyNDIyfSx7IngiOjI0My41MzcwNjM1OTg2MzI4NCwieSI6MzM1LjE5OTk5Njk0ODI0MjJ9XQ%3D%3D%22%20marker-end%3D%22url\(%23mermaid-_r_171__flowchart-v2-pointEnd\)%22%3E%3C%2Fpath%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabels%22%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%3E%3Crect%20class%3D%22background%22%20style%3D%22stroke%3A%20none%22%3E%3C%2Frect%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_A_B_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_U_B_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_B_C_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_C_D_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_C_E_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_D_F_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_F_G_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_G_H_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_G_I_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_I_J_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_J_K_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_G_L_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_M_I_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_N_O_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_G_O_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_P_Q_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_C_Q_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_E_Q_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_J_Q_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_U_R_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3Cg%20class%3D%22edgeLabel%22%3E%3Cg%20class%3D%22label%22%20data-id%3D%22L_C_S_0%22%20transform%3D%22translate\(0%2C%200\)%22%3E%3Ctext%20y%3D%22-10.1%22%3E%3Ctspan%20class%3D%22text-outer-tspan%22%20x%3D%220%22%20y%3D%22-0.1em%22%20dy%3D%221.1em%22%3E%3C%2Ftspan%3E%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E)
+
+## 4. What the statuses should mean
+
+Because the database design includes a general `status` field as well as workflow-specific statuses, they should have clearly defined meanings.
+
+|
+Record type
+
+|
+
+General status
+
+|
+
+Separate workflow state
+
+|
+| --- | --- | --- |
+|
+
+Member
+
+|
+
+Whether the record is active, inactive or otherwise retained
+
+|
+
+Application approval and membership state
+
+|
+|
+
+Receipt
+
+|
+
+Whether the receipt record is active or cancelled/retained
+
+|
+
+Payment or refund processing state
+
+|
+|
+
+Magazine subscription
+
+|
+
+Whether the subscription record is active
+
+|
+
+Delivery, pause or stop state
+
+|
+|
+
+KYC request
+
+|
+
+Whether the request record is active
+
+|
+
+Pending, approved, rejected or correction required
+
+|
+|
+
+Profile change request
+
+|
+
+Whether the request record is active
+
+|
+
+Pending, approved or rejected
+
+|
+|
+
+Notification campaign
+
+|
+
+Whether the campaign record is active
+
+|
+
+Draft, queued, sending or completed, as applicable
+
+|
+
+These are recommended status responsibilities, not a claim that every value or transition has already been implemented in the migration. The allowed values and transitions should be defined consistently in the application and database.
+
+## 5. Example: One member's journey
+
+* Staff registers a new member and uploads the required documents.
+
+* The system checks for duplicates and creates the application.
+
+* A receipt is created and allocated to the member.
+
+* An authorized reviewer approves the application and the permanent membership number is assigned when applicable.
+
+* The member profile displays membership, receipt and approval information.
+
+* Magazine delivery is configured, and the member can be considered for eligible label batches.
+
+* The member may later submit KYC or profile-change requests, attend linked events, or use recorded services.
+
+* Relevant notifications, activity history and reports are updated as these actions occur.
+
+In short: the member record is the central entity. Registration creates the record; receipts, approvals, KYC, delivery, events and profile changes connect to it; notifications communicate relevant updates; and reports bring the operational data together. The foreign keys should enforce those relationships so records remain connected and traceable.
+
+
+
+
+
+
+
+
+
+
+
+
+
+# HMS MMA – Complete API List (CRUD + Workflow)
+
+Below is the API checklist for your React JS + FastAPI + PostgreSQL application. It covers the CRUD operations for all the modules, along with the additional workflow APIs needed for approvals, payments, magazine delivery, notifications, reports and activity tracking.
+
+API convention: use `/api/v1` as the base path. The examples use REST-style endpoints, with `GET` for reading, `POST` for creating or performing actions, `PATCH` for partial updates, and `DELETE` for deletion.
+
+
+## 1. Common API pattern
+
+For each resource, use the following standard CRUD pattern unless the resource needs a specialized workflow.
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET
+
+|
+
+`/api/v1/{resource}`
+
+|
+
+List records with pagination, filters and sorting
+
+|
+|
+
+GET
+
+|
+
+`/api/v1/{resource}/{id}`
+
+|
+
+Get one record
+
+|
+|
+
+POST
+
+|
+
+`/api/v1/{resource}`
+
+|
+
+Create a record
+
+|
+|
+
+PATCH
+
+|
+
+`/api/v1/{resource}/{id}`
+
+|
+
+Update a record
+
+|
+|
+
+DELETE
+
+|
+
+`/api/v1/{resource}/{id}`
+
+|
+
+Delete or soft-delete a record according to its rules
+
+|
+
+For list endpoints, support parameters where applicable, such as `page`, `per_page`, `search`, `status`, `sort_by`, `sort_order`, `from_date` and `to_date`.
+
+## 2. Authentication and user management
+
+Base resource: `/api/v1`
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+POST
+
+|
+
+`/auth/login`
+
+|
+
+Login
+
+|
+|
+
+POST
+
+|
+
+`/auth/logout`
+
+|
+
+Logout and revoke refresh token
+
+|
+|
+
+POST
+
+|
+
+`/auth/refresh`
+
+|
+
+Refresh access token
+
+|
+|
+
+GET
+
+|
+
+`/auth/me`
+
+|
+
+Get logged-in user's details and permissions
+
+|
+|
+
+POST
+
+|
+
+`/auth/forgot-password`
+
+|
+
+Request password reset
+
+|
+|
+
+POST
+
+|
+
+`/auth/reset-password`
+
+|
+
+Reset password using token
+
+|
+|
+
+PATCH
+
+|
+
+`/auth/change-password`
+
+|
+
+Change current password
+
+|
+|
+
+GET
+
+|
+
+`/users`
+
+|
+
+List users
+
+|
+|
+
+POST
+
+|
+
+`/users`
+
+|
+
+Create user
+
+|
+|
+
+GET
+
+|
+
+`/users/{id}`
+
+|
+
+Get user details
+
+|
+|
+
+PATCH
+
+|
+
+`/users/{id}`
+
+|
+
+Update user
+
+|
+|
+
+DELETE
+
+|
+
+`/users/{id}`
+
+|
+
+Deactivate or delete user according to policy
+
+|
+|
+
+PATCH
+
+|
+
+`/users/{id}/status`
+
+|
+
+Activate/deactivate user
+
+|
+|
+
+GET
+
+|
+
+`/users/{id}/roles`
+
+|
+
+Get assigned roles
+
+|
+|
+
+PUT
+
+|
+
+`/users/{id}/roles`
+
+|
+
+Replace role assignments
+
+|
+|
+
+GET
+
+|
+
+`/roles`
+
+|
+
+List roles
+
+|
+|
+
+POST
+
+|
+
+`/roles`
+
+|
+
+Create role
+
+|
+|
+
+GET
+
+|
+
+`/roles/{id}`
+
+|
+
+Get role
+
+|
+|
+
+PATCH
+
+|
+
+`/roles/{id}`
+
+|
+
+Update role
+
+|
+|
+
+DELETE
+
+|
+
+`/roles/{id}`
+
+|
+
+Delete role
+
+|
+|
+
+GET
+
+|
+
+`/permissions`
+
+|
+
+List permissions
+
+|
+|
+
+POST
+
+|
+
+`/permissions`
+
+|
+
+Create permission
+
+|
+|
+
+PATCH
+
+|
+
+`/permissions/{id}`
+
+|
+
+Update permission
+
+|
+|
+
+DELETE
+
+|
+
+`/permissions/{id}`
+
+|
+
+Delete permission
+
+|
+|
+
+GET
+
+|
+
+`/roles/{id}/permissions`
+
+|
+
+Get role permissions
+
+|
+|
+
+PUT
+
+|
+
+`/roles/{id}/permissions`
+
+|
+
+Replace role permissions
+
+|
+
+## 3. Masters and configuration
+
+### Location masters
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/states`
+
+|
+
+List or create states
+
+|
+|
+
+GET, PATCH, DELETE
+
+|
+
+`/states/{id}`
+
+|
+
+Read, update or delete state
+
+|
+|
+
+GET, POST
+
+|
+
+`/districts`
+
+|
+
+List or create districts
+
+|
+|
+
+GET, PATCH, DELETE
+
+|
+
+`/districts/{id}`
+
+|
+
+Read, update or delete district
+
+|
+|
+
+GET, POST
+
+|
+
+`/taluks`
+
+|
+
+List or create taluks
+
+|
+|
+
+GET, PATCH, DELETE
+
+|
+
+`/taluks/{id}`
+
+|
+
+Read, update or delete taluk
+
+|
+|
+
+GET, POST
+
+|
+
+`/postal-codes`
+
+|
+
+List or create postal codes
+
+|
+|
+
+GET, PATCH, DELETE
+
+|
+
+`/postal-codes/{id}`
+
+|
+
+Read, update or delete postal code
+
+|
+|
+
+GET
+
+|
+
+`/locations/states/{state_id}/districts`
+
+|
+
+Get districts in a state
+
+|
+|
+
+GET
+
+|
+
+`/locations/districts/{district_id}/taluks`
+
+|
+
+Get taluks in a district
+
+|
+|
+
+GET
+
+|
+
+`/locations/taluks/{taluk_id}/postal-codes`
+
+|
+
+Get postal codes in a taluk
+
+|
+|
+
+POST
+
+|
+
+`/locations/import`
+
+|
+
+Import location master data
+
+|
+|
+
+POST
+
+|
+
+`/locations/map-postal-codes`
+
+|
+
+Map postal codes to location records
+
+|
+
+### Membership types, prices and settings
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/membership-types`
+
+|
+
+List or create membership types
+
+|
+|
+
+GET, PATCH, DELETE
+
+|
+
+`/membership-types/{id}`
+
+|
+
+Read, update or delete type
+
+|
+|
+
+GET
+
+|
+
+`/membership-types/{id}/prices`
+
+|
+
+Get price history
+
+|
+|
+
+POST
+
+|
+
+`/membership-types/{id}/prices`
+
+|
+
+Add a price record
+
+|
+|
+
+PATCH
+
+|
+
+`/membership-type-prices/{id}`
+
+|
+
+Update price record
+
+|
+|
+
+DELETE
+
+|
+
+`/membership-type-prices/{id}`
+
+|
+
+Delete price record if permitted
+
+|
+|
+
+GET
+
+|
+
+`/settings`
+
+|
+
+Get application settings
+
+|
+|
+
+PATCH
+
+|
+
+`/settings`
+
+|
+
+Update application settings
+
+|
+|
+
+GET, POST
+
+|
+
+`/document-types`
+
+|
+
+List or create document types
+
+|
+|
+
+GET, PATCH, DELETE
+
+|
+
+`/document-types/{id}`
+
+|
+
+Read, update or delete document type
+
+|
+|
+
+GET, POST
+
+|
+
+`/service-types`
+
+|
+
+List or create service types
+
+|
+|
+
+GET, PATCH, DELETE
+
+|
+
+`/service-types/{id}`
+
+|
+
+Read, update or delete service type
+
+|
+
+## 4. Membership management
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET
+
+|
+
+`/members`
+
+|
+
+Member list with filters and pagination
+
+|
+|
+
+POST
+
+|
+
+`/members`
+
+|
+
+Create member / offline registration
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}`
+
+|
+
+Get member profile
+
+|
+|
+
+PATCH
+
+|
+
+`/members/{id}`
+
+|
+
+Update member details when direct editing is allowed
+
+|
+|
+
+DELETE
+
+|
+
+`/members/{id}`
+
+|
+
+Delete or soft-delete member according to policy
+
+|
+|
+
+POST
+
+|
+
+`/members/online-registration`
+
+|
+
+Submit online registration
+
+|
+|
+
+POST
+
+|
+
+`/members/check-duplicate`
+
+|
+
+Check possible duplicate member details
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/memberships`
+
+|
+
+Get member's membership records
+
+|
+|
+
+POST
+
+|
+
+`/members/{id}/memberships`
+
+|
+
+Create membership record
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/documents`
+
+|
+
+List member documents
+
+|
+|
+
+POST
+
+|
+
+`/members/{id}/documents`
+
+|
+
+Upload member document
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/documents/{document_id}`
+
+|
+
+Get document metadata or authorized file
+
+|
+|
+
+PATCH
+
+|
+
+`/members/{id}/documents/{document_id}`
+
+|
+
+Update document metadata
+
+|
+|
+
+DELETE
+
+|
+
+`/members/{id}/documents/{document_id}`
+
+|
+
+Remove document according to retention rules
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/approval-history`
+
+|
+
+Get approval history
+
+|
+|
+
+POST
+
+|
+
+`/members/{id}/approve`
+
+|
+
+Approve membership
+
+|
+|
+
+POST
+
+|
+
+`/members/{id}/reject`
+
+|
+
+Reject membership
+
+|
+|
+
+POST
+
+|
+
+`/members/{id}/request-corrections`
+
+|
+
+Return application for correction
+
+|
+|
+
+POST
+
+|
+
+`/members/{id}/assign-membership-number`
+
+|
+
+Assign permanent membership number
+
+|
+|
+
+PATCH
+
+|
+
+`/members/{id}/status`
+
+|
+
+Change member's general status
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/timeline`
+
+|
+
+Get member activity timeline
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/services`
+
+|
+
+Get services associated with member
+
+|
+|
+
+POST
+
+|
+
+`/members/{id}/services`
+
+|
+
+Record a service usage entry
+
+|
+
+### Profile changes, membership type changes and deletion requests
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/profile-change-requests`
+
+|
+
+List or submit profile change requests
+
+|
+|
+
+GET
+
+|
+
+`/profile-change-requests/{id}`
+
+|
+
+Get request details
+
+|
+|
+
+POST
+
+|
+
+`/profile-change-requests/{id}/approve`
+
+|
+
+Approve changes and update profile
+
+|
+|
+
+POST
+
+|
+
+`/profile-change-requests/{id}/reject`
+
+|
+
+Reject change request
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/profile-history`
+
+|
+
+Get profile change history
+
+|
+|
+
+GET, POST
+
+|
+
+`/membership-type-change-requests`
+
+|
+
+List or submit type change requests
+
+|
+|
+
+GET
+
+|
+
+`/membership-type-change-requests/{id}`
+
+|
+
+Get request details
+
+|
+|
+
+POST
+
+|
+
+`/membership-type-change-requests/{id}/approve`
+
+|
+
+Approve type change
+
+|
+|
+
+POST
+
+|
+
+`/membership-type-change-requests/{id}/reject`
+
+|
+
+Reject type change
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/membership-type-history`
+
+|
+
+Get type change history
+
+|
+|
+
+GET, POST
+
+|
+
+`/member-deletion-requests`
+
+|
+
+List or submit deletion requests
+
+|
+|
+
+GET
+
+|
+
+`/member-deletion-requests/{id}`
+
+|
+
+Get deletion request
+
+|
+|
+
+POST
+
+|
+
+`/member-deletion-requests/{id}/approve`
+
+|
+
+Approve deletion request
+
+|
+|
+
+POST
+
+|
+
+`/member-deletion-requests/{id}/reject`
+
+|
+
+Reject deletion request
+
+|
+|
+
+POST
+
+|
+
+`/members/{id}/permanent-delete`
+
+|
+
+Permanently delete, with strict authorization and safeguards
+
+|
+
+### KYC
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/kyc-requests`
+
+|
+
+List or create KYC requests
+
+|
+|
+
+GET
+
+|
+
+`/kyc-requests/{id}`
+
+|
+
+Get KYC request
+
+|
+|
+
+PATCH
+
+|
+
+`/kyc-requests/{id}`
+
+|
+
+Update request details
+
+|
+|
+
+POST
+
+|
+
+`/kyc-requests/{id}/submit`
+
+|
+
+Submit KYC information
+
+|
+|
+
+POST
+
+|
+
+`/kyc-requests/{id}/approve`
+
+|
+
+Approve KYC
+
+|
+|
+
+POST
+
+|
+
+`/kyc-requests/{id}/reject`
+
+|
+
+Reject KYC
+
+|
+|
+
+POST
+
+|
+
+`/kyc-requests/{id}/request-corrections`
+
+|
+
+Request additional information
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/kyc-history`
+
+|
+
+Get member's KYC history
+
+|
+
+
+## 5. Receipts and payments
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/receipts`
+
+|
+
+List or create receipts
+
+|
+|
+
+GET
+
+|
+
+`/receipts/{id}`
+
+|
+
+Get receipt details
+
+|
+|
+
+PATCH
+
+|
+
+`/receipts/{id}`
+
+|
+
+Update receipt if still editable
+
+|
+|
+
+DELETE
+
+|
+
+`/receipts/{id}`
+
+|
+
+Delete draft receipt if permitted
+
+|
+|
+
+GET, POST
+
+|
+
+`/receipts/{id}/items`
+
+|
+
+List or add receipt items
+
+|
+|
+
+PATCH, DELETE
+
+|
+
+`/receipt-items/{id}`
+
+|
+
+Update or remove receipt item
+
+|
+|
+
+GET
+
+|
+
+`/receipts/{id}/allocations`
+
+|
+
+Get receipt allocations
+
+|
+|
+
+POST
+
+|
+
+`/receipts/{id}/allocations`
+
+|
+
+Allocate receipt to member(s)
+
+|
+|
+
+PATCH
+
+|
+
+`/receipt-allocations/{id}`
+
+|
+
+Update allocation
+
+|
+|
+
+DELETE
+
+|
+
+`/receipt-allocations/{id}`
+
+|
+
+Remove allocation if permitted
+
+|
+|
+
+POST
+
+|
+
+`/receipts/{id}/cancel`
+
+|
+
+Cancel receipt with reason
+
+|
+|
+
+GET
+
+|
+
+`/receipt-cancellations`
+
+|
+
+List cancellation records
+
+|
+|
+
+GET
+
+|
+
+`/receipt-cancellations/{id}`
+
+|
+
+Get cancellation details
+
+|
+|
+
+POST
+
+|
+
+`/receipts/{id}/refunds`
+
+|
+
+Create refund transaction
+
+|
+|
+
+GET
+
+|
+
+`/refund-transactions`
+
+|
+
+List refunds
+
+|
+|
+
+GET
+
+|
+
+`/refund-transactions/{id}`
+
+|
+
+Get refund details
+
+|
+|
+
+PATCH
+
+|
+
+`/refund-transactions/{id}`
+
+|
+
+Update refund processing details
+
+|
+|
+
+POST
+
+|
+
+`/payments/online/initiate`
+
+|
+
+Initiate online payment
+
+|
+|
+
+POST
+
+|
+
+`/payments/online/callback`
+
+|
+
+Process payment provider callback/webhook
+
+|
+|
+
+GET
+
+|
+
+`/payments/transactions`
+
+|
+
+List payment transactions
+
+|
+|
+
+GET
+
+|
+
+`/payments/transactions/{id}`
+
+|
+
+Get transaction details
+
+|
+|
+
+POST
+
+|
+
+`/payments/transactions/{id}/reconcile`
+
+|
+
+Reconcile transaction
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/receipts`
+
+|
+
+Get member's receipts
+
+|
+|
+
+GET
+
+|
+
+`/receipts/{id}/print`
+
+|
+
+Generate/download printable receipt
+
+|
+
+## 6. Magazine subscriptions, delivery and labels
+
+### Subscription and delivery settings
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/magazine-subscriptions`
+
+|
+
+List or create subscriptions
+
+|
+|
+
+GET
+
+|
+
+`/magazine-subscriptions/{id}`
+
+|
+
+Get subscription
+
+|
+|
+
+PATCH
+
+|
+
+`/magazine-subscriptions/{id}`
+
+|
+
+Update subscription
+
+|
+|
+
+DELETE
+
+|
+
+`/magazine-subscriptions/{id}`
+
+|
+
+Remove subscription if permitted
+
+|
+|
+
+POST
+
+|
+
+`/magazine-subscriptions/{id}/start`
+
+|
+
+Start delivery
+
+|
+|
+
+POST
+
+|
+
+`/magazine-subscriptions/{id}/stop`
+
+|
+
+Stop delivery
+
+|
+|
+
+GET, POST
+
+|
+
+`/magazine-subscriptions/{id}/pauses`
+
+|
+
+List or create delivery pauses
+
+|
+|
+
+GET
+
+|
+
+`/magazine-delivery-pauses/{id}`
+
+|
+
+Get pause details
+
+|
+|
+
+PATCH
+
+|
+
+`/magazine-delivery-pauses/{id}`
+
+|
+
+Update pause dates or note
+
+|
+|
+
+DELETE
+
+|
+
+`/magazine-delivery-pauses/{id}`
+
+|
+
+Remove pause if permitted
+
+|
+|
+
+POST
+
+|
+
+`/magazine-delivery-pauses/{id}/resume`
+
+|
+
+Resume delivery
+
+|
+|
+
+GET, POST
+
+|
+
+`/magazine-returns`
+
+|
+
+List or record magazine returns
+
+|
+|
+
+GET
+
+|
+
+`/magazine-returns/{id}`
+
+|
+
+Get return details
+
+|
+|
+
+PATCH
+
+|
+
+`/magazine-returns/{id}`
+
+|
+
+Update return record
+
+|
+|
+
+DELETE
+
+|
+
+`/magazine-returns/{id}`
+
+|
+
+Remove return record if permitted
+
+|
+
+### Delivery batches and labels
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/magazine-delivery-batches`
+
+|
+
+List or create delivery batches
+
+|
+|
+
+GET
+
+|
+
+`/magazine-delivery-batches/{id}`
+
+|
+
+Get batch details
+
+|
+|
+
+PATCH
+
+|
+
+`/magazine-delivery-batches/{id}`
+
+|
+
+Update batch
+
+|
+|
+
+DELETE
+
+|
+
+`/magazine-delivery-batches/{id}`
+
+|
+
+Delete batch if not finalized
+
+|
+|
+
+POST
+
+|
+
+`/magazine-delivery-batches/{id}/generate`
+
+|
+
+Generate delivery batch
+
+|
+|
+
+GET
+
+|
+
+`/magazine-delivery-batches/{id}/items`
+
+|
+
+Get batch items
+
+|
+|
+
+GET, POST
+
+|
+
+`/magazine-label-batches`
+
+|
+
+List or create label batches
+
+|
+|
+
+GET
+
+|
+
+`/magazine-label-batches/{id}`
+
+|
+
+Get label batch
+
+|
+|
+
+PATCH
+
+|
+
+`/magazine-label-batches/{id}`
+
+|
+
+Update batch
+
+|
+|
+
+DELETE
+
+|
+
+`/magazine-label-batches/{id}`
+
+|
+
+Delete batch if permitted
+
+|
+|
+
+POST
+
+|
+
+`/magazine-label-batches/{id}/generate`
+
+|
+
+Generate labels
+
+|
+|
+
+GET
+
+|
+
+`/magazine-label-batches/{id}/items`
+
+|
+
+Get label batch items
+
+|
+|
+
+PATCH
+
+|
+
+`/magazine-label-batch-items/{id}`
+
+|
+
+Update label item if permitted
+
+|
+|
+
+DELETE
+
+|
+
+`/magazine-label-batch-items/{id}`
+
+|
+
+Remove item if permitted
+
+|
+|
+
+GET
+
+|
+
+`/magazine-label-batches/{id}/print`
+
+|
+
+Generate printable labels
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/magazine-history`
+
+|
+
+Get member's delivery and return history
+
+|
+
+Label batch creation should accept filters such as district, taluk, membership type, subscription status and receipt allocation eligibility.
+
+## 7. WhatsApp notifications
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/notification-templates`
+
+|
+
+List or create templates
+
+|
+|
+
+GET
+
+|
+
+`/notification-templates/{id}`
+
+|
+
+Get template
+
+|
+|
+
+PATCH
+
+|
+
+`/notification-templates/{id}`
+
+|
+
+Update template
+
+|
+|
+
+DELETE
+
+|
+
+`/notification-templates/{id}`
+
+|
+
+Delete template if permitted
+
+|
+|
+
+POST
+
+|
+
+`/notification-templates/{id}/submit-for-approval`
+
+|
+
+Submit template to provider
+
+|
+|
+
+GET
+
+|
+
+`/notification-campaigns`
+
+|
+
+List campaigns
+
+|
+|
+
+POST
+
+|
+
+`/notification-campaigns`
+
+|
+
+Create campaign
+
+|
+|
+
+GET
+
+|
+
+`/notification-campaigns/{id}`
+
+|
+
+Get campaign
+
+|
+|
+
+PATCH
+
+|
+
+`/notification-campaigns/{id}`
+
+|
+
+Update draft campaign
+
+|
+|
+
+DELETE
+
+|
+
+`/notification-campaigns/{id}`
+
+|
+
+Delete draft campaign
+
+|
+|
+
+POST
+
+|
+
+`/notification-campaigns/{id}/recipients`
+
+|
+
+Add recipients
+
+|
+|
+
+GET
+
+|
+
+`/notification-campaigns/{id}/recipients`
+
+|
+
+List recipients
+
+|
+|
+
+DELETE
+
+|
+
+`/notification-campaigns/{id}/recipients/{recipient_id}`
+
+|
+
+Remove recipient
+
+|
+|
+
+POST
+
+|
+
+`/notification-campaigns/{id}/send`
+
+|
+
+Send campaign
+
+|
+|
+
+POST
+
+|
+
+`/notifications/send-individual`
+
+|
+
+Send individual notification
+
+|
+|
+
+POST
+
+|
+
+`/notifications/send-bulk`
+
+|
+
+Send bulk notification using filters
+
+|
+|
+
+POST
+
+|
+
+`/notifications/import-phones`
+
+|
+
+Import CSV phone numbers
+
+|
+|
+
+GET
+
+|
+
+`/notification-import-batches`
+
+|
+
+List CSV import batches
+
+|
+|
+
+GET
+
+|
+
+`/notification-import-batches/{id}`
+
+|
+
+Get import results and errors
+
+|
+|
+
+GET
+
+|
+
+`/notification-messages`
+
+|
+
+List messages
+
+|
+|
+
+GET
+
+|
+
+`/notification-messages/{id}`
+
+|
+
+Get message details
+
+|
+|
+
+GET
+
+|
+
+`/notification-delivery-logs`
+
+|
+
+List delivery logs
+
+|
+|
+
+GET
+
+|
+
+`/notification-delivery-logs/{id}`
+
+|
+
+Get delivery log
+
+|
+|
+
+POST
+
+|
+
+`/notifications/provider-webhook`
+
+|
+
+Receive provider delivery status updates
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/notifications`
+
+|
+
+Get member notification history
+
+|
+
+## 8. Events
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/events`
+
+|
+
+List or create events
+
+|
+|
+
+GET
+
+|
+
+`/events/{id}`
+
+|
+
+Get event details
+
+|
+|
+
+PATCH
+
+|
+
+`/events/{id}`
+
+|
+
+Update event
+
+|
+|
+
+DELETE
+
+|
+
+`/events/{id}`
+
+|
+
+Delete event if permitted
+
+|
+|
+
+GET, POST
+
+|
+
+`/events/{id}/participants`
+
+|
+
+List or add participants
+
+|
+|
+
+GET
+
+|
+
+`/event-participants/{id}`
+
+|
+
+Get participant
+
+|
+|
+
+PATCH
+
+|
+
+`/event-participants/{id}`
+
+|
+
+Update participant
+
+|
+|
+
+DELETE
+
+|
+
+`/event-participants/{id}`
+
+|
+
+Remove participant
+
+|
+|
+
+GET, POST
+
+|
+
+`/events/{id}/members`
+
+|
+
+List or link members to event
+
+|
+|
+
+DELETE
+
+|
+
+`/events/{id}/members/{member_id}`
+
+|
+
+Remove member-event link
+
+|
+|
+
+GET, POST
+
+|
+
+`/events/{id}/attachments`
+
+|
+
+List or upload attachments
+
+|
+|
+
+DELETE
+
+|
+
+`/events/{id}/attachments/{attachment_id}`
+
+|
+
+Remove attachment
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/events`
+
+|
+
+Get events linked to member
+
+|
+|
+
+POST
+
+|
+
+`/events/{id}/notifications`
+
+|
+
+Prepare/send event notification
+
+|
+
+
+## 9. Affiliations
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/affiliations`
+
+|
+
+List or create affiliations
+
+|
+|
+
+GET
+
+|
+
+`/affiliations/{id}`
+
+|
+
+Get affiliation
+
+|
+|
+
+PATCH
+
+|
+
+`/affiliations/{id}`
+
+|
+
+Update affiliation
+
+|
+|
+
+DELETE
+
+|
+
+`/affiliations/{id}`
+
+|
+
+Delete or deactivate affiliation
+
+|
+|
+
+GET, POST
+
+|
+
+`/affiliations/{id}/contacts`
+
+|
+
+List or add contacts
+
+|
+|
+
+GET
+
+|
+
+`/affiliation-contacts/{id}`
+
+|
+
+Get contact
+
+|
+|
+
+PATCH
+
+|
+
+`/affiliation-contacts/{id}`
+
+|
+
+Update contact
+
+|
+|
+
+DELETE
+
+|
+
+`/affiliation-contacts/{id}`
+
+|
+
+Delete contact
+
+|
+|
+
+GET
+
+|
+
+`/affiliations/{id}/magazine-settings`
+
+|
+
+Get delivery settings
+
+|
+|
+
+PUT
+
+|
+
+`/affiliations/{id}/magazine-settings`
+
+|
+
+Configure delivery settings
+
+|
+|
+
+GET
+
+|
+
+`/affiliations/{id}/labels`
+
+|
+
+Get eligible label records
+
+|
+
+## 10. Associates
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/associates`
+
+|
+
+List or create associates
+
+|
+|
+
+GET
+
+|
+
+`/associates/{id}`
+
+|
+
+Get associate
+
+|
+|
+
+PATCH
+
+|
+
+`/associates/{id}`
+
+|
+
+Update associate
+
+|
+|
+
+DELETE
+
+|
+
+`/associates/{id}`
+
+|
+
+Delete or deactivate associate
+
+|
+|
+
+GET
+
+|
+
+`/associates/{id}/magazine-settings`
+
+|
+
+Get delivery settings
+
+|
+|
+
+PUT
+
+|
+
+`/associates/{id}/magazine-settings`
+
+|
+
+Configure delivery settings
+
+|
+|
+
+GET
+
+|
+
+`/associates/{id}/labels`
+
+|
+
+Get eligible label records
+
+|
+
+## 11. Press and media
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/press-media`
+
+|
+
+List or create press/media records
+
+|
+|
+
+GET
+
+|
+
+`/press-media/{id}`
+
+|
+
+Get record
+
+|
+|
+
+PATCH
+
+|
+
+`/press-media/{id}`
+
+|
+
+Update record
+
+|
+|
+
+DELETE
+
+|
+
+`/press-media/{id}`
+
+|
+
+Delete or deactivate record
+
+|
+|
+
+GET
+
+|
+
+`/press-media/{id}/magazine-settings`
+
+|
+
+Get delivery settings
+
+|
+|
+
+PUT
+
+|
+
+`/press-media/{id}/magazine-settings`
+
+|
+
+Configure delivery settings
+
+|
+|
+
+GET
+
+|
+
+`/press-media/{id}/labels`
+
+|
+
+Get eligible label records
+
+|
+
+## 12. Managing committee
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/committee-categories`
+
+|
+
+List or create categories
+
+|
+|
+
+GET
+
+|
+
+`/committee-categories/{id}`
+
+|
+
+Get category
+
+|
+|
+
+PATCH
+
+|
+
+`/committee-categories/{id}`
+
+|
+
+Update category
+
+|
+|
+
+DELETE
+
+|
+
+`/committee-categories/{id}`
+
+|
+
+Delete category if unused
+
+|
+|
+
+GET, POST
+
+|
+
+`/committee-subcategories`
+
+|
+
+List or create subcategories
+
+|
+|
+
+GET
+
+|
+
+`/committee-subcategories/{id}`
+
+|
+
+Get subcategory
+
+|
+|
+
+PATCH
+
+|
+
+`/committee-subcategories/{id}`
+
+|
+
+Update subcategory
+
+|
+|
+
+DELETE
+
+|
+
+`/committee-subcategories/{id}`
+
+|
+
+Delete subcategory if unused
+
+|
+|
+
+GET, POST
+
+|
+
+`/committee-members`
+
+|
+
+List or create committee members
+
+|
+|
+
+GET
+
+|
+
+`/committee-members/{id}`
+
+|
+
+Get committee member
+
+|
+|
+
+PATCH
+
+|
+
+`/committee-members/{id}`
+
+|
+
+Update committee member
+
+|
+|
+
+DELETE
+
+|
+
+`/committee-members/{id}`
+
+|
+
+Delete or deactivate committee member
+
+|
+|
+
+GET, POST
+
+|
+
+`/committee-members/{id}/links`
+
+|
+
+List or create member links
+
+|
+|
+
+DELETE
+
+|
+
+`/committee-members/{id}/links/{link_id}`
+
+|
+
+Remove member link
+
+|
+|
+
+GET, POST
+
+|
+
+`/committee-terms`
+
+|
+
+List or create committee terms
+
+|
+|
+
+GET
+
+|
+
+`/committee-terms/{id}`
+
+|
+
+Get term
+
+|
+|
+
+PATCH
+
+|
+
+`/committee-terms/{id}`
+
+|
+
+Update term
+
+|
+|
+
+DELETE
+
+|
+
+`/committee-terms/{id}`
+
+|
+
+Delete term if permitted
+
+|
+|
+
+PATCH
+
+|
+
+`/committee-members/{id}/website-visibility`
+
+|
+
+Toggle website visibility
+
+|
+|
+
+GET
+
+|
+
+`/website/committee`
+
+|
+
+Get committee members configured for public display
+
+|
+
+## 13. Reports and exports
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET
+
+|
+
+`/reports/unapproved-members`
+
+|
+
+Pending/unapproved member report
+
+|
+|
+
+GET
+
+|
+
+`/reports/approved-members`
+
+|
+
+Approved members with configurable fields
+
+|
+|
+
+GET
+
+|
+
+`/reports/members-by-location`
+
+|
+
+District, taluk and postal-code reports
+
+|
+|
+
+GET
+
+|
+
+`/reports/members-by-gender`
+
+|
+
+Gender-based report
+
+|
+|
+
+GET
+
+|
+
+`/reports/members-by-type`
+
+|
+
+Membership-type report
+
+|
+|
+
+GET
+
+|
+
+`/reports/magazine/label-status`
+
+|
+
+Pending/generated label report
+
+|
+|
+
+GET
+
+|
+
+`/reports/magazine/returns`
+
+|
+
+Magazine returns report
+
+|
+|
+
+GET
+
+|
+
+`/reports/magazine/delivery`
+
+|
+
+Magazine delivery report
+
+|
+|
+
+GET
+
+|
+
+`/reports/receipts`
+
+|
+
+Receipt report with filters
+
+|
+|
+
+GET
+
+|
+
+`/reports/receipt-members`
+
+|
+
+Members grouped by receipt
+
+|
+|
+
+GET
+
+|
+
+`/reports/payments`
+
+|
+
+Payment and reconciliation report
+
+|
+|
+
+GET
+
+|
+
+`/reports/notifications`
+
+|
+
+Campaign and delivery report
+
+|
+|
+
+GET
+
+|
+
+`/reports/events`
+
+|
+
+Event and participant report
+
+|
+|
+
+GET
+
+|
+
+`/reports/committee`
+
+|
+
+Committee report
+
+|
+|
+
+GET
+
+|
+
+`/reports/activity`
+
+|
+
+User activity report
+
+|
+|
+
+GET
+
+|
+
+`/reports/member-timeline`
+
+|
+
+Member activity report
+
+|
+|
+
+GET, POST
+
+|
+
+`/saved-reports`
+
+|
+
+List or save report configuration
+
+|
+|
+
+GET
+
+|
+
+`/saved-reports/{id}`
+
+|
+
+Get saved report
+
+|
+|
+
+PATCH
+
+|
+
+`/saved-reports/{id}`
+
+|
+
+Update saved report
+
+|
+|
+
+DELETE
+
+|
+
+`/saved-reports/{id}`
+
+|
+
+Delete saved report
+
+|
+|
+
+POST
+
+|
+
+`/reports/export`
+
+|
+
+Export a report using selected filters and fields
+
+|
+|
+
+GET
+
+|
+
+`/report-export-logs`
+
+|
+
+List export history
+
+|
+|
+
+GET
+
+|
+
+`/report-export-logs/{id}`
+
+|
+
+Get export status and file information
+
+|
+
+Report endpoints should accept appropriate filters and support CSV or Excel export where required. Restrict access to reports containing sensitive member information.
+
+## 14. Activity logs, attachments and system administration
+
+### Activity tracking
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET
+
+|
+
+`/activity-logs`
+
+|
+
+List user activity logs
+
+|
+|
+
+GET
+
+|
+
+`/activity-logs/{id}`
+
+|
+
+Get activity log details
+
+|
+|
+
+GET
+
+|
+
+`/members/{id}/activity-logs`
+
+|
+
+Get member-specific activity
+
+|
+|
+
+GET
+
+|
+
+`/audit/member/{id}`
+
+|
+
+Get member audit history, if exposed as a separate API
+
+|
+
+Activity logs should generally be append-only. Avoid normal update/delete endpoints for audit records; use restricted retention or archival processes instead.
+
+### File attachments
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+POST
+
+|
+
+`/attachments`
+
+|
+
+Upload a file
+
+|
+|
+
+GET
+
+|
+
+`/attachments/{id}`
+
+|
+
+Get file metadata or authorized download
+
+|
+|
+
+PATCH
+
+|
+
+`/attachments/{id}`
+
+|
+
+Update permitted metadata
+
+|
+|
+
+DELETE
+
+|
+
+`/attachments/{id}`
+
+|
+
+Remove file according to retention policy
+
+|
+
+### Approval workflows
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET, POST
+
+|
+
+`/approval-workflows`
+
+|
+
+List or create workflow definitions
+
+|
+|
+
+GET
+
+|
+
+`/approval-workflows/{id}`
+
+|
+
+Get workflow
+
+|
+|
+
+PATCH
+
+|
+
+`/approval-workflows/{id}`
+
+|
+
+Update workflow
+
+|
+|
+
+DELETE
+
+|
+
+`/approval-workflows/{id}`
+
+|
+
+Delete workflow if unused
+
+|
+|
+
+GET
+
+|
+
+`/approval-workflows/{id}/actions`
+
+|
+
+Get configured workflow actions
+
+|
+|
+
+POST
+
+|
+
+`/approval-workflows/{id}/actions`
+
+|
+
+Add workflow action
+
+|
+|
+
+PATCH
+
+|
+
+`/approval-actions/{id}`
+
+|
+
+Update action
+
+|
+|
+
+DELETE
+
+|
+
+`/approval-actions/{id}`
+
+|
+
+Delete action if permitted
+
+|
+|
+
+GET
+
+|
+
+`/approval/inbox`
+
+|
+
+Get approvals awaiting current user
+
+|
+|
+
+GET
+
+|
+
+`/approval/history`
+
+|
+
+Get approval history
+
+|
+
+### Number sequences and system errors
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET
+
+|
+
+`/number-sequences`
+
+|
+
+List number sequence configurations
+
+|
+|
+
+POST
+
+|
+
+`/number-sequences`
+
+|
+
+Create sequence configuration
+
+|
+|
+
+GET
+
+|
+
+`/number-sequences/{id}`
+
+|
+
+Get sequence
+
+|
+|
+
+PATCH
+
+|
+
+`/number-sequences/{id}`
+
+|
+
+Update sequence configuration
+
+|
+|
+
+GET
+
+|
+
+`/system-errors`
+
+|
+
+Restricted system error listing
+
+|
+|
+
+GET
+
+|
+
+`/system-errors/{id}`
+
+|
+
+Get error details for authorized administrators
+
+|
+
+Number generation should be handled atomically in the backend. Do not let the frontend decide permanent membership numbers or receipt numbers.
+
+
+## 15. Additional APIs you should include
+
+These are supporting APIs that make the modules easier to use from React.
+
+|
+Method
+
+|
+
+Endpoint
+
+|
+
+Purpose
+
+|
+| --- | --- | --- |
+|
+
+GET
+
+|
+
+`/dashboard/summary`
+
+|
+
+Dashboard counts and summary cards
+
+|
+|
+
+GET
+
+|
+
+`/dashboard/recent-activities`
+
+|
+
+Recent activity feed
+
+|
+|
+
+GET
+
+|
+
+`/dashboard/pending-approvals`
+
+|
+
+Pending approvals count/list
+
+|
+|
+
+GET
+
+|
+
+`/dropdowns/membership-types`
+
+|
+
+Membership type dropdown
+
+|
+|
+
+GET
+
+|
+
+`/dropdowns/locations`
+
+|
+
+Location dropdown data
+
+|
+|
+
+GET
+
+|
+
+`/dropdowns/document-types`
+
+|
+
+Document type dropdown
+
+|
+|
+
+GET
+
+|
+
+`/dropdowns/service-types`
+
+|
+
+Service type dropdown
+
+|
+|
+
+GET
+
+|
+
+`/dropdowns/users`
+
+|
+
+User dropdown for authorized screens
+
+|
+|
+
+GET
+
+|
+
+`/dropdowns/committee-categories`
+
+|
+
+Committee category dropdown
+
+|
+|
+
+GET
+
+|
+
+`/search`
+
+|
+
+Unified search, subject to permissions
+
+|
+|
+
+GET
+
+|
+
+`/health`
+
+|
+
+Application health check
+
+|
+|
+
+GET
+
+|
+
+`/version`
+
+|
+
+API version information
+
+|
+
+## 16. API implementation rules
+
+Use these rules consistently across all modules:
+
+1. Authentication: Protect private APIs with authentication. Enforce role and permission checks in FastAPI, not only in React.
+
+2. Validation: Validate request bodies, IDs, file types, required fields and related database records.
+
+3. Pagination: Return pagination metadata for large lists.
+
+4. Transactions: Use database transactions for operations that change multiple related tables, such as approving a membership and assigning its number.
+
+5. Deletion: Use soft deletion where records must remain for audit, payment, membership or legal history. Permanent deletion should be restricted.
+
+6. Audit fields: Populate `created_by`, `updated_by` and relevant deletion fields from the authenticated user, not from untrusted frontend values.
+
+7. Status values: Define allowed status values and transitions separately for each workflow. Do not use one ambiguous status field for unrelated processes.
+
+8. File access: Check permissions before returning document or attachment download links.
+
+9. Errors: Return consistent error responses, including validation details and useful messages.
+
+10. Documentation: Enable FastAPI OpenAPI/Swagger documentation and describe each endpoint's request body, response model, permissions and error codes.
+
+## 17. Recommended development order
+
+* Phase 1 – Foundation
+
+  Authentication, users, roles, permissions, settings and location masters.
+
+* Phase 2 – Membership
+
+  Registration, duplicate validation, member profiles, documents, approval, membership numbers, KYC and change requests.
+
+* Phase 3 – Financial operations
+
+  Receipts, receipt items, allocations, online payments, cancellations and refunds.
+
+* Phase 4 – Magazine operations
+
+  Subscriptions, delivery settings, pauses, returns, batches and labels.
+
+* Phase 5 – Other management modules
+
+  Events, affiliations, associates, press/media and managing committee.
+
+* Phase 6 – Communication and reporting
+
+  WhatsApp campaigns, imports, delivery logs, reports, exports and dashboards.
+
+* Phase 7 – Audit and hardening
+
+  Activity history, approval workflow configuration, access-control testing, error handling and API documentation.
+
+Important: This is the proposed API inventory for the scope, not a statement that these routes already exist in your FastAPI project. Some database tables are internal relationship, history or logging tables; expose them through controlled business endpoints rather than automatically creating unrestricted CRUD APIs for every table.
+Not exactly. The API list is complete as a proposed backend checklist, but that does not mean the backend is already implemented or finished.
+
+You have the planned endpoints and module flow. To say the backend is done, the FastAPI routes, database operations, validation, permissions and workflows must actually be implemented and tested.
+
+Backend completion checklist
+Backend readiness
+0/14 checked
+All required API routes implemented in FastAPI
+SQLAlchemy models match the PostgreSQL schema
+Alembic migrations run successfully
+CRUD operations work for all required modules
+Foreign keys, unique constraints and validations are enforced
+Authentication, roles and permissions are enforced
+Membership approval, numbering and change-request workflows work
+Receipt, payment, cancellation and refund workflows work
+Magazine delivery, pause, return and label generation work
+WhatsApp integration and provider callbacks work
+File uploads and secure downloads work
+Reports, filters, pagination and exports work
+Audit logs and member timelines are recorded correctly
+API tests, error handling and Swagger documentation are completed
+
+Check each item only after confirming it is implemented and working. This checklist tracks your review in this conversation.
+
+Bottom line: The planning/API-definition part is done. The backend coding and verification are not confirmed done yet. Once these items are implemented and tested, you can consider the backend ready and move on to frontend integration.
+
+U LSITED ALL APIS RIGHT OR ANYTHING PENDING
+
+Yes, I listed the APIs for all the major modules in your HMS MMA scope, including CRUD and the main workflows.
+
+But I wouldn't call the list 100% final yet. A few supporting APIs and some detailed workflow endpoints may still need to be added based on your exact business rules and database schema.
+
+APIs to add or confirm before finalizing
+
+Module
+
+	
+
+Additional API to consider
+
+	
+
+Why
+
+
+
+
+Membership
+
+	
+
+GET /members/{id}/receipts and GET /members/{id}/documents
+
+	
+
+Convenient profile data retrieval (already included in the earlier list).
+
+
+
+
+Membership
+
+	
+
+GET /members/{id}/services, POST /members/{id}/services/{service_id}/usage
+
+	
+
+Track service usage consistently.
+
+
+
+
+Membership
+
+	
+
+GET /members/{id}/deletion-requests
+
+	
+
+View deletion request history for a member.
+
+
+
+
+Receipts
+
+	
+
+GET /receipts/{id}/download
+
+	
+
+Download receipt PDF, if needed separately from printing.
+
+
+
+
+Magazine
+
+	
+
+GET /magazine/eligible-members
+
+	
+
+Preview which members qualify for a delivery or label batch.
+
+
+
+
+Magazine
+
+	
+
+POST /magazine-label-batches/{id}/finalize
+
+	
+
+Finalize a batch after review.
+
+
+
+
+Notifications
+
+	
+
+POST /notification-campaigns/{id}/cancel
+
+	
+
+Cancel a queued campaign, where supported.
+
+
+
+
+Notifications
+
+	
+
+GET /notification-campaigns/{id}/delivery-summary
+
+	
+
+Show sent, delivered, failed and pending counts.
+
+
+
+
+Events
+
+	
+
+GET /events/{id}/participants/export
+
+	
+
+Export participant lists.
+
+
+
+
+Reports
+
+	
+
+GET /reports/{report_key}/fields
+
+	
+
+Return configurable columns for report generation.
+
+
+
+
+Dashboard
+
+	
+
+GET /dashboard/statistics
+
+	
+
+Provide additional dashboard statistics.
+
+
+
+
+System
+
+	
+
+GET /audit-logs
+
+	
+
+Provide a restricted audit-log view if required by administrators.
+
+Some of these capabilities could instead be handled through existing endpoints, so they don't necessarily need separate routes.
+
+Final answer
+
+The earlier list covers the main modules and their CRUD operations, but it is a proposed API inventory—not a verified, exhaustive list of every endpoint your application needs. Before development is considered complete, compare it against each database table, screen, permission, and business workflow. Internal tables such as history, relationship, token and logging tables should not automatically receive unrestricted CRUD endpoints.

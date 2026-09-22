@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Environment / secrets
+.env
+
+# Local uploads and databases
+hms/uploads/
+hms/backend/uploads/
+*.db
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

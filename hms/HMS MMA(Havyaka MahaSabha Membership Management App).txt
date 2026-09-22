@@ -1,0 +1,105 @@
+﻿HMS MMA(Havyaka MahaSabha Membership Management App)
+Scope (21-09-2026)
+Web Panel Features
+1. Masters 
+* Managing States, Districts, Taluks: Creating all State, District and Taluk and managing those to use it while registering members and filters.
+   * Managing Postal codes: Creating and managing all postal codes of India including importing.ANd mapping to State,District and Taluks.
+* Managing Membership Types: Managing the type of Membership like Poshaka, Mahaposhaka including its price and price history when it has changed.
+ 
+2. Users
+* Managing User roles & Privileges:  Creating and Managing the users role and configuring the privileges to the roles
+* Managing Users:  Creating and managing users including assigning roles.
+
+
+3. Membership 
+* Creating new Members: Option to register the Members (offline members) using the membership form with both kannada & english. Validating for duplicate entries. An user with a membership role will be created.
+* Listing Registered members (Registered from website or offline): List and manage (Edit/Update/Delete) the registered members from both Offline or Online (website). Filters to list the members by District, Taluk, Gender, Active/Inactive, Approved/Unapproved, membership type
+* Creating an approved members profile with all details of services utilizations of Havyaka Mahasabha
+ An members profile screen with all details of member like personal details, membership details , service opted details (Magazine, Temple, Mangalya, Hall etc)
+* Membership Deletion Request & approval with reason including soft delete & permanent delete: There should be an option to delete the registered members with option of request to delete  and direct delete and also option to specify the reason for deletion.Also need option to delete permanently.
+* Membership activation:  Option to activate request and approve the registered members by assigning the permanent membership number to them.
+* Membership type change option: Option to upgrade the membership type in case of change with maintaining the history and new receipt for the same. 
+* Membership Details Change request approval (received from mobile app) 
+All membership information changes request should appear for approval and admin role users or users with privileges to approve can be approved or declined the request. Changes will reflect on membership profile immediately after approvals. Changes history will be recorded in membership profile 
+* Membership KYC Update: Option to send a link (if no mobile app) or notification (for mobile app) to update the Members basic information like mobile number, address, email id etc on regular specified intervals. Updated information will be stored as request, on approval from Admin it will reflect in the members profile
+
+
+4. Magazine
+* Manage magazine deliver: Option to stop or start magazines to the members after the registration
+* Label printing based on the filters like district-wise, taluk-wise for receipt generated members
+* Magazine Delivery pause option: Incase of members request option to pause and start the magazine delivery with note. Which will skip in the label print list.
+* Managing Magazine return entries: Option to mark the magazine returns with respect to the members and highlight the returns list in the profile and during the label print.
+
+
+5. Receipts 
+* Add Receipts: Receipt entry option for both Online and offline members registration. Managing receipt entries.
+* Assign receipts to members: Option to map the created receipt to the members. On assignment members should start a list in the label list to print. 
+
+
+6. Reports
+* Unapproved members report
+* Labels report (pending/generated)
+* All Approved members report (In Kannada or English) with option to display fields in print
+* Districtwise, talukwise members report
+* Genderwise members report
+* Membership type based report
+* Magazine returned report
+* Receipt wise members report
+* Receipt reports 
+* Any other additional reports from existing data 
+
+
+
+
+
+
+
+
+
+
+
+
+7. Notification (Whatsapp)
+* Notification sending on membership activation (Template based)
+* Individual custom notification for member (Template based)
+* Bulk notification system (Template based) : Option to send bulk whatsapp message to the registered member with filter or to all. Option to upload the csv file and send notification to those numbers by selecting the approved template.
+
+
+8. Activity Management
+* All user activity logs should be registered: From login to logout what all the activities performed for example created member, edited member etc should be recorded under each user activity tab to track the history.
+* Members activity logs with timeline to be recorded: each members activity such as when created and by whom, when and what services utilized and what data updated all those activities data should be recorded
+9. Events 
+* Option for Updating the events happening from Sri Akhila Havyaka Mahasabha including the Guests, Honourable person, date, invitation copy upload, location etc. 
+* Updated Guests and honors details should be reflected in the profile screen of that specific person (if the person is Havyaka Member)
+* This event can be used to send the notification
+
+
+10. Affiliation
+* Option to add the affiliate groups of Havyaka with all necessary information.
+* Option to enable or disable Magazine delivery 
+* List these in label print along with the members list
+
+
+11. Associates
+* Option to add/register the Associates who are engaged with Sri Akhila Havyaka Mahasabha without as member
+* Option to enable or disable Magazine delivery 
+* List these in label print along with the members list
+12. Press & Media
+* Option to add/register the Press or Media who are engaged with Sri Akhila Havyaka Mahasabha
+* Option to enable or disable Magazine delivery 
+* List these in label print along with the members list
+
+
+
+
+
+
+
+
+
+
+13. Managing Committee
+* Option to add committee members details (Current) with respect to each category and sub category
+* Option to add and manage Category and sub Category such as ಬೆಂಗಳೂರು ಕ್ಷೇತ್ರ, ಆಡಳಿತ ಮಂಡಳಿಯ ನಾಮಾಂಕಿತ ನಿರ್ದೇಶಕರು,ಶ್ರೀ ಸಿದ್ಧಿವಿನಾಯಕ ದೇವಾಲಯ ,ಶ್ರೀ ವಿದ್ಯಾಗಣಪತಿ ದೇವಾಲಯ  etc
+* Option to enable/disable display in website for each category
+* Enabled category committee details should be displayed on website in the specific page
