@@ -7,6 +7,7 @@ class NotificationTemplateBase(BaseModel):
     provider_template_id: Optional[str] = None
     language: str = "en"
     content: str
+    purpose: str = "GENERAL"
     status: bool = True
 
 class NotificationTemplateCreate(NotificationTemplateBase):
@@ -28,6 +29,16 @@ class NotificationCampaignCreate(BaseModel):
     target_audience: Optional[str] = None
     scheduled_at: Optional[datetime] = None
     status: str = "PENDING"
+    # MEMBERS (default): pick recipients from registered members using
+    # member_filters; empty filters = all active members.
+    member_filters: Optional[dict] = None
+
+
+class BulkSendRequest(BaseModel):
+    """Body for POST /notifications/send-bulk."""
+
+    template_id: int
+    member_filters: Optional[dict] = None
 
 
 class NotificationCampaign(BaseModel):
@@ -37,6 +48,9 @@ class NotificationCampaign(BaseModel):
     target_audience: Optional[str] = None
     scheduled_at: Optional[datetime] = None
     status: str
+    source: str = "MEMBERS"
+    member_filters: Optional[dict] = None
+    total_recipients: int = 0
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 

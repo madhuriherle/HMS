@@ -13,6 +13,9 @@ EDITABLE_MEMBER_FIELDS: Set[str] = {
     "state_id", "district_id", "taluk_id", "pincode_id",
 }
 
+VALID_GENDERS = {"MALE", "FEMALE", "OTHER"}
+
+
 class MemberBase(BaseModel):
     first_name_en: str
     middle_name_en: Optional[str] = None
@@ -22,24 +25,106 @@ class MemberBase(BaseModel):
     date_of_birth: Optional[date] = None
     mobile: Optional[str] = None
     mobile_country_code: str = "+91"
+    alternate_mobile: Optional[str] = None
     email: Optional[str] = None
-    
+
     address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
     locality: Optional[str] = None
+    address_line1_kn: Optional[str] = None
+    address_line2_kn: Optional[str] = None
+    locality_kn: Optional[str] = None
     state_id: Optional[int] = None
     district_id: Optional[int] = None
     taluk_id: Optional[int] = None
     pincode_id: Optional[int] = None
-    
+
     registration_source: str = "ONLINE"
+
+    @field_validator("gender")
+    @classmethod
+    def _validate_gender(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        v = v.strip().upper()
+        if v not in VALID_GENDERS:
+            raise ValueError(f"gender must be one of: {', '.join(sorted(VALID_GENDERS))}")
+        return v
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _validate_dob(cls, v: Optional[date]) -> Optional[date]:
+        if v and v > date.today():
+            raise ValueError("date_of_birth cannot be in the future")
+        return v
+
+    @field_validator("mobile", "alternate_mobile")
+    @classmethod
+    def _validate_mobile(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        v = v.strip()
+        if not v.isdigit() or not (10 <= len(v) <= 12):
+            raise ValueError("mobile must be 10-12 digits")
+        return v
+
 
 class MemberCreate(MemberBase):
     pass
 
+
 class MemberUpdate(BaseModel):
+    """Admin edit — every column is editable except identity/status fields
+    that have dedicated flows (member_code via approval, statuses via
+    approve/activate endpoints)."""
     first_name_en: Optional[str] = None
-    approval_status: Optional[str] = None
-    member_status: Optional[str] = None
+    middle_name_en: Optional[str] = None
+    last_name_en: Optional[str] = None
+    full_name_kn: Optional[str] = None
+    gender: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    mobile: Optional[str] = None
+    mobile_country_code: Optional[str] = None
+    alternate_mobile: Optional[str] = None
+    email: Optional[str] = None
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    locality: Optional[str] = None
+    address_line1_kn: Optional[str] = None
+    address_line2_kn: Optional[str] = None
+    locality_kn: Optional[str] = None
+    state_id: Optional[int] = None
+    district_id: Optional[int] = None
+    taluk_id: Optional[int] = None
+    pincode_id: Optional[int] = None
+
+    @field_validator("gender")
+    @classmethod
+    def _validate_gender(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        v = v.strip().upper()
+        if v not in VALID_GENDERS:
+            raise ValueError(f"gender must be one of: {', '.join(sorted(VALID_GENDERS))}")
+        return v
+
+    @field_validator("date_of_birth")
+    @classmethod
+    def _validate_dob(cls, v: Optional[date]) -> Optional[date]:
+        if v and v > date.today():
+            raise ValueError("date_of_birth cannot be in the future")
+        return v
+
+    @field_validator("mobile", "alternate_mobile")
+    @classmethod
+    def _validate_mobile(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        v = v.strip()
+        if not v.isdigit() or not (10 <= len(v) <= 12):
+            raise ValueError("mobile must be 10-12 digits")
+        return v
+
 
 class MemberInDBBase(MemberBase):
     id: int
@@ -48,11 +133,13 @@ class MemberInDBBase(MemberBase):
     approval_status: str
     member_status: str
     created_at: datetime
-    
+
     model_config = ConfigDict(from_attributes=True)
+
 
 class Member(MemberInDBBase):
     pass
+
 
 class MemberMembershipBase(BaseModel):
     member_id: int
@@ -60,17 +147,21 @@ class MemberMembershipBase(BaseModel):
     membership_number: Optional[str] = None
     status: str = "ACTIVE"
 
+
 class MemberMembershipCreate(MemberMembershipBase):
     pass
+
 
 class MemberMembershipUpdate(BaseModel):
     status: Optional[str] = None
     membership_number: Optional[str] = None
 
+
 class MemberMembership(MemberMembershipBase):
     id: int
     applied_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
 
 class MemberDocumentBase(BaseModel):
     member_id: int
@@ -78,16 +169,20 @@ class MemberDocumentBase(BaseModel):
     file_path: str
     original_filename: str
 
+
 class MemberDocumentCreate(MemberDocumentBase):
     pass
 
+
 class MemberDocumentUpdate(BaseModel):
     verification_status: Optional[str] = None
+
 
 class MemberDocument(MemberDocumentBase):
     id: int
     verification_status: str
     model_config = ConfigDict(from_attributes=True)
+
 
 class MemberProfileChangeRequestBase(BaseModel):
     member_id: int
@@ -105,17 +200,21 @@ class MemberProfileChangeRequestBase(BaseModel):
             raise ValueError("new_values must contain at least one field")
         return values
 
+
 class MemberProfileChangeRequestCreate(MemberProfileChangeRequestBase):
     pass
+
 
 class MembershipCreate(BaseModel):
     """Body for POST /members/{id}/memberships — member comes from the path."""
     membership_type_id: int
     status: str = "ACTIVE"
 
+
 class MemberProfileChangeRequestUpdate(BaseModel):
     status: Optional[str] = None
     review_note: Optional[str] = None
+
 
 class MemberProfileChangeRequest(MemberProfileChangeRequestBase):
     id: int

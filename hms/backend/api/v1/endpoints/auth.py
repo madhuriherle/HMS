@@ -80,6 +80,35 @@ def login(
         "token_type": "bearer",
     }
 
+@router.post("/logout")
+def logout(
+    request: Request,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    payload: Optional[RefreshRequest] = None,
+) -> Any:
+    """Logout: records the LOGOUT activity and revokes the refresh token when
+    one is supplied (access tokens simply expire)."""
+    from models.system import RefreshToken
+
+    if payload and payload.refresh_token:
+        row = db.query(RefreshToken).filter(
+            RefreshToken.token == payload.refresh_token,
+            RefreshToken.revoked == False,  # noqa: E712
+        ).first()
+        if row:
+            row.revoked = True
+    record_activity(
+        db,
+        user_id=current_user.id,
+        action="LOGOUT",
+        entity_type="users",
+        entity_id=current_user.id,
+        ip_address=request.client.host if request.client else None,
+    )
+    db.commit()
+    return {"message": "Logged out successfully"}
+
 @router.post("/refresh", response_model=Token)
 def refresh_token(payload: RefreshRequest, db: Session = Depends(deps.get_db)) -> Any:
     data = decode_token(payload.refresh_token)

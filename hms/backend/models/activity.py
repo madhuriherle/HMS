@@ -18,3 +18,5 @@ class MemberActivityLog(AuditMixin, Base):
     member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=False)
     action: Mapped[str] = mapped_column(String(50), nullable=False) 
     details: Mapped[dict] = mapped_column(JSON, nullable=True)
+    # Who performed the activity (nullable for system/online self-service rows).
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)

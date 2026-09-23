@@ -9,6 +9,9 @@ class NotificationTemplate(AuditMixin, Base):
     provider_template_id: Mapped[str] = mapped_column(String(100), nullable=True)
     language: Mapped[str] = mapped_column(String(10), default="en")
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # What the template is for: MEMBERSHIP_ACTIVATION, GENERAL, CUSTOM, ...;
+    # the activation hook looks its template up by this key.
+    purpose: Mapped[str] = mapped_column(String(50), default="GENERAL", nullable=False)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
 
 class NotificationCampaign(AuditMixin, Base):
@@ -19,6 +22,11 @@ class NotificationCampaign(AuditMixin, Base):
     target_audience: Mapped[str] = mapped_column(String(50), nullable=True) 
     scheduled_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="PENDING")
+    # MEMBERS: recipients chosen from registered members (with filters).
+    # CSV: recipients come from an uploaded number list.
+    source: Mapped[str] = mapped_column(String(20), default="MEMBERS", nullable=False)
+    member_filters: Mapped[dict] = mapped_column(JSON, nullable=True)
+    total_recipients: Mapped[int] = mapped_column(BigInteger, default=0)
 
 class NotificationRecipient(AuditMixin, Base):
     __tablename__ = "notification_recipients"
@@ -27,6 +35,8 @@ class NotificationRecipient(AuditMixin, Base):
     member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=True)
     mobile: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="PENDING")
+    # Per-recipient {{placeholders}} resolved at send time.
+    variables: Mapped[dict] = mapped_column(JSON, nullable=True)
 
 class NotificationMessage(AuditMixin, Base):
     __tablename__ = "notification_messages"

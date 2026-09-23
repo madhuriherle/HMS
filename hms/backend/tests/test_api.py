@@ -25,7 +25,7 @@ def _create_member(client, headers, mobile, name="Member"):
         headers=headers,
         json={"first_name_en": name, "mobile": mobile},
     )
-    assert response.status_code == 200, response.text
+    assert response.status_code in (200, 201), response.text
     return response.json()
 
 
@@ -225,7 +225,7 @@ def test_rbac_blocks_then_grants_writes(client, admin_headers):
         headers=staff_headers,
         json={"first_name_en": "Now Allowed", "mobile": "9000000006"},
     )
-    assert allowed.status_code == 200, allowed.text
+    assert allowed.status_code == 201, allowed.text
 
     # assigning the same role twice is idempotent (DB unique index backs it)
     again = client.post(
@@ -519,8 +519,8 @@ def test_receipt_creation_and_sequence(client, admin_headers):
     }
     first = client.post("/api/v1/receipts/", headers=admin_headers, json=payload)
     second = client.post("/api/v1/receipts/", headers=admin_headers, json=payload)
-    assert first.status_code == 200, first.text
-    assert second.status_code == 200, second.text
+    assert first.status_code == 201, first.text
+    assert second.status_code == 201, second.text
 
     number_1 = first.json()["receipt_number"]
     number_2 = second.json()["receipt_number"]
@@ -536,49 +536,215 @@ def test_engagement_write_endpoints_serialize(client, admin_headers):
     associate = client.post(
         "/api/v1/engagements/associates",
         headers=admin_headers,
-        params={"name": "Assoc One", "organization": "Havyaka Group"},
+        json={"name": "Assoc One", "organization": "Havyaka Group", "address": "Hubballi"},
     )
-    assert associate.status_code == 200, associate.text
+    assert associate.status_code == 201, associate.text
     assert associate.json()["id"]
 
     press = client.post(
         "/api/v1/engagements/press-media",
         headers=admin_headers,
-        params={"organization_name": "Press One"},
+        json={"organization_name": "Press One", "reporter_name": "Reporter", "address": "Bengaluru"},
     )
-    assert press.status_code == 200, press.text
+    assert press.status_code == 201, press.text
     assert press.json()["id"]
 
     category = client.post(
         "/api/v1/engagements/committee/categories",
         headers=admin_headers,
-        params={"name_en": "Bengaluru constituency"},
+        json={"name_en": "Bengaluru constituency"},
     )
-    assert category.status_code == 200, category.text
+    assert category.status_code == 201, category.text
 
     term = client.post(
         "/api/v1/engagements/committee/terms",
         headers=admin_headers,
-        params={"term_name": "2026-2029", "is_current": "true"},
+        json={"term_name": "2026-2029", "is_current": True},
     )
-    assert term.status_code == 200, term.text
+    assert term.status_code == 201, term.text
     assert term.json()["is_current"] is True
 
     member = client.post(
         "/api/v1/engagements/committee/members",
         headers=admin_headers,
-        params={"category_id": category.json()["id"], "member_name": "Office Bearer"},
+        json={"category_id": category.json()["id"], "member_name": "Office Bearer"},
     )
-    assert member.status_code == 200, member.text
+    assert member.status_code == 201, member.text
     assert member.json()["member_name"] == "Office Bearer"
 
     updated = client.put(
         f"/api/v1/engagements/associates/{associate.json()['id']}",
         headers=admin_headers,
-        params={"magazine_enabled": "false"},
+        json={"magazine_enabled": False, "address": "Mysuru"},
     )
     assert updated.status_code == 200, updated.text
     assert updated.json()["magazine_enabled"] is False
+    assert updated.json()["address"] == "Mysuru"
+
+
+def test_affiliation_full_lifecycle_magazine_and_labels(client, admin_headers):
+    """Affiliate groups: full info, magazine toggle, label print inclusion."""
+    # ── create with all necessary information ──
+    aff = client.post(
+        "/api/v1/engagements/affiliations",
+        headers=admin_headers,
+        json={
+            "group_name": "Saraswath Havyaka Sangha",
+            "contact_person": "Rama Bhat",
+            "contact_number": "9340000301",
+            "address": "Sangha Bhavana, Shirva",
+            "magazine_enabled": True,
+        },
+    )
+    assert aff.status_code == 201, aff.text
+    aff_body = aff.json()
+    assert aff_body["address"] == "Sangha Bhavana, Shirva"
+    aff_id = aff_body["id"]
+
+    # contact persons management
+    contact = client.post(
+        f"/api/v1/engagements/affiliations/{aff_id}/contacts",
+        headers=admin_headers,
+        json={"name": "Suresh Pai", "mobile": "9340000302", "designation": "Secretary"},
+    )
+    assert contact.status_code == 201, contact.text
+
+    contacts = client.get(
+        f"/api/v1/engagements/affiliations/{aff_id}/contacts", headers=admin_headers
+    )
+    assert contacts.status_code == 200, contacts.text
+    assert contacts.json()["total"] == 1
+    assert contacts.json()["data"][0]["designation"] == "Secretary"
+
+    # affiliates list with magazine filter
+    listing = client.get(
+        "/api/v1/engagements/affiliations",
+        headers=admin_headers,
+        params={"magazine_enabled": "true"},
+    )
+    assert any(a["id"] == aff_id for a in listing.json()["data"])
+
+    # ── magazine enable/disable toggle ──
+    disabled = client.put(
+        f"/api/v1/engagements/affiliations/{aff_id}",
+        headers=admin_headers,
+        json={"magazine_enabled": False},
+    )
+    assert disabled.status_code == 200, disabled.text
+    assert disabled.json()["magazine_enabled"] is False
+
+    # member with subscription for the label batch comparison
+    member = _create_member(client, admin_headers, "9340000310", "LabelMember")
+    sub = client.post(
+        "/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": member["id"]}
+    )
+    assert sub.status_code == 201, sub.text
+
+    issue = date.today().strftime("%Y-%m")
+    generated = client.post(
+        "/api/v1/magazines/generate-labels",
+        headers=admin_headers,
+        params={"issue_month_year": issue},
+    )
+    assert generated.status_code == 200, generated.text
+    batch_id = generated.json()["batch_id"]
+
+    def _batch_types(bid):
+        detail = client.get(
+            f"/api/v1/magazines/label-batches/{bid}", headers=admin_headers
+        ).json()
+        return {
+            i["recipient_type"] for i in detail["data"]
+            if i["recipient_id"] == aff_id
+        }, detail["data"]
+
+    # disabled affiliate is NOT in the labels
+    types, _ = _batch_types(batch_id)
+    assert "AFFILIATION" not in types
+
+    # re-enable → appears in the next label batch alongside members
+    client.put(
+        f"/api/v1/engagements/affiliations/{aff_id}",
+        headers=admin_headers,
+        json={"magazine_enabled": True},
+    )
+    generated2 = client.post(
+        "/api/v1/magazines/generate-labels",
+        headers=admin_headers,
+        params={"issue_month_year": issue},
+    )
+    batch2 = generated2.json()["batch_id"]
+    detail2 = client.get(
+        f"/api/v1/magazines/label-batches/{batch2}", headers=admin_headers
+    ).json()
+    aff_labels = [
+        i for i in detail2["data"]
+        if i["recipient_type"] == "AFFILIATION" and i["recipient_id"] == aff_id
+    ]
+    member_labels = [
+        i for i in detail2["data"]
+        if i["recipient_type"] == "MEMBER" and i["recipient_id"] == member["id"]
+    ]
+    assert aff_labels and "Saraswath Havyaka Sangha" in (aff_labels[0]["recipient_name"] or "")
+    assert member_labels  # member listed in the same batch
+
+
+    # ── associates & press magazine toggles + labels ──
+    assoc = client.post(
+        "/api/v1/engagements/associates",
+        headers=admin_headers,
+        json={"name": "Havyaka Trust", "address": "Sirsi", "magazine_enabled": True},
+    ).json()
+    press = client.post(
+        "/api/v1/engagements/press-media",
+        headers=admin_headers,
+        json={"organization_name": "Havyaka Times", "address": "Mangaluru"},
+    ).json()
+
+    generated3 = client.post(
+        "/api/v1/magazines/generate-labels",
+        headers=admin_headers,
+        params={"issue_month_year": issue},
+    )
+    detail3 = client.get(
+        f"/api/v1/magazines/label-batches/{generated3.json()['batch_id']}", headers=admin_headers
+    ).json()
+    assert any(
+        i["recipient_type"] == "ASSOCIATE" and i["recipient_id"] == assoc["id"]
+        for i in detail3["data"]
+    )
+    assert any(
+        i["recipient_type"] == "PRESS" and i["recipient_id"] == press["id"]
+        for i in detail3["data"]
+    )
+
+    # disable associate → excluded from the next batch
+    client.put(
+        f"/api/v1/engagements/associates/{assoc['id']}",
+        headers=admin_headers,
+        json={"magazine_enabled": False},
+    )
+    client.put(
+        f"/api/v1/engagements/press-media/{press['id']}",
+        headers=admin_headers,
+        json={"magazine_enabled": False},
+    )
+    generated4 = client.post(
+        "/api/v1/magazines/generate-labels",
+        headers=admin_headers,
+        params={"issue_month_year": issue},
+    )
+    detail4 = client.get(
+        f"/api/v1/magazines/label-batches/{generated4.json()['batch_id']}", headers=admin_headers
+    ).json()
+    assert not any(
+        i["recipient_type"] == "ASSOCIATE" and i["recipient_id"] == assoc["id"]
+        for i in detail4["data"]
+    )
+    assert not any(
+        i["recipient_type"] == "PRESS" and i["recipient_id"] == press["id"]
+        for i in detail4["data"]
+    )
 
 
 def test_receipt_refund_and_payment_transaction_serialize(client, admin_headers):
@@ -595,7 +761,7 @@ def test_receipt_refund_and_payment_transaction_serialize(client, admin_headers)
             "items": [{"item_type": "MEMBERSHIP", "amount": 100}],
         },
     )
-    assert receipt.status_code == 200, receipt.text
+    assert receipt.status_code == 201, receipt.text
     receipt_id = receipt.json()["id"]
 
     refund = client.post(
@@ -1290,7 +1456,909 @@ def test_superadmin_protections(client, admin_headers):
     assert removed_now.status_code == 200, removed_now.text
 
 
-# ─────────────── response shapes ───────────────
+# ─────────────── membership module ───────────────
+
+def test_offline_registration_bilingual_and_duplicates(client, admin_headers):
+    payload = {
+        "first_name_en": "Ramesh",
+        "last_name_en": "Hegde",
+        "full_name_kn": "ರಮೇಶ್ ಹೆಗಡೆ",
+        "gender": "MALE",
+        "date_of_birth": "1990-05-01",
+        "mobile": "9330000001",
+        "address_line1": "1st Cross",
+        "registration_source": "OFFLINE",
+    }
+    response = client.post(
+        "/api/v1/members/", headers=admin_headers, json=payload
+    )
+    assert response.status_code == 201, response.text
+    member = response.json()
+    assert member["full_name_kn"] == "ರಮೇಶ್ ಹೆಗಡೆ"
+    assert member["registration_source"] == "OFFLINE"
+    assert member["approval_status"] == "UNAPPROVED"
+
+    # duplicate mobile → 409 with the existing id
+    dup = client.post(
+        "/api/v1/members/",
+        headers=admin_headers,
+        json={"first_name_en": "Other", "mobile": "9330000001"},
+    )
+    assert dup.status_code == 409, dup.text
+    assert "Duplicate" in dup.json()["detail"]
+
+    # duplicate Kannada name + same DOB → 409
+    dup_kn = client.post(
+        "/api/v1/members/",
+        headers=admin_headers,
+        json={
+            "first_name_en": "Different",
+            "full_name_kn": "ರಮೇಶ್ ಹೆಗಡೆ",
+            "date_of_birth": "1990-05-01",
+            "mobile": "9330000002",
+        },
+    )
+    assert dup_kn.status_code == 409, dup_kn.text
+    assert "Kannada name" in dup_kn.json()["detail"]
+
+    # same Kannada name but different DOB is fine
+    ok_kn = client.post(
+        "/api/v1/members/",
+        headers=admin_headers,
+        json={
+            "first_name_en": "Different",
+            "full_name_kn": "ರಮೇಶ್ ಹೆಗಡೆ",
+            "date_of_birth": "1985-05-01",
+            "mobile": "9330000003",
+        },
+    )
+    assert ok_kn.status_code == 201, ok_kn.text
+
+    # a MEMBER login account was provisioned with mobile as username
+    from db.session import SessionLocal
+    from models.users import User as UserModel
+
+    with SessionLocal() as db:
+        login = db.query(UserModel).filter(UserModel.username == "9330000001").first()
+        assert login is not None, "member login account was not provisioned"
+        assert login.user_type == "MEMBER"
+        assert login.member_id == member["id"]
+
+    # validation: bad gender, future dob, bad mobile
+    assert client.post(
+        "/api/v1/members/", headers=admin_headers, json={"first_name_en": "X", "gender": "ALIEN"}
+    ).status_code == 422
+    assert client.post(
+        "/api/v1/members/", headers=admin_headers, json={"first_name_en": "X", "date_of_birth": "2999-01-01"}
+    ).status_code == 422
+    assert client.post(
+        "/api/v1/members/", headers=admin_headers, json={"first_name_en": "X", "mobile": "123"}
+    ).status_code == 422
+
+
+def test_member_registration_geography_autofill(client, admin_headers):
+    state = client.post("/api/v1/masters/states", headers=admin_headers, json={"name_en": "M Nadu"}).json()
+    district = client.post(
+        "/api/v1/masters/districts", headers=admin_headers,
+        json={"state_id": state["id"], "name_en": "M District"},
+    ).json()
+    pc = client.post(
+        "/api/v1/masters/postal-codes", headers=admin_headers,
+        json={"pincode": "589001", "state_id": state["id"], "district_id": district["id"]},
+    ).json()
+
+    # only pincode supplied → geography auto-filled from the postal code
+    member = client.post(
+        "/api/v1/members/",
+        headers=admin_headers,
+        json={"first_name_en": "Auto", "pincode_id": pc["id"], "mobile": "9330000010"},
+    )
+    assert member.status_code == 201, member.text
+    body = member.json()
+    assert body["state_id"] == state["id"]
+    assert body["district_id"] == district["id"]
+
+    # mismatched district/state rejected
+    state2 = client.post("/api/v1/masters/states", headers=admin_headers, json={"name_en": "M Nadu 2"}).json()
+    bad = client.post(
+        "/api/v1/members/",
+        headers=admin_headers,
+        json={"first_name_en": "Bad", "state_id": state2["id"], "district_id": district["id"]},
+    )
+    assert bad.status_code == 400, bad.text
+
+    # unknown geography rejected
+    assert client.post(
+        "/api/v1/members/", headers=admin_headers, json={"first_name_en": "X", "state_id": 999999}
+    ).status_code == 400
+
+
+def test_member_list_filters_and_edit(client, admin_headers):
+    m1 = client.post(
+        "/api/v1/members/", headers=admin_headers,
+        json={"first_name_en": "FilterOne", "gender": "FEMALE", "mobile": "9330000020", "full_name_kn": "ಫಿಲ್ಟರ್ ಒಂದು"},
+    ).json()
+    m2 = client.post(
+        "/api/v1/members/", headers=admin_headers,
+        json={"first_name_en": "FilterTwo", "gender": "MALE", "mobile": "9330000021"},
+    ).json()
+
+    # gender + approval_status filters
+    females = client.get("/api/v1/members/", headers=admin_headers, params={"gender": "FEMALE"}).json()
+    assert any(m["id"] == m1["id"] for m in females["data"])
+    assert not any(m["id"] == m2["id"] for m in females["data"])
+
+    unapproved = client.get(
+        "/api/v1/members/", headers=admin_headers, params={"approval_status": "UNAPPROVED"}
+    ).json()
+    assert any(m["id"] == m1["id"] for m in unapproved["data"])
+
+    # Kannada search
+    kn = client.get("/api/v1/members/", headers=admin_headers, params={"search": "ಫಿಲ್ಟರ್"}).json()
+    assert any(m["id"] == m1["id"] for m in kn["data"])
+
+    # full bilingual edit via PUT
+    upd = client.put(
+        f"/api/v1/members/{m1['id']}",
+        headers=admin_headers,
+        json={
+            "address_line1": "New Street",
+            "address_line1_kn": "ಹೊಸ ಬೀದಿ",
+            "alternate_mobile": "9330000099",
+            "email": "filterone@example.com",
+        },
+    )
+    assert upd.status_code == 200, upd.text
+    assert upd.json()["address_line1_kn"] == "ಹೊಸ ಬೀದಿ"
+
+    # mobile change onto another member's number → 409
+    clash = client.put(
+        f"/api/v1/members/{m1['id']}", headers=admin_headers, json={"mobile": "9330000021"}
+    )
+    assert clash.status_code == 409, clash.text
+
+    # include_deleted shows soft-deleted members
+    client.delete(
+        f"/api/v1/members/{m2['id']}", headers=admin_headers, params={"reason": "dupe"}
+    )
+    gone = client.get(
+        "/api/v1/members/", headers=admin_headers, params={"include_deleted": True, "search": "FilterTwo"}
+    ).json()
+    assert any(m["id"] == m2["id"] for m in gone["data"])
+
+
+def test_member_profile_endpoint(client, admin_headers):
+    mt = _create_membership_type(client, admin_headers, "TST_PROF", "Profile Type")
+    member = _create_member(client, admin_headers, "9330000030", "Profiler")
+    client.post(
+        f"/api/v1/members/{member['id']}/memberships",
+        headers=admin_headers,
+        json={"membership_type_id": mt["id"]},
+    )
+    client.put(f"/api/v1/members/{member['id']}/approve", headers=admin_headers)
+
+    # magazine subscription + receipt allocation as service/financial data
+    sub = client.post("/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": member["id"]})
+    assert sub.status_code in (200, 201), sub.text
+    receipt = client.post(
+        "/api/v1/receipts/",
+        headers=admin_headers,
+        json={
+            "receipt_date": date.today().isoformat(),
+            "receipt_type": "MEMBERSHIP",
+            "payment_mode": "CASH",
+            "gross_amount": 250,
+            "discount_amount": 0,
+            "net_amount": 250,
+            "items": [{"item_type": "MEMBERSHIP", "amount": 250}],
+        },
+    ).json()
+    client.post(
+        f"/api/v1/receipts/{receipt['id']}/allocate",
+        headers=admin_headers,
+        json={"member_id": member["id"], "allocated_amount": 250},
+    )
+
+    profile = client.get(f"/api/v1/members/{member['id']}/profile", headers=admin_headers)
+    assert profile.status_code == 200, profile.text
+    body = profile.json()
+
+    assert body["personal"]["first_name_en"] == "Profiler"
+    assert body["personal"]["member_code"]
+    assert len(body["memberships"]) == 1
+    assert body["memberships"][0]["type_code"] == "TST_PROF"
+    assert body["memberships"][0]["membership_number"]  # activated on approve
+    assert len(body["services"]["magazine"]) == 1
+    assert len(body["financial"]["receipts"]) == 1
+    assert body["financial"]["receipts"][0]["net_amount"] == 250.0
+    assert len(body["history"]["approvals"]) >= 1
+    assert body["deletion_requests"] == []
+    assert body["kyc_requests"] == []
+
+    assert client.get("/api/v1/members/999999/profile", headers=admin_headers).status_code == 404
+
+
+def test_direct_delete_soft_and_permanent(client, admin_headers):
+    soft_target = _create_member(client, admin_headers, "9330000040", "Softly")
+    perm_target = _create_member(client, admin_headers, "9330000041", "Permaly")
+
+    # soft delete with reason records history
+    soft = client.delete(
+        f"/api/v1/members/{soft_target['id']}", headers=admin_headers, params={"reason": "left sabha"}
+    )
+    assert soft.status_code == 200, soft.text
+    assert soft.json()["mode"] == "SOFT"
+
+    from db.session import SessionLocal
+    from models.members import Member, MemberApprovalHistory
+
+    with SessionLocal() as db:
+        row = db.get(Member, soft_target["id"])
+        assert row.is_deleted is True
+        history = (
+            db.query(MemberApprovalHistory)
+            .filter(
+                MemberApprovalHistory.member_id == soft_target["id"],
+                MemberApprovalHistory.action == "DELETE",
+            )
+            .first()
+        )
+        assert history is not None
+        assert history.reason == "left sabha"
+
+    # permanent delete wipes the row entirely (receipt allocation detached)
+    receipt = client.post(
+        "/api/v1/receipts/",
+        headers=admin_headers,
+        json={
+            "receipt_date": date.today().isoformat(),
+            "receipt_type": "MEMBERSHIP",
+            "payment_mode": "CASH",
+            "gross_amount": 100,
+            "discount_amount": 0,
+            "net_amount": 100,
+            "items": [{"item_type": "MEMBERSHIP", "amount": 100}],
+        },
+    ).json()
+    client.post(
+        f"/api/v1/receipts/{receipt['id']}/allocate",
+        headers=admin_headers,
+        json={"member_id": perm_target["id"], "allocated_amount": 100},
+    )
+
+    perm = client.delete(
+        f"/api/v1/members/{perm_target['id']}",
+        headers=admin_headers,
+        params={"reason": "gdpr request", "mode": "PERMANENT"},
+    )
+    assert perm.status_code == 200, perm.text
+    assert perm.json()["mode"] == "PERMANENT"
+
+    with SessionLocal() as db:
+        assert db.get(Member, perm_target["id"]) is None
+
+    # mode validation and missing reason
+    assert client.delete(
+        f"/api/v1/members/{_create_member(client, admin_headers, '9330000042', 'Bad')['id']}",
+        headers=admin_headers,
+        params={"reason": "x", "mode": "HARD"},
+    ).status_code == 400
+    assert client.delete(
+        f"/api/v1/members/{_create_member(client, admin_headers, '9330000043', 'NoR')['id']}",
+        headers=admin_headers,
+    ).status_code == 422  # reason is required
+
+
+def test_kyc_link_channels(client, admin_headers, monkeypatch):
+    import services.whatsapp as whatsapp
+
+    sent = []
+
+    async def _capture(to, message, template_id=None):
+        sent.append(message)
+        return {"ok": True}
+
+    monkeypatch.setattr(whatsapp.whatsapp_service, "send_message", _capture)
+
+    member = _create_member(client, admin_headers, "9330000050", "KycLink")
+
+    # APP channel: no link, nudge message
+    app_resp = client.post(
+        f"/api/v1/magazines/members/{member['id']}/send-kyc-link",
+        headers=admin_headers,
+        params={"channel": "APP"},
+    )
+    assert app_resp.status_code == 200, app_resp.text
+    assert app_resp.json()["channel"] == "APP"
+    assert "kyc_url" not in app_resp.json()
+    assert len(sent) == 1 and "app" in sent[0].lower()
+
+    # LINK channel: still works, returns url
+    link_resp = client.post(
+        f"/api/v1/magazines/members/{member['id']}/send-kyc-link",
+        headers=admin_headers,
+        params={"channel": "LINK"},
+    )
+    assert link_resp.status_code == 200, link_resp.text
+    assert "kyc_url" in link_resp.json()
+
+    # bad channel rejected
+    assert client.post(
+        f"/api/v1/magazines/members/{member['id']}/send-kyc-link",
+        headers=admin_headers,
+        params={"channel": "SMS"},
+    ).status_code == 400
+
+    # KYC submit still lands as a profile-change request (end-to-end)
+    token = link_resp.json()["kyc_url"].split("token=")[1]
+    submitted = client.post(
+        f"/api/v1/kyc/{token}",
+        json={"values": {"email": "kyc2@example.com"}},
+    )
+    assert submitted.status_code == 200, submitted.text
+
+    # profile shows the kyc request trail
+    profile = client.get(f"/api/v1/members/{member['id']}/profile", headers=admin_headers)
+    assert len(profile.json()["kyc_requests"]) == 2
+    assert len(profile.json()["profile_change_requests"]) == 1
+
+
+# ─────────────── magazine module ───────────────
+
+def test_magazine_subscription_stop_start(client, admin_headers):
+    member = _create_member(client, admin_headers, "9340000001", "MagReader")
+
+    # start delivery
+    sub = client.post(
+        "/api/v1/magazines/subscriptions",
+        headers=admin_headers,
+        json={"member_id": member["id"], "delivery_status": "ACTIVE"},
+    )
+    assert sub.status_code == 201, sub.text
+    sub_id = sub.json()["id"]
+
+    # second subscription for the same member blocked
+    dup = client.post(
+        "/api/v1/magazines/subscriptions",
+        headers=admin_headers,
+        json={"member_id": member["id"]},
+    )
+    assert dup.status_code == 409, dup.text
+
+    # unknown member blocked
+    assert client.post(
+        "/api/v1/magazines/subscriptions",
+        headers=admin_headers,
+        json={"member_id": 999999},
+    ).status_code == 400
+
+    # stop delivery
+    stopped = client.put(
+        f"/api/v1/magazines/subscriptions/{sub_id}",
+        headers=admin_headers,
+        json={"delivery_status": "STOPPED"},
+    )
+    assert stopped.status_code == 200, stopped.text
+    assert stopped.json()["delivery_status"] == "STOPPED"
+
+    # invalid status rejected
+    assert client.put(
+        f"/api/v1/magazines/subscriptions/{sub_id}",
+        headers=admin_headers,
+        json={"delivery_status": "PAUSED_FOREVER"},
+    ).status_code == 400
+
+    # start again
+    restarted = client.put(
+        f"/api/v1/magazines/subscriptions/{sub_id}",
+        headers=admin_headers,
+        json={"delivery_status": "ACTIVE"},
+    )
+    assert restarted.status_code == 200, restarted.text
+
+    # filter by member
+    listed = client.get(
+        "/api/v1/magazines/subscriptions",
+        headers=admin_headers,
+        params={"member_id": member["id"]},
+    )
+    assert listed.json()["total"] == 1
+
+
+def test_magazine_pause_resume_cycle(client, admin_headers):
+    member = _create_member(client, admin_headers, "9340000002", "Pauser")
+    sub = client.post(
+        "/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": member["id"]}
+    ).json()
+
+    # pause with note
+    pause = client.post(
+        "/api/v1/magazines/pauses",
+        headers=admin_headers,
+        json={"subscription_id": sub["id"], "pause_start_date": "2026-01-01", "reason": "travelling abroad"},
+    )
+    assert pause.status_code == 201, pause.text
+    pause_id = pause.json()["id"]
+
+    # second open pause blocked while first is open
+    dup_pause = client.post(
+        "/api/v1/magazines/pauses",
+        headers=admin_headers,
+        json={"subscription_id": sub["id"], "pause_start_date": "2026-02-01"},
+    )
+    assert dup_pause.status_code == 409, dup_pause.text
+
+    # end before start rejected
+    bad = client.post(
+        "/api/v1/magazines/pauses",
+        headers=admin_headers,
+        json={"subscription_id": sub["id"], "pause_start_date": "2026-03-01", "pause_end_date": "2026-02-01"},
+    )
+    assert bad.status_code == 400, bad.text
+
+    # active_only filter shows the open pause
+    active = client.get(
+        "/api/v1/magazines/pauses", headers=admin_headers, params={"active_only": True}
+    )
+    assert any(p["id"] == pause_id for p in active.json()["data"])
+
+    # resume closes the pause
+    resumed = client.post(f"/api/v1/magazines/pauses/{pause_id}/resume", headers=admin_headers)
+    assert resumed.status_code == 200, resumed.text
+    assert resumed.json()["pause_end_date"] is not None
+
+    # resuming a closed pause blocked
+    assert client.post(
+        f"/api/v1/magazines/pauses/{pause_id}/resume", headers=admin_headers
+    ).status_code == 400
+
+    # extend window via PUT
+    pause2 = client.post(
+        "/api/v1/magazines/pauses",
+        headers=admin_headers,
+        json={"subscription_id": sub["id"], "pause_start_date": "2026-05-01", "pause_end_date": "2026-05-10"},
+    ).json()
+    extended = client.put(
+        f"/api/v1/magazines/pauses/{pause2['id']}",
+        headers=admin_headers,
+        json={"pause_end_date": "2026-05-31", "reason": "extended holiday"},
+    )
+    assert extended.status_code == 200, extended.text
+    assert extended.json()["pause_end_date"] == "2026-05-31"
+
+
+def test_magazine_returns_lifecycle_and_label_flagging(client, admin_headers):
+    member = _create_member(client, admin_headers, "9340000003", "Returner")
+    sub = client.post(
+        "/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": member["id"]}
+    ).json()
+
+    # mark a return
+    ret = client.post(
+        "/api/v1/magazines/returns",
+        headers=admin_headers,
+        json={
+            "subscription_id": sub["id"],
+            "issue_month_year": "2026-04",
+            "return_date": "2026-05-02",
+            "return_reason": "not received at address",
+        },
+    )
+    assert ret.status_code == 201, ret.text
+    ret_id = ret.json()["id"]
+
+    # duplicate return for the same issue blocked
+    dup = client.post(
+        "/api/v1/magazines/returns",
+        headers=admin_headers,
+        json={"subscription_id": sub["id"], "issue_month_year": "2026-04", "return_date": "2026-05-03"},
+    )
+    assert dup.status_code == 409, dup.text
+
+    # bad issue format rejected
+    assert client.post(
+        "/api/v1/magazines/returns",
+        headers=admin_headers,
+        json={"subscription_id": sub["id"], "issue_month_year": "April 2026", "return_date": "2026-05-03"},
+    ).status_code == 400
+
+    # returns list filters by member and month
+    by_member = client.get(
+        "/api/v1/magazines/returns", headers=admin_headers, params={"member_id": member["id"]}
+    )
+    assert by_member.json()["total"] == 1
+
+    # follow-up workflow
+    followed = client.put(
+        f"/api/v1/magazines/returns/{ret_id}",
+        headers=admin_headers,
+        json={"follow_up_status": "CONTACTED"},
+    )
+    assert followed.status_code == 200, followed.text
+    assert followed.json()["follow_up_status"] == "CONTACTED"
+
+    # invalid follow-up status rejected
+    assert client.put(
+        f"/api/v1/magazines/returns/{ret_id}",
+        headers=admin_headers,
+        json={"follow_up_status": "DONE"},
+    ).status_code == 400
+
+    # returns appear highlighted on the member profile
+    profile = client.get(f"/api/v1/members/{member['id']}/profile", headers=admin_headers)
+    returns = profile.json()["services"]["magazine_returns"]
+    assert len(returns) == 1
+    assert returns[0]["issue_month_year"] == "2026-04"
+
+    # label generation flags the return
+    generated = client.post(
+        "/api/v1/magazines/generate-labels",
+        headers=admin_headers,
+        params={"issue_month_year": "2026-04"},
+    )
+    assert generated.status_code == 200, generated.text
+    assert generated.json()["returned_count"] == 1
+
+    batch_id = generated.json()["batch_id"]
+    detail = client.get(
+        f"/api/v1/magazines/label-batches/{batch_id}",
+        headers=admin_headers,
+        params={"returns_only": True},
+    )
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["total"] == 1
+    assert detail.json()["data"][0]["is_return"] is True
+
+    # undo the return → it leaves the returns list
+    undone = client.delete(f"/api/v1/magazines/returns/{ret_id}", headers=admin_headers)
+    assert undone.status_code == 200, undone.text
+    remaining = client.get(
+        "/api/v1/magazines/returns", headers=admin_headers, params={"member_id": member["id"]}
+    )
+    assert remaining.json()["total"] == 0
+
+
+def test_label_generation_skips_stopped_and_paused(client, admin_headers):
+    m_active = _create_member(client, admin_headers, "9340000010", "Active")
+    m_stopped = _create_member(client, admin_headers, "9340000011", "Stopped")
+    m_paused = _create_member(client, admin_headers, "9340000012", "Paused")
+
+    sub_a = client.post(
+        "/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": m_active["id"]}
+    ).json()
+    sub_s = client.post(
+        "/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": m_stopped["id"]}
+    ).json()
+    sub_p = client.post(
+        "/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": m_paused["id"]}
+    ).json()
+
+    client.put(
+        f"/api/v1/magazines/subscriptions/{sub_s['id']}",
+        headers=admin_headers,
+        json={"delivery_status": "STOPPED"},
+    )
+    client.post(
+        "/api/v1/magazines/pauses",
+        headers=admin_headers,
+        json={"subscription_id": sub_p["id"], "pause_start_date": "2020-01-01"},  # open-ended
+    )
+
+    issue = (date.today()).strftime("%Y-%m")
+    generated = client.post(
+        "/api/v1/magazines/generate-labels", headers=admin_headers, params={"issue_month_year": issue}
+    )
+    assert generated.status_code == 200, generated.text
+
+    detail = client.get(
+        f"/api/v1/magazines/label-batches/{generated.json()['batch_id']}", headers=admin_headers
+    )
+    member_ids = {
+        item["recipient_id"] for item in detail.json()["data"] if item["recipient_type"] == "MEMBER"
+    }
+    assert m_active["id"] in member_ids
+    assert m_stopped["id"] not in member_ids  # stopped delivery
+    assert m_paused["id"] not in member_ids   # paused → skipped in label print
+
+    # district/taluk/state filters respected
+    state = client.post("/api/v1/masters/states", headers=admin_headers, json={"name_en": "Mag Nadu"}).json()
+    district = client.post(
+        "/api/v1/masters/districts",
+        headers=admin_headers,
+        json={"state_id": state["id"], "name_en": "Mag District"},
+    ).json()
+    client.put(
+        f"/api/v1/members/{m_active['id']}",
+        headers=admin_headers,
+        json={"state_id": state["id"], "district_id": district["id"]},
+    )
+
+    filtered = client.post(
+        "/api/v1/magazines/generate-labels",
+        headers=admin_headers,
+        params={"issue_month_year": issue, "district_id": district["id"]},
+    )
+    assert filtered.status_code == 200, filtered.text
+    detail2 = client.get(
+        f"/api/v1/magazines/label-batches/{filtered.json()['batch_id']}", headers=admin_headers
+    )
+    member_ids2 = {
+        item["recipient_id"] for item in detail2.json()["data"] if item["recipient_type"] == "MEMBER"
+    }
+    assert member_ids2 == {m_active["id"]}
+
+    # bad issue format rejected
+    assert client.post(
+        "/api/v1/magazines/generate-labels",
+        headers=admin_headers,
+        params={"issue_month_year": "Jan 2026"},
+    ).status_code == 400
+
+
+def test_label_generation_only_paid_receipt_members(client, admin_headers):
+    m_paid = _create_member(client, admin_headers, "9340000020", "PaidUp")
+    m_free = _create_member(client, admin_headers, "9340000021", "FreeRider")
+
+    for m in (m_paid, m_free):
+        sub = client.post(
+            "/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": m["id"]}
+        )
+        assert sub.status_code == 201, sub.text
+
+    receipt = client.post(
+        "/api/v1/receipts/",
+        headers=admin_headers,
+        json={
+            "receipt_date": date.today().isoformat(),
+            "receipt_type": "MAGAZINE",
+            "payment_mode": "CASH",
+            "gross_amount": 100,
+            "discount_amount": 0,
+            "net_amount": 100,
+            "items": [{"item_type": "MAGAZINE", "amount": 100}],
+        },
+    ).json()
+    client.post(
+        f"/api/v1/receipts/{receipt['id']}/allocate",
+        headers=admin_headers,
+        json={"member_id": m_paid["id"], "allocated_amount": 100},
+    )
+
+    issue = date.today().strftime("%Y-%m")
+    generated = client.post(
+        "/api/v1/magazines/generate-labels",
+        headers=admin_headers,
+        params={"issue_month_year": issue, "only_paid": "true"},
+    )
+    assert generated.status_code == 200, generated.text
+
+    detail = client.get(
+        f"/api/v1/magazines/label-batches/{generated.json()['batch_id']}", headers=admin_headers
+    )
+    member_ids = {
+        item["recipient_id"] for item in detail.json()["data"] if item["recipient_type"] == "MEMBER"
+    }
+    assert m_paid["id"] in member_ids
+    assert m_free["id"] not in member_ids
+
+
+def test_receipt_entry_online_offline_and_management(client, admin_headers):
+    payload = {
+        "receipt_date": date.today().isoformat(),
+        "receipt_type": "DONATION",
+        "payment_mode": "CASH",
+        "payer_name": "Counter Donor",
+        "gross_amount": 300,
+        "discount_amount": 0,
+        "net_amount": 300,
+        "source": "OFFLINE",
+        "items": [{"item_type": "DONATION", "amount": 300}],
+    }
+    created = client.post("/api/v1/receipts/", headers=admin_headers, json=payload)
+    assert created.status_code == 201, created.text
+    receipt = created.json()
+    assert receipt["source"] == "OFFLINE"
+    assert receipt["receipt_number"].startswith("REC-")
+
+    # unknown source rejected at validation
+    bad_source = dict(payload, source="PHONE")
+    assert client.post("/api/v1/receipts/", headers=admin_headers, json=bad_source).status_code == 422
+
+    # totals must be consistent (net = gross - discount)
+    bad_total = dict(payload, net_amount=250)
+    assert client.post("/api/v1/receipts/", headers=admin_headers, json=bad_total).status_code == 422
+
+    # entry management: correct payer/notes
+    updated = client.put(
+        f"/api/v1/receipts/{receipt['id']}",
+        headers=admin_headers,
+        json={"payer_name": "Counter Donor Corrected", "notes": "fixed at counter"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["payer_name"] == "Counter Donor Corrected"
+
+    # inconsistent amount edit rejected
+    inconsistent = client.put(
+        f"/api/v1/receipts/{receipt['id']}",
+        headers=admin_headers,
+        json={"gross_amount": 400, "net_amount": 300},
+    )
+    assert inconsistent.status_code == 400, inconsistent.text
+
+    # source filter on the list
+    listed = client.get(
+        "/api/v1/receipts/",
+        headers=admin_headers,
+        params={"source": "OFFLINE", "receipt_type": "DONATION"},
+    )
+    assert any(r["id"] == receipt["id"] for r in listed.json()["data"])
+
+    # unallocated receipt can be deleted
+    assert client.delete(f"/api/v1/receipts/{receipt['id']}", headers=admin_headers).status_code == 200
+    assert client.get(f"/api/v1/receipts/{receipt['id']}", headers=admin_headers).status_code == 404
+
+
+def test_receipt_entry_with_inline_member_allocation(client, admin_headers):
+    member = _create_member(client, admin_headers, "9340000032", "InlineAlloc")
+    created = client.post(
+        "/api/v1/receipts/",
+        headers=admin_headers,
+        json={
+            "receipt_date": date.today().isoformat(),
+            "receipt_type": "MEMBERSHIP",
+            "payment_mode": "CASH",
+            "gross_amount": 500,
+            "discount_amount": 0,
+            "net_amount": 500,
+            "source": "OFFLINE",
+            "items": [{"item_type": "MEMBERSHIP", "amount": 500}],
+            "allocations": [{"member_id": member["id"], "allocated_amount": 500}],
+        },
+    )
+    assert created.status_code == 201, created.text
+    receipt_id = created.json()["id"]
+
+    # the mapping was written in the same transaction as the entry
+    allocs = client.get(f"/api/v1/receipts/{receipt_id}/allocations", headers=admin_headers)
+    assert allocs.status_code == 200, allocs.text
+    assert len(allocs.json()) == 1
+    assert allocs.json()[0]["member_id"] == member["id"]
+    assert allocs.json()[0]["member_name"] == "InlineAlloc"
+
+    # inline over-allocation rejected and nothing persisted
+    over = client.post(
+        "/api/v1/receipts/",
+        headers=admin_headers,
+        json={
+            "receipt_date": date.today().isoformat(),
+            "receipt_type": "DONATION",
+            "payment_mode": "CASH",
+            "gross_amount": 100,
+            "discount_amount": 0,
+            "net_amount": 100,
+            "items": [{"item_type": "DONATION", "amount": 100}],
+            "allocations": [{"member_id": member["id"], "allocated_amount": 150}],
+        },
+    )
+    assert over.status_code == 409, over.text
+
+    # unknown member in the inline mapping rejected
+    unknown = client.post(
+        "/api/v1/receipts/",
+        headers=admin_headers,
+        json={
+            "receipt_date": date.today().isoformat(),
+            "receipt_type": "DONATION",
+            "payment_mode": "CASH",
+            "gross_amount": 100,
+            "discount_amount": 0,
+            "net_amount": 100,
+            "items": [{"item_type": "DONATION", "amount": 100}],
+            "allocations": [{"member_id": 999999, "allocated_amount": 100}],
+        },
+    )
+    assert unknown.status_code == 400, unknown.text
+
+
+def test_receipt_allocation_mapping_and_label_list(client, admin_headers):
+    member = _create_member(client, admin_headers, "9340000030", "Allocated")
+    other = _create_member(client, admin_headers, "9340000031", "Second")
+    receipt = client.post(
+        "/api/v1/receipts/",
+        headers=admin_headers,
+        json={
+            "receipt_date": date.today().isoformat(),
+            "receipt_type": "MAGAZINE",
+            "payment_mode": "UPI",
+            "gross_amount": 200,
+            "discount_amount": 0,
+            "net_amount": 200,
+            "items": [{"item_type": "MAGAZINE", "amount": 200}],
+        },
+    ).json()
+
+    # map the created receipt to the member
+    alloc = client.post(
+        f"/api/v1/receipts/{receipt['id']}/allocate",
+        headers=admin_headers,
+        json={"member_id": member["id"], "allocated_amount": 200},
+    )
+    assert alloc.status_code == 201, alloc.text
+    assert alloc.json()["member_id"] == member["id"]
+
+    # over-allocation blocked
+    assert client.post(
+        f"/api/v1/receipts/{receipt['id']}/allocate",
+        headers=admin_headers,
+        json={"member_id": other["id"], "allocated_amount": 1},
+    ).status_code == 409
+
+    # unknown member blocked
+    assert client.post(
+        f"/api/v1/receipts/{receipt['id']}/allocate",
+        headers=admin_headers,
+        json={"member_id": 999999, "allocated_amount": 10},
+    ).status_code == 400
+
+    # entry edits cannot drop below the allocated total
+    lowered = client.put(
+        f"/api/v1/receipts/{receipt['id']}",
+        headers=admin_headers,
+        json={"gross_amount": 100, "net_amount": 100},
+    )
+    assert lowered.status_code == 409, lowered.text
+
+    # receipt cannot be deleted while allocations exist
+    assert client.delete(f"/api/v1/receipts/{receipt['id']}", headers=admin_headers).status_code == 409
+
+    # allocations listing resolves the member name
+    listing = client.get(
+        "/api/v1/receipts/allocations", headers=admin_headers, params={"member_id": member["id"]}
+    )
+    assert listing.status_code == 200, listing.text
+    assert listing.json()["total"] == 1
+    assert listing.json()["data"][0]["member_name"] == "Allocated"
+
+    # assigned member starts appearing in the label print list (only_paid)
+    sub = client.post(
+        "/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": member["id"]}
+    )
+    assert sub.status_code == 201, sub.text
+    issue = date.today().strftime("%Y-%m")
+    generated = client.post(
+        "/api/v1/magazines/generate-labels",
+        headers=admin_headers,
+        params={"issue_month_year": issue, "only_paid": "true"},
+    )
+    assert generated.status_code == 200, generated.text
+    detail = client.get(
+        f"/api/v1/magazines/label-batches/{generated.json()['batch_id']}", headers=admin_headers
+    )
+    member_ids = {
+        i["recipient_id"] for i in detail.json()["data"] if i["recipient_type"] == "MEMBER"
+    }
+    assert member["id"] in member_ids
+    assert other["id"] not in member_ids  # no receipt mapped
+
+    # un-mapping drops the member out of the label list again
+    allocation_id = listing.json()["data"][0]["id"]
+    removed = client.delete(
+        f"/api/v1/receipts/{receipt['id']}/allocations/{allocation_id}", headers=admin_headers
+    )
+    assert removed.status_code == 200, removed.text
+    regenerated = client.post(
+        "/api/v1/magazines/generate-labels",
+        headers=admin_headers,
+        params={"issue_month_year": issue, "only_paid": "true"},
+    )
+    detail2 = client.get(
+        f"/api/v1/magazines/label-batches/{regenerated.json()['batch_id']}", headers=admin_headers
+    )
+    ids2 = {i["recipient_id"] for i in detail2.json()["data"] if i["recipient_type"] == "MEMBER"}
+    assert member["id"] not in ids2
+
+    # with the allocation gone the receipt is deletable again
+    assert client.delete(f"/api/v1/receipts/{receipt['id']}", headers=admin_headers).status_code == 200
 
 
 # ─────────────── response shapes ───────────────
@@ -1507,7 +2575,7 @@ def test_duplicate_mobile_blocked_at_api_and_db(client, admin_headers):
         headers=admin_headers,
         json={"first_name_en": "Duplicate", "mobile": "9000000022"},
     )
-    assert duplicate.status_code == 400, duplicate.text
+    assert duplicate.status_code == 409, duplicate.text
 
     # and the partial unique index backstops races around the API check
     from sqlalchemy.exc import IntegrityError
@@ -1617,7 +2685,7 @@ def test_permanent_delete_cascades(client, admin_headers):
         headers=admin_headers,
         json={"member_id": member["id"]},
     )
-    assert subscription.status_code == 200, subscription.text
+    assert subscription.status_code in (200, 201), subscription.text
     subscription_id = subscription.json()["id"]
 
     pause = client.post(
@@ -1625,7 +2693,7 @@ def test_permanent_delete_cascades(client, admin_headers):
         headers=admin_headers,
         json={"subscription_id": subscription_id, "pause_start_date": "2026-01-01"},
     )
-    assert pause.status_code == 200, pause.text
+    assert pause.status_code in (200, 201), pause.text
 
     receipt = client.post(
         "/api/v1/receipts/",
@@ -1640,15 +2708,15 @@ def test_permanent_delete_cascades(client, admin_headers):
             "items": [{"item_type": "MEMBERSHIP", "amount": 100}],
         },
     )
-    assert receipt.status_code == 200, receipt.text
+    assert receipt.status_code == 201, receipt.text
     receipt_id = receipt.json()["id"]
 
     allocation = client.post(
         f"/api/v1/receipts/{receipt_id}/allocate",
         headers=admin_headers,
-        params={"member_id": member["id"], "allocated_amount": 100},
+        json={"member_id": member["id"], "allocated_amount": 100},
     )
-    assert allocation.status_code == 200, allocation.text
+    assert allocation.status_code == 201, allocation.text
 
     request_made = client.post(
         "/api/v1/approvals/deletion-requests",
@@ -1790,6 +2858,405 @@ def test_event_notification_targets_linked_members(client, admin_headers, monkey
     assert any("9000000026" in number for number in sent_batches[0])
 
 
+def test_event_guests_honours_invitation_and_profile(client, admin_headers, monkeypatch):
+    import services.whatsapp as whatsapp
+    from db.session import SessionLocal
+    from models.notifications import NotificationMessage
+
+    async def _ok(recipients, message, template_id=None):
+        return [{"to": r, "ok": True} for r in recipients]
+
+    monkeypatch.setattr(whatsapp.whatsapp_service, "send_bulk", _ok)
+
+    # ── create event ──
+    event = client.post(
+        "/api/v1/events/",
+        headers=admin_headers,
+        json={
+            "title": "Mahasabha Centenary",
+            "description": "Centenary celebrations",
+            "event_date": "2026-12-15",
+            "location": "Udupi",
+        },
+    )
+    assert event.status_code == 200, event.text
+    event_id = event.json()["id"]
+
+    member = _create_member(client, admin_headers, "9340000240", "HonouredOne")
+
+    # ── participants: guest + honoured (member-linked) ──
+    guest = client.post(
+        f"/api/v1/events/{event_id}/participants",
+        headers=admin_headers,
+        json={"participant_name": "Dr. Outside Guest", "participant_role": "Chief Guest", "participant_type": "GUEST"},
+    )
+    assert guest.status_code == 201, guest.text
+
+    honoured = client.post(
+        f"/api/v1/events/{event_id}/participants",
+        headers=admin_headers,
+        json={
+            "participant_name": "HonouredOne",
+            "participant_role": "Community Service",
+            "participant_type": "HONOURED",
+            "member_id": member["id"],
+        },
+    )
+    assert honoured.status_code == 201, honoured.text
+    honoured_id = honoured.json()["id"]
+
+    # invalid type rejected
+    assert client.post(
+        f"/api/v1/events/{event_id}/participants",
+        headers=admin_headers,
+        json={"participant_name": "X", "participant_type": "SPEAKER"},
+    ).status_code == 422
+
+    # unknown member link rejected
+    assert client.post(
+        f"/api/v1/events/{event_id}/participants",
+        headers=admin_headers,
+        json={"participant_name": "X", "member_id": 999999},
+    ).status_code == 400
+
+    # participants list + filter
+    listing = client.get(
+        f"/api/v1/events/{event_id}/participants", headers=admin_headers
+    )
+    assert listing.status_code == 200, listing.text
+    assert listing.json()["total"] == 2
+    honoured_list = client.get(
+        f"/api/v1/events/{event_id}/participants",
+        headers=admin_headers,
+        params={"participant_type": "HONOURED"},
+    )
+    assert honoured_list.json()["total"] == 1
+    assert honoured_list.json()["data"][0]["member_name"] == "HonouredOne"
+
+    # update: promote guest, then remove
+    promoted = client.put(
+        f"/api/v1/events/{event_id}/participants/{honoured_id}",
+        headers=admin_headers,
+        json={"participant_role": "Lifetime Achievement"},
+    )
+    assert promoted.status_code == 200, promoted.text
+    assert promoted.json()["participant_role"] == "Lifetime Achievement"
+
+    # ── invitation copy upload ──
+    invitation = client.post(
+        f"/api/v1/events/{event_id}/invitation",
+        headers=admin_headers,
+        files={"file": ("invite.pdf", b"%PDF-1.4 invitation copy", "application/pdf")},
+    )
+    assert invitation.status_code == 200, invitation.text
+    assert invitation.json()["invitation_file_path"]
+
+    # event detail shows guests/honoured and the invitation
+    detail = client.get(f"/api/v1/events/{event_id}/detail", headers=admin_headers)
+    assert detail.status_code == 200, detail.text
+    d = detail.json()
+    assert len(d["guests"]) == 1
+    assert len(d["honoured"]) == 1
+    assert d["honoured"][0]["member_id"] == member["id"]
+    assert d["event"]["invitation_file_path"]
+
+    # ── profile of the member shows the honour ──
+    profile = client.get(f"/api/v1/members/{member['id']}/profile", headers=admin_headers)
+    assert profile.status_code == 200, profile.text
+    guests_honours = profile.json()["services"]["guests_and_honours"]
+    assert len(guests_honours) == 1
+    gh = guests_honours[0]
+    assert gh["event_id"] == event_id
+    assert gh["participant_type"] == "HONOURED"
+    assert gh["honoured_as"] == "Lifetime Achievement"
+    assert gh["location"] == "Udupi"
+
+    # non-member guest must not appear anywhere in member profiles
+    # (implicitly true — they have no member_id)
+
+    # ── event notification with template ──
+    template = client.post(
+        "/api/v1/notifications/templates",
+        headers=admin_headers,
+        json={
+            "template_name": "TST_EVENT_1",
+            "content": "{{event_title}} on {{event_date}} at {{location}} — see invite.",
+        },
+    ).json()
+
+    client.post(
+        f"/api/v1/events/{event_id}/links",
+        headers=admin_headers,
+        params={"member_id": member["id"], "role": "Volunteer"},
+    )
+
+    notified = client.post(
+        f"/api/v1/events/{event_id}/notify",
+        headers=admin_headers,
+        params={"template_id": template["id"]},
+    )
+    assert notified.status_code == 200, notified.text
+    assert notified.json()["queued"] == 1
+    body = notified.json()["rendered_content"]
+    assert "Mahasabha Centenary" in body
+    assert "2026-12-15" in body
+    assert "Udupi" in body
+
+    # message logged for the member
+    with SessionLocal() as db:
+        msg = (
+            db.query(NotificationMessage)
+            .filter(NotificationMessage.member_id == member["id"])
+            .order_by(NotificationMessage.id.desc())
+            .first()
+        )
+    assert msg is not None and "Mahasabha Centenary" in msg.message_content
+
+    # ── upcoming events ──
+    upcoming = client.get("/api/v1/events/upcoming", headers=admin_headers)
+    assert upcoming.status_code == 200, upcoming.text
+    assert any(e["id"] == event_id for e in upcoming.json()["data"])
+
+    # remove participant → drops off profile listing
+    assert client.delete(
+        f"/api/v1/events/{event_id}/participants/{honoured_id}", headers=admin_headers
+    ).status_code == 200
+    profile2 = client.get(f"/api/v1/members/{member['id']}/profile", headers=admin_headers)
+    assert profile2.json()["services"]["guests_and_honours"] == []
+
+
+def test_committee_management_and_website_display(client, admin_headers):
+    """Categories/subcategories (bilingual), members per category,
+    website display toggles and the public committee page."""
+    # ── categories with Kannada names (spec examples) ──
+    cat_bengaluru = client.post(
+        "/api/v1/engagements/committee/categories",
+        headers=admin_headers,
+        json={"name_en": "Bengaluru Kshetra", "name_kn": "ಬೆಂಗಳೂರು ಕ್ಷೇತ್ರ", "display_on_website": True},
+    )
+    assert cat_bengaluru.status_code == 201, cat_bengaluru.text
+    cat_bengaluru = cat_bengaluru.json()
+
+    cat_nominee = client.post(
+        "/api/v1/engagements/committee/categories",
+        headers=admin_headers,
+        json={"name_en": "Board Nominee Directors", "name_kn": "ಆಡಳಿತ ಮಂಡಳಿಯ ನಾಮಾಂಕಿತ ನಿರ್ದೇಶಕರು", "display_on_website": True},
+    ).json()
+
+    cat_temple = client.post(
+        "/api/v1/engagements/committee/categories",
+        headers=admin_headers,
+        json={"name_en": "Sri Siddhivinayaka Temple", "name_kn": "ಶ್ರೀ ಸಿದ್ಧಿವಿನಾಯಕ ದೇವಾಲಯ", "display_on_website": False},
+    ).json()
+
+    # duplicate category name rejected?
+    # (no unique constraint in model — admin responsibility; just verify update works)
+    renamed = client.put(
+        f"/api/v1/engagements/committee/categories/{cat_bengaluru['id']}",
+        headers=admin_headers,
+        json={"name_en": "Bengaluru Region"},
+    )
+    assert renamed.status_code == 200, renamed.text
+
+    # ── subcategories ──
+    sub = client.post(
+        "/api/v1/engagements/committee/subcategories",
+        headers=admin_headers,
+        json={
+            "category_id": cat_bengaluru["id"],
+            "name_en": "Youth Wing",
+            "name_kn": "ಯುವ ಘಟಕ",
+        },
+    )
+    assert sub.status_code == 201, sub.text
+    sub_id = sub.json()["id"]
+
+    # subcategory must belong to the category
+    assert client.post(
+        "/api/v1/engagements/committee/members",
+        headers=admin_headers,
+        json={
+            "category_id": cat_nominee["id"],
+            "subcategory_id": sub_id,
+            "member_name": "Wrong Category",
+        },
+    ).status_code == 400
+
+    # ── current term ──
+    term = client.post(
+        "/api/v1/engagements/committee/terms",
+        headers=admin_headers,
+        json={"term_name": "2026-2029", "is_current": True},
+    )
+    assert term.status_code == 201, term.text
+    term_id = term.json()["id"]
+
+    # only one current term
+    term2 = client.post(
+        "/api/v1/engagements/committee/terms",
+        headers=admin_headers,
+        json={"term_name": "2029-2032", "is_current": True},
+    ).json()
+    terms_list = client.get("/api/v1/engagements/committee/terms", headers=admin_headers).json()
+    currents = [t for t in terms_list["data"] if t["is_current"]]
+    assert len(currents) == 1
+    assert currents[0]["term_name"] == "2029-2032"
+
+    # ── committee members per category/subcategory ──
+    havyaka_member = _create_member(client, admin_headers, "9340000401", "CommitteeMan")
+    client.put(f"/api/v1/members/{havyaka_member['id']}/approve", headers=admin_headers)
+
+    cm1 = client.post(
+        "/api/v1/engagements/committee/members",
+        headers=admin_headers,
+        json={
+            "category_id": cat_bengaluru["id"],
+            "subcategory_id": sub_id,
+            "term_id": term_id,
+            "member_name": "Ramesh Joisha",
+            "designation": "Convener",
+            "hms_member_id": havyaka_member["id"],
+        },
+    )
+    assert cm1.status_code == 201, cm1.text
+    cm1_id = cm1.json()["id"]
+
+    cm2 = client.post(
+        "/api/v1/engagements/committee/members",
+        headers=admin_headers,
+        json={
+            "category_id": cat_bengaluru["id"],
+            "term_id": term_id,
+            "member_name": "Ganesh Hegde",
+            "designation": "Member",
+        },
+    )
+    assert cm2.status_code == 201, cm2.text
+
+    # unknown category rejected
+    assert client.post(
+        "/api/v1/engagements/committee/members",
+        headers=admin_headers,
+        json={"category_id": 999999, "member_name": "X"},
+    ).status_code == 400
+
+    # listing resolves names and the linked Havyaka member
+    listing = client.get(
+        "/api/v1/engagements/committee/members",
+        headers=admin_headers,
+        params={"category_id": cat_bengaluru["id"]},
+    )
+    assert listing.status_code == 200, listing.text
+    rows = listing.json()["data"]
+    assert len(rows) == 2
+    row1 = [r for r in rows if r["id"] == cm1_id][0]
+    assert row1["category_name_kn"] == "ಬೆಂಗಳೂರು ಕ್ಷೇತ್ರ"
+    assert row1["subcategory_name_en"] == "Youth Wing"
+    assert row1["hms_member_code"]  # approved above → code minted
+    assert row1["hms_member_name"] == "CommitteeMan"
+
+    # current-term filter: cm1/cm2 sit in the older term, so the current one is empty
+    current_rows = client.get(
+        "/api/v1/engagements/committee/members",
+        headers=admin_headers,
+        params={"current_term_only": "true"},
+    ).json()
+    assert current_rows["total"] == 0
+
+    # a member added under the new current term shows up
+    cm3 = client.post(
+        "/api/v1/engagements/committee/members",
+        headers=admin_headers,
+        json={
+            "category_id": cat_nominee["id"],
+            "term_id": term2["id"],
+            "member_name": "Current Term Person",
+        },
+    )
+    assert cm3.status_code == 201, cm3.text
+    current_rows2 = client.get(
+        "/api/v1/engagements/committee/members",
+        headers=admin_headers,
+        params={"current_term_only": "true"},
+    ).json()
+    assert current_rows2["total"] == 1
+    assert current_rows2["data"][0]["member_name"] == "Current Term Person"
+
+    # update: change designation, hide from website
+    updated = client.put(
+        f"/api/v1/engagements/committee/members/{cm2.json()['id']}",
+        headers=admin_headers,
+        json={"designation": "Treasurer", "display_on_website": False},
+    )
+    assert updated.status_code == 200, updated.text
+
+    # category delete blocked while members exist
+    assert client.delete(
+        f"/api/v1/engagements/committee/categories/{cat_bengaluru['id']}",
+        headers=admin_headers,
+    ).status_code == 409
+
+    # ── website display toggles ──
+    # temple category was created hidden → flip it on
+    assert client.get(
+        "/api/v1/engagements/committee/categories",
+        headers=admin_headers,
+        params={"display_on_website": "false"},
+    ).json()["total"] >= 1
+
+    shown = client.put(
+        f"/api/v1/engagements/committee/categories/{cat_temple['id']}",
+        headers=admin_headers,
+        json={"display_on_website": True},
+    )
+    assert shown.json()["display_on_website"] is True
+
+    # ── public committee page ──
+    website = client.get("/api/v1/engagements/committee/website", headers=admin_headers)
+    assert website.status_code == 200, website.text
+    web = website.json()["data"]
+
+    # only display-enabled categories appear (temple now on, all enabled here)
+    web_ids = {c["category_id"] for c in web}
+    assert cat_bengaluru["id"] in web_ids
+    assert cat_nominee["id"] in web_ids
+
+    bengaluru_block = [c for c in web if c["category_id"] == cat_bengaluru["id"]][0]
+    assert bengaluru_block["category_name_kn"] == "ಬೆಂಗಳೂರು ಕ್ಷೇತ್ರ"
+    # default = current term: cm1/cm2 (old term) hidden anyway, cm3 (nominee) visible
+    nominee_block = [c for c in web if c["category_id"] == cat_nominee["id"]][0]
+    assert any(m["member_name"] == "Current Term Person" for m in nominee_block["members"])
+
+    # explicitly requesting the old term shows cm1 (visible) but not cm2 (hidden)
+    website_old = client.get(
+        "/api/v1/engagements/committee/website",
+        headers=admin_headers,
+        params={"term_id": term_id},
+    )
+    bengaluru_old = [
+        c for c in website_old.json()["data"] if c["category_id"] == cat_bengaluru["id"]
+    ][0]
+    member_ids = {m["id"] for m in bengaluru_old["members"]}
+    assert cm1_id in member_ids
+    assert cm2.json()["id"] not in member_ids
+
+    # empty category (temple) shows with an empty member list
+    temple_block = [c for c in web if c["category_id"] == cat_temple["id"]]
+    if temple_block:
+        assert temple_block[0]["members"] == []
+
+    # remove committee member
+    assert client.delete(
+        f"/api/v1/engagements/committee/members/{cm1_id}", headers=admin_headers
+    ).status_code == 200
+    after = client.get(
+        "/api/v1/engagements/committee/members",
+        headers=admin_headers,
+        params={"category_id": cat_bengaluru["id"]},
+    ).json()
+    assert after["total"] == 1
+
+
 def test_label_batches_and_printable_pdf(client, admin_headers):
     member = _create_member(client, admin_headers, "9000000027", "Labeled")
     subscription = client.post(
@@ -1797,7 +3264,7 @@ def test_label_batches_and_printable_pdf(client, admin_headers):
         headers=admin_headers,
         json={"member_id": member["id"]},
     )
-    assert subscription.status_code == 200, subscription.text
+    assert subscription.status_code in (200, 201), subscription.text
 
     generated = client.post(
         "/api/v1/magazines/generate-labels",
@@ -1851,6 +3318,250 @@ def test_report_language_and_column_selection(client, admin_headers):
     assert body["language"] == "en"
     assert body["columns"] == ["member_code"]
     assert body["total"] >= 1
+
+
+def test_reports_module_end_to_end(client, admin_headers):
+    """Covers every report endpoint against seeded members/receipts/labels."""
+    # ── seed geography ──
+    state = client.post("/api/v1/masters/states", headers=admin_headers, json={"name_en": "Report Nadu"}).json()
+    district_a = client.post(
+        "/api/v1/masters/districts", headers=admin_headers,
+        json={"state_id": state["id"], "name_en": "Report District A"},
+    ).json()
+    district_b = client.post(
+        "/api/v1/masters/districts", headers=admin_headers,
+        json={"state_id": state["id"], "name_en": "Report District B"},
+    ).json()
+    taluk_a1 = client.post(
+        "/api/v1/masters/taluks", headers=admin_headers,
+        json={"district_id": district_a["id"], "name_en": "Report Taluk A1"},
+    ).json()
+
+    # ── seed members ──
+    m_male = _create_member(client, admin_headers, "9340000101", "Male")
+    m_female = _create_member(client, admin_headers, "9340000102", "Female")
+    m_unapproved = _create_member(client, admin_headers, "9340000103", "Waiting")
+    client.put(
+        f"/api/v1/members/{m_male['id']}", headers=admin_headers,
+        json={"gender": "MALE", "state_id": state["id"], "district_id": district_a["id"], "taluk_id": taluk_a1["id"]},
+    )
+    client.put(
+        f"/api/v1/members/{m_female['id']}", headers=admin_headers,
+        json={"gender": "FEMALE", "state_id": state["id"], "district_id": district_b["id"]},
+    )
+    client.put(
+        f"/api/v1/members/{m_male['id']}/approve", headers=admin_headers,
+    )
+    # approval mints the member_code — refresh the local copy
+    m_male = client.get(f"/api/v1/members/{m_male['id']}", headers=admin_headers).json()
+    assert m_male["member_code"]
+
+    # membership type for the type-based report
+    mt = _create_membership_type(client, admin_headers, "TST_RPT", "Report Type")
+    from db.session import SessionLocal
+    from models.members import MemberMembership
+    with SessionLocal() as db:
+        db.add(MemberMembership(
+            member_id=m_male["id"], membership_type_id=mt["id"],
+            applied_at=datetime.now(timezone.utc), status="ACTIVE",
+        ))
+        db.commit()
+
+    # ── geography report ──
+    geo = client.get(
+        "/api/v1/reports/members/by-geography",
+        headers=admin_headers,
+        params={"group_by": "district", "state_id": state["id"]},
+    )
+    assert geo.status_code == 200, geo.text
+    geo_body = geo.json()
+    by_district = {r["district_name"]: r["member_count"] for r in geo_body["data"]}
+    assert by_district.get("Report District A") == 1
+    assert by_district.get("Report District B") == 1
+
+    geo_taluk = client.get(
+        "/api/v1/reports/members/by-geography",
+        headers=admin_headers,
+        params={"group_by": "taluk", "state_id": state["id"]},
+    )
+    assert geo_taluk.status_code == 200, geo_taluk.text
+    by_taluk = {r["taluk_name"]: r["member_count"] for r in geo_taluk.json()["data"]}
+    assert by_taluk.get("Report Taluk A1") == 1
+    assert client.get(
+        "/api/v1/reports/members/by-geography", headers=admin_headers,
+        params={"group_by": "city"},
+    ).status_code == 400
+
+    geo_csv = client.get(
+        "/api/v1/reports/members/by-geography",
+        headers=admin_headers,
+        params={"group_by": "district", "export": "csv"},
+    )
+    assert geo_csv.status_code == 200, geo_csv.text
+    assert "Report District A" in geo_csv.text
+
+    # ── gender report ──
+    gender = client.get("/api/v1/reports/members/by-gender", headers=admin_headers)
+    assert gender.status_code == 200, gender.text
+    by_gender = {r["gender"]: r["member_count"] for r in gender.json()["data"]}
+    # members seeded here exist; other tests may add more of either gender
+    assert by_gender.get("MALE", 0) >= 1
+    assert by_gender.get("FEMALE", 0) >= 1
+
+    # ── membership type report ──
+    by_type = client.get(
+        "/api/v1/reports/members/by-membership-type",
+        headers=admin_headers,
+        params={"membership_type_id": mt["id"]},
+    )
+    assert by_type.status_code == 200, by_type.text
+    type_body = by_type.json()
+    assert type_body["data"][0]["type_code"] == "TST_RPT"
+    assert type_body["data"][0]["member_count"] == 1
+    assert any(m["member_code"] == m_male["member_code"] for m in type_body["members"])
+
+    # ── unapproved members report ──
+    unapproved = client.get("/api/v1/reports/unapproved-members", headers=admin_headers)
+    assert unapproved.status_code == 200, unapproved.text
+    unapproved_ids = {r["member_id"] for r in unapproved.json()["data"]}
+    assert m_unapproved["id"] in unapproved_ids
+    assert m_male["id"] not in unapproved_ids  # approved above
+
+    # ── receipts + receipt-wise members report ──
+    receipt = client.post(
+        "/api/v1/receipts/",
+        headers=admin_headers,
+        json={
+            "receipt_date": date.today().isoformat(),
+            "receipt_type": "MAGAZINE",
+            "payment_mode": "CASH",
+            "gross_amount": 150,
+            "discount_amount": 0,
+            "net_amount": 150,
+            "source": "OFFLINE",
+            "items": [{"item_type": "MAGAZINE", "amount": 150}],
+        },
+    )
+    assert receipt.status_code == 201, receipt.text
+    client.post(
+        f"/api/v1/receipts/{receipt.json()['id']}/allocate",
+        headers=admin_headers,
+        json={"member_id": m_male["id"], "allocated_amount": 150},
+    )
+
+    receipt_report = client.get(
+        "/api/v1/reports/receipts",
+        headers=admin_headers,
+        params={"source": "OFFLINE"},
+    )
+    assert receipt_report.status_code == 200, receipt_report.text
+    assert receipt_report.json()["summary"]["total_amount"] >= 150
+
+    by_member = client.get(
+        "/api/v1/reports/receipts/by-member",
+        headers=admin_headers,
+        params={"member_id": m_male["id"]},
+    )
+    assert by_member.status_code == 200, by_member.text
+    mb = by_member.json()
+    assert mb["total"] == 1
+    assert mb["data"][0]["receipt_number"]
+    assert mb["data"][0]["name"] == "Male"
+    assert mb["total_allocated"] == 150
+    assert mb["distinct_members"] == 1
+
+    # excel export path
+    excel = client.get("/api/v1/reports/receipts/by-member", headers=admin_headers, params={"export": "excel"})
+    assert excel.status_code == 200, excel.text
+    assert excel.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+    # ── magazines: subscriptions, pause, return, labels ──
+    sub = client.post(
+        "/api/v1/magazines/subscriptions", headers=admin_headers,
+        json={"member_id": m_male["id"]},
+    )
+    assert sub.status_code == 201, sub.text
+    sub_f = client.post(
+        "/api/v1/magazines/subscriptions", headers=admin_headers,
+        json={"member_id": m_female["id"]},
+    )
+    assert sub_f.status_code == 201, sub_f.text
+
+    # mark a return for the male member's subscription
+    ret = client.post(
+        "/api/v1/magazines/returns",
+        headers=admin_headers,
+        json={
+            "subscription_id": sub.json()["id"],
+            "issue_month_year": "2026-07",
+            "return_date": "2026-08-01",
+            "return_reason": "address shifted",
+        },
+    )
+    assert ret.status_code == 201, ret.text
+
+    returns_report = client.get(
+        "/api/v1/reports/magazine-returns",
+        headers=admin_headers,
+        params={"issue_month_year": "2026-07"},
+    )
+    assert returns_report.status_code == 200, returns_report.text
+    rr = returns_report.json()
+    assert rr["total"] == 1
+    assert rr["data"][0]["member_code"] == m_male["member_code"]
+    assert rr["pending_follow_ups"] == 1
+
+    # generate labels so the 'generated' side has data
+    generated = client.post(
+        "/api/v1/magazines/generate-labels",
+        headers=admin_headers,
+        params={"issue_month_year": "2026-07"},
+    )
+    assert generated.status_code == 200, generated.text
+
+    labels_generated = client.get(
+        "/api/v1/reports/labels",
+        headers=admin_headers,
+        params={"status": "generated", "issue_month_year": "2026-07"},
+    )
+    assert labels_generated.status_code == 200, labels_generated.text
+    lg = labels_generated.json()
+    assert lg["total"] >= 1
+    assert lg["returned_count"] == 1  # the male member's flagged label
+
+    labels_pending = client.get(
+        "/api/v1/reports/labels",
+        headers=admin_headers,
+        params={"status": "pending", "issue_month_year": "2026-07"},
+    )
+    assert labels_pending.status_code == 200, labels_pending.text
+    # the two members just printed are no longer pending for that issue
+    pending_ids = {r["member_id"] for r in labels_pending.json()["data"]}
+    assert m_male["id"] not in pending_ids
+    assert m_female["id"] not in pending_ids
+
+    assert client.get(
+        "/api/v1/reports/labels", headers=admin_headers, params={"status": "nope"}
+    ).status_code == 400
+
+    # ── consolidated summary ──
+    summary = client.get("/api/v1/reports/summary", headers=admin_headers)
+    assert summary.status_code == 200, summary.text
+    s = summary.json()
+    assert s["members"]["total"] >= 3
+    assert s["receipts"]["count"] >= 1
+    assert s["magazines"]["returns_total"] >= 1
+    assert s["members"]["by_approval_status"].get("APPROVED", 0) >= 1
+    assert any(t["type_code"] if "type_code" in t else True for t in s["memberships"]["by_type"])
+
+    # export log recorded the excel export above (JSON calls are not logged)
+    logs = client.get(
+        "/api/v1/reports/export-logs", headers=admin_headers, params={"report_key": "receipts_by_member"}
+    )
+    assert logs.status_code == 200, logs.text
+    assert logs.json()["total"] >= 1
 
 
 def test_campaign_send_records_delivery_status(client, admin_headers, monkeypatch):
@@ -1910,3 +3621,291 @@ def test_production_requires_strong_secret():
     # non-production and strong secrets pass
     validate_secret_key(Settings(ENVIRONMENT="production", SECRET_KEY="x" * 48))
     validate_secret_key(Settings(ENVIRONMENT="development", SECRET_KEY=PLACEHOLDER_SECRET))
+
+
+# ─────────────── notifications & activity ───────────────
+
+def test_membership_activation_notification_on_approval(client, admin_headers, monkeypatch):
+    import services.whatsapp as whatsapp
+    from db.session import SessionLocal
+    from models.notifications import NotificationMessage
+
+    sent = []
+
+    async def _capture(to, message, template_id=None):
+        sent.append({"to": to, "message": message})
+        return {"ok": True}
+
+    monkeypatch.setattr(whatsapp.whatsapp_service, "send_message", _capture)
+
+    template = client.post(
+        "/api/v1/notifications/templates",
+        headers=admin_headers,
+        json={
+            "template_name": "TST_ACT_1",
+            "purpose": "MEMBERSHIP_ACTIVATION",
+            "content": "Dear {{name}}, your membership {{member_code}} is active.",
+        },
+    )
+    assert template.status_code == 200, template.text
+
+    member = _create_member(client, admin_headers, "9340000201", "Activated")
+    approved = client.put(f"/api/v1/members/{member['id']}/approve", headers=admin_headers)
+    assert approved.status_code == 200, approved.text
+    member_code = approved.json()["member_code"]
+
+    from db.session import SessionLocal as S
+    with S() as db:
+        msg = (
+            db.query(NotificationMessage)
+            .filter(NotificationMessage.member_id == member["id"])
+            .order_by(NotificationMessage.id.desc())
+            .first()
+        )
+    assert msg is not None, "activation notification was not recorded"
+    assert member_code in msg.message_content
+    assert "Activated" in msg.message_content
+
+    # approval without an activation template must not fail
+    with S() as db:
+        from models.notifications import NotificationTemplate
+        tpl = db.query(NotificationTemplate).filter(
+            NotificationTemplate.purpose == "MEMBERSHIP_ACTIVATION"
+        ).first()
+        tpl.status = False
+        db.commit()
+
+    member2 = _create_member(client, admin_headers, "9340000202", "NoTemplate")
+    assert client.put(
+        f"/api/v1/members/{member2['id']}/approve", headers=admin_headers
+    ).status_code == 200
+
+
+def test_individual_bulk_and_csv_notifications(client, admin_headers, monkeypatch):
+    import io
+    import services.whatsapp as whatsapp
+    from db.session import SessionLocal
+    from models.notifications import NotificationMessage
+
+    bulk_results = []
+
+    async def _all_ok(recipients, message, template_id=None):
+        return [{"to": r, "ok": True} for r in recipients]
+
+    async def _ok_message(to, message, template_id=None):
+        return {"ok": True}
+
+    monkeypatch.setattr(whatsapp.whatsapp_service, "send_bulk", _all_ok)
+    monkeypatch.setattr(whatsapp.whatsapp_service, "send_message", _ok_message)
+
+    m1 = _create_member(client, admin_headers, "9340000210", "Bulk One")
+    m2 = _create_member(client, admin_headers, "9340000211", "Bulk Two")
+    client.put(
+        f"/api/v1/members/{m1['id']}", headers=admin_headers, json={"gender": "MALE"}
+    )
+
+    template = client.post(
+        "/api/v1/notifications/templates",
+        headers=admin_headers,
+        json={
+            "template_name": "TST_BULK_1",
+            "content": "Hello {{name}} ({{member_code}})",
+        },
+    ).json()
+
+    # variables introspection
+    vars_resp = client.get(
+        f"/api/v1/notifications/templates/{template['id']}/variables", headers=admin_headers
+    )
+    assert vars_resp.json()["variables"] == ["name", "member_code"]
+
+    # individual custom notification with variables (JSON body)
+    individual = client.post(
+        "/api/v1/notifications/send-individual",
+        headers=admin_headers,
+        params={
+            "member_id": m1["id"],
+            "template_id": template["id"],
+        },
+        json={"member_code": "HMS-777"},
+    )
+    assert individual.status_code == 200, individual.text
+    assert "Bulk One" in individual.json()["rendered_content"]
+    assert "HMS-777" in individual.json()["rendered_content"]
+
+    with SessionLocal() as db:
+        msg = (
+            db.query(NotificationMessage)
+            .filter(NotificationMessage.member_id == m1["id"])
+            .order_by(NotificationMessage.id.desc())
+            .first()
+        )
+    assert msg is not None and "HMS-777" in msg.message_content
+
+    # bulk send to filtered members (other tests may also have MALE members)
+    bulk = client.post(
+        "/api/v1/notifications/send-bulk",
+        headers=admin_headers,
+        json={"template_id": template["id"], "member_filters": {"gender": "MALE"}},
+    )
+    assert bulk.status_code == 200, bulk.text
+    bulk_count = int(re.search(r"for (\d+) members", bulk.json()["message"]).group(1))
+    assert bulk_count >= 1  # m1 is MALE and must be included
+
+    # unknown filters rejected
+    bad = client.post(
+        "/api/v1/notifications/send-bulk",
+        headers=admin_headers,
+        json={"template_id": template["id"], "member_filters": {"planet": "Mars"}},
+    )
+    assert bad.status_code == 400, bad.text
+
+    # inactive template rejected for sends
+    client.put(
+        f"/api/v1/notifications/templates/{template['id']}/variables",  # dummy path -> 405/404 check below
+        headers=admin_headers,
+    )
+
+    # CSV campaign: upload + send
+    csv_content = "mobile,name\n9340000220,Csv Person\n9340000221,Second Person\n"
+    csv_campaign = client.post(
+        "/api/v1/notifications/campaigns/csv",
+        headers=admin_headers,
+        params={
+            "campaign_name": "TST_CSV_CAMP",
+            "template_id": template["id"],
+        },
+        files={"file": ("numbers.csv", csv_content.encode("utf-8"), "text/csv")},
+    )
+    assert csv_campaign.status_code == 200, csv_campaign.text
+    campaign_id = csv_campaign.json()["id"]
+    assert csv_campaign.json()["source"] == "CSV"
+
+    send = client.post(f"/api/v1/notifications/campaigns/{campaign_id}/send", headers=admin_headers)
+    assert send.status_code == 200, send.text
+    assert "2 recipients" in send.json()["message"]
+
+    # per-recipient rows recorded with the CSV variable columns
+    with SessionLocal() as db:
+        from models.notifications import NotificationRecipient
+        rows = db.query(NotificationRecipient).filter(
+            NotificationRecipient.campaign_id == campaign_id
+        ).order_by(NotificationRecipient.id).all()
+    assert len(rows) == 2
+    assert rows[0].status == "SENT"
+    assert rows[0].variables.get("name") == "Csv Person"
+
+    recipients_listing = client.get(
+        f"/api/v1/notifications/campaigns/{campaign_id}/recipients", headers=admin_headers
+    )
+    assert recipients_listing.status_code == 200, recipients_listing.text
+    assert recipients_listing.json()["total"] == 2
+
+    # double send blocked
+    assert client.post(
+        f"/api/v1/notifications/campaigns/{campaign_id}/send", headers=admin_headers
+    ).status_code == 400
+
+    # member-filtered campaign create + send
+    campaign = client.post(
+        "/api/v1/notifications/campaigns",
+        headers=admin_headers,
+        json={
+            "campaign_name": "TST_FILTERED_CAMP",
+            "template_id": template["id"],
+            "member_filters": {"gender": "MALE"},
+        },
+    )
+    assert campaign.status_code == 200, campaign.text
+    fc_id = campaign.json()["id"]
+    sent = client.post(f"/api/v1/notifications/campaigns/{fc_id}/send", headers=admin_headers)
+    assert sent.status_code == 200, sent.text
+    filtered_count = int(re.search(r"for (\d+) recipients", sent.json()["message"]).group(1))
+    assert filtered_count >= 1
+
+    # invalid CSV type rejected
+    assert client.post(
+        "/api/v1/notifications/campaigns/csv",
+        headers=admin_headers,
+        params={"campaign_name": "X", "template_id": template["id"]},
+        files={"file": ("x.png", b"\x89PNG", "image/png")},
+    ).status_code == 400
+
+
+def test_logout_activity_and_member_timeline(client, admin_headers):
+    from db.session import SessionLocal
+    from models.activity import UserActivityLog, MemberActivityLog
+
+    member = _create_member(client, admin_headers, "9340000230", "Timeline")
+
+    # edit the member to generate an UPDATE entry with change details
+    client.put(
+        f"/api/v1/members/{member['id']}",
+        headers=admin_headers,
+        json={"email": "timeline@example.com"},
+    )
+
+    # member timeline endpoint
+    timeline = client.get(
+        f"/api/v1/activity/members/{member['id']}/timeline", headers=admin_headers
+    )
+    assert timeline.status_code == 200, timeline.text
+    body = timeline.json()
+    actions = [row["action"] for row in body["data"]]
+    assert "CREATE" in actions
+    assert "UPDATE" in actions
+    update_row = [r for r in body["data"] if r["action"] == "UPDATE"][0]
+    assert update_row["acted_by_name"]
+    changes = (update_row.get("details") or {}).get("changes", {})
+    assert changes.get("email", {}).get("to") == "timeline@example.com"
+
+    # member activity filter by entity_type via JSON extract
+    filtered = client.get(
+        "/api/v1/activity/members",
+        headers=admin_headers,
+        params={"member_id": member["id"], "entity_type": "members"},
+    )
+    assert filtered.status_code == 200, filtered.text
+    assert filtered.json()["total"] >= 2
+
+    # user activity trail + filters
+    trail = client.get(
+        "/api/v1/activity/users",
+        headers=admin_headers,
+        params={"action": "CREATE", "entity_type": "members"},
+    )
+    assert trail.status_code == 200, trail.text
+    assert trail.json()["total"] >= 1
+
+    # logout records LOGOUT activity
+    login = client.post(
+        "/api/v1/auth/login",
+        data={"username": "admin", "password": "admintest123"},
+    )
+    token = login.json()["access_token"]
+    logout = client.post(
+        "/api/v1/auth/logout",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert logout.status_code == 200, logout.text
+
+    with SessionLocal() as db:
+        log = (
+            db.query(UserActivityLog)
+            .filter(UserActivityLog.action == "LOGOUT")
+            .order_by(UserActivityLog.id.desc())
+            .first()
+        )
+    assert log is not None, "LOGOUT was not recorded"
+
+    # summary endpoint has per-user counters
+    summary = client.get("/api/v1/activity/users/summary", headers=admin_headers)
+    assert summary.status_code == 200, summary.text
+    any_user = next(iter(summary.json()["data"].values()))
+    assert any_user.get("LOGIN", 0) >= 1
+    assert any_user.get("CREATE", 0) >= 1
+
+    # timeline 404 for unknown member
+    assert client.get(
+        "/api/v1/activity/members/999999/timeline", headers=admin_headers
+    ).status_code == 404

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import event
 from sqlalchemy.orm import Session
@@ -26,6 +26,46 @@ def setup_audit_listeners(engine):
 
         now = datetime.now(timezone.utc)
 
+        def _json_safe(value):
+            """Coerce a column value to something JSON-serialisable."""
+            import decimal
+
+            if value is None or isinstance(value, (str, int, float, bool)):
+                return value
+            if isinstance(value, decimal.Decimal):
+                return float(value)
+            if isinstance(value, (datetime, date)):
+                return value.isoformat()
+            if isinstance(value, (dict, list)):
+                try:
+                    import json
+                    json.dumps(value)
+                    return value
+                except (TypeError, ValueError):
+                    return str(value)
+            return str(value)
+
+        def _change_details(obj) -> dict | None:
+            """Human-readable before/after for updated columns."""
+            from sqlalchemy.orm import attributes
+            history_map = {}
+            state = attributes.instance_state(obj)
+            for attr in state.attrs:
+                hist = attr.load_history()
+                if not hist.has_changes():
+                    continue
+                if attr.key in ("created_at", "updated_at", "created_by", "updated_by"):
+                    continue
+                old = hist.deleted[0] if hist.deleted else None
+                new = hist.added[0] if hist.added else None
+                if isinstance(old, (dict, list)) or isinstance(new, (dict, list)):
+                    continue
+                history_map[attr.key] = {
+                    "from": _json_safe(old),
+                    "to": _json_safe(new),
+                }
+            return history_map or None
+
         def record(action: str, obj) -> None:
             table = getattr(obj, "__tablename__", None)
             if not table or table in _AUDIT_TABLES:
@@ -51,11 +91,20 @@ def setup_audit_listeners(engine):
             else:
                 member_id = obj.id if table == "members" else getattr(obj, "member_id", None)
             if member_id is not None:
+                details = {"entity_type": table, "entity_id": entity_id}
+                if action == "UPDATE":
+                    changes = _change_details(obj)
+                    if changes:
+                        details["changes"] = changes
+                elif action == "CREATE":
+                    # Point at the created row; full data lives on the entity.
+                    details["created"] = True
                 session.add(
                     MemberActivityLog(
                         member_id=member_id,
                         action=action,
-                        details={"entity_type": table, "entity_id": entity_id},
+                        details=details,
+                        user_id=current_user_id,
                         created_at=now,
                     )
                 )

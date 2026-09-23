@@ -17,6 +17,11 @@ class EventParticipant(AuditMixin, Base):
     event_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("events.id"), nullable=False)
     participant_name: Mapped[str] = mapped_column(String(150), nullable=False)
     participant_role: Mapped[str] = mapped_column(String(100), nullable=True)
+    # GUEST (invited attendee) or HONOURED (felicitated on stage) — the spec
+    # distinguishes the two so profiles can show 'honoured at …' separately.
+    participant_type: Mapped[str] = mapped_column(String(20), default="GUEST", nullable=False)
+    # Set when the participant is a Havyaka member: their profile then shows
+    # this event under their guest/honour history.
     member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=True)
 
 class EventMemberLink(AuditMixin, Base):
