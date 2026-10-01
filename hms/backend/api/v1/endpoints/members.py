@@ -916,13 +916,24 @@ def read_membership_credit(
     *, db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
     id: int,
+    include: Optional[str] = None,
 ) -> Any:
     """What the member has paid toward membership, which type that buys, and
-    what is left over for the next one (see services/membership_credit)."""
+    what is left over for the next one (see services/membership_credit).
+
+    `include` (comma separated receipt types) previews the result for a
+    different selection of ticked types without saving anything or
+    upgrading the member."""
     from services import membership_credit
     if not crud_members.member.get(db=db, id=id):
         raise HTTPException(status_code=404, detail="Member not found")
-    return membership_credit.summary(db, id)
+    types = None
+    if include is not None:
+        try:
+            types = membership_credit.parse_types(include)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+    return membership_credit.summary(db, id, types)
 
 
 @router.post("/{id}/membership-credit/recalculate")

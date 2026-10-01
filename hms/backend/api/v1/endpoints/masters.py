@@ -730,12 +730,15 @@ def create_document_type(
 # ─────────────── MEMBERSHIP CREDIT SETTING ───────────────
 @router.get("/membership-credit-settings")
 def read_membership_credit_settings(db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user)) -> Any:
-    """Receipt types whose allocated money counts toward a member's
-    membership total (and so toward auto-upgrade)."""
+    """Checkbox model for the "what counts toward the membership total"
+    screen: every receipt type with a label and whether it is ticked
+    (`selected`) and ticked by default (`default`). Only ticked types add to
+    a member's credit and so toward auto-upgrade."""
     from services import membership_credit
     return {
         "receipt_types": membership_credit.credit_receipt_types(db),
         "default": membership_credit.DEFAULT_RECEIPT_TYPES,
+        "options": membership_credit.receipt_type_options(db),
     }
 
 
@@ -745,16 +748,33 @@ def update_membership_credit_settings(
     current_user: User = Depends(deps.require_permission("masters.write")),
     receipt_types: List[str],
 ) -> Any:
+    """Save the ticked receipt types (send the full list of codes that
+    should count). Takes effect for the next payment or recalculation."""
     from services import membership_credit
-    if not receipt_types:
-        raise HTTPException(400, "Give at least one receipt type")
-    from api.v1.endpoints.receipts import VALID_RECEIPT_TYPES
-    unknown = {t.strip().upper() for t in receipt_types} - VALID_RECEIPT_TYPES - {"TYPE_CHANGE"}
-    if unknown:
-        raise HTTPException(400, f"Unknown receipt type(s): {', '.join(sorted(unknown))}")
-    saved = membership_credit.set_credit_receipt_types(db, receipt_types, current_user.id)
+    try:
+        cleaned = membership_credit.parse_types(receipt_types)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if not cleaned:
+        raise HTTPException(400, "Select at least one receipt type")
+    saved = membership_credit.set_credit_receipt_types(db, cleaned, current_user.id)
     db.commit()
-    return {"receipt_types": saved}
+    return {
+        "receipt_types": saved,
+        "options": membership_credit.receipt_type_options(db, saved),
+    }
+
+
+@router.post("/membership-credit-settings/reset")
+def reset_membership_credit_settings(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("masters.write")),
+) -> Any:
+    """Back to the default ticks."""
+    from services import membership_credit
+    saved = membership_credit.set_credit_receipt_types(db, membership_credit.DEFAULT_RECEIPT_TYPES, current_user.id)
+    db.commit()
+    return {"receipt_types": saved, "options": membership_credit.receipt_type_options(db, saved)}
 
 
 @router.get("/document-types/{id}", response_model=schemas_masters.DocumentType)

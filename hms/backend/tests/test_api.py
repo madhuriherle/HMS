@@ -6368,3 +6368,39 @@ def test_membership_credit_auto_upgrade_with_remaining_carried(client, admin_hea
     assert client.put("/api/v1/masters/membership-credit-settings", headers=H, json=[]).status_code == 400
     assert client.put("/api/v1/masters/membership-credit-settings", headers=H, json=["NOPE"]).status_code == 400
     client.put("/api/v1/masters/membership-credit-settings", headers=H, json=settings["default"])
+
+
+def test_membership_credit_checkbox_options_api(client, admin_headers):
+    H = admin_headers
+    cfg = client.get("/api/v1/masters/membership-credit-settings", headers=H).json()
+    opts = {o["code"]: o for o in cfg["options"]}
+    assert {"MEMBERSHIP", "TYPE_CHANGE", "GENERAL_DONATION", "DONATION_1", "DONATION_2", "DONATION_3", "P_NIDHI",
+            "SCHOLARSHIP", "MAGAZINE", "EVENT", "OTHER"} <= set(opts)
+    assert opts["P_NIDHI"]["label"] == "P. Nidhi" and opts["P_NIDHI"]["selected"] is True and opts["P_NIDHI"]["default"] is True
+    assert opts["MAGAZINE"]["selected"] is False and opts["MAGAZINE"]["default"] is False
+
+    # untick everything but membership + P.Nidhi, save, read back
+    saved = client.put("/api/v1/masters/membership-credit-settings", headers=H, json=["MEMBERSHIP", "P_NIDHI"])
+    assert saved.status_code == 200, saved.text
+    assert {o["code"] for o in saved.json()["options"] if o["selected"]} == {"MEMBERSHIP", "P_NIDHI"}
+    assert client.get("/api/v1/masters/membership-credit-settings", headers=H).json()["receipt_types"] == ["MEMBERSHIP", "P_NIDHI"]
+
+    # a member's credit follows the saved ticks; ?include= previews other ticks without saving
+    m = _create_member(client, H, "9666666666", "Boxes")
+    for rtype, amt in (("MEMBERSHIP", 100), ("P_NIDHI", 40), ("SCHOLARSHIP", 25)):
+        _make_receipt(client, H, receipt_type=rtype, gross_amount=amt, net_amount=amt,
+                      items=[{"item_type": rtype, "amount": amt}],
+                      allocations=[{"member_id": m["id"], "allocated_amount": amt}])
+    url = f"/api/v1/members/{m['id']}/membership-credit"
+    base = client.get(url, headers=H).json()
+    assert base["credit_total"] == 140 and base["preview"] is False and base["counted_receipt_types"] == ["MEMBERSHIP", "P_NIDHI"]
+    pre = client.get(url, headers=H, params={"include": "MEMBERSHIP,P_NIDHI,SCHOLARSHIP"}).json()
+    assert pre["credit_total"] == 165 and pre["preview"] is True
+    assert client.get(url, headers=H).json()["credit_total"] == 140  # nothing saved
+    assert client.get(url, headers=H, params={"include": "NOPE"}).status_code == 400
+
+    # validation + reset to defaults
+    assert client.put("/api/v1/masters/membership-credit-settings", headers=H, json=["NOPE"]).status_code == 400
+    assert client.put("/api/v1/masters/membership-credit-settings", headers=H, json=[]).status_code == 400
+    reset = client.post("/api/v1/masters/membership-credit-settings/reset", headers=H)
+    assert reset.status_code == 200 and set(reset.json()["receipt_types"]) == set(cfg["default"])

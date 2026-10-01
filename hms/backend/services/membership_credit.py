@@ -44,6 +44,61 @@ def _d(value) -> Decimal:
     return Decimal(str(value or 0))
 
 
+RECEIPT_TYPE_LABELS = {
+    "MEMBERSHIP": "Membership fee / renewal",
+    "TYPE_CHANGE": "Membership upgrade difference",
+    "GENERAL_DONATION": "General donation",
+    "DONATION": "Donation (legacy)",
+    "DONATION_1": "Donation 1",
+    "DONATION_2": "Donation 2",
+    "DONATION_3": "Donation 3",
+    "P_NIDHI": "P. Nidhi",
+    "SCHOLARSHIP": "Scholarship",
+    "MAGAZINE": "Magazine",
+    "EVENT": "Event",
+    "OTHER": "Other",
+}
+
+
+def all_receipt_types() -> list:
+    """Every receipt type that can be ticked: the types a receipt can carry
+    plus TYPE_CHANGE (minted by the upgrade-approval flow)."""
+    from api.v1.endpoints.receipts import VALID_RECEIPT_TYPES
+    codes = set(VALID_RECEIPT_TYPES) | {"TYPE_CHANGE"}
+    order = list(RECEIPT_TYPE_LABELS)
+    return sorted(codes, key=lambda c: (order.index(c) if c in order else len(order), c))
+
+
+def receipt_type_options(db: Session, selected: Optional[list] = None) -> list:
+    """Checkbox model for the frontend: one entry per receipt type, ticked
+    when it currently counts toward the membership total."""
+    chosen = set(selected if selected is not None else credit_receipt_types(db))
+    return [
+        {
+            "code": c,
+            "label": RECEIPT_TYPE_LABELS.get(c, c.replace("_", " ").title()),
+            "selected": c in chosen,
+            "default": c in DEFAULT_RECEIPT_TYPES,
+        }
+        for c in all_receipt_types()
+    ]
+
+
+def parse_types(raw) -> list:
+    """Normalise + validate a list / comma string of receipt types."""
+    items = raw.split(",") if isinstance(raw, str) else list(raw or [])
+    cleaned = []
+    for t in items:
+        t = (t or "").strip().upper()
+        if t and t not in cleaned:
+            cleaned.append(t)
+    known = all_receipt_types()
+    unknown = [t for t in cleaned if t not in known]
+    if unknown:
+        raise ValueError("Unknown receipt type(s): " + ", ".join(sorted(unknown)))
+    return cleaned
+
+
 def credit_receipt_types(db: Session) -> list:
     from models.masters import HmsSetting
     row = db.query(HmsSetting).filter(
@@ -92,11 +147,12 @@ def ladder(db: Session) -> list:
     return tiers
 
 
-def credit_ledger(db: Session, member_id: int) -> dict:
-    """Counted allocations for the member, with refund-adjusted amounts."""
+def credit_ledger(db: Session, member_id: int, types: Optional[list] = None) -> dict:
+    """Counted allocations for the member, with refund-adjusted amounts.
+    `types` overrides the saved setting (used for previews)."""
     from models.receipts import Receipt, ReceiptAllocation, RefundTransaction
 
-    types = credit_receipt_types(db)
+    types = types if types is not None else credit_receipt_types(db)
     rows = (
         db.query(ReceiptAllocation, Receipt)
         .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
@@ -149,12 +205,12 @@ def _current_membership(db: Session, member_id: int):
     )
 
 
-def summary(db: Session, member_id: int) -> dict:
+def summary(db: Session, member_id: int, receipt_types: Optional[list] = None) -> dict:
     """Credit, current / qualified type, remaining and the gap to the next type."""
     from models.masters import MembershipType
     from services.pricing import active_price
 
-    led = credit_ledger(db, member_id)
+    led = credit_ledger(db, member_id, receipt_types)
     total = led["total"]
     tiers = ladder(db)
     qualified = None
@@ -174,6 +230,7 @@ def summary(db: Session, member_id: int) -> dict:
     return {
         "member_id": member_id,
         "credit_total": float(total),
+        "preview": receipt_types is not None,
         "counted_receipt_types": led["receipt_types"],
         "current_type": (
             {"id": current_type.id, "code": current_type.code, "name_en": current_type.name_en,
