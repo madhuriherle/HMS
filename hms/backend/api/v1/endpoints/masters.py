@@ -9,7 +9,7 @@ from api import deps
 from models.users import User
 from models.masters import (
     State, District, Taluk, PostalCode,
-    MembershipType, MembershipTypePrice, DocumentType, ServiceType,
+    MembershipType, MembershipTypePrice, DocumentType, ServiceType, DeletionReason,
 )
 from core.pagination import paginate
 from schemas import masters as schemas_masters
@@ -726,6 +726,18 @@ def create_document_type(
         raise HTTPException(409, f"Document type code '{dt_in.code}' already exists")
     return crud_masters.document_type.create(db=db, obj_in=dt_in, created_by=current_user.id)
 
+
+@router.get("/document-types/{id}", response_model=schemas_masters.DocumentType)
+def read_document_type(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:
+    obj = db.query(DocumentType).filter(DocumentType.id == id, DocumentType.is_deleted == False).first()
+    if not obj: raise HTTPException(404, "Document type not found")
+    return obj
+
+@router.get("/deletion-reasons/{id}", response_model=schemas_masters.DeletionReason)
+def read_deletion_reason(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:
+    obj = db.query(DeletionReason).filter(DeletionReason.id == id, DeletionReason.is_deleted == False).first()
+    if not obj: raise HTTPException(404, "Deletion reason not found")
+    return obj
 
 @router.put("/document-types/{id}", response_model=Union[schemas_masters.DocumentType, PendingApproval])
 @approval_gate.gated("masters", "UPDATE", "DocumentType", "masters.update")

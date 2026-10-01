@@ -378,6 +378,12 @@ def create_committee_subcategory(
         raise HTTPException(400, "Unknown category_id")
     return crud_engagements.committee_subcategory.create(db=db, obj_in=sub_in, created_by=current_user.id)
 
+@router.get("/committee/subcategories/{id}", response_model=schemas_engagements.CommitteeSubcategory)
+def read_committee_subcategory(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:
+    obj = db.query(CommitteeSubcategory).filter(CommitteeSubcategory.id == id, CommitteeSubcategory.is_deleted == False).first()
+    if not obj: raise HTTPException(404, "Subcategory not found")
+    return obj
+
 @router.put("/committee/subcategories/{id}", response_model=Union[schemas_engagements.CommitteeSubcategory, PendingApproval])
 @approval_gate.gated("engagements", "UPDATE", "CommitteeSubcategory", "engagements.update")
 def update_committee_subcategory(
@@ -557,6 +563,12 @@ def create_committee_member(
     db.refresh(obj)
     return obj
 
+@router.get("/committee/members/{id}", response_model=schemas_engagements.CommitteeMember)
+def read_committee_member(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:
+    obj = db.query(CommitteeMember).filter(CommitteeMember.id == id, CommitteeMember.is_deleted == False).first()
+    if not obj: raise HTTPException(404, "Committee member not found")
+    return obj
+
 @router.put("/committee/members/{id}", response_model=Union[schemas_engagements.CommitteeMember, PendingApproval])
 @approval_gate.gated("engagements", "UPDATE", "CommitteeMember", "engagements.update")
 def update_committee_member(
@@ -627,6 +639,12 @@ def create_committee_term(*, db: Session = Depends(deps.get_db), current_user: U
         db.query(CommitteeTerm).filter(CommitteeTerm.is_current == True).update({"is_current": False})
     return crud_engagements.committee_term.create(db=db, obj_in=term_in, created_by=current_user.id)
 
+
+@router.get("/committee/terms/{id}", response_model=schemas_engagements.CommitteeTerm)
+def read_committee_term(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:
+    obj = db.query(CommitteeTerm).filter(CommitteeTerm.id == id, CommitteeTerm.is_deleted == False).first()
+    if not obj: raise HTTPException(404, "Term not found")
+    return obj
 
 @router.put("/committee/terms/{id}", response_model=Union[schemas_engagements.CommitteeTerm, PendingApproval])
 @approval_gate.gated("engagements", "UPDATE", "CommitteeTerm", "engagements.update")

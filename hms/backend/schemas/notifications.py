@@ -14,7 +14,11 @@ class NotificationTemplateCreate(NotificationTemplateBase):
     pass
 
 class NotificationTemplateUpdate(BaseModel):
+    template_name: Optional[str] = None
+    provider_template_id: Optional[str] = None
+    language: Optional[str] = None
     content: Optional[str] = None
+    purpose: Optional[str] = None
     status: Optional[bool] = None
 
 class NotificationTemplate(NotificationTemplateBase):
@@ -51,6 +55,14 @@ class BulkSendRequest(BaseModel):
     """Body for POST /notifications/send-bulk."""
 
     template_id: int
+    member_filters: Optional[dict] = None
+
+
+class NotificationCampaignUpdate(BaseModel):
+    campaign_name: Optional[str] = None
+    template_id: Optional[int] = None
+    target_audience: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
     member_filters: Optional[dict] = None
 
 

@@ -96,6 +96,50 @@ def create_template(
     from crud import notifications as crud_notif
     return crud_notif.template.create(db=db, obj_in=template_in, created_by=current_user.id)
 
+@router.get("/templates/{template_id}", response_model=schemas_notifications.NotificationTemplate)
+def read_template(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), template_id: int) -> Any:
+    t = db.query(NotificationTemplate).filter(NotificationTemplate.id == template_id, NotificationTemplate.is_deleted == False).first()
+    if not t:
+        raise HTTPException(404, "Template not found")
+    return t
+
+@router.put("/templates/{template_id}", response_model=Union[schemas_notifications.NotificationTemplate, PendingApproval])
+@approval_gate.gated("notifications", "UPDATE", "NotificationTemplate", "notifications.update", id_param="template_id")
+def update_template(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("notifications.update")),
+    template_id: int, template_in: schemas_notifications.NotificationTemplateUpdate,
+) -> Any:
+    t = db.query(NotificationTemplate).filter(NotificationTemplate.id == template_id, NotificationTemplate.is_deleted == False).first()
+    if not t:
+        raise HTTPException(404, "Template not found")
+    for k, v in template_in.model_dump(exclude_unset=True).items():
+        setattr(t, k, v)
+    t.updated_by = current_user.id
+    db.commit(); db.refresh(t)
+    return t
+
+@router.delete("/templates/{template_id}")
+@approval_gate.gated("notifications", "DELETE", "NotificationTemplate", "notifications.delete", id_param="template_id")
+def delete_template(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("notifications.delete")),
+    template_id: int,
+) -> Any:
+    t = db.query(NotificationTemplate).filter(NotificationTemplate.id == template_id, NotificationTemplate.is_deleted == False).first()
+    if not t:
+        raise HTTPException(404, "Template not found")
+    in_use = db.query(NotificationCampaign).filter(
+        NotificationCampaign.template_id == template_id,
+        NotificationCampaign.is_deleted == False,
+        NotificationCampaign.status.in_(("PENDING", "SCHEDULED", "QUEUED")),
+    ).count()
+    if in_use:
+        raise HTTPException(409, "Template is used by an unsent campaign; delete or change that campaign first")
+    t.is_deleted = True; t.deleted_by = current_user.id
+    db.commit()
+    return {"message": "Deleted"}
+
 @router.get("/templates/{template_id}/variables")
 def read_template_variables(
     *,
@@ -424,6 +468,51 @@ async def send_bulk_notification(
     background_tasks.add_task(bulk_send)
     return {"message": f"Bulk notification queued for {len(numbers)} members"}
 
+
+@router.get("/campaigns/{campaign_id}", response_model=schemas_notifications.NotificationCampaign)
+def read_campaign(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), campaign_id: int) -> Any:
+    c = db.query(NotificationCampaign).filter(NotificationCampaign.id == campaign_id, NotificationCampaign.is_deleted == False).first()
+    if not c:
+        raise HTTPException(404, "Campaign not found")
+    return c
+
+@router.put("/campaigns/{campaign_id}", response_model=Union[schemas_notifications.NotificationCampaign, PendingApproval])
+@approval_gate.gated("notifications", "UPDATE", "NotificationCampaign", "notifications.update", id_param="campaign_id")
+def update_campaign(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("notifications.update")),
+    campaign_id: int, campaign_in: schemas_notifications.NotificationCampaignUpdate,
+) -> Any:
+    c = db.query(NotificationCampaign).filter(NotificationCampaign.id == campaign_id, NotificationCampaign.is_deleted == False).first()
+    if not c:
+        raise HTTPException(404, "Campaign not found")
+    if c.status in ("QUEUED", "SENT"):
+        raise HTTPException(400, f"Campaign is already {c.status.lower()} and can no longer be edited")
+    data = campaign_in.model_dump(exclude_unset=True)
+    if "template_id" in data and not db.query(NotificationTemplate).filter(
+        NotificationTemplate.id == data["template_id"], NotificationTemplate.is_deleted == False).first():
+        raise HTTPException(404, "Template not found")
+    for k, v in data.items():
+        setattr(c, k, v)
+    c.updated_by = current_user.id
+    db.commit(); db.refresh(c)
+    return c
+
+@router.delete("/campaigns/{campaign_id}")
+@approval_gate.gated("notifications", "DELETE", "NotificationCampaign", "notifications.delete", id_param="campaign_id")
+def delete_campaign(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("notifications.delete")),
+    campaign_id: int,
+) -> Any:
+    c = db.query(NotificationCampaign).filter(NotificationCampaign.id == campaign_id, NotificationCampaign.is_deleted == False).first()
+    if not c:
+        raise HTTPException(404, "Campaign not found")
+    if c.status == "QUEUED":
+        raise HTTPException(400, "Campaign is being sent and cannot be deleted")
+    c.is_deleted = True; c.deleted_by = current_user.id
+    db.commit()
+    return {"message": "Deleted"}
 
 @router.post("/campaigns/{campaign_id}/send")
 # Not @approval_gate.gated: takes a BackgroundTasks param.

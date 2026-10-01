@@ -6112,3 +6112,67 @@ def test_label_pdf_renders_kannada_text(client, admin_headers):
     assert pdf.status_code == 200, pdf.text
     assert pdf.content.startswith(b"%PDF")
     assert b"NotoSansKannada" in pdf.content  # Kannada glyphs embedded, not blanks
+
+
+def test_template_campaign_crud_and_document_management(client, admin_headers):
+    N = "/api/v1/notifications"
+    t = client.post(f"{N}/templates", headers=admin_headers, json={"template_name": "CRUD_TPL", "content": "Hi {{name}}"}).json()
+    assert client.get(f"{N}/templates/{t['id']}", headers=admin_headers).json()["template_name"] == "CRUD_TPL"
+    u = client.put(f"{N}/templates/{t['id']}", headers=admin_headers, json={"content": "Hello {{name}}", "template_name": "CRUD_TPL2"})
+    assert u.status_code == 200 and u.json()["content"] == "Hello {{name}}"
+
+    c = client.post(f"{N}/campaigns", headers=admin_headers, json={"campaign_name": "CRUD_C", "template_id": t["id"]}).json()
+    assert client.get(f"{N}/campaigns/{c['id']}", headers=admin_headers).status_code == 200
+    assert client.put(f"{N}/campaigns/{c['id']}", headers=admin_headers, json={"campaign_name": "CRUD_C2"}).json()["campaign_name"] == "CRUD_C2"
+    # template in use by an unsent campaign cannot be deleted
+    assert client.delete(f"{N}/templates/{t['id']}", headers=admin_headers).status_code == 409
+    assert client.delete(f"{N}/campaigns/{c['id']}", headers=admin_headers).status_code == 200
+    assert client.get(f"{N}/campaigns/{c['id']}", headers=admin_headers).status_code == 404
+    assert client.delete(f"{N}/templates/{t['id']}", headers=admin_headers).status_code == 200
+    assert client.get(f"{N}/templates/{t['id']}", headers=admin_headers).status_code == 404
+
+    # member documents: upload, list, verify, download, delete
+    m = _create_member(client, admin_headers, "9800000088", "DocMember")
+    dt = client.post("/api/v1/masters/document-types", headers=admin_headers, json={"code": "AADHAAR_CRUD", "name_en": "Aadhaar-CRUD"})
+    assert dt.status_code in (200, 201), dt.text
+    dt_id = dt.json()["id"]
+    assert client.get(f"/api/v1/masters/document-types/{dt_id}", headers=admin_headers).status_code == 200
+    up = client.post("/api/v1/members/documents/", headers=admin_headers,
+                     params={"member_id": m["id"], "document_type_id": dt_id},
+                     files={"file": ("a.pdf", b"%PDF-1.4 doc", "application/pdf")})
+    assert up.status_code == 200, up.text
+    did = up.json()["id"]
+    assert client.post("/api/v1/members/documents/", headers=admin_headers,
+                       params={"member_id": 99999999, "document_type_id": dt_id},
+                       files={"file": ("a.pdf", b"x", "application/pdf")}).status_code == 404
+    lst = client.get(f"/api/v1/members/{m['id']}/documents", headers=admin_headers).json()
+    assert lst["total"] == 1 and lst["data"][0]["verification_status"] == "PENDING"
+    v = client.put(f"/api/v1/members/documents/{did}", headers=admin_headers, json={"verification_status": "VERIFIED"})
+    assert v.status_code == 200 and v.json()["verification_status"] == "VERIFIED"
+    assert client.put(f"/api/v1/members/documents/{did}", headers=admin_headers, json={"verification_status": "NOPE"}).status_code == 400
+    f = client.get(f"/api/v1/members/documents/{did}/file", headers=admin_headers)
+    assert f.status_code == 200 and f.content.startswith(b"%PDF")
+    assert client.delete(f"/api/v1/members/documents/{did}", headers=admin_headers).status_code == 200
+    assert client.get(f"/api/v1/members/{m['id']}/documents", headers=admin_headers).json()["total"] == 0
+
+
+def test_remaining_get_delete_endpoints(client, admin_headers):
+    E, M = "/api/v1/engagements", "/api/v1/magazines"
+    cat = client.post(f"{E}/committee/categories", headers=admin_headers, json={"name_en": "GapCat"}).json()
+    sub = client.post(f"{E}/committee/subcategories", headers=admin_headers, json={"category_id": cat["id"], "name_en": "GapSub"}).json()
+    term = client.post(f"{E}/committee/terms", headers=admin_headers, json={"term_name": "GapTerm"}).json()
+    cm = client.post(f"{E}/committee/members", headers=admin_headers, json={"category_id": cat["id"], "member_name": "Mr X"}).json()
+    for path, obj in (("subcategories", sub), ("terms", term), ("members", cm)):
+        assert client.get(f"{E}/committee/{path}/{obj['id']}", headers=admin_headers).status_code == 200
+        assert client.get(f"{E}/committee/{path}/99999999", headers=admin_headers).status_code == 404
+
+    b = client.post(f"{M}/delivery-batches", headers=admin_headers, json={"batch_name": "B1", "issue_month_year": "2026-05"}).json()
+    assert client.get(f"{M}/delivery-batches/{b['id']}", headers=admin_headers).status_code == 200
+    assert client.put(f"{M}/delivery-batches/{b['id']}", headers=admin_headers, json={"status": "DISPATCHED"}).json()["status"] == "DISPATCHED"
+    assert client.delete(f"{M}/delivery-batches/{b['id']}", headers=admin_headers).status_code == 200
+    assert client.get(f"{M}/delivery-batches/{b['id']}", headers=admin_headers).status_code == 404
+
+    sr = client.post("/api/v1/reports/saved", headers=admin_headers, json={"report_name": "SR1", "report_key": "members", "filters": {}})
+    if sr.status_code in (200, 201):
+        assert client.get(f"/api/v1/reports/saved/{sr.json()['id']}", headers=admin_headers).status_code == 200
+    assert client.get("/api/v1/masters/deletion-reasons/99999999", headers=admin_headers).status_code == 404

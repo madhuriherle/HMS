@@ -958,6 +958,13 @@ def read_saved_reports(
         q = q.filter(SavedReport.report_key == report_key)
     return paginate(q, page, limit)
 
+@router.get("/saved/{id}", response_model=schemas_reports.SavedReport)
+def read_saved_report(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:
+    r = db.query(SavedReport).filter(SavedReport.id == id, SavedReport.is_deleted == False).first()
+    if not r:
+        raise HTTPException(404, "Saved report not found")
+    return r
+
 @router.post("/saved", response_model=Union[schemas_reports.SavedReport, PendingApproval])
 @approval_gate.gated("reports", "CREATE", "SavedReport", "reports.create")
 def create_saved_report(

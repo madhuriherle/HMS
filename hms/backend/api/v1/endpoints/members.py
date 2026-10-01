@@ -486,6 +486,8 @@ async def upload_member_document(
 ) -> Any:
     """Upload a KYC document for a member."""
     from models.members import MemberDocument
+    if not crud_members.member.get(db=db, id=member_id):
+        raise HTTPException(status_code=404, detail="Member not found")
     meta = await save_upload(file, subfolder="member_documents")
     doc = MemberDocument(
         member_id=member_id,
@@ -500,6 +502,78 @@ async def upload_member_document(
     db.commit()
     db.refresh(doc)
     return doc
+
+@router.get("/{id}/documents")
+def list_member_documents(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    id: int,
+) -> Any:
+    """KYC / supporting documents uploaded for a member."""
+    from models.members import MemberDocument
+    if not crud_members.member.get(db=db, id=id):
+        raise HTTPException(status_code=404, detail="Member not found")
+    docs = db.query(MemberDocument).filter(
+        MemberDocument.member_id == id, MemberDocument.is_deleted == False
+    ).order_by(MemberDocument.id.desc()).all()
+    return {"total": len(docs), "data": [
+        {
+            "id": d.id, "member_id": d.member_id, "document_type_id": d.document_type_id,
+            "original_filename": d.original_filename, "mime_type": d.mime_type,
+            "file_size": d.file_size, "verification_status": d.verification_status,
+            "verified_by": d.verified_by, "verified_at": d.verified_at, "created_at": d.created_at,
+        } for d in docs
+    ]}
+
+def _get_document(db: Session, doc_id: int):
+    from models.members import MemberDocument
+    d = db.query(MemberDocument).filter(MemberDocument.id == doc_id, MemberDocument.is_deleted == False).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return d
+
+@router.get("/documents/{doc_id}/file")
+def download_member_document(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.read")),
+    doc_id: int,
+) -> Any:
+    import os
+    from fastapi.responses import FileResponse
+    d = _get_document(db, doc_id)
+    if not os.path.isfile(d.file_path):
+        raise HTTPException(status_code=404, detail="File missing on disk")
+    return FileResponse(d.file_path, media_type=d.mime_type or "application/octet-stream", filename=d.original_filename)
+
+@router.put("/documents/{doc_id}", response_model=schemas_members.MemberDocument)
+def verify_member_document(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.update")),
+    doc_id: int, doc_in: schemas_members.MemberDocumentUpdate,
+) -> Any:
+    """Mark a document VERIFIED / REJECTED / PENDING."""
+    from datetime import datetime, timezone
+    d = _get_document(db, doc_id)
+    status = (doc_in.verification_status or "").upper()
+    if status not in ("PENDING", "VERIFIED", "REJECTED"):
+        raise HTTPException(status_code=400, detail="verification_status must be PENDING, VERIFIED or REJECTED")
+    d.verification_status = status
+    d.verified_by = current_user.id if status != "PENDING" else None
+    d.verified_at = datetime.now(timezone.utc) if status != "PENDING" else None
+    d.updated_by = current_user.id
+    db.commit(); db.refresh(d)
+    return d
+
+@router.delete("/documents/{doc_id}")
+def delete_member_document(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.delete")),
+    doc_id: int,
+) -> Any:
+    d = _get_document(db, doc_id)
+    d.is_deleted = True; d.deleted_by = current_user.id
+    db.commit()
+    return {"message": "Deleted"}
 
 @router.delete("/{id}")
 # Not @approval_gate.gated (generic engine): uses its own bespoke

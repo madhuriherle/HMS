@@ -190,6 +190,57 @@ def pause_subscription(
     return crud_magazines.pause.create(db=db, obj_in=pause_in, created_by=current_user.id)
 
 
+@router.get("/pauses/{pause_id}", response_model=schemas_magazines.MagazineDeliveryPause)
+def read_pause(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), pause_id: int) -> Any:
+    p = db.query(MagazineDeliveryPause).filter(MagazineDeliveryPause.id == pause_id, MagazineDeliveryPause.is_deleted == False).first()
+    if not p: raise HTTPException(404, "Pause not found")
+    return p
+
+@router.delete("/pauses/{pause_id}")
+@approval_gate.gated("magazines", "DELETE", "MagazineDeliveryPause", "magazines.delete", id_param="pause_id")
+def delete_pause(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("magazines.delete")), pause_id: int) -> Any:
+    p = db.query(MagazineDeliveryPause).filter(MagazineDeliveryPause.id == pause_id, MagazineDeliveryPause.is_deleted == False).first()
+    if not p: raise HTTPException(404, "Pause not found")
+    p.is_deleted = True; p.deleted_by = current_user.id
+    db.commit()
+    return {"message": "Deleted"}
+
+@router.get("/returns/{return_id}", response_model=schemas_magazines.MagazineReturn)
+def read_return(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), return_id: int) -> Any:
+    r = db.query(MagazineReturn).filter(MagazineReturn.id == return_id, MagazineReturn.is_deleted == False).first()
+    if not r: raise HTTPException(404, "Return not found")
+    return r
+
+@router.get("/delivery-batches/{batch_id}", response_model=schemas_magazines.MagazineDeliveryBatch)
+def read_delivery_batch(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), batch_id: int) -> Any:
+    b = db.query(MagazineDeliveryBatch).filter(MagazineDeliveryBatch.id == batch_id, MagazineDeliveryBatch.is_deleted == False).first()
+    if not b: raise HTTPException(404, "Delivery batch not found")
+    return b
+
+@router.put("/delivery-batches/{batch_id}", response_model=Union[schemas_magazines.MagazineDeliveryBatch, PendingApproval])
+@approval_gate.gated("magazines", "UPDATE", "MagazineDeliveryBatch", "magazines.update", id_param="batch_id")
+def update_delivery_batch(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("magazines.update")),
+    batch_id: int, batch_in: schemas_magazines.MagazineDeliveryBatchUpdate,
+) -> Any:
+    b = db.query(MagazineDeliveryBatch).filter(MagazineDeliveryBatch.id == batch_id, MagazineDeliveryBatch.is_deleted == False).first()
+    if not b: raise HTTPException(404, "Delivery batch not found")
+    for k, v in batch_in.model_dump(exclude_unset=True).items():
+        setattr(b, k, v)
+    b.updated_by = current_user.id
+    db.commit(); db.refresh(b)
+    return b
+
+@router.delete("/delivery-batches/{batch_id}")
+@approval_gate.gated("magazines", "DELETE", "MagazineDeliveryBatch", "magazines.delete", id_param="batch_id")
+def delete_delivery_batch(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("magazines.delete")), batch_id: int) -> Any:
+    b = db.query(MagazineDeliveryBatch).filter(MagazineDeliveryBatch.id == batch_id, MagazineDeliveryBatch.is_deleted == False).first()
+    if not b: raise HTTPException(404, "Delivery batch not found")
+    b.is_deleted = True; b.deleted_by = current_user.id
+    db.commit()
+    return {"message": "Deleted"}
+
 @router.put("/pauses/{pause_id}", response_model=Union[schemas_magazines.MagazineDeliveryPause, PendingApproval])
 @approval_gate.gated("magazines", "UPDATE", "MagazineDeliveryPause", "magazines.update", id_param="pause_id")
 def update_pause(

@@ -73,6 +73,13 @@ class MagazineDeliveryBatchCreate(BaseModel):
     dispatch_date: Optional[date] = None
     status: str = "PENDING"
 
+class MagazineDeliveryBatchUpdate(BaseModel):
+    batch_name: Optional[str] = None
+    issue_month_year: Optional[str] = None
+    dispatch_date: Optional[date] = None
+    status: Optional[str] = None
+
+
 class MagazineDeliveryBatch(BaseModel):
     id: int
     batch_name: str
