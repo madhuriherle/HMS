@@ -2,13 +2,18 @@ from crud.base import CRUDBase
 from models.masters import (
     State, District, Taluk, PostalCode, MembershipType, MembershipTypePrice,
     DocumentType, ServiceType, HmsSetting,
+    Qualification, NativePlace,
+    DeletionReason,
 )
 from schemas.masters import (
     StateCreate, StateUpdate, DistrictCreate, DistrictUpdate, 
     TalukCreate, TalukUpdate, PostalCodeCreate, PostalCodeUpdate,
     MembershipTypeCreate, MembershipTypeUpdate, MembershipTypePriceCreate, MembershipTypePriceUpdate,
     DocumentTypeCreate, DocumentTypeUpdate,
-    ServiceTypeCreate, ServiceTypeUpdate, HmsSettingCreate, HmsSettingUpdate
+    ServiceTypeCreate, ServiceTypeUpdate, HmsSettingCreate, HmsSettingUpdate,
+    PersonalMasterCreate, PersonalMasterUpdate,
+    NativePlaceCreate, NativePlaceUpdate,
+    DeletionReasonCreate, DeletionReasonUpdate,
 )
 
 class CRUDState(CRUDBase[State, StateCreate, StateUpdate]):
@@ -47,3 +52,19 @@ membership_type_price = CRUDMembershipTypePrice(MembershipTypePrice)
 document_type = CRUDDocumentType(DocumentType)
 service_type = CRUDServiceType(ServiceType)
 hms_setting = CRUDHmsSetting(HmsSetting)
+
+# ─── Personal masters ───
+class CRUDPersonalMaster(CRUDBase):
+    """Generic CRUD for the simple id+name(+kn)+status masters."""
+    pass
+
+class CRUDNativePlace(CRUDBase[NativePlace, NativePlaceCreate, NativePlaceUpdate]):
+    pass
+
+qualification = CRUDPersonalMaster(Qualification)
+native_place = CRUDNativePlace(NativePlace)
+
+class CRUDDeletionReason(CRUDBase[DeletionReason, DeletionReasonCreate, DeletionReasonUpdate]):
+    pass
+
+deletion_reason = CRUDDeletionReason(DeletionReason)

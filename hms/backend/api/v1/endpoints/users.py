@@ -1,12 +1,14 @@
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Union
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from api import deps
-from models.users import User, Role, Permission, RolePermission, UserRole, ScopeTypeEnum
+from models.users import User, Role, Permission, RolePermission, UserRole, ScopeTypeEnum, Module
 from schemas import users as schemas_users
+from schemas.common import PendingApproval
 from crud import users as crud_users
 from core.pagination import paginate
 from core.security import get_password_hash, validate_password_strength, PasswordPolicyError
+from services import approval_gate
 from datetime import datetime, timezone
 
 router = APIRouter()
@@ -24,7 +26,11 @@ def read_users(db: Session = Depends(deps.get_db), current_user: User = Depends(
     return paginate(q, page, limit, exclude={"password_hash"})
 
 @router.post("/", response_model=schemas_users.User)
-def create_user(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.write")), user_in: schemas_users.UserCreate) -> Any:
+# Not @approval_gate.gated: user_in carries a plaintext password — the
+# generic engine stores its captured payload as JSON at rest, which would
+# mean storing that password in the clear. User create/update stay
+# permission-gated only.
+def create_user(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.create")), user_in: schemas_users.UserCreate) -> Any:
     existing = db.query(User).filter(User.username == user_in.username).first()
     if existing:
         raise HTTPException(400, f"Username '{user_in.username}' already exists")
@@ -39,6 +45,61 @@ def create_user(*, db: Session = Depends(deps.get_db), current_user: User = Depe
     db.commit()
     db.refresh(obj)
     return obj
+
+# ─────────────── MODULES ────────────────
+def _module_permission_count(db: Session, module_id: int) -> int:
+    return (
+        db.query(Permission)
+        .filter(Permission.module_id == module_id, Permission.is_deleted == False)
+        .count()
+    )
+
+@router.get("/modules")
+def read_modules(db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), page: int = 1, limit: int = 100, search: Optional[str] = None, status: Optional[bool] = None) -> Any:
+    q = db.query(Module).filter(Module.is_deleted == False)
+    if search:
+        q = q.filter(Module.name_en.ilike(f"%{search}%") | Module.code.ilike(f"%{search}%"))
+    if status is not None:
+        q = q.filter(Module.status == status)
+    page_data = paginate(q.order_by(Module.id), page, limit)
+    for module in page_data["data"]:
+        module["permission_count"] = _module_permission_count(db, module["id"])
+    return page_data
+
+@router.get("/modules/{module_id}", response_model=schemas_users.ModuleWithPermissionCount)
+def read_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), module_id: int) -> Any:
+    module = crud_users.module.get(db, module_id)
+    if not module:
+        raise HTTPException(404, "Module not found")
+    out = schemas_users.ModuleWithPermissionCount.model_validate(module, from_attributes=True)
+    out.permission_count = _module_permission_count(db, module.id)
+    return out
+
+@router.post("/modules", response_model=Union[schemas_users.Module, PendingApproval])
+@approval_gate.gated("users", "CREATE", "Module", "users.create")
+def create_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.create")), module_in: schemas_users.ModuleCreate) -> Any:
+    existing = db.query(Module).filter(Module.code == module_in.code, Module.is_deleted == False).first()
+    if existing:
+        raise HTTPException(409, f"Module code '{module_in.code}' already exists")
+    return crud_users.module.create(db=db, obj_in=module_in, created_by=current_user.id)
+
+@router.put("/modules/{module_id}", response_model=Union[schemas_users.Module, PendingApproval])
+@approval_gate.gated("users", "UPDATE", "Module", "users.update", id_param="module_id")
+def update_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.update")), module_id: int, module_in: schemas_users.ModuleUpdate) -> Any:
+    module = crud_users.module.get(db, module_id)
+    if not module:
+        raise HTTPException(404, "Module not found")
+    return crud_users.module.update(db, db_obj=module, obj_in=module_in, updated_by=current_user.id)
+
+@router.delete("/modules/{module_id}", response_model=Union[schemas_users.Module, PendingApproval])
+@approval_gate.gated("users", "DELETE", "Module", "users.delete", id_param="module_id")
+def delete_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.delete")), module_id: int) -> Any:
+    module = crud_users.module.get(db, module_id)
+    if not module:
+        raise HTTPException(404, "Module not found")
+    if _module_permission_count(db, module.id) > 0:
+        raise HTTPException(409, "Module has permissions assigned to it and cannot be deleted")
+    return crud_users.module.remove(db, id=module_id, deleted_by=current_user.id)
 
 # ─────────────── ROLES ────────────────
 def _role_user_count(db: Session, role_id: int) -> int:
@@ -76,15 +137,17 @@ def read_role(*, db: Session = Depends(deps.get_db), current_user: User = Depend
     out.user_count = _role_user_count(db, role_id)
     return out
 
-@router.post("/roles", response_model=schemas_users.Role)
-def create_role(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.write")), role_in: schemas_users.RoleCreate) -> Any:
+@router.post("/roles", response_model=Union[schemas_users.Role, PendingApproval])
+@approval_gate.gated("users", "CREATE", "Role", "users.create")
+def create_role(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.create")), role_in: schemas_users.RoleCreate) -> Any:
     existing = db.query(Role).filter(Role.code == role_in.code, Role.is_deleted == False).first()
     if existing:
         raise HTTPException(400, f"Role code '{role_in.code}' already exists")
     return crud_users.role.create(db=db, obj_in=role_in, created_by=current_user.id)
 
-@router.put("/roles/{role_id}", response_model=schemas_users.Role)
-def update_role(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.write")), role_id: int, role_in: schemas_users.RoleUpdate) -> Any:
+@router.put("/roles/{role_id}", response_model=Union[schemas_users.Role, PendingApproval])
+@approval_gate.gated("users", "UPDATE", "Role", "users.update", id_param="role_id")
+def update_role(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.update")), role_id: int, role_in: schemas_users.RoleUpdate) -> Any:
     role = crud_users.role.get(db, role_id)
     if not role:
         raise HTTPException(404, "Role not found")
@@ -93,8 +156,9 @@ def update_role(*, db: Session = Depends(deps.get_db), current_user: User = Depe
         raise HTTPException(409, "Role is assigned to users; unassign them before deactivating")
     return crud_users.role.update(db, db_obj=role, obj_in=role_in, updated_by=current_user.id)
 
-@router.delete("/roles/{role_id}", response_model=schemas_users.Role)
-def delete_role(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.write")), role_id: int) -> Any:
+@router.delete("/roles/{role_id}", response_model=Union[schemas_users.Role, PendingApproval])
+@approval_gate.gated("users", "DELETE", "Role", "users.delete", id_param="role_id")
+def delete_role(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.delete")), role_id: int) -> Any:
     role = crud_users.role.get(db, role_id)
     if not role:
         raise HTTPException(404, "Role not found")
@@ -106,16 +170,26 @@ def delete_role(*, db: Session = Depends(deps.get_db), current_user: User = Depe
 @router.get("/roles/{role_id}/permissions")
 def list_role_permissions(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), role_id: int) -> Any:
     rows = (
-        db.query(Permission)
+        db.query(Permission, RolePermission.requires_approval)
         .join(RolePermission, RolePermission.permission_id == Permission.id)
         .filter(RolePermission.role_id == role_id, RolePermission.is_deleted == False)
         .all()
     )
-    return [{"id": p.id, "module": p.module, "code": p.code, "name": p.name} for p in rows]
+    return [
+        {"id": p.id, "module": p.module, "module_id": p.module_id, "code": p.code, "name": p.name, "requires_approval": requires_approval}
+        for p, requires_approval in rows
+    ]
 
 @router.post("/roles/{role_id}/permissions")
-def grant_role_permission(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.write")), role_id: int, permission_id: Optional[int] = None, code: Optional[str] = None) -> Any:
-    """Grant a permission to a role, by permission_id or code."""
+@approval_gate.gated("users", "CREATE", "RolePermission", "users.create", id_param="role_id")
+def grant_role_permission(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.create")), role_id: int, permission_id: Optional[int] = None, code: Optional[str] = None, requires_approval: bool = False) -> Any:
+    """Grant a permission to a role, by permission_id or code.
+
+    requires_approval: if true, a holder of this permission via this role
+    doesn't act directly — the action auto-files an approval request
+    instead (see api.deps.permission_requires_approval). Calling this again
+    on an existing grant updates the flag rather than erroring.
+    """
     role = crud_users.role.get(db, role_id)
     if not role:
         raise HTTPException(404, "Role not found")
@@ -131,15 +205,25 @@ def grant_role_permission(*, db: Session = Depends(deps.get_db), current_user: U
         RolePermission.is_deleted == False,
     ).first()
     if existing:
+        if existing.requires_approval != requires_approval:
+            existing.requires_approval = requires_approval
+            existing.updated_by = current_user.id
+            db.commit()
+            return {"message": f"Permission '{perm.code}' updated (requires_approval={requires_approval})"}
         return {"message": f"Role already has permission '{perm.code}'"}
 
-    db.add(RolePermission(role_id=role_id, permission_id=perm.id, created_by=current_user.id))
+    db.add(RolePermission(
+        role_id=role_id, permission_id=perm.id,
+        requires_approval=requires_approval, created_by=current_user.id,
+    ))
     db.commit()
-    return {"message": f"Permission '{perm.code}' granted to role '{role.name}'"}
+    return {"message": f"Permission '{perm.code}' granted to role '{role.name}' (requires_approval={requires_approval})"}
 
 @router.put("/roles/{role_id}/permissions")
-def set_role_permissions(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.write")), role_id: int, payload: schemas_users.RolePermissionSet) -> Any:
-    """Bulk-configure a role's privileges: grant missing, revoke absent (single commit)."""
+@approval_gate.gated("users", "UPDATE", "RolePermission", "users.update", id_param="role_id")
+def set_role_permissions(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.update")), role_id: int, payload: schemas_users.RolePermissionSet) -> Any:
+    """Bulk-configure a role's privileges: grant missing, revoke absent,
+    sync requires_approval on everything that stays (single commit)."""
     role = crud_users.role.get(db, role_id)
     if not role:
         raise HTTPException(404, "Role not found")
@@ -156,6 +240,14 @@ def set_role_permissions(*, db: Session = Depends(deps.get_db), current_user: Us
     if unknown:
         raise HTTPException(400, f"Unknown permission code(s): {', '.join(sorted(unknown))}")
 
+    approval_required = set(payload.approval_required_codes)
+    unknown_gated = approval_required - set(requested)
+    if unknown_gated:
+        raise HTTPException(400, f"approval_required_codes must be a subset of permission_codes: {', '.join(sorted(unknown_gated))}")
+
+    codes_by_id = {p.id: p.code for p in perms}
+    gated_ids = {p.id for p in perms if p.code in approval_required}
+
     current_links = (
         db.query(RolePermission)
         .filter(RolePermission.role_id == role_id, RolePermission.is_deleted == False)
@@ -166,16 +258,23 @@ def set_role_permissions(*, db: Session = Depends(deps.get_db), current_user: Us
 
     granted, revoked = [], []
     for pid in target_ids - set(by_perm):
-        db.add(RolePermission(role_id=role_id, permission_id=pid, created_by=current_user.id))
+        db.add(RolePermission(
+            role_id=role_id, permission_id=pid,
+            requires_approval=pid in gated_ids, created_by=current_user.id,
+        ))
         granted.append(pid)
     for lp in current_links:
         if lp.permission_id not in target_ids:
             lp.is_deleted = True
             lp.deleted_by = current_user.id
             revoked.append(lp.permission_id)
+        else:
+            desired = lp.permission_id in gated_ids
+            if lp.requires_approval != desired:
+                lp.requires_approval = desired
+                lp.updated_by = current_user.id
     db.commit()
 
-    codes_by_id = {p.id: p.code for p in perms}
     all_codes = {p.id: p.code for p in db.query(Permission).filter(Permission.id.in_(revoked)).all()} if revoked else {}
     revoked_codes = [all_codes.get(pid, str(pid)) for pid in revoked]
     return {
@@ -183,10 +282,12 @@ def set_role_permissions(*, db: Session = Depends(deps.get_db), current_user: Us
         "granted": [codes_by_id[pid] for pid in granted],
         "revoked": revoked_codes,
         "permission_codes": sorted(codes_by_id.values()),
+        "approval_required_codes": sorted(approval_required),
     }
 
 @router.delete("/roles/{role_id}/permissions/{permission_id}")
-def revoke_role_permission(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.write")), role_id: int, permission_id: int) -> Any:
+@approval_gate.gated("users", "DELETE", "RolePermission", "users.delete", id_param="permission_id")
+def revoke_role_permission(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.delete")), role_id: int, permission_id: int) -> Any:
     link = db.query(RolePermission).filter(
         RolePermission.role_id == role_id,
         RolePermission.permission_id == permission_id,
@@ -236,7 +337,9 @@ def read_user(*, db: Session = Depends(deps.get_db), current_user: User = Depend
     return out
 
 @router.put("/{id}", response_model=schemas_users.UserWithRoles)
-def update_user(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.write")), id: int, user_in: schemas_users.UserUpdate) -> Any:
+# Not @approval_gate.gated: user_in can carry a plaintext password (admin
+# reset) — see the note on create_user above.
+def update_user(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.update")), id: int, user_in: schemas_users.UserUpdate) -> Any:
     user = crud_users.user.get(db, id)
     if not user:
         raise HTTPException(404, "User not found")
@@ -261,8 +364,9 @@ def update_user(*, db: Session = Depends(deps.get_db), current_user: User = Depe
     out.roles = _user_roles(db, id)
     return out
 
-@router.delete("/{id}", response_model=schemas_users.User)
-def delete_user(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.write")), id: int) -> Any:
+@router.delete("/{id}", response_model=Union[schemas_users.User, PendingApproval])
+@approval_gate.gated("users", "DELETE", "User", "users.delete")
+def delete_user(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.delete")), id: int) -> Any:
     user = crud_users.user.get(db, id)
     if not user:
         raise HTTPException(404, "User not found")
@@ -284,7 +388,8 @@ def delete_user(*, db: Session = Depends(deps.get_db), current_user: User = Depe
 
 # ─────────────── USER-ROLE ASSIGNMENT ────────────────
 @router.post("/{user_id}/assign-role")
-def assign_role(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.write")), user_id: int, role_id: int, scope_type: str = "GLOBAL", scope_id: Optional[int] = None) -> Any:
+@approval_gate.gated("users", "CREATE", "UserRole", "users.create", id_param="user_id")
+def assign_role(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.create")), user_id: int, role_id: int, scope_type: str = "GLOBAL", scope_id: Optional[int] = None) -> Any:
     user = crud_users.user.get(db, user_id)
     if not user:
         raise HTTPException(404, "User not found")
@@ -340,7 +445,8 @@ def list_user_roles(*, db: Session = Depends(deps.get_db), current_user: User = 
     return [r.model_dump(mode="json") for r in _user_roles(db, user_id)]
 
 @router.delete("/{user_id}/roles/{role_id}")
-def remove_role_from_user(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.write")), user_id: int, role_id: int) -> Any:
+@approval_gate.gated("users", "DELETE", "UserRole", "users.delete", id_param="user_id")
+def remove_role_from_user(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("users.delete")), user_id: int, role_id: int) -> Any:
     """Revoke a role assignment (soft-deletes the user_roles row)."""
     user = crud_users.user.get(db, user_id)
     if not user:
@@ -385,4 +491,4 @@ def get_user_permissions(*, db: Session = Depends(deps.get_db), current_user: Us
         .filter(UserRole.user_id == user_id, UserRole.is_deleted == False, RolePermission.is_deleted == False)
         .distinct().all()
     )
-    return [{"id": p.id, "module": p.module, "code": p.code, "name": p.name} for p in perms]
+    return [{"id": p.id, "module": p.module, "module_id": p.module_id, "code": p.code, "name": p.name} for p in perms]

@@ -81,7 +81,7 @@ def read_member_activity(
     if entity_type:
         # JSON path filter; cast to text for cross-dialect (SQLite/PostgreSQL) use.
         q = q.filter(
-            func.json_extract(MemberActivityLog.details, '$.entity_type') == entity_type
+            MemberActivityLog.details["entity_type"].as_string() == entity_type
         )
     return paginate(q.order_by(MemberActivityLog.created_at.desc()), page, limit)
 

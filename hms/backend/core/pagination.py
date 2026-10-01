@@ -1,4 +1,6 @@
 from typing import Generic, TypeVar, List, Optional, Set
+import decimal
+
 from pydantic import BaseModel
 from sqlalchemy import inspect as sa_inspect
 
@@ -11,6 +13,19 @@ class PaginatedResponse(BaseModel, Generic[T]):
     pages: int
     data: List[T]
 
+def _jsonable(value):
+    """Coerce values pydantic can't serialise (datetime → ISO string, etc.)."""
+    import datetime as _dt
+
+    if isinstance(value, (_dt.datetime, _dt.date)):
+        return value.isoformat()
+    if isinstance(value, _dt.timedelta):
+        return value.total_seconds()
+    if isinstance(value, decimal.Decimal):
+        return float(value)
+    return value
+
+
 def _to_plain(obj, exclude: Set[str]):
     """ORM row → plain dict of its mapped columns.
 
@@ -21,7 +36,7 @@ def _to_plain(obj, exclude: Set[str]):
         return obj
     state = sa_inspect(obj)
     return {
-        prop.key: getattr(obj, prop.key)
+        prop.key: _jsonable(getattr(obj, prop.key))
         for prop in state.mapper.column_attrs
         if prop.key not in exclude
     }

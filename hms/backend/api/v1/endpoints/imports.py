@@ -12,10 +12,11 @@ router = APIRouter()
 
 
 @router.post("/postal-codes/import")
+# Not @approval_gate.gated: UploadFile bytes can't be captured/replayed.
 async def import_postal_codes(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("imports.write")),
+    current_user: User = Depends(deps.require_permission("imports.create")),
     file: UploadFile = File(...),
 ) -> Any:
     """

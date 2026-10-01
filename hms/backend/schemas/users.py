@@ -36,6 +36,34 @@ class UserInDBBase(UserBase):
 class User(UserInDBBase):
     pass
 
+# Modules
+class ModuleBase(BaseModel):
+    code: str
+    name_en: str
+    name_kn: Optional[str] = None
+    description: Optional[str] = None
+    status: bool = True
+
+class ModuleCreate(ModuleBase):
+    pass
+
+class ModuleUpdate(BaseModel):
+    name_en: Optional[str] = None
+    name_kn: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[bool] = None
+    # code is immutable — permissions reference it as a stable string key.
+
+class Module(ModuleBase):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ModuleWithPermissionCount(Module):
+    permission_count: int = 0
+
+
 # Roles
 class RoleBase(BaseModel):
     name: str
@@ -63,8 +91,15 @@ class RoleWithPermissions(Role):
 
 
 class RolePermissionSet(BaseModel):
-    """Bulk replace a role's privileges. Empty list = strip the role."""
+    """Bulk replace a role's privileges. Empty list = strip the role.
+
+    approval_required_codes is a subset of permission_codes: those grants
+    are flagged requires_approval=True (holder still has the permission,
+    but exercising it auto-files an approval request instead of executing
+    directly). Any code not listed here defaults to un-gated.
+    """
     permission_codes: List[str]
+    approval_required_codes: List[str] = []
 
 
 class RoleWithUserCount(Role):
@@ -88,6 +123,7 @@ class UserWithRoles(User):
 # Permissions
 class PermissionBase(BaseModel):
     module: str
+    module_id: Optional[int] = None
     name: str
     code: str
     description: Optional[str] = None

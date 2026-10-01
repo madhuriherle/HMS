@@ -23,6 +23,19 @@ class NotificationTemplate(NotificationTemplateBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class InboxBroadcastCreate(BaseModel):
+    title: str
+    body: str
+    source: Optional[str] = "MANUAL"
+    data: Optional[dict] = None
+
+
+class DeviceTokenCreate(BaseModel):
+    device_token: str
+    platform: str = "FCM"  # FCM or APNS
+    device_name: Optional[str] = None
+
+
 class NotificationCampaignCreate(BaseModel):
     campaign_name: str
     template_id: int

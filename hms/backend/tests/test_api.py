@@ -57,8 +57,453 @@ def test_permission_catalog_seeded(client, admin_headers):
     body = response.json()
     assert {"total", "page", "limit", "pages", "data"} <= set(body)
     codes = {p["code"] for p in body["data"]}
-    assert {"members.write", "users.write", "approvals.write"} <= codes
+    assert {"members.create", "users.create", "approvals.write"} <= codes
     assert body["total"] >= 11
+    assert all(p["module_id"] is not None for p in body["data"]), "every seeded permission must resolve a module_id"
+
+
+def test_module_catalog_seeded(client, admin_headers):
+    response = client.get("/api/v1/users/modules", headers=admin_headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert {"total", "page", "limit", "pages", "data"} <= set(body)
+    codes = {m["code"] for m in body["data"]}
+    assert {"masters", "users", "members", "approvals"} <= codes
+    assert body["total"] >= 11
+    members_module = next(m for m in body["data"] if m["code"] == "members")
+    assert members_module["permission_count"] >= 1
+
+    # module_id on the permission actually resolves to this module's row (real FK, not just a string match)
+    perms = client.get("/api/v1/users/permissions", headers=admin_headers).json()["data"]
+    members_create = next(p for p in perms if p["code"] == "members.create")
+    assert members_create["module_id"] == members_module["id"]
+
+
+def test_seed_permissions_skips_unknown_module(client, admin_headers):
+    """A permission whose module isn't in the modules master is refused, not
+    inserted with a dangling module_id (guards the FK's integrity intent)."""
+    from db.session import SessionLocal
+    from models.users import Permission
+    from services.permissions import seed_permissions
+
+    with SessionLocal() as db:
+        before = db.query(Permission).filter(Permission.code == "ghost.write").count()
+        assert before == 0
+
+        import services.permissions as perm_service
+        original_catalog = perm_service.PERMISSION_CATALOG
+        perm_service.PERMISSION_CATALOG = original_catalog + [
+            ("ghost.write", "nonexistent_module", "Ghost", "Should not be seeded")
+        ]
+        try:
+            seed_permissions(db)
+        finally:
+            perm_service.PERMISSION_CATALOG = original_catalog
+
+        after = db.query(Permission).filter(Permission.code == "ghost.write").count()
+        assert after == 0, "permission for an unknown module must not be created"
+
+
+def test_module_crud_lifecycle(client, admin_headers):
+    r = client.post(
+        "/api/v1/users/modules", headers=admin_headers,
+        json={"code": "custom_test_module", "name_en": "Custom Test Module", "name_kn": "ಪರೀಕ್ಷಾ ಮಾಡ್ಯೂಲ್"},
+    )
+    assert r.status_code == 200, r.text
+    module = r.json()
+    assert module["name_kn"] == "ಪರೀಕ್ಷಾ ಮಾಡ್ಯೂಲ್"
+
+    dup = client.post(
+        "/api/v1/users/modules", headers=admin_headers,
+        json={"code": "custom_test_module", "name_en": "Dup"},
+    )
+    assert dup.status_code == 409
+
+    upd = client.put(
+        f"/api/v1/users/modules/{module['id']}", headers=admin_headers,
+        json={"name_en": "Renamed Module"},
+    )
+    assert upd.status_code == 200 and upd.json()["name_en"] == "Renamed Module"
+
+    got = client.get(f"/api/v1/users/modules/{module['id']}", headers=admin_headers)
+    assert got.status_code == 200 and got.json()["permission_count"] == 0
+
+    # in-use guard: the "members" module (seeded, has permissions) can't be deleted
+    members_module = next(
+        m for m in client.get("/api/v1/users/modules", headers=admin_headers).json()["data"]
+        if m["code"] == "members"
+    )
+    blocked = client.delete(f"/api/v1/users/modules/{members_module['id']}", headers=admin_headers)
+    assert blocked.status_code == 409
+
+    # unused custom module deletes fine
+    assert client.delete(f"/api/v1/users/modules/{module['id']}", headers=admin_headers).status_code == 200
+    assert client.get(f"/api/v1/users/modules/{module['id']}", headers=admin_headers).status_code == 404
+
+
+# ─────────────── generic approval engine ───────────────
+
+def test_generic_approval_engine_create_update_delete(client, admin_headers):
+    """End-to-end: a gated create/update/delete on masters.states doesn't
+    execute — it files a generic ApprovalRequest — and on approval the
+    SAME endpoint function replays with the original requester's identity,
+    producing the exact result a direct (ungated) call would have."""
+    gated_id, _, gated_headers = _staff_with_role(
+        client, admin_headers, "gated_masters_editor", "Gated Masters Editor", "GATED_MASTERS_EDITOR",
+        permission_grants=[
+            ("masters.create", True), ("masters.update", True), ("masters.delete", True),
+        ],
+    )
+
+    # CREATE: files instead of executing
+    filed = client.post(
+        "/api/v1/masters/states", headers=gated_headers,
+        json={"name_en": "GenericEngineState", "name_kn": "ಜೆನೆರಿಕ್"},
+    )
+    assert filed.status_code in (200, 201), filed.text
+    body = filed.json()
+    assert body["status"] == "PENDING"
+    req_id = body["approval_request_id"]
+
+    # not created yet
+    listing = client.get("/api/v1/masters/states", headers=admin_headers, params={"search": "GenericEngineState"})
+    assert listing.json()["total"] == 0
+
+    # shows up in the generic queue
+    queued = client.get("/api/v1/approvals/requests", headers=admin_headers, params={"module": "masters", "status": "PENDING"})
+    assert queued.status_code == 200, queued.text
+    assert any(r["id"] == req_id for r in queued.json()["data"])
+
+    # the gated user can't approve their own request (needs approvals.write)
+    self_approve = client.put(f"/api/v1/approvals/requests/{req_id}/approve", headers=gated_headers)
+    assert self_approve.status_code == 403
+
+    # approvals.write holder approves -> replays create_state as the ORIGINAL requester
+    approved = client.put(f"/api/v1/approvals/requests/{req_id}/approve", headers=admin_headers)
+    assert approved.status_code == 200, approved.text
+    state = approved.json()
+    assert state["name_en"] == "GenericEngineState"
+    state_id = state["id"]
+
+    from db.session import SessionLocal
+    from models.masters import State
+    with SessionLocal() as db:
+        row = db.query(State).filter(State.id == state_id).first()
+    assert row.created_by == gated_id, "replay must attribute the row to the original requester, not the approver"
+
+    # re-approving an already-decided request is rejected
+    redo = client.put(f"/api/v1/approvals/requests/{req_id}/approve", headers=admin_headers)
+    assert redo.status_code == 400
+
+    # UPDATE: also files instead of executing
+    filed_update = client.put(
+        f"/api/v1/masters/states/{state_id}", headers=gated_headers,
+        json={"name_kn": "ಬದಲಾದ ಹೆಸರು"},
+    )
+    assert filed_update.status_code == 200, filed_update.text
+    update_req_id = filed_update.json()["approval_request_id"]
+
+    still_old = client.get(f"/api/v1/masters/states/{state_id}", headers=admin_headers)
+    assert still_old.json()["name_kn"] == "ಜೆನೆರಿಕ್"
+
+    approved_update = client.put(f"/api/v1/approvals/requests/{update_req_id}/approve", headers=admin_headers)
+    assert approved_update.status_code == 200, approved_update.text
+    assert approved_update.json()["name_kn"] == "ಬದಲಾದ ಹೆಸರು"
+    # untouched field survives a partial (exclude_unset) patch replay
+    assert approved_update.json()["name_en"] == "GenericEngineState"
+
+    # DELETE: files, then a reject leaves the row untouched
+    filed_delete = client.delete(f"/api/v1/masters/states/{state_id}", headers=gated_headers)
+    assert filed_delete.status_code == 200, filed_delete.text
+    delete_req_id = filed_delete.json()["approval_request_id"]
+
+    rejected = client.put(
+        f"/api/v1/approvals/requests/{delete_req_id}/reject", headers=admin_headers, params={"note": "not now"},
+    )
+    assert rejected.status_code == 200, rejected.text
+
+    still_there = client.get(f"/api/v1/masters/states/{state_id}", headers=admin_headers)
+    assert still_there.status_code == 200
+
+    # a fresh delete request, this time approved, actually removes it
+    filed_delete_2 = client.delete(f"/api/v1/masters/states/{state_id}", headers=gated_headers)
+    delete_req_id_2 = filed_delete_2.json()["approval_request_id"]
+    approved_delete = client.put(f"/api/v1/approvals/requests/{delete_req_id_2}/approve", headers=admin_headers)
+    assert approved_delete.status_code == 200, approved_delete.text
+
+    gone = client.get(f"/api/v1/masters/states/{state_id}", headers=admin_headers)
+    assert gone.status_code == 404
+
+
+def test_filing_an_approval_request_notifies_approvers(client, admin_headers):
+    """Approvers shouldn't have to poll: filing a gated request pings every
+    approvals.write holder via the in-app inbox (models.inbox.AppNotification)."""
+    approver_id, approver_role_id, approver_headers = _staff_with_role(
+        client, admin_headers, "notify_approver", "Notify Approver", "NOTIFY_APPROVER",
+        permission_grants=[("approvals.write", False)],
+    )
+    _, _, requester_headers = _staff_with_role(
+        client, admin_headers, "notify_requester", "Notify Requester", "NOTIFY_REQUESTER",
+        permission_grants=[("masters.create", True)],
+    )
+
+    filed = client.post(
+        "/api/v1/masters/states", headers=requester_headers, json={"name_en": "NotifyEngineState"},
+    )
+    assert filed.status_code in (200, 201), filed.text
+    req_id = filed.json()["approval_request_id"]
+
+    from db.session import SessionLocal
+    from models.inbox import AppNotification
+
+    with SessionLocal() as db:
+        note = (
+            db.query(AppNotification)
+            .filter(AppNotification.user_id == approver_id, AppNotification.source == "APPROVAL_REQUEST")
+            .order_by(AppNotification.id.desc())
+            .first()
+        )
+    assert note is not None, "approvals.write holder must be notified when a request is filed"
+    assert note.data["approval_request_id"] == req_id
+
+    # a user without approvals.write is not notified
+    from models.users import User
+
+    with SessionLocal() as db:
+        requester_row = db.query(User).filter(User.username == "notify_requester").first()
+        non_approver_note = (
+            db.query(AppNotification)
+            .filter(AppNotification.user_id == requester_row.id, AppNotification.source == "APPROVAL_REQUEST")
+            .first()
+        )
+    assert non_approver_note is None
+
+
+def test_deletion_request_endpoints_notify_approvers(client, admin_headers):
+    """Both deletion-request entry points (the rank/permission-gated direct
+    delete, and the standalone request endpoint) notify approvers too."""
+    approver_id, _, _ = _staff_with_role(
+        client, admin_headers, "notify_approver_del", "Notify Approver Del", "NOTIFY_APPROVER_DEL",
+        permission_grants=[("approvals.write", False)],
+    )
+    target = _create_member(client, admin_headers, "9000000094", "NotifyDeletionTarget")
+
+    response = client.post(
+        "/api/v1/approvals/deletion-requests", headers=admin_headers,
+        params={"member_id": target["id"], "reason": "notify test"},
+    )
+    assert response.status_code == 200, response.text
+
+    from db.session import SessionLocal
+    from models.inbox import AppNotification
+
+    with SessionLocal() as db:
+        note = (
+            db.query(AppNotification)
+            .filter(AppNotification.user_id == approver_id, AppNotification.source == "APPROVAL_REQUEST")
+            .filter(AppNotification.body.ilike("%NotifyDeletionTarget%") | AppNotification.title.ilike("%Delete member%"))
+            .order_by(AppNotification.id.desc())
+            .first()
+        )
+    assert note is not None
+
+
+def test_generic_approval_engine_ungated_grant_executes_immediately(client, admin_headers):
+    """requires_approval=False on the same permission code -> normal,
+    immediate execution, unaffected by the engine."""
+    _, _, direct_headers = _staff_with_role(
+        client, admin_headers, "direct_masters_editor", "Direct Masters Editor", "DIRECT_MASTERS_EDITOR",
+        permission_grants=[("masters.create", False)],
+    )
+    created = client.post(
+        "/api/v1/masters/states", headers=direct_headers, json={"name_en": "DirectEngineState"},
+    )
+    assert created.status_code in (200, 201), created.text
+    assert created.json().get("status") != "PENDING"
+    assert created.json()["name_en"] == "DirectEngineState"
+
+
+def test_generic_approval_engine_bulk_approve_and_reject(client, admin_headers):
+    """PUT /approvals/requests/bulk-approve|reject act on several pending
+    requests in one call, and one bad id doesn't abort the rest of the batch."""
+    _, _, gated_headers = _staff_with_role(
+        client, admin_headers, "bulk_masters_editor", "Bulk Masters Editor", "BULK_MASTERS_EDITOR",
+        permission_grants=[("masters.create", True)],
+    )
+
+    req_ids = []
+    for i in range(3):
+        filed = client.post(
+            "/api/v1/masters/states", headers=gated_headers, json={"name_en": f"BulkEngineState{i}"},
+        )
+        assert filed.status_code in (200, 201), filed.text
+        req_ids.append(filed.json()["approval_request_id"])
+
+    # approve two, reject one, plus one bogus id mixed into the approve batch
+    bulk_approved = client.put(
+        "/api/v1/approvals/requests/bulk-approve", headers=admin_headers,
+        json={"ids": [req_ids[0], req_ids[1], 999999], "note": "bulk ok"},
+    )
+    assert bulk_approved.status_code == 200, bulk_approved.text
+    body = bulk_approved.json()
+    assert body["succeeded"] == 2
+    assert body["failed"] == 1
+    ok_ids = {r["id"] for r in body["results"] if r["success"]}
+    assert ok_ids == {req_ids[0], req_ids[1]}
+    bad = next(r for r in body["results"] if not r["success"])
+    assert bad["id"] == 999999
+    assert "not found" in bad["error"].lower()
+
+    for name in (f"BulkEngineState0", f"BulkEngineState1"):
+        listing = client.get("/api/v1/masters/states", headers=admin_headers, params={"search": name})
+        assert listing.json()["total"] == 1, f"{name} should have been created by bulk-approve"
+
+    bulk_rejected = client.put(
+        "/api/v1/approvals/requests/bulk-reject", headers=admin_headers,
+        json={"ids": [req_ids[2]], "note": "not needed"},
+    )
+    assert bulk_rejected.status_code == 200, bulk_rejected.text
+    assert bulk_rejected.json()["succeeded"] == 1
+
+    listing3 = client.get("/api/v1/masters/states", headers=admin_headers, params={"search": "BulkEngineState2"})
+    assert listing3.json()["total"] == 0, "rejected request must not have created the state"
+
+    # re-approving an already-decided id fails cleanly within the batch
+    redo = client.put(
+        "/api/v1/approvals/requests/bulk-approve", headers=admin_headers,
+        json={"ids": [req_ids[0]], "note": None},
+    )
+    assert redo.status_code == 200
+    assert redo.json()["succeeded"] == 0
+    assert "already" in redo.json()["results"][0]["error"].lower()
+
+
+def test_deletion_requests_bulk_approve(client, admin_headers):
+    """PUT /approvals/deletion-requests/bulk-approve soft-deletes several
+    members in one call."""
+    members = [
+        _create_member(client, admin_headers, f"910000020{i}", f"BulkDelete{i}")
+        for i in range(3)
+    ]
+    req_ids = []
+    for m in members:
+        r = client.post(
+            "/api/v1/approvals/deletion-requests", headers=admin_headers,
+            params={"member_id": m["id"], "reason": "bulk test"},
+        )
+        assert r.status_code == 200, r.text
+
+    from db.session import SessionLocal
+    from models.members import MemberDeletionRequest
+
+    with SessionLocal() as db:
+        for m in members:
+            row = (
+                db.query(MemberDeletionRequest)
+                .filter(MemberDeletionRequest.member_id == m["id"])
+                .order_by(MemberDeletionRequest.id.desc())
+                .first()
+            )
+            req_ids.append(row.id)
+
+    bulk = client.put(
+        "/api/v1/approvals/deletion-requests/bulk-approve", headers=admin_headers,
+        json={"ids": req_ids, "note": "bulk approved"},
+    )
+    assert bulk.status_code == 200, bulk.text
+    assert bulk.json()["succeeded"] == 3
+
+    for m in members:
+        gone = client.get(f"/api/v1/members/{m['id']}", headers=admin_headers)
+        assert gone.status_code == 404
+
+
+def test_generic_approval_engine_engagements_no_response_model(client, admin_headers):
+    """Spot-check a second, differently-shaped module: engagements.Associate,
+    whose DELETE endpoint declares no response_model (plain dict return) —
+    a different code path through the engine than the masters.State test."""
+    _, _, gated_headers = _staff_with_role(
+        client, admin_headers, "gated_engagements_editor", "Gated Engagements Editor", "GATED_ENGAGEMENTS_EDITOR",
+        permission_grants=[("engagements.create", True), ("engagements.delete", True)],
+    )
+
+    filed = client.post(
+        "/api/v1/engagements/associates", headers=gated_headers,
+        json={"name": "Gated Associate", "organization": "Test Org"},
+    )
+    assert filed.status_code in (200, 201), filed.text
+    assert filed.json()["status"] == "PENDING"
+    req_id = filed.json()["approval_request_id"]
+
+    approved = client.put(f"/api/v1/approvals/requests/{req_id}/approve", headers=admin_headers)
+    assert approved.status_code == 200, approved.text
+    associate_id = approved.json()["id"]
+    assert approved.json()["name"] == "Gated Associate"
+
+    filed_delete = client.delete(f"/api/v1/engagements/associates/{associate_id}", headers=gated_headers)
+    assert filed_delete.status_code == 200, filed_delete.text
+    assert filed_delete.json()["status"] == "PENDING"
+    delete_req_id = filed_delete.json()["approval_request_id"]
+
+    approved_delete = client.put(f"/api/v1/approvals/requests/{delete_req_id}/approve", headers=admin_headers)
+    assert approved_delete.status_code == 200, approved_delete.text
+
+
+def test_generic_approval_engine_receipts_nested_and_decimal_fields(client, admin_headers):
+    """Receipts exercise nested list fields (items) and Decimal/date types —
+    a stress test for the JSON round-trip through payload capture + replay."""
+    _, _, gated_headers = _staff_with_role(
+        client, admin_headers, "gated_receipts_editor", "Gated Receipts Editor", "GATED_RECEIPTS_EDITOR",
+        permission_grants=[("receipts.create", True)],
+    )
+
+    filed = client.post(
+        "/api/v1/receipts/", headers=gated_headers,
+        json={
+            "receipt_date": date.today().isoformat(),
+            "receipt_type": "MEMBERSHIP",
+            "payment_mode": "CASH",
+            "payer_name": "Gated Receipt Payer",
+            "gross_amount": 750,
+            "discount_amount": 50,
+            "net_amount": 700,
+            "items": [{"item_type": "MEMBERSHIP", "amount": 700}],
+        },
+    )
+    assert filed.status_code in (200, 201), filed.text
+    assert filed.json()["status"] == "PENDING"
+    req_id = filed.json()["approval_request_id"]
+
+    approved = client.put(f"/api/v1/approvals/requests/{req_id}/approve", headers=admin_headers)
+    assert approved.status_code == 200, approved.text
+    body = approved.json()
+    assert float(body["net_amount"]) == 700.0
+    assert body["payer_name"] == "Gated Receipt Payer"
+    assert re.match(r"^REC-\d{8}-\d{6}$", body["receipt_number"])
+
+
+def test_password_fields_never_captured_by_generic_engine(client, admin_headers):
+    """Safety net: even if users.create/users.update were flagged
+    requires_approval, create_user/update_user must still execute directly
+    — they're deliberately excluded from @approval_gate.gated because the
+    body can carry a plaintext password."""
+    _, _, gated_headers = _staff_with_role(
+        client, admin_headers, "gated_user_admin", "Gated User Admin", "GATED_USER_ADMIN",
+        permission_grants=[("users.create", True), ("users.update", True)],
+    )
+
+    created = client.post(
+        "/api/v1/users/", headers=gated_headers,
+        json={
+            "name": "Directly Created",
+            "username": "directly_created_user",
+            "password": "somepass123",
+            "user_type": "STAFF",
+        },
+    )
+    assert created.status_code == 200, created.text
+    assert "approval_request_id" not in created.json()
+    assert created.json()["username"] == "directly_created_user"
 
 
 # ─────────────── audit logging ───────────────
@@ -193,7 +638,7 @@ def test_rbac_blocks_then_grants_writes(client, admin_headers):
         json={"first_name_en": "Nope"},
     )
     assert denied.status_code == 403, denied.text
-    assert "members.write" in denied.json()["detail"]
+    assert "members.create" in denied.json()["detail"]
 
     # SUPERADMIN bypasses the permission check (this call succeeds)
     assert _create_member(client, admin_headers, "9000000005", "Super")["id"]
@@ -209,7 +654,7 @@ def test_rbac_blocks_then_grants_writes(client, admin_headers):
     grant = client.post(
         f"/api/v1/users/roles/{role.json()['id']}/permissions",
         headers=admin_headers,
-        params={"code": "members.write"},
+        params={"code": "members.create"},
     )
     assert grant.status_code == 200, grant.text
 
@@ -235,6 +680,144 @@ def test_rbac_blocks_then_grants_writes(client, admin_headers):
     )
     assert again.status_code == 200, again.text
     assert "already assigned" in again.json()["message"]
+
+
+def _staff_with_role(client, admin_headers, username, role_name, role_code, permission_grants):
+    """Create a STAFF user + a role granting permission_grants
+    ([(code, requires_approval), ...]), assign it, return (user_id, headers)."""
+    user = client.post(
+        "/api/v1/users/",
+        headers=admin_headers,
+        json={"name": role_name, "username": username, "password": "staffpass1", "user_type": "STAFF"},
+    ).json()
+
+    login = client.post("/api/v1/auth/login", data={"username": username, "password": "staffpass1"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    role = client.post(
+        "/api/v1/users/roles", headers=admin_headers,
+        json={"name": role_name, "code": role_code},
+    ).json()
+    for code, requires_approval in permission_grants:
+        client.post(
+            f"/api/v1/users/roles/{role['id']}/permissions", headers=admin_headers,
+            params={"code": code, "requires_approval": requires_approval},
+        )
+    client.post(f"/api/v1/users/{user['id']}/assign-role", headers=admin_headers, params={"role_id": role["id"]})
+    return user["id"], role["id"], headers
+
+
+def test_member_delete_gated_grant_files_approval_request(client, admin_headers):
+    """A role holding members.delete with requires_approval=True can still
+    call DELETE /members/{id} — it just doesn't execute immediately. It
+    auto-files the same deletion request an approvals.write holder then
+    has to approve."""
+    target = _create_member(client, admin_headers, "9000000096", "GatedDelete")
+
+    _, _, coordinator_headers = _staff_with_role(
+        client, admin_headers, "gated_coordinator", "Coordinator", "COORDINATOR_GATED",
+        permission_grants=[("members.delete", True)],
+    )
+
+    filed = client.delete(
+        f"/api/v1/members/{target['id']}", headers=coordinator_headers,
+        params={"reason": "testing approval gate", "mode": "SOFT"},
+    )
+    assert filed.status_code == 200, filed.text
+    body = filed.json()
+    assert body["status"] == "PENDING"
+    assert "deletion_request_id" in body
+
+    # not actually deleted yet
+    still_there = client.get(f"/api/v1/members/{target['id']}", headers=admin_headers)
+    assert still_there.status_code == 200
+
+    # the coordinator can't approve their own filed request
+    approve_denied = client.put(
+        f"/api/v1/approvals/deletion-requests/{body['deletion_request_id']}/approve",
+        headers=coordinator_headers,
+    )
+    assert approve_denied.status_code == 403
+
+    # a role with approvals.write can approve it
+    _, _, admin_role_headers = _staff_with_role(
+        client, admin_headers, "gated_admin", "Admin", "ADMIN_GATED",
+        permission_grants=[("approvals.write", False)],
+    )
+    approved = client.put(
+        f"/api/v1/approvals/deletion-requests/{body['deletion_request_id']}/approve",
+        headers=admin_role_headers,
+    )
+    assert approved.status_code == 200, approved.text
+
+    deleted = client.get(f"/api/v1/members/{target['id']}", headers=admin_headers)
+    assert deleted.status_code == 404
+
+
+def test_member_delete_ungated_grant_executes_immediately(client, admin_headers):
+    """A role holding members.delete with requires_approval=False (default)
+    executes the delete right away instead of filing a request."""
+    target = _create_member(client, admin_headers, "9000000097", "UngatedDelete")
+
+    _, _, direct_headers = _staff_with_role(
+        client, admin_headers, "ungated_deleter", "Direct Deleter", "DIRECT_DELETER",
+        permission_grants=[("members.delete", False)],
+    )
+
+    deleted = client.delete(
+        f"/api/v1/members/{target['id']}", headers=direct_headers,
+        params={"reason": "immediate", "mode": "SOFT"},
+    )
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json().get("status") != "PENDING"
+
+    gone = client.get(f"/api/v1/members/{target['id']}", headers=admin_headers)
+    assert gone.status_code == 404
+
+
+def test_member_delete_without_permission_denied(client, admin_headers):
+    """members.create/update alone (no members.delete grant at all) can't
+    delete — plain RBAC denial, nothing to gate."""
+    target = _create_member(client, admin_headers, "9000000098", "NoDeletePerm")
+
+    _, _, editor_headers = _staff_with_role(
+        client, admin_headers, "editor_only", "Editor", "EDITOR_ONLY",
+        permission_grants=[("members.create", False), ("members.update", False)],
+    )
+
+    denied = client.delete(
+        f"/api/v1/members/{target['id']}", headers=editor_headers,
+        params={"reason": "no permission", "mode": "SOFT"},
+    )
+    assert denied.status_code == 403
+    assert "members.delete" in denied.json()["detail"]
+
+
+def test_member_delete_most_permissive_grant_wins(client, admin_headers):
+    """A user holding members.delete via two roles — one gated, one not —
+    can act directly: any un-gated grant beats a gated one."""
+    target = _create_member(client, admin_headers, "9000000099", "MixedGrantDelete")
+
+    user_id, gated_role_id, headers = _staff_with_role(
+        client, admin_headers, "mixed_grant_user", "Gated Role", "GATED_ROLE",
+        permission_grants=[("members.delete", True)],
+    )
+    ungated_role = client.post(
+        "/api/v1/users/roles", headers=admin_headers,
+        json={"name": "Ungated Role", "code": "UNGATED_ROLE"},
+    ).json()
+    client.post(
+        f"/api/v1/users/roles/{ungated_role['id']}/permissions", headers=admin_headers,
+        params={"code": "members.delete", "requires_approval": False},
+    )
+    client.post(f"/api/v1/users/{user_id}/assign-role", headers=admin_headers, params={"role_id": ungated_role["id"]})
+
+    deleted = client.delete(
+        f"/api/v1/members/{target['id']}", headers=headers,
+        params={"reason": "most permissive wins", "mode": "SOFT"},
+    )
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json().get("status") != "PENDING"
 
 
 def test_users_static_routes_not_shadowed_by_id(client, admin_headers):
@@ -351,6 +934,87 @@ def test_membership_type_change_approval_writes_history(client, admin_headers):
     assert receipt is not None
     assert float(receipt.net_amount) == 150.0
     assert receipt.payment_status == "PENDING"
+
+
+def test_request_type_change_endpoint(client, admin_headers):
+    """POST /approvals/type-changes — the public entry point to submit a
+    type-change request (previously only creatable by direct DB insert)."""
+    type_a = _create_membership_type(client, admin_headers, "TST_REQ_A", "Request Type A")
+    type_b = _create_membership_type(client, admin_headers, "TST_REQ_B", "Request Type B")
+    member = _create_member(client, admin_headers, "9000000193", "TypeChangeRequester")
+
+    # no active membership yet -> rejected
+    no_membership = client.post(
+        "/api/v1/approvals/type-changes", headers=admin_headers,
+        params={"member_id": member["id"], "requested_type_id": type_b["id"]},
+    )
+    assert no_membership.status_code == 400
+
+    from db.session import SessionLocal
+    from models.members import MemberMembership
+
+    with SessionLocal() as db:
+        membership = MemberMembership(
+            member_id=member["id"], membership_type_id=type_a["id"],
+            applied_at=datetime.now(timezone.utc), status="ACTIVE",
+        )
+        db.add(membership)
+        db.commit()
+        db.refresh(membership)
+        membership_id = membership.id
+
+    # unknown type rejected
+    assert client.post(
+        "/api/v1/approvals/type-changes", headers=admin_headers,
+        params={"member_id": member["id"], "requested_type_id": 999999},
+    ).status_code == 400
+
+    # same type as current rejected
+    assert client.post(
+        "/api/v1/approvals/type-changes", headers=admin_headers,
+        params={"member_id": member["id"], "requested_type_id": type_a["id"]},
+    ).status_code == 400
+
+    # a type with no active price configured is rejected too (would otherwise
+    # blow up at approval time on membership_type_history.new_price NOT NULL)
+    priceless = client.post(
+        "/api/v1/approvals/type-changes", headers=admin_headers,
+        params={"member_id": member["id"], "requested_type_id": type_b["id"]},
+    )
+    assert priceless.status_code == 400
+    assert "active price" in priceless.json()["detail"]
+
+    from models.masters import MembershipTypePrice
+
+    with SessionLocal() as db:
+        db.add(MembershipTypePrice(membership_type_id=type_b["id"], amount=300, effective_from=date(2026, 1, 1)))
+        db.commit()
+
+    submitted = client.post(
+        "/api/v1/approvals/type-changes", headers=admin_headers,
+        params={"member_id": member["id"], "requested_type_id": type_b["id"], "reason": "Upgrade please"},
+    )
+    assert submitted.status_code == 200, submitted.text
+    req_id = submitted.json()["id"]
+
+    # a second pending request for the same membership is blocked
+    duplicate = client.post(
+        "/api/v1/approvals/type-changes", headers=admin_headers,
+        params={"member_id": member["id"], "requested_type_id": type_b["id"]},
+    )
+    assert duplicate.status_code == 409
+
+    from models.members import MembershipTypeChangeRequest
+
+    with SessionLocal() as db:
+        req = db.query(MembershipTypeChangeRequest).filter(MembershipTypeChangeRequest.id == req_id).first()
+    assert req.current_membership_id == membership_id
+    assert req.requested_type_id == type_b["id"]
+    assert req.status == "PENDING"
+
+    # it's approvable via the existing endpoint
+    approved = client.put(f"/api/v1/approvals/type-changes/{req_id}/approve", headers=admin_headers)
+    assert approved.status_code == 200, approved.text
 
 
 def test_profile_change_approval_applies_and_records(client, admin_headers):
@@ -1218,18 +1882,18 @@ def test_role_lifecycle_with_privilege_configuration(client, admin_headers):
     configured = client.put(
         f"/api/v1/users/roles/{role_id}/permissions",
         headers=admin_headers,
-        json={"permission_codes": ["masters.write", "members.write", "imports.write"]},
+        json={"permission_codes": ["masters.create", "members.create", "imports.create"]},
     )
     assert configured.status_code == 200, configured.text
     conf_body = configured.json()
-    assert sorted(conf_body["granted"]) == ["imports.write", "masters.write", "members.write"]
-    assert sorted(conf_body["permission_codes"]) == ["imports.write", "masters.write", "members.write"]
+    assert sorted(conf_body["granted"]) == ["imports.create", "masters.create", "members.create"]
+    assert sorted(conf_body["permission_codes"]) == ["imports.create", "masters.create", "members.create"]
 
     # unknown permission code rejected
     unknown = client.put(
         f"/api/v1/users/roles/{role_id}/permissions",
         headers=admin_headers,
-        json={"permission_codes": ["masters.write", "nope.write"]},
+        json={"permission_codes": ["masters.create", "nope.write"]},
     )
     assert unknown.status_code == 400, unknown.text
 
@@ -1237,16 +1901,16 @@ def test_role_lifecycle_with_privilege_configuration(client, admin_headers):
     resync = client.put(
         f"/api/v1/users/roles/{role_id}/permissions",
         headers=admin_headers,
-        json={"permission_codes": ["masters.write"]},
+        json={"permission_codes": ["masters.create"]},
     )
     assert resync.status_code == 200, resync.text
-    assert sorted(resync.json()["revoked"]) == ["imports.write", "members.write"]
-    assert resync.json()["permission_codes"] == ["masters.write"]
+    assert sorted(resync.json()["revoked"]) == ["imports.create", "members.create"]
+    assert resync.json()["permission_codes"] == ["masters.create"]
 
     # roles listing carries permission_codes + user_count
     listing = client.get("/api/v1/users/roles", headers=admin_headers)
     row = [r for r in listing.json()["data"] if r["id"] == role_id][0]
-    assert row["permission_codes"] == ["masters.write"]
+    assert row["permission_codes"] == ["masters.create"]
     assert row["user_count"] == 0
 
     # delete blocked while a user holds the role
@@ -1801,6 +2465,78 @@ def test_kyc_link_channels(client, admin_headers, monkeypatch):
     profile = client.get(f"/api/v1/members/{member['id']}/profile", headers=admin_headers)
     assert len(profile.json()["kyc_requests"]) == 2
     assert len(profile.json()["profile_change_requests"]) == 1
+
+
+def test_kyc_reminders_batch_respects_interval_and_dedup(client, admin_headers, monkeypatch):
+    """POST /magazines/members/kyc-reminders (the periodic-nudge batch job):
+    never-asked and stale-asked members are queued, recently-asked members
+    are skipped."""
+    import services.whatsapp as whatsapp
+
+    sent = []
+
+    async def _capture(to, message, template_id=None):
+        sent.append(to)
+        return {"ok": True}
+
+    monkeypatch.setattr(whatsapp.whatsapp_service, "send_message", _capture)
+
+    never_asked = _create_member(client, admin_headers, "9330000060", "NeverAskedKyc")
+    stale_asked = _create_member(client, admin_headers, "9330000061", "StaleAskedKyc")
+    recently_asked = _create_member(client, admin_headers, "9330000062", "RecentlyAskedKyc")
+    for m in (never_asked, stale_asked, recently_asked):
+        approved = client.put(f"/api/v1/members/{m['id']}/approve", headers=admin_headers)
+        assert approved.status_code == 200, approved.text
+
+    from datetime import datetime, timedelta, timezone
+    from db.session import SessionLocal
+    from models.members import MemberKycRequest
+
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        db.add(MemberKycRequest(
+            member_id=stale_asked["id"], token_hash=f"stale-{stale_asked['id']}",
+            sent_to=stale_asked["mobile"], sent_at=now - timedelta(days=200),
+            expires_at=now - timedelta(days=199), status="EXPIRED",
+        ))
+        db.add(MemberKycRequest(
+            member_id=recently_asked["id"], token_hash=f"recent-{recently_asked['id']}",
+            sent_to=recently_asked["mobile"], sent_at=now - timedelta(days=5),
+            expires_at=now + timedelta(hours=19), status="SENT",
+        ))
+        db.commit()
+
+    # bad channel rejected
+    assert client.post(
+        "/api/v1/magazines/members/kyc-reminders", headers=admin_headers,
+        params={"channel": "SMS"},
+    ).status_code == 400
+
+    response = client.post(
+        "/api/v1/magazines/members/kyc-reminders", headers=admin_headers,
+        params={"interval_days": 180, "channel": "LINK"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+
+    queued_ids = set(body["member_ids"])
+    assert never_asked["id"] in queued_ids
+    assert stale_asked["id"] in queued_ids
+    assert recently_asked["id"] not in queued_ids
+    assert body["queued"] == len(queued_ids)
+
+    # actually sent via WhatsApp (background tasks run synchronously under TestClient)
+    assert len(sent) == len(queued_ids)
+
+    # each queued member now has a fresh MemberKycRequest row
+    with SessionLocal() as db:
+        fresh = (
+            db.query(MemberKycRequest)
+            .filter(MemberKycRequest.member_id == never_asked["id"])
+            .order_by(MemberKycRequest.id.desc())
+            .first()
+        )
+    assert fresh is not None
 
 
 # ─────────────── magazine module ───────────────
@@ -2368,6 +3104,7 @@ def test_receipt_allocation_mapping_and_label_list(client, admin_headers):
     "/api/v1/users",
     "/api/v1/users/roles",
     "/api/v1/users/permissions",
+    "/api/v1/users/modules",
     "/api/v1/masters/states",
     "/api/v1/masters/districts",
     "/api/v1/masters/taluks",
@@ -2407,6 +3144,55 @@ def test_lists_use_paginated_envelope(client, admin_headers, path):
 
 
 # ─────────────── hardening round ───────────────
+
+def test_service_type_delete(client, admin_headers):
+    r = client.post(
+        "/api/v1/masters/service-types", headers=admin_headers,
+        json={"code": "TESTSVC", "name_en": "Test Service"},
+    )
+    assert r.status_code == 200, r.text
+    service_type_id = r.json()["id"]
+
+    r = client.delete(f"/api/v1/masters/service-types/{service_type_id}", headers=admin_headers)
+    assert r.status_code == 200, r.text
+
+    r = client.get(f"/api/v1/masters/service-types/{service_type_id}", headers=admin_headers)
+    assert r.status_code == 404
+
+
+def test_profile_change_allows_new_mangalya_parity_fields(client, admin_headers):
+    referrer = _create_member(client, admin_headers, "9000000090", "Referrer")
+    member = _create_member(client, admin_headers, "9000000091", "Referred")
+
+    response = client.post(
+        "/api/v1/members/profile-changes/",
+        headers=admin_headers,
+        json={
+            "member_id": member["id"],
+            "new_values": {
+                "aadhaar_number": "999988887777",
+                "referred_by_member_id": referrer["id"],
+            },
+        },
+    )
+    assert response.status_code == 200, response.text
+    request_id = response.json()["id"]
+
+    response = client.put(
+        f"/api/v1/approvals/profile-changes/{request_id}/approve",
+        headers=admin_headers,
+    )
+    assert response.status_code == 200, response.text
+
+    from db.session import SessionLocal
+    from models.members import Member
+
+    with SessionLocal() as db:
+        updated = db.query(Member).filter(Member.id == member["id"]).first()
+
+    assert updated.aadhaar_number == "999988887777"
+    assert updated.referred_by_member_id == referrer["id"]
+
 
 def test_profile_change_submit_rejects_illegal_fields(client, admin_headers):
     member = _create_member(client, admin_headers, "9000000020", "Guarded")
@@ -2600,12 +3386,12 @@ def test_permission_revoke_and_regrant(client, admin_headers):
     grant = client.post(
         f"/api/v1/users/roles/{role_id}/permissions",
         headers=admin_headers,
-        params={"code": "events.write"},
+        params={"code": "events.create"},
     )
     assert grant.status_code == 200, grant.text
 
     perms = client.get(f"/api/v1/users/roles/{role_id}/permissions", headers=admin_headers).json()
-    permission_id = [p["id"] for p in perms if p["code"] == "events.write"][0]
+    permission_id = [p["id"] for p in perms if p["code"] == "events.create"][0]
 
     revoke = client.delete(
         f"/api/v1/users/roles/{role_id}/permissions/{permission_id}",
@@ -2617,13 +3403,13 @@ def test_permission_revoke_and_regrant(client, admin_headers):
     regrant = client.post(
         f"/api/v1/users/roles/{role_id}/permissions",
         headers=admin_headers,
-        params={"code": "events.write"},
+        params={"code": "events.create"},
     )
     assert regrant.status_code == 200, regrant.text
     assert "already has" not in regrant.json()["message"]
 
     perms = client.get(f"/api/v1/users/roles/{role_id}/permissions", headers=admin_headers).json()
-    assert len([p for p in perms if p["code"] == "events.write"]) == 1
+    assert len([p for p in perms if p["code"] == "events.create"]) == 1
 
     # a second ACTIVE grant is impossible at the DB level
     from sqlalchemy.exc import IntegrityError
@@ -3901,11 +4687,1428 @@ def test_logout_activity_and_member_timeline(client, admin_headers):
     # summary endpoint has per-user counters
     summary = client.get("/api/v1/activity/users/summary", headers=admin_headers)
     assert summary.status_code == 200, summary.text
-    any_user = next(iter(summary.json()["data"].values()))
-    assert any_user.get("LOGIN", 0) >= 1
-    assert any_user.get("CREATE", 0) >= 1
+    admin_summary = summary.json()["data"].get("1", {})
+    assert admin_summary.get("LOGIN", 0) >= 1
+    assert admin_summary.get("CREATE", 0) >= 1
 
     # timeline 404 for unknown member
     assert client.get(
         "/api/v1/activity/members/999999/timeline", headers=admin_headers
     ).status_code == 404
+
+
+# ─────────────── Personal masters & member register fields ───────────────
+
+def test_personal_masters_crud_and_member_usage(client, admin_headers):
+    """The surviving personal masters (qualification, native place): CRUD,
+    dup-guard, delete guard, use on a member profile, and confirmation that
+    the horoscope masters (gotra/nakshatra/rashi/masa/mithi/samvathsara)
+    were removed with migration 0014 — Mangalya owns that data now."""
+    r = client.post("/api/v1/masters/qualifications", headers=admin_headers, json={"name_en": "B.E"})
+    assert r.status_code == 201, r.text
+    qualification = r.json()
+    dup = client.post("/api/v1/masters/qualifications", headers=admin_headers, json={"name_en": "B.E"})
+    assert dup.status_code == 409, dup.text
+
+    # native place with district link
+    districts = client.get("/api/v1/masters/districts", headers=admin_headers).json()
+    district_id = districts["data"][0]["id"] if districts["data"] else None
+    np_payload = {"name_en": "Siddapura", "name_kn": "ಸಿದ್ಧಾಪುರ"}
+    if district_id:
+        np_payload["district_id"] = district_id
+    r = client.post("/api/v1/masters/native-places", headers=admin_headers, json=np_payload)
+    assert r.status_code == 201, r.text
+    native_place = r.json()
+
+    # overview endpoint lists only the surviving masters
+    overview = client.get("/api/v1/masters/personal-masters", headers=admin_headers)
+    assert overview.status_code == 200, overview.text
+    assert "qualifications" in overview.json()
+    assert "native_places" in overview.json()
+    assert "gotras" not in overview.json()
+
+    # list + search + update
+    lst = client.get("/api/v1/masters/qualifications", headers=admin_headers, params={"search": "B.E"})
+    assert lst.status_code == 200 and lst.json()["total"] >= 1
+    upd = client.put(
+        f"/api/v1/masters/qualifications/{qualification['id']}", headers=admin_headers,
+        json={"name_kn": "ಬಿ.ಇ"},
+    )
+    assert upd.status_code == 200 and upd.json()["name_kn"] == "ಬಿ.ಇ"
+
+    # member with the register fields, incl. master references
+    r = client.post(
+        "/api/v1/members/",
+        headers=admin_headers,
+        json={
+            "first_name_en": "Master",
+            "last_name_en": "Fields",
+            "mobile": "9600000001",
+            "father_husband_name": "Ramaiah",
+            "blood_group": "B+",
+            "native_place_id": native_place["id"],
+            "qualification_id": qualification["id"],
+            "occupation": "Farmer",
+            "aadhaar_number": "123456789012",
+            "whatsapp_number": "9600000002",
+        },
+    )
+    assert r.status_code == 201, r.text
+    member = r.json()
+    assert member["father_husband_name"] == "Ramaiah"
+    assert member["blood_group"] == "B+"
+    assert member["native_place_id"] == native_place["id"]
+    assert member["qualification_id"] == qualification["id"]
+
+    # horoscope fields no longer exist on the member schema — unknown fields
+    # are ignored by pydantic, so nothing can set them even if posted
+    r = client.post(
+        "/api/v1/members/",
+        headers=admin_headers,
+        json={"first_name_en": "Horo", "mobile": "9600000005", "nakshatra_id": 1, "gotra_id": 1},
+    )
+    assert r.status_code == 201, r.text
+    assert "nakshatra_id" not in r.json() and "gotra_id" not in r.json()
+
+    # invalid master reference rejected
+    bad = client.post(
+        "/api/v1/members/",
+        headers=admin_headers,
+        json={"first_name_en": "Bad", "mobile": "9600000003", "qualification_id": 999999},
+    )
+    assert bad.status_code == 400
+
+    # profile resolves master names
+    profile = client.get(f"/api/v1/members/{member['id']}/profile", headers=admin_headers)
+    assert profile.status_code == 200, profile.text
+    pm = profile.json()["personal_masters"]
+    assert pm["native_place"]["name_en"] == "Siddapura"
+    assert pm["qualification"]["name_en"] == "B.E"
+    assert "gotra" not in pm and "nakshatra" not in pm
+
+    # delete guard: master in use by a member
+    r = client.delete(f"/api/v1/masters/qualifications/{qualification['id']}", headers=admin_headers)
+    assert r.status_code == 409
+
+    # horoscope master routes are gone
+    for slug in ("gotras", "nakshatras", "rashis", "masas", "mithis", "samvathraras"):
+        resp = client.get(f"/api/v1/masters/{slug}", headers=admin_headers)
+        assert resp.status_code == 404, f"{slug} should be removed ({resp.status_code})"
+
+    # unused master deletes fine
+    r = client.post("/api/v1/masters/qualifications", headers=admin_headers, json={"name_en": "M.A"})
+    assert r.status_code == 201
+    assert client.delete(f"/api/v1/masters/qualifications/{r.json()['id']}", headers=admin_headers).status_code == 200
+
+
+def test_member_referral_and_family_membership(client, admin_headers):
+    """Referral field and family membership number on members/memberships."""
+    referrer = _create_member(client, admin_headers, "9600000011", "Referrer")
+    r = client.post(
+        "/api/v1/members/",
+        headers=admin_headers,
+        json={"first_name_en": "Referred", "mobile": "9600000012", "referred_by_member_id": referrer["id"]},
+    )
+    assert r.status_code == 201, r.text
+    member = r.json()
+    assert member["referred_by_member_id"] == referrer["id"]
+
+    # invalid referral rejected
+    bad = client.post(
+        "/api/v1/members/",
+        headers=admin_headers,
+        json={"first_name_en": "Bad", "mobile": "9600000013", "referred_by_member_id": 999999},
+    )
+    assert bad.status_code == 400
+
+    # family membership number via membership creation
+    mtype = _create_membership_type(client, admin_headers, "FAMTEST", "Family Test")
+    r = client.post(
+        f"/api/v1/members/{member['id']}/memberships",
+        headers=admin_headers,
+        json={"membership_type_id": mtype["id"], "family_membership_number": "FAM-001"},
+    )
+    assert r.status_code in (200, 201), r.text
+    assert r.json()["family_membership_number"] == "FAM-001"
+
+
+def test_renewal_receipt_and_cheque_fields(client, admin_headers):
+    """is_renewal flag + cheque capture on receipts, and the is_renewal filter."""
+    member = _create_member(client, admin_headers, "9600000021", "Renewal")
+    r = client.post(
+        "/api/v1/receipts/",
+        headers=admin_headers,
+        json={
+            "receipt_date": "2026-09-01",
+            "payer_name": "Renewal Member",
+            "receipt_type": "MEMBERSHIP",
+            "payment_mode": "CHEQUE",
+            "gross_amount": 500,
+            "net_amount": 500,
+            "is_renewal": True,
+            "cheque_number": "CH-100200",
+            "cheque_date": "2026-09-01",
+            "allocations": [{"member_id": member["id"], "allocated_amount": 500}],
+        },
+    )
+    assert r.status_code == 201, r.text
+    receipt = r.json()
+    assert receipt["is_renewal"] is True
+    assert receipt["cheque_number"] == "CH-100200"
+    assert receipt["cheque_date"] == "2026-09-01"
+
+    # filter by is_renewal
+    lst = client.get("/api/v1/receipts/", headers=admin_headers, params={"is_renewal": "true"})
+    assert lst.status_code == 200, lst.text
+    ids = [row["id"] for row in lst.json()["data"]]
+    assert receipt["id"] in ids
+    lst = client.get("/api/v1/receipts/", headers=admin_headers, params={"is_renewal": "false"})
+    assert receipt["id"] not in [row["id"] for row in lst.json()["data"]]
+
+
+def test_login_failure_audit_and_login_count(client, admin_headers):
+    """LOGIN_FAILED rows for bad password AND unknown username; LOGIN bumps
+    login_count."""
+    # failed login against an existing account (admin)
+    from db.session import SessionLocal
+    from models.activity import UserActivityLog
+
+    r = client.post("/api/v1/auth/login", data={"username": "admin", "password": "wrong-pass"})
+    assert r.status_code == 401
+    with SessionLocal() as db:
+        row = (
+            db.query(UserActivityLog)
+            .filter(UserActivityLog.action == "LOGIN_FAILED", UserActivityLog.user_id.isnot(None))
+            .order_by(UserActivityLog.id.desc())
+            .first()
+        )
+    assert row is not None, "LOGIN_FAILED not recorded for known user"
+    assert (row.details or {}).get("reason") == "BAD_PASSWORD"
+
+    # failed login with unknown username (user_id NULL, username captured)
+    r = client.post("/api/v1/auth/login", data={"username": "no_such_user_xy", "password": "whatever1"})
+    assert r.status_code == 401
+    with SessionLocal() as db:
+        row = (
+            db.query(UserActivityLog)
+            .filter(UserActivityLog.action == "LOGIN_FAILED", UserActivityLog.user_id.is_(None))
+            .order_by(UserActivityLog.id.desc())
+            .first()
+        )
+    assert row is not None, "LOGIN_FAILED not recorded for unknown username"
+    assert (row.details or {}).get("username") == "no_such_user_xy"
+
+    # successful login increments login_count
+    login = client.post("/api/v1/auth/login", data={"username": "admin", "password": "admintest123"})
+    assert login.status_code == 200
+    with SessionLocal() as db:
+        from models.users import User
+        user = db.query(User).filter(User.username == "admin").first()
+    assert user.login_count >= 1
+
+
+def test_deletion_reason_master_and_request_link(client, admin_headers):
+    """Deletion-reason master CRUD + linking deletion requests via reason_id."""
+    # create + duplicate guard + applies_to validation
+    r = client.post(
+        "/api/v1/masters/deletion-reasons",
+        headers=admin_headers,
+        json={"name_en": "Deceased", "name_kn": "ಮೃತಪಟ್ಟಿರುವುದು"},
+    )
+    assert r.status_code == 201, r.text
+    reason = r.json()
+    dup = client.post(
+        "/api/v1/masters/deletion-reasons", headers=admin_headers, json={"name_en": "Deceased"}
+    )
+    assert dup.status_code == 409
+    bad = client.post(
+        "/api/v1/masters/deletion-reasons",
+        headers=admin_headers,
+        json={"name_en": "Weird", "applies_to": "BOTH"},
+    )
+    assert bad.status_code == 422
+
+    # SOFT-only reason
+    r = client.post(
+        "/api/v1/masters/deletion-reasons",
+        headers=admin_headers,
+        json={"name_en": "Wrong entry", "name_kn": "ತಪ್ಪು ನಮೂದು", "applies_to": "SOFT"},
+    )
+    assert r.status_code == 201, r.text
+    soft_reason = r.json()
+
+    # filter by applies_to: SOFT sees the SOFT reason and unflagged ones,
+    # PERMANENT only sees unflagged ones.
+    lst = client.get(
+        "/api/v1/masters/deletion-reasons", headers=admin_headers, params={"applies_to": "SOFT"}
+    )
+    assert lst.status_code == 200, lst.text
+    ids = [row["id"] for row in lst.json()["data"]]
+    assert soft_reason["id"] in ids
+    lst = client.get(
+        "/api/v1/masters/deletion-reasons", headers=admin_headers, params={"applies_to": "PERMANENT"}
+    )
+    assert soft_reason["id"] not in [row["id"] for row in lst.json()["data"]]
+
+    # update
+    upd = client.put(
+        f"/api/v1/masters/deletion-reasons/{soft_reason['id']}",
+        headers=admin_headers,
+        json={"applies_to": "PERMANENT"},
+    )
+    assert upd.status_code == 200 and upd.json()["applies_to"] == "PERMANENT"
+
+    # deletion request linked to the master reason
+    member = _create_member(client, admin_headers, "9600000031", "DeletionLink")
+    req = client.post(
+        "/api/v1/approvals/deletion-requests",
+        headers=admin_headers,
+        params={
+            "member_id": member["id"],
+            "reason_id": soft_reason["id"],
+            "deletion_type": "PERMANENT",
+        },
+    )
+    assert req.status_code == 200, req.text
+
+    from db.session import SessionLocal
+
+    with SessionLocal() as db:
+        from models.members import MemberDeletionRequest
+        row = (
+            db.query(MemberDeletionRequest)
+            .filter(MemberDeletionRequest.member_id == member["id"])
+            .order_by(MemberDeletionRequest.id.desc())
+            .first()
+        )
+    assert row is not None and row.reason_id == soft_reason["id"]
+    assert row.reason == "Wrong entry"  # name snapshotted from the master
+
+    # invalid reason_id rejected
+    req = client.post(
+        "/api/v1/approvals/deletion-requests",
+        headers=admin_headers,
+        params={"member_id": member["id"], "reason": "free text", "reason_id": 999999},
+    )
+    assert req.status_code == 400
+
+    # delete guard: reason in use cannot be deleted
+    r = client.delete(
+        f"/api/v1/masters/deletion-reasons/{soft_reason['id']}", headers=admin_headers
+    )
+    assert r.status_code == 409
+
+    # unused reason deletes fine
+    r = client.post(
+        "/api/v1/masters/deletion-reasons", headers=admin_headers, json={"name_en": "Unused reason"}
+    )
+    assert r.status_code == 201
+    assert client.delete(
+        f"/api/v1/masters/deletion-reasons/{r.json()['id']}", headers=admin_headers
+    ).status_code == 200
+
+
+# ─────────────── expiry reminders, inbox, device tokens ───────────────
+
+def test_membership_expiry_reminders(client, admin_headers, monkeypatch):
+    """MEMBERSHIP_EXPIRY template + scan endpoint queues per-member WhatsApps
+    and deduplicates repeat runs within 7 days."""
+    # template for the reminder purpose
+    r = client.post(
+        "/api/v1/notifications/templates",
+        headers=admin_headers,
+        json={
+            "template_name": "Expiry Reminder T",
+            "purpose": "MEMBERSHIP_EXPIRY",
+            "content": "Hi {{name}}, membership {{member_code}} expires on {{expiry_date}} ({{days_left}} days). Renewal reminder.",
+        },
+    )
+    assert r.status_code in (200, 201), r.text
+
+    member = _create_member(client, admin_headers, "9600000030", "Expiring")
+    # approve so member_status is ACTIVE for the scan
+    client.put(f"/api/v1/members/{member['id']}/approve", headers=admin_headers)
+
+    mtype = _create_membership_type(client, admin_headers, "EXPTY", "Expiry Test")
+    r = client.post(
+        f"/api/v1/members/{member['id']}/memberships",
+        headers=admin_headers,
+        json={"membership_type_id": mtype["id"]},
+    )
+    assert r.status_code in (200, 201), r.text
+    membership_id = r.json()["id"]
+
+    # backdate expires_at to 10 days from now
+    from datetime import datetime, timedelta, timezone
+    from db.session import SessionLocal
+
+    expires = datetime.now(timezone.utc) + timedelta(days=10)
+    with SessionLocal() as db:
+        from models.members import MemberMembership
+        row = db.get(MemberMembership, membership_id)
+        row.expires_at = expires
+        db.commit()
+
+    # no provider configured in tests → sends fail but are logged; the scan
+    # must still count them as reminded (dedup by campaign, not delivery).
+    sent = client.post("/api/v1/notifications/expiry-reminders", headers=admin_headers)
+    assert sent.status_code == 200, sent.text
+    assert sent.json()["queued"] >= 1
+
+    # immediate second run → nothing new (7-day dedup window)
+    again = client.post("/api/v1/notifications/expiry-reminders", headers=admin_headers)
+    assert again.status_code == 200
+    assert again.json()["queued"] == 0
+
+
+def test_in_app_notification_inbox(client, admin_headers):
+    """Broadcast visibility, unread counts, per-user read tracking."""
+    # broadcast is visible to everyone
+    r = client.post(
+        "/api/v1/notifications/inbox/broadcast",
+        headers=admin_headers,
+        json={"title": "Samavesha 2026", "body": "Registrations are open."},
+    )
+    assert r.status_code in (200, 201), r.text
+    notification_id = r.json()["id"]
+
+    inbox = client.get("/api/v1/notifications/inbox", headers=admin_headers)
+    assert inbox.status_code == 200, inbox.text
+    ids = [row["id"] for row in inbox.json()["data"]]
+    assert notification_id in ids
+
+    count = client.get("/api/v1/notifications/inbox/unread-count", headers=admin_headers)
+    assert count.status_code == 200
+    unread_before = count.json()["unread"]
+    assert unread_before >= 1
+
+    # mark read → unread count drops; idempotent
+    read = client.post(f"/api/v1/notifications/inbox/{notification_id}/read", headers=admin_headers)
+    assert read.status_code == 200
+    count2 = client.get("/api/v1/notifications/inbox/unread-count", headers=admin_headers)
+    assert count2.json()["unread"] == unread_before - 1
+    # unread_only filter hides it now
+    unread_list = client.get(
+        "/api/v1/notifications/inbox", headers=admin_headers, params={"unread_only": "true"}
+    )
+    assert notification_id not in [row["id"] for row in unread_list.json()["data"]]
+
+    # 404 on someone else's personal notification
+    missing = client.post("/api/v1/notifications/inbox/999999/read", headers=admin_headers)
+    assert missing.status_code == 404
+
+
+def test_device_token_registration(client, admin_headers):
+    """Register, idempotent re-register, deregister."""
+    payload = {"device_token": "fcm-token-abc123", "platform": "FCM", "device_name": "Pixel 9"}
+    r = client.post("/api/v1/notifications/devices", headers=admin_headers, json=payload)
+    assert r.status_code == 200, r.text
+    token_id = r.json()["id"]
+    assert r.json()["registered"] is True
+
+    # same token again → refreshed, no duplicate row (still 1 registration id? new id ok, but count stays 1)
+    r2 = client.post("/api/v1/notifications/devices", headers=admin_headers, json=payload)
+    assert r2.status_code == 200
+    assert r2.json()["id"] == token_id
+
+    # remove
+    d = client.delete(f"/api/v1/notifications/devices/{token_id}", headers=admin_headers)
+    assert d.status_code == 200
+
+    # re-register after removal creates a fresh row
+    r3 = client.post("/api/v1/notifications/devices", headers=admin_headers, json=payload)
+    assert r3.status_code == 200
+    assert r3.json()["id"] != token_id
+
+
+# ─────────────── service opt-ins (Magazine, Temple, Mangalya, Hall…) ───────────────
+
+def _service_type(client, headers, code):
+    """Fetch a seeded service_types row by its code."""
+    response = client.get("/api/v1/masters/service-types", headers=headers)
+    assert response.status_code == 200, response.text
+    for row in response.json()["data"]:
+        if row["code"] == code:
+            return row
+    pytest.fail(f"service type '{code}' not found in /masters/service-types")
+
+
+def test_default_service_types_seeded(client, admin_headers):
+    """Startup seeds the spec's service catalogue (Magazine, Temple,
+    Mangalya, Hall); re-seeding is a no-op and never resurrects a retired
+    service an admin has deleted."""
+    codes = {
+        t["code"]
+        for t in client.get("/api/v1/masters/service-types", headers=admin_headers).json()["data"]
+    }
+    assert {"MAGAZINE", "TEMPLE", "MANGALYA", "HALL"} <= codes
+
+    from db.session import SessionLocal
+    from services.service_types import seed_service_types
+
+    # idempotent: everything already present, nothing created
+    with SessionLocal() as db:
+        assert seed_service_types(db) == 0
+
+    # a soft-deleted service type stays retired across re-seeds
+    created = client.post(
+        "/api/v1/masters/service-types", headers=admin_headers,
+        json={"code": "TST_SVC_NR", "name_en": "Retire Me"},
+    )
+    assert created.status_code in (200, 201), created.text
+    deleted = client.delete(
+        f"/api/v1/masters/service-types/{created.json()['id']}", headers=admin_headers
+    )
+    assert deleted.status_code == 200, deleted.text
+
+    with SessionLocal() as db:
+        assert seed_service_types(db) == 0
+        from models.masters import ServiceType
+        rows = db.query(ServiceType).filter(ServiceType.code == "TST_SVC_NR").all()
+    assert len(rows) == 1 and rows[0].is_deleted is True, "re-seed must not resurrect a retired service"
+
+
+def test_service_optin_crud_lifecycle(client, admin_headers):
+    """Opt in → duplicate refused → cancel → reinstate (not duplicate) →
+    soft delete, with the catalogue names resolved for display."""
+    member = _create_member(client, admin_headers, "9700000001", "Optin")
+    temple = _service_type(client, admin_headers, "TEMPLE")
+
+    r = client.post(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        json={"service_type_id": temple["id"], "notes": "wants seva updates"},
+    )
+    assert r.status_code == 201, r.text
+    optin = r.json()
+    assert optin["status"] == "ACTIVE"
+    assert optin["service_code"] == "TEMPLE"
+    assert optin["service_name_en"] == "Temple"
+    assert optin["opted_via"] == "ADMIN"
+
+    # a second opt-in for a service the member already holds is a 409
+    dup = client.post(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        json={"service_type_id": temple["id"]},
+    )
+    assert dup.status_code == 409
+
+    # unknown catalogue id / unknown member
+    bad = client.post(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        json={"service_type_id": 999999},
+    )
+    assert bad.status_code == 400
+    missing = client.post(
+        "/api/v1/members/999999/service-optins", headers=admin_headers,
+        json={"service_type_id": temple["id"]},
+    )
+    assert missing.status_code == 404
+
+    listing = client.get(f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers)
+    assert listing.status_code == 200, listing.text
+    body = listing.json()
+    assert body["member_id"] == member["id"]
+    assert body["total"] == 1
+    assert body["data"][0]["id"] == optin["id"]
+
+    upd = client.put(
+        f"/api/v1/members/{member['id']}/service-optins/{optin['id']}", headers=admin_headers,
+        json={"status": "CANCELLED", "notes": "member moved away"},
+    )
+    assert upd.status_code == 200, upd.text
+    assert upd.json()["status"] == "CANCELLED"
+    assert upd.json()["notes"] == "member moved away"
+
+    active = client.get(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        params={"status": "ACTIVE"},
+    )
+    assert active.json()["total"] == 0
+    cancelled = client.get(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        params={"status": "cancelled"},
+    )
+    assert cancelled.json()["total"] == 1
+
+    # re-opt-in reinstates the same row instead of colliding with the
+    # partial unique index on (member_id, service_type_id)
+    again = client.post(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        json={"service_type_id": temple["id"], "opted_via": "MOBILE_APP"},
+    )
+    assert again.status_code == 201, again.text
+    assert again.json()["status"] == "ACTIVE"
+    assert again.json()["opted_via"] == "MOBILE_APP"
+    assert client.get(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers
+    ).json()["total"] == 1
+
+    removed = client.delete(
+        f"/api/v1/members/{member['id']}/service-optins/{optin['id']}", headers=admin_headers
+    )
+    assert removed.status_code == 200, removed.text
+    assert client.get(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers
+    ).json()["total"] == 0
+
+
+def test_service_optin_body_validation(client, admin_headers):
+    """Schema guards: enum fields, and never half a linked_type/linked_id pair."""
+    member = _create_member(client, admin_headers, "9700000002", "OptinValid")
+    temple = _service_type(client, admin_headers, "TEMPLE")
+
+    bad_status = client.post(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        json={"service_type_id": temple["id"], "status": "MAYBE"},
+    )
+    assert bad_status.status_code == 422
+
+    bad_via = client.post(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        json={"service_type_id": temple["id"], "opted_via": "CARRIER_PIGEON"},
+    )
+    assert bad_via.status_code == 422
+
+    half_pair = client.post(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        json={"service_type_id": temple["id"], "linked_type": "SOME_TABLE"},
+    )
+    assert half_pair.status_code == 422
+
+
+def test_service_optin_bulk_set(client, admin_headers):
+    """The registration form's checkbox group in one call: opt_in adds or
+    reinstates, opt_out cancels, and the response carries the full list."""
+    member = _create_member(client, admin_headers, "9700000003", "OptinBulk")
+    temple = _service_type(client, admin_headers, "TEMPLE")
+    hall = _service_type(client, admin_headers, "HALL")
+    mangalya = _service_type(client, admin_headers, "MANGALYA")
+
+    r = client.post(
+        f"/api/v1/members/{member['id']}/service-optins/bulk", headers=admin_headers,
+        json={"opt_in": [temple["id"], hall["id"]], "opt_out": [mangalya["id"]]},
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["member_id"] == member["id"]
+    assert body["opted_in"] == [temple["id"], hall["id"]]
+    assert body["changed"] == []  # opting out a service not held is a no-op
+    statuses = {row["service_code"]: row["status"] for row in body["data"]}
+    assert statuses == {"TEMPLE": "ACTIVE", "HALL": "ACTIVE"}
+
+    # flip: add Mangalya, drop Temple
+    r = client.post(
+        f"/api/v1/members/{member['id']}/service-optins/bulk", headers=admin_headers,
+        json={"opt_in": [mangalya["id"]], "opt_out": [temple["id"]]},
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["opted_in"] == [mangalya["id"]]
+    assert body["changed"] == [temple["id"]]
+    statuses = {row["service_code"]: row["status"] for row in body["data"]}
+    assert statuses == {"TEMPLE": "CANCELLED", "HALL": "ACTIVE", "MANGALYA": "ACTIVE"}
+
+    dup = client.post(
+        f"/api/v1/members/{member['id']}/service-optins/bulk", headers=admin_headers,
+        json={"opt_in": [temple["id"], temple["id"]]},
+    )
+    assert dup.status_code == 422
+    overlap = client.post(
+        f"/api/v1/members/{member['id']}/service-optins/bulk", headers=admin_headers,
+        json={"opt_in": [temple["id"]], "opt_out": [temple["id"]]},
+    )
+    assert overlap.status_code == 422
+    bad = client.post(
+        f"/api/v1/members/{member['id']}/service-optins/bulk", headers=admin_headers,
+        json={"opt_in": [999999]},
+    )
+    assert bad.status_code == 400
+
+
+def test_profile_lists_active_optins(client, admin_headers):
+    """The profile's services.opted shows live opt-ins only — cancelling one
+    drops it off the profile without touching the rest."""
+    member = _create_member(client, admin_headers, "9700000004", "OptinProfile")
+    temple = _service_type(client, admin_headers, "TEMPLE")
+    hall = _service_type(client, admin_headers, "HALL")
+
+    for st in (temple, hall):
+        r = client.post(
+            f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+            json={"service_type_id": st["id"]},
+        )
+        assert r.status_code == 201, r.text
+
+    profile = client.get(f"/api/v1/members/{member['id']}/profile", headers=admin_headers)
+    assert profile.status_code == 200, profile.text
+    opted = profile.json()["services"]["opted"]
+    codes = {row["service_code"] for row in opted}
+    assert {"TEMPLE", "HALL"} <= codes
+
+    temple_optin = next(row for row in opted if row["service_code"] == "TEMPLE")
+    r = client.put(
+        f"/api/v1/members/{member['id']}/service-optins/{temple_optin['id']}",
+        headers=admin_headers, json={"status": "CANCELLED"},
+    )
+    assert r.status_code == 200, r.text
+
+    opted_after = client.get(
+        f"/api/v1/members/{member['id']}/profile", headers=admin_headers
+    ).json()["services"]["opted"]
+    codes_after = {row["service_code"] for row in opted_after}
+    assert "TEMPLE" not in codes_after
+    assert "HALL" in codes_after
+
+
+def test_magazine_subscription_syncs_the_optin(client, admin_headers):
+    """Magazine keeps its own subscription table; creating/cancelling a
+    subscription must mirror into the generic opt-in list so 'Magazine'
+    shows on the profile without a second manual opt-in."""
+    member = _create_member(client, admin_headers, "9700000005", "OptinMagazine")
+
+    r = client.post(
+        "/api/v1/magazines/subscriptions", headers=admin_headers,
+        json={"member_id": member["id"], "delivery_status": "ACTIVE"},
+    )
+    assert r.status_code == 201, r.text
+    sub = r.json()
+
+    rows = client.get(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers
+    ).json()["data"]
+    magazine = [row for row in rows if row["service_code"] == "MAGAZINE"]
+    assert len(magazine) == 1, "subscribing must opt the member into the Magazine service"
+    assert magazine[0]["status"] == "ACTIVE"
+    assert magazine[0]["linked_type"] == "MAGAZINE_SUBSCRIPTION"
+    assert magazine[0]["linked_id"] == sub["id"]
+
+    # removing the subscription cancels (not deletes) the opt-in
+    d = client.delete(f"/api/v1/magazines/subscriptions/{sub['id']}", headers=admin_headers)
+    assert d.status_code == 200, d.text
+    cancelled = client.get(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        params={"status": "CANCELLED"},
+    ).json()["data"]
+    assert any(row["service_code"] == "MAGAZINE" for row in cancelled)
+
+
+def test_service_type_delete_guard(client, admin_headers):
+    """A service_type with live opt-ins cannot be deleted, or the profile's
+    service list would silently lose entries."""
+    member = _create_member(client, admin_headers, "9700000006", "OptinGuard")
+    st = client.post(
+        "/api/v1/masters/service-types", headers=admin_headers,
+        json={"code": "TST_SVC_GUARD", "name_en": "Guarded Service"},
+    )
+    assert st.status_code in (200, 201), st.text
+    service_type = st.json()
+
+    dup = client.post(
+        "/api/v1/masters/service-types", headers=admin_headers,
+        json={"code": "TST_SVC_GUARD", "name_en": "Dup"},
+    )
+    assert dup.status_code == 409
+
+    r = client.post(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        json={"service_type_id": service_type["id"]},
+    )
+    assert r.status_code == 201, r.text
+    blocked = client.delete(
+        f"/api/v1/masters/service-types/{service_type['id']}", headers=admin_headers
+    )
+    assert blocked.status_code == 409
+    assert "in use" in blocked.json()["detail"]
+
+    # once the opt-in is soft-deleted the master can go
+    d = client.delete(
+        f"/api/v1/members/{member['id']}/service-optins/{r.json()['id']}", headers=admin_headers
+    )
+    assert d.status_code == 200, d.text
+    ok = client.delete(
+        f"/api/v1/masters/service-types/{service_type['id']}", headers=admin_headers
+    )
+    assert ok.status_code == 200, ok.text
+
+
+def test_permanent_delete_purges_service_optins(client, admin_headers):
+    """PERMANENT delete hard-removes the member's opt-in rows too — no
+    orphans pointing at a member that no longer exists."""
+    member = _create_member(client, admin_headers, "9700000007", "OptinPurge")
+    temple = _service_type(client, admin_headers, "TEMPLE")
+    r = client.post(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        json={"service_type_id": temple["id"]},
+    )
+    assert r.status_code == 201, r.text
+
+    from db.session import SessionLocal
+    from models.members import MemberServiceOptin
+
+    with SessionLocal() as db:
+        assert db.query(MemberServiceOptin).filter(
+            MemberServiceOptin.member_id == member["id"]
+        ).count() == 1
+
+    deleted = client.delete(
+        f"/api/v1/members/{member['id']}",
+        headers=admin_headers, params={"reason": "purge test", "mode": "PERMANENT"},
+    )
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json()["mode"] == "PERMANENT"
+
+    with SessionLocal() as db:
+        assert db.query(MemberServiceOptin).filter(
+            MemberServiceOptin.member_id == member["id"]
+        ).count() == 0
+    assert client.get(f"/api/v1/members/{member['id']}", headers=admin_headers).status_code == 404
+
+
+# ─────────────── receipt tracking & activate-from-receipt ───────────────
+
+def _make_receipt(client, headers, **overrides):
+    """Minimal MEMBERSHIP receipt; overrides deep-merge over the defaults."""
+    payload = {
+        "receipt_date": date.today().isoformat(),
+        "receipt_type": "MEMBERSHIP",
+        "payment_mode": "CASH",
+        "payer_name": "Track Payer",
+        "gross_amount": 600,
+        "discount_amount": 0,
+        "net_amount": 600,
+        "items": [{"item_type": "MEMBERSHIP", "amount": 600}],
+    }
+    payload.update(overrides)
+    r = client.post("/api/v1/receipts/", headers=headers, json=payload)
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def _create_associate(client, headers, name):
+    r = client.post(
+        "/api/v1/engagements/associates", headers=headers,
+        json={"name": name, "organization": "Donor Org"},
+    )
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+def test_receipt_purposes_accepted(client, admin_headers):
+    """The 'payment made for' choice: Membership, General Donation,
+    Scholarship etc are accepted receipt types."""
+    for purpose in ("MEMBERSHIP", "GENERAL_DONATION", "SCHOLARSHIP"):
+        receipt = _make_receipt(client, admin_headers, receipt_type=purpose, payer_name=f"Payer {purpose}")
+        assert receipt["receipt_type"] == purpose
+    # junk is still rejected
+    r = client.post(
+        "/api/v1/receipts/", headers=admin_headers,
+        json={
+            "receipt_date": date.today().isoformat(),
+            "receipt_type": "FREE_LUNCH",
+            "payment_mode": "CASH",
+            "gross_amount": 100, "net_amount": 100,
+        },
+    )
+    assert r.status_code == 400
+
+
+def test_receipt_allocated_to_associate(client, admin_headers):
+    """Non-member donor: allocate to an associate, shows in tracking with
+    payee columns and in the allocation listings; membership_id refused."""
+    associate = _create_associate(client, admin_headers, "Donor Nonmember")
+
+    r = client.post(
+        f"/api/v1/receipts/{_make_receipt(client, admin_headers, receipt_type='GENERAL_DONATION')['id']}/allocate",
+        headers=admin_headers,
+        json={"associate_id": associate["id"], "allocated_amount": 600},
+    )
+    assert r.status_code == 201, r.text
+    alloc = r.json()
+    assert alloc["associate_id"] == associate["id"] and alloc["member_id"] is None
+
+    # per-receipt listing resolves the associate name
+    rows = client.get(
+        f"/api/v1/receipts/{alloc['receipt_id']}/allocations", headers=admin_headers
+    ).json()
+    assert rows[0]["associate_name"] == "Donor Nonmember"
+
+    # global allocation listing carries payee_name too
+    page = client.get("/api/v1/receipts/allocations", headers=admin_headers, params={"receipt_id": alloc["receipt_id"]}).json()
+    row = next(a for a in page["data"] if a["id"] == alloc["id"])
+    assert row["payee_name"] == "Donor Nonmember"
+
+    # tracking shows the associate as payee, no member profile columns
+    tracking = client.get("/api/v1/receipts/tracking", headers=admin_headers).json()["data"]
+    row = next(r for r in tracking if r["id"] == alloc["receipt_id"])
+    assert row["associate_id"] == associate["id"]
+    assert row["associate_name"] == "Donor Nonmember"
+    assert row["payee_name"] == "Donor Nonmember"
+    assert row["member_id"] is None and row["approval_status"] is None
+
+    # membership_id makes no sense for an associate
+    r = client.post(
+        f"/api/v1/receipts/{alloc['receipt_id']}/allocate", headers=admin_headers,
+        json={"associate_id": associate["id"], "membership_id": 1, "allocated_amount": 1},
+    )
+    assert r.status_code == 422
+
+    # unknown associate refused
+    r = client.post(
+        f"/api/v1/receipts/{alloc['receipt_id']}/allocate",
+        headers=admin_headers,
+        json={"associate_id": 999999, "allocated_amount": 1},
+    )
+    assert r.status_code == 400
+
+    # no profile to activate on an associate-only receipt
+    r = client.post(f"/api/v1/receipts/{alloc['receipt_id']}/activate-member", headers=admin_headers)
+    assert r.status_code == 400
+    assert "associate" in r.json()["detail"].lower()
+
+
+def test_receipt_payee_xor_validation(client, admin_headers):
+    """member_id and associate_id are mutually exclusive, never both, never
+    neither."""
+    member = _create_member(client, admin_headers, "9800000011", "XorMember")
+    associate = _create_associate(client, admin_headers, "XorAssociate")
+    receipt = _make_receipt(client, admin_headers)
+
+    both = client.post(
+        f"/api/v1/receipts/{receipt['id']}/allocate", headers=admin_headers,
+        json={"member_id": member["id"], "associate_id": associate["id"], "allocated_amount": 100},
+    )
+    assert both.status_code == 422
+
+    neither = client.post(
+        f"/api/v1/receipts/{receipt['id']}/allocate", headers=admin_headers,
+        json={"allocated_amount": 100},
+    )
+    assert neither.status_code == 422
+
+
+def test_receipt_inline_allocation_to_associate_and_member_profile_reflects(client, admin_headers):
+    """Same receipt entry form: one inline allocation to a member (profile
+    financial.receipts shows it) and one to an associate."""
+    member = _create_member(client, admin_headers, "9800000012", "InlinePayee")
+    associate = _create_associate(client, admin_headers, "Inline Associate")
+
+    r = client.post(
+        "/api/v1/receipts/", headers=admin_headers,
+        json={
+            "receipt_date": date.today().isoformat(),
+            "receipt_type": "SCHOLARSHIP",
+            "payment_mode": "CHEQUE",
+            "cheque_number": "CH-777",
+            "payer_name": "Fund Payer",
+            "gross_amount": 1500,
+            "net_amount": 1500,
+            "items": [{"item_type": "SCHOLARSHIP", "amount": 1500}],
+            "allocations": [
+                {"member_id": member["id"], "allocated_amount": 1000},
+                {"associate_id": associate["id"], "allocated_amount": 500},
+            ],
+        },
+    )
+    assert r.status_code == 201, r.text
+    receipt = r.json()
+
+    # member's profile financial history reflects the receipt
+    profile = client.get(f"/api/v1/members/{member['id']}/profile", headers=admin_headers)
+    assert profile.status_code == 200, profile.text
+    receipts = profile.json()["financial"]["receipts"]
+    entry = next(e for e in receipts if e["receipt_id"] == receipt["id"])
+    assert entry["receipt_type"] == "SCHOLARSHIP"
+    assert float(entry["allocated_amount"]) == 1000.0
+
+    # both allocations listed with their payee names
+    rows = client.get(f"/api/v1/receipts/{receipt['id']}/allocations", headers=admin_headers).json()
+    names = {(row["member_id"], row["associate_id"]): (row["member_name"], row["associate_name"]) for row in rows}
+    assert names[(member["id"], None)][0] == "InlinePayee"
+    assert names[(None, associate["id"])][1] == "Inline Associate"
+
+
+# ─────────────── search params ───────────────
+
+def test_receipt_search_payer_number_and_payee(client, admin_headers):
+    """GET /receipts?search= matches payer name, receipt number, cheque ref,
+    and payee names (member AND associate) through allocations."""
+    member = _create_member(client, admin_headers, "9800000021", "Searchable")
+    associate = _create_associate(client, admin_headers, "Quillridge Trust")
+
+    member_receipt = _make_receipt(client, admin_headers, payer_name="Zyxwv Uniquepayer")
+    client.post(
+        f"/api/v1/receipts/{member_receipt['id']}/allocate", headers=admin_headers,
+        json={"member_id": member["id"], "allocated_amount": 600},
+    )
+    associate_receipt = _make_receipt(client, admin_headers, payment_mode="CHEQUE", cheque_number="CHQ-5551212")
+    client.post(
+        f"/api/v1/receipts/{associate_receipt['id']}/allocate", headers=admin_headers,
+        json={"associate_id": associate["id"], "allocated_amount": 600},
+    )
+
+    def ids_for(**params):
+        body = client.get("/api/v1/receipts/", headers=admin_headers, params={"search": params.pop("search"), **params}).json()
+        return {row["id"] for row in body["data"]}
+
+    # payer name
+    assert member_receipt["id"] in ids_for(search="Zyxwv Uniquepayer")
+    # receipt number
+    assert member_receipt["id"] in ids_for(search=member_receipt["receipt_number"])
+    # cheque number (stored in its own column, not just transaction_reference)
+    assert associate_receipt["id"] in ids_for(search="5551212")
+    # payee: member name + mobile via allocation
+    assert member_receipt["id"] in ids_for(search="Searchable")
+    assert member_receipt["id"] in ids_for(search="9800000021")
+    # payee: associate name via allocation
+    assert associate_receipt["id"] in ids_for(search="Quillridge")
+    # no match -> empty
+    assert ids_for(search="nothing-matches-this-xyz") == set()
+
+
+def test_receipt_tracking_search(client, admin_headers):
+    """GET /receipts/tracking?search= composes with the year/mode filters and
+    reaches payee names."""
+    member = _create_member(client, admin_headers, "9800000022", "TrackSearch")
+    receipt = _make_receipt(client, admin_headers, payer_name="Tracksearch Payername")
+    client.post(
+        f"/api/v1/receipts/{receipt['id']}/allocate", headers=admin_headers,
+        json={"member_id": member["id"], "allocated_amount": 600},
+    )
+
+    body = client.get(
+        "/api/v1/receipts/tracking", headers=admin_headers,
+        params={"search": "Tracksearch Payername", "year": date.today().year},
+    ).json()
+    assert receipt["id"] in {row["id"] for row in body["data"]}
+
+    # search by payee member name finds it too
+    body = client.get(
+        "/api/v1/receipts/tracking", headers=admin_headers,
+        params={"search": "TrackSearch"},
+    ).json()
+    assert receipt["id"] in {row["id"] for row in body["data"]}
+
+
+def test_associates_and_press_search(client, admin_headers):
+    """The donor-picker search: associates by name/org/mobile/email; the
+    press list by organization/reporter."""
+    associate = _create_associate(client, admin_headers, "Bramhayya Samsa")
+    client.put(
+        f"/api/v1/engagements/associates/{associate['id']}", headers=admin_headers,
+        json={"organization": "Samsa Traders", "mobile": "9812345678"},
+    )
+    press = client.post(
+        "/api/v1/engagements/press-media", headers=admin_headers,
+        json={"organization_name": "Karavali Patha", "reporter_name": "Girish Rao"},
+    )
+    assert press.status_code == 201, press.text
+
+    def assoc_ids(search):
+        body = client.get("/api/v1/engagements/associates", headers=admin_headers, params={"search": search}).json()
+        return {row["id"] for row in body["data"]}
+
+    assert associate["id"] in assoc_ids("Bramhayya")
+    assert associate["id"] in assoc_ids("Samsa Traders")
+    assert associate["id"] in assoc_ids("9812345678")
+    assert assoc_ids("zzz-no-match-xyz") == set()
+
+    press_body = client.get(
+        "/api/v1/engagements/press-media", headers=admin_headers,
+        params={"search": "Karavali"},
+    ).json()
+    assert press.json()["id"] in {row["id"] for row in press_body["data"]}
+
+
+def test_events_search_and_date_filters(client, admin_headers):
+    """GET /events?search= title/location; from_date/to_date narrow the date
+    window."""
+    created = client.post(
+        "/api/v1/events/", headers=admin_headers,
+        json={
+            "title": "Sharadotsava 2027",
+            "event_date": "2027-10-15",
+            "location": "Uttara Kannada Bhavan",
+        },
+    )
+    assert created.status_code in (200, 201), created.text
+    event_id = created.json()["id"]
+
+    body = client.get("/api/v1/events/", headers=admin_headers, params={"search": "Sharadotsava"}).json()
+    assert event_id in {row["id"] for row in body["data"]}
+    body = client.get("/api/v1/events/", headers=admin_headers, params={"search": "Kannada Bhavan"}).json()
+    assert event_id in {row["id"] for row in body["data"]}
+
+    body = client.get(
+        "/api/v1/events/", headers=admin_headers,
+        params={"from_date": "2027-10-01", "to_date": "2027-10-31"},
+    ).json()
+    assert event_id in {row["id"] for row in body["data"]}
+    body = client.get(
+        "/api/v1/events/", headers=admin_headers,
+        params={"from_date": "2027-11-01"},
+    ).json()
+    assert event_id not in {row["id"] for row in body["data"]}
+
+    # search with no hit
+    body = client.get("/api/v1/events/", headers=admin_headers, params={"search": "no-such-event-xyz"}).json()
+    assert body["total"] == 0
+
+
+def test_receipt_tracking_rows_summary_and_filters(client, admin_headers):
+    """The register view: linked profile + expiry per row, per-mode summary
+    over the whole filtered set, and the year/month/mode filters."""
+    member = _create_member(client, admin_headers, "9800000001", "TrackedOne")
+    member2 = _create_member(client, admin_headers, "9800000002", "TrackedTwo")
+    mtype = _create_membership_type(client, admin_headers, "TRK_TYP", "Track Type")
+
+    r = client.post(
+        f"/api/v1/members/{member['id']}/memberships", headers=admin_headers,
+        json={"membership_type_id": mtype["id"]},
+    )
+    assert r.status_code in (200, 201), r.text
+    membership_id = r.json()["id"]
+
+    cash_receipt = _make_receipt(client, admin_headers)
+    assert client.post(
+        f"/api/v1/receipts/{cash_receipt['id']}/allocate", headers=admin_headers,
+        json={"member_id": member["id"], "membership_id": membership_id, "allocated_amount": 600},
+    ).status_code == 201
+    upi_receipt = _make_receipt(client, admin_headers, payment_mode="UPI", payer_name="Track UPI")
+    assert client.post(
+        f"/api/v1/receipts/{upi_receipt['id']}/allocate", headers=admin_headers,
+        json={"member_id": member2["id"], "allocated_amount": 600},
+    ).status_code == 201
+
+    year = date.today().year
+    page = client.get(
+        "/api/v1/receipts/tracking", headers=admin_headers,
+        params={"year": year, "payment_mode": "CASH"},
+    )
+    assert page.status_code == 200, page.text
+    body = page.json()
+
+    # envelope + per-mode summary computed across the filtered set (other
+    # tests in this session-scoped DB also file CASH receipts today, so the
+    # counts are >=, not ==)
+    assert {"total", "page", "limit", "pages", "data"} <= set(body)
+    assert body["summary"]["by_payment_mode"].get("CASH", 0) >= 1
+    ids = {row["id"] for row in body["data"]}
+    assert cash_receipt["id"] in ids
+
+    # newest-first: our just-created receipt leads the page
+    row = body["data"][0]
+    assert row["id"] == cash_receipt["id"]
+    assert row["member_id"] == member["id"]
+    assert row["member_name"] == "TrackedOne"
+    assert row["membership_id"] == membership_id
+    assert row["allocation_count"] == 1
+
+    # UPI-only view sees the other receipt and its (membership-less) profile
+    page_upi = client.get(
+        "/api/v1/receipts/tracking", headers=admin_headers,
+        params={"year": year, "payment_mode": "UPI"},
+    ).json()
+    assert page_upi["summary"]["by_payment_mode"].get("UPI", 0) >= 1
+    upi_row = next(r for r in page_upi["data"] if r["id"] == upi_receipt["id"])
+    assert upi_row["member_id"] == member2["id"]
+    assert upi_row["membership_id"] is None
+    assert upi_row["membership_expiry_date"] is None
+
+    # an unallocated receipt shows profile columns as null (needs mapping first)
+    unallocated = _make_receipt(client, admin_headers, payment_mode="CARD")
+    row = client.get(
+        "/api/v1/receipts/tracking", headers=admin_headers,
+        params={"payment_mode": "CARD"},
+    ).json()["data"][0]
+    assert row["id"] == unallocated["id"]
+    assert row["member_id"] is None and row["approval_status"] is None
+
+    # member filter narrows to that member's receipts only
+    mine = client.get(
+        "/api/v1/receipts/tracking", headers=admin_headers,
+        params={"member_id": member["id"]},
+    ).json()
+    assert {r["id"] for r in mine["data"]} == {cash_receipt["id"]}
+
+
+def test_activate_member_from_receipt(client, admin_headers):
+    """The Receipt Tracking row action: activate the unapproved profile the
+    receipt was entered for — mints member_code + membership numbers exactly
+    like PUT /members/{id}/approve (shared core)."""
+    member = _create_member(client, admin_headers, "9800000003", "ActivateMe")
+    assert member["approval_status"] == "UNAPPROVED"
+
+    receipt = _make_receipt(client, admin_headers)
+    assert client.post(
+        f"/api/v1/receipts/{receipt['id']}/allocate", headers=admin_headers,
+        json={"member_id": member["id"], "allocated_amount": 600},
+    ).status_code == 201
+
+    r = client.post(f"/api/v1/receipts/{receipt['id']}/activate-member", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["member"]["approval_status"] == "APPROVED"
+    assert body["member"]["member_code"]
+
+    from db.session import SessionLocal
+    from models.members import Member, MemberMembership
+
+    with SessionLocal() as db:
+        row = db.query(Member).filter(Member.id == member["id"]).first()
+        memberships = db.query(MemberMembership).filter(
+            MemberMembership.member_id == member["id"]
+        ).all()
+    assert row.approval_status == "APPROVED"
+    assert row.member_code == body["member"]["member_code"]
+    assert row.approved_by is not None
+
+    # activating again is refused (idempotency: no double numbering)
+    again = client.post(f"/api/v1/receipts/{receipt['id']}/activate-member", headers=admin_headers)
+    assert again.status_code == 409
+
+    # the tracking row now shows the approved profile + minted identity
+    tracking = client.get(
+        "/api/v1/receipts/tracking", headers=admin_headers,
+        params={"member_id": member["id"]},
+    ).json()["data"][0]
+    assert tracking["approval_status"] == "APPROVED"
+    assert tracking["member_code"] == body["member"]["member_code"]
+
+
+def test_activate_member_from_receipt_guards(client, admin_headers):
+    """No allocation, several linked members, unknown receipt — all refused
+    with a clear error instead of activating the wrong profile."""
+    # unallocated receipt
+    receipt = _make_receipt(client, admin_headers, payer_name="No Alloc")
+    r = client.post(f"/api/v1/receipts/{receipt['id']}/activate-member", headers=admin_headers)
+    assert r.status_code == 400
+    assert "no member allocation" in r.json()["detail"]
+
+    # two members allocated on one receipt — ambiguous
+    m1 = _create_member(client, admin_headers, "9800000004", "AmbigOne")
+    m2 = _create_member(client, admin_headers, "9800000005", "AmbigTwo")
+    shared = _make_receipt(client, admin_headers, gross_amount=1200, net_amount=1200)
+    for m in (m1, m2):
+        assert client.post(
+            f"/api/v1/receipts/{shared['id']}/allocate", headers=admin_headers,
+            json={"member_id": m["id"], "allocated_amount": 600},
+        ).status_code == 201
+    r = client.post(f"/api/v1/receipts/{shared['id']}/activate-member", headers=admin_headers)
+    assert r.status_code == 400
+    assert "exactly one" in r.json()["detail"]
+
+    # unknown receipt
+    assert client.post("/api/v1/receipts/999999/activate-member", headers=admin_headers).status_code == 404
+
+
+def test_activate_member_from_receipt_requires_permission(client, admin_headers):
+    """Activation is a members.update action, not receipts — a receipts-only
+    role must be refused."""
+    _, _, receipts_only_headers = _staff_with_role(
+        client, admin_headers, "receipts_only_user", "Receipts Only", "RECEIPTS_ONLY",
+        permission_grants=[("receipts.create", False), ("receipts.update", False)],
+    )
+    member = _create_member(client, admin_headers, "9800000006", "NoPermTarget")
+    receipt = _make_receipt(client, admin_headers, payer_name="Perm Check")
+    assert client.post(
+        f"/api/v1/receipts/{receipt['id']}/allocate", headers=admin_headers,
+        json={"member_id": member["id"], "allocated_amount": 600},
+    ).status_code == 201
+
+    r = client.post(f"/api/v1/receipts/{receipt['id']}/activate-member", headers=receipts_only_headers)
+    assert r.status_code == 403
+    assert "members.update" in r.json()["detail"]
+
+
+# ─────────────── receipt screen gaps: tracking export + renewals due ───────────────
+
+def test_receipt_tracking_export_csv_and_excel(client, admin_headers):
+    """The Tracking screen's Export button: the whole filtered register as a
+    download — page/limit ignored, export value validated."""
+    _make_receipt(client, admin_headers, payer_name="Export Payer")
+
+    csv = client.get(
+        "/api/v1/receipts/tracking", headers=admin_headers,
+        params={"export": "csv", "search": "Export Payer", "page": 1, "limit": 1},
+    )
+    assert csv.status_code == 200, csv.text
+    assert csv.headers["content-type"].startswith("text/csv")
+    assert "receipt_tracking.csv" in csv.headers["content-disposition"]
+    assert "Export Payer" in csv.text
+
+    excel = client.get(
+        "/api/v1/receipts/tracking", headers=admin_headers,
+        params={"export": "excel", "search": "Export Payer"},
+    )
+    assert excel.status_code == 200, excel.text
+    assert excel.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    assert "receipt_tracking.xlsx" in excel.headers["content-disposition"]
+
+    # junk export value refused (same contract as /reports/*)
+    bad = client.get("/api/v1/receipts/tracking", headers=admin_headers, params={"export": "pdf"})
+    assert bad.status_code == 400
+
+
+def test_renewals_due_worklist(client, admin_headers):
+    """Receipt Entry's UNAPPROVED RENEWAL PAYMENT LIST: ACTIVE memberships
+    expiring within days_ahead (plus already-expired ones), soonest first,
+    with the member + membership columns needed to record the renewal."""
+    from datetime import datetime, timedelta, timezone
+    from db.session import SessionLocal
+    from models.members import MemberMembership
+
+    member = _create_member(client, admin_headers, "9800000031", "RenewalDue")
+    mtype = _create_membership_type(client, admin_headers, "RND_TYP", "Renewal Due Type")
+    r = client.post(
+        f"/api/v1/members/{member['id']}/memberships", headers=admin_headers,
+        json={"membership_type_id": mtype["id"]},
+    )
+    assert r.status_code in (200, 201), r.text
+    membership_id = r.json()["id"]
+
+    # no expires_at yet -> not on the worklist
+    body = client.get("/api/v1/receipts/renewals-due", headers=admin_headers).json()
+    assert membership_id not in {row["membership_id"] for row in body["data"]}
+
+    # expiring in 10 days -> shows up with member/membership columns
+    expires = datetime.now(timezone.utc) + timedelta(days=10)
+    with SessionLocal() as db:
+        row = db.query(MemberMembership).filter(MemberMembership.id == membership_id).first()
+        row.expires_at = expires
+        db.commit()
+
+    body = client.get(
+        "/api/v1/receipts/renewals-due", headers=admin_headers,
+        params={"days_ahead": 30},
+    ).json()
+    hit = next((row for row in body["data"] if row["membership_id"] == membership_id), None)
+    assert hit is not None
+    assert hit["member_id"] == member["id"]
+    assert hit["member_name"] == "RenewalDue"
+    assert hit["membership_type"] == "Renewal Due Type"
+    assert hit["status"] == "ACTIVE"
+    assert hit["days_to_expiry"] in (9, 10)  # wall-time dependent
+
+    # soonest-expiry-first ordering across the whole worklist
+    expiries = [row["expiry_date"] for row in body["data"]]
+    assert expiries == sorted(expiries)
+
+    # already-expired memberships stay on the list (include_expired default)
+    past = datetime.now(timezone.utc) - timedelta(days=5)
+    with SessionLocal() as db:
+        row = db.query(MemberMembership).filter(MemberMembership.id == membership_id).first()
+        row.expires_at = past
+        db.commit()
+    body = client.get("/api/v1/receipts/renewals-due", headers=admin_headers).json()
+    hit = next((row for row in body["data"] if row["membership_id"] == membership_id), None)
+    assert hit is not None
+    assert hit["days_to_expiry"] in (-6, -5)
+
+    # include_expired=false drops it
+    body = client.get(
+        "/api/v1/receipts/renewals-due", headers=admin_headers,
+        params={"include_expired": "false"},
+    ).json()
+    assert membership_id not in {row["membership_id"] for row in body["data"]}
+
+    # export path shares the reports Export plumbing
+    csv = client.get(
+        "/api/v1/receipts/renewals-due", headers=admin_headers, params={"export": "csv"},
+    )
+    assert csv.status_code == 200, csv.text
+    assert "renewals_due.csv" in csv.headers["content-disposition"]
+
+
+def test_engagement_gap_endpoints(client, admin_headers):
+    """Affiliation contact edit/delete, associate/press get-by-id, per-record
+    magazine settings, committee term edit/delete."""
+    E = "/api/v1/engagements"
+    aff = client.post(f"{E}/affiliations", headers=admin_headers, json={"group_name": "GapGroup"}).json()
+    c = client.post(f"{E}/affiliations/{aff['id']}/contacts", headers=admin_headers, json={"name": "A"}).json()
+    r = client.put(f"{E}/affiliations/{aff['id']}/contacts/{c['id']}", headers=admin_headers, json={"name": "B"})
+    assert r.status_code == 200 and r.json()["name"] == "B"
+    assert client.delete(f"{E}/affiliations/{aff['id']}/contacts/{c['id']}", headers=admin_headers).status_code == 200
+    assert client.delete(f"{E}/affiliations/{aff['id']}/contacts/{c['id']}", headers=admin_headers).status_code == 404
+
+    s = client.put(f"{E}/affiliations/{aff['id']}/magazine-setting", headers=admin_headers,
+                   json={"enabled": False, "address_override": "Other St"})
+    assert s.status_code == 200 and s.json()["enabled"] is False
+    assert client.get(f"{E}/affiliations/{aff['id']}", headers=admin_headers).json()["magazine_enabled"] is False
+
+    assoc = client.post(f"{E}/associates", headers=admin_headers, json={"name": "Asso"}).json()
+    assert client.get(f"{E}/associates/{assoc['id']}", headers=admin_headers).json()["name"] == "Asso"
+    assert client.put(f"{E}/associates/{assoc['id']}/magazine-setting", headers=admin_headers,
+                      json={"address_override": "X"}).json()["address_override"] == "X"
+    press = client.post(f"{E}/press-media", headers=admin_headers, json={"organization_name": "Daily"}).json()
+    assert client.get(f"{E}/press-media/{press['id']}", headers=admin_headers).status_code == 200
+    assert client.get(f"{E}/press-media/{press['id']}/magazine-setting", headers=admin_headers).json()["enabled"] is True
+
+    t = client.post(f"{E}/committee/terms", headers=admin_headers, json={"term_name": "T-gap"}).json()
+    u = client.put(f"{E}/committee/terms/{t['id']}", headers=admin_headers, json={"term_name": "T-gap2", "is_current": True})
+    assert u.status_code == 200 and u.json()["is_current"] is True
+    assert client.delete(f"{E}/committee/terms/{t['id']}", headers=admin_headers).status_code == 200
+    assert client.put(f"{E}/committee/terms/{t['id']}", headers=admin_headers, json={"term_name": "x"}).status_code == 404
+
+
+def test_member_is_active_filter_and_activation_request(client, admin_headers):
+    m = _create_member(client, admin_headers, "9800000077", "ReqAct")
+    ids = lambda p: [x["id"] for x in client.get("/api/v1/members/", headers=admin_headers, params=p).json()["data"]]
+    assert m["id"] in ids({"is_active": True, "limit": 100})
+    assert m["id"] not in ids({"is_active": False, "limit": 100})
+
+    r = client.post(f"/api/v1/members/{m['id']}/request-activation", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    req_id = r.json()["approval_request_id"]
+    assert client.post(f"/api/v1/members/{m['id']}/request-activation", headers=admin_headers).status_code == 409
+    a = client.put(f"/api/v1/approvals/requests/{req_id}/approve", headers=admin_headers)
+    assert a.status_code == 200, a.text
+    got = client.get(f"/api/v1/members/{m['id']}", headers=admin_headers).json()
+    assert got["approval_status"] == "APPROVED" and got["member_code"]
+    assert client.post(f"/api/v1/members/{m['id']}/request-activation", headers=admin_headers).status_code == 400
+
+
+def test_scheduler_sends_due_campaigns_only(client, admin_headers, monkeypatch):
+    import asyncio
+    import services.whatsapp as whatsapp
+    from db.session import SessionLocal
+    from models.notifications import NotificationCampaign
+    from services.scheduler import run_due_campaigns
+
+    async def _all_ok(recipients, message, template_id=None):
+        return [{"to": r, "ok": True} for r in recipients]
+
+    monkeypatch.setattr(whatsapp.whatsapp_service, "send_bulk", _all_ok)
+    tpl = client.post("/api/v1/notifications/templates", headers=admin_headers,
+                      json={"template_name": "TST_SCHED_TPL", "content": "Hi"}).json()
+    mk = lambda name, when: client.post(
+        "/api/v1/notifications/campaigns", headers=admin_headers,
+        json={"campaign_name": name, "template_id": tpl["id"], "scheduled_at": when},
+    ).json()["id"]
+    past = mk("SCHED_PAST", "2020-01-01T00:00:00+00:00")
+    future = mk("SCHED_FUTURE", "2099-01-01T00:00:00+00:00")
+
+    assert asyncio.run(run_due_campaigns()) >= 1
+    with SessionLocal() as db:
+        assert db.get(NotificationCampaign, past).status == "SENT"
+        assert db.get(NotificationCampaign, future).status != "SENT"
+
+
+def test_label_pdf_renders_kannada_text(client, admin_headers):
+    aff = client.post(
+        "/api/v1/engagements/affiliations", headers=admin_headers,
+        json={"group_name": "ಹವ್ಯಕ ಮಂಡಳಿ KN", "address": "ಬೆಂಗಳೂರು, ಕರ್ನಾಟಕ 560001"},
+    )
+    assert aff.status_code == 201, aff.text
+    gen = client.post(
+        "/api/v1/magazines/generate-labels", headers=admin_headers,
+        params={"issue_month_year": "2026-04"},
+    )
+    assert gen.status_code == 200, gen.text
+    pdf = client.get(
+        f"/api/v1/magazines/label-batches/{gen.json()['batch_id']}/pdf", headers=admin_headers
+    )
+    assert pdf.status_code == 200, pdf.text
+    assert pdf.content.startswith(b"%PDF")
+    assert b"NotoSansKannada" in pdf.content  # Kannada glyphs embedded, not blanks

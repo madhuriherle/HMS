@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Callable, Dict, List, Optional
 from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,7 +11,7 @@ from models.members import (
     MemberProfileChangeRequest, MemberProfileHistory,
     MembershipTypeChangeRequest, MembershipTypeHistory, MemberDeletionRequest,
     Member, MemberMembership, MemberApprovalHistory,
-    MemberDocument, MemberKycRequest, MemberProfileHistory as _MPH,
+    MemberDocument, MemberKycRequest, MemberServiceOptin, MemberProfileHistory as _MPH,
 )
 from models.activity import MemberActivityLog
 from models.engagements import CommitteeMemberLink
@@ -19,7 +19,9 @@ from models.events import EventMemberLink, EventParticipant
 from models.magazines import MagazineDeliveryPause, MagazineReturn, MagazineSubscription
 from models.notifications import NotificationMessage, NotificationRecipient
 from models.receipts import Receipt, ReceiptItem, ReceiptAllocation
+import models.approval_requests  # noqa: F401  # register approval_requests table on Base.metadata
 from schemas.members import EDITABLE_MEMBER_FIELDS
+from schemas.common import BulkApprovalAction, BulkRejectionAction
 from services.pricing import active_price
 from services.sequences import generate_next_number
 
@@ -27,6 +29,43 @@ router = APIRouter()
 
 
 # ─── shared helpers ─────────────────────────────────────────
+def _bulk_run(db: Session, ids: List[int], action: Callable[[int], Any]) -> Dict[str, Any]:
+    """Run `action(id)` for each id, collecting per-item success/failure
+    instead of letting one bad id abort the whole batch. `action` is a
+    single-item approve/reject endpoint function called directly (not
+    through FastAPI) — same call-directly pattern the generic engine's
+    replay uses, so bulk behaviour can never drift from the single-item one."""
+    results = []
+    succeeded = 0
+    for item_id in ids:
+        try:
+            detail = action(item_id)
+            results.append({"id": item_id, "success": True, "detail": detail})
+            succeeded += 1
+        except HTTPException as exc:
+            db.rollback()
+            results.append({"id": item_id, "success": False, "error": exc.detail})
+        except Exception as exc:  # defensive: a DB-level error shouldn't abort the rest of the batch
+            db.rollback()
+            results.append({"id": item_id, "success": False, "error": str(exc)})
+    return {"results": results, "succeeded": succeeded, "failed": len(ids) - succeeded}
+
+
+async def _bulk_run_async(db: Session, ids: List[int], action: Callable[[int], Any]) -> Dict[str, Any]:
+    results = []
+    succeeded = 0
+    for item_id in ids:
+        try:
+            detail = await action(item_id)
+            results.append({"id": item_id, "success": True, "detail": detail})
+            succeeded += 1
+        except HTTPException as exc:
+            db.rollback()
+            results.append({"id": item_id, "success": False, "error": exc.detail})
+        except Exception as exc:
+            db.rollback()
+            results.append({"id": item_id, "success": False, "error": str(exc)})
+    return {"results": results, "succeeded": succeeded, "failed": len(ids) - succeeded}
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -58,6 +97,7 @@ def _purge_member(db: Session, member_id: int) -> None:
     _delete(MembershipTypeHistory)
     _delete(MembershipTypeChangeRequest)
     _delete(MemberDocument)
+    _delete(MemberServiceOptin)
 
     # 2. Magazine subscriptions (pauses/returns first)
     subscription_ids = [
@@ -184,7 +224,93 @@ def reject_profile_change(
     db.commit()
     return {"message": "Profile change rejected"}
 
+@router.put("/profile-changes/bulk-approve")
+def bulk_approve_profile_changes(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("approvals.write")),
+    payload: BulkApprovalAction,
+) -> Any:
+    return _bulk_run(db, payload.ids, lambda i: approve_profile_change(db=db, current_user=current_user, id=i, note=payload.note))
+
+@router.put("/profile-changes/bulk-reject")
+def bulk_reject_profile_changes(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("approvals.write")),
+    payload: BulkRejectionAction,
+) -> Any:
+    return _bulk_run(db, payload.ids, lambda i: reject_profile_change(db=db, current_user=current_user, id=i, note=payload.note))
+
 # ─── MEMBERSHIP TYPE CHANGE REQUESTS ────────────────────────
+@router.post("/type-changes")
+def request_type_change(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    member_id: int,
+    requested_type_id: int,
+    reason: Optional[str] = None,
+) -> Any:
+    """Submit a membership type change request. Deliberately open to any
+    authenticated user (mirrors request_deletion below): members submit
+    these from the mobile app, staff can submit on a member's behalf. Takes
+    effect only once approved via PUT /type-changes/{id}/approve, which
+    also mints the upgrade receipt (spec: 'new receipt for the same')."""
+    from models.masters import MembershipType
+
+    member = db.query(Member).filter(Member.id == member_id, Member.is_deleted == False).first()
+    if not member:
+        raise HTTPException(404, "Member not found")
+
+    membership = (
+        db.query(MemberMembership)
+        .filter(
+            MemberMembership.member_id == member_id,
+            MemberMembership.status == "ACTIVE",
+            MemberMembership.is_deleted == False,
+        )
+        .order_by(MemberMembership.id.desc())
+        .first()
+    )
+    if not membership:
+        raise HTTPException(400, "Member has no active membership to change")
+
+    requested_type = db.query(MembershipType).filter(
+        MembershipType.id == requested_type_id, MembershipType.is_deleted == False
+    ).first()
+    if not requested_type:
+        raise HTTPException(400, f"Membership type {requested_type_id} not found")
+    if membership.membership_type_id == requested_type_id:
+        raise HTTPException(400, "Member already has this membership type")
+    if not active_price(db, requested_type_id):
+        raise HTTPException(400, f"Membership type '{requested_type.name_en}' has no active price configured")
+
+    existing = db.query(MembershipTypeChangeRequest).filter(
+        MembershipTypeChangeRequest.current_membership_id == membership.id,
+        MembershipTypeChangeRequest.status == "PENDING",
+    ).first()
+    if existing:
+        raise HTTPException(409, f"A type-change request is already pending (id={existing.id})")
+
+    req = MembershipTypeChangeRequest(
+        member_id=member_id,
+        current_membership_id=membership.id,
+        requested_type_id=requested_type_id,
+        reason=reason,
+        status="PENDING",
+        created_by=current_user.id,
+    )
+    db.add(req)
+    db.commit()
+    db.refresh(req)
+
+    from services.approval_notify import notify_approvers
+    notify_approvers(
+        db,
+        title="Approval needed: Membership type change",
+        body=f"{current_user.name} requested a membership type change for member #{member_id} to '{requested_type.name_en}'.",
+        data={"type_change_request_id": req.id, "member_id": member_id},
+    )
+    return {"message": "Membership type change request submitted", "id": req.id}
+
 @router.get("/type-changes")
 def read_type_changes(
     db: Session = Depends(deps.get_db),
@@ -219,6 +345,10 @@ def approve_type_change(
         old_type_id = membership.membership_type_id
         old_price = active_price(db, old_type_id)
         new_price = active_price(db, req.requested_type_id)
+        # membership_type_history.new_price is NOT NULL: a price that existed
+        # at request time may have been deactivated before approval.
+        if not new_price:
+            raise HTTPException(409, "The requested membership type no longer has an active price; ask the requester to resubmit")
 
         membership.membership_type_id = req.requested_type_id
         if new_price:
@@ -307,6 +437,22 @@ def reject_type_change(
     db.commit()
     return {"message": "Membership type change rejected"}
 
+@router.put("/type-changes/bulk-approve")
+def bulk_approve_type_changes(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("approvals.write")),
+    payload: BulkApprovalAction,
+) -> Any:
+    return _bulk_run(db, payload.ids, lambda i: approve_type_change(db=db, current_user=current_user, id=i, note=payload.note))
+
+@router.put("/type-changes/bulk-reject")
+def bulk_reject_type_changes(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("approvals.write")),
+    payload: BulkRejectionAction,
+) -> Any:
+    return _bulk_run(db, payload.ids, lambda i: reject_type_change(db=db, current_user=current_user, id=i, note=payload.note))
+
 # ─── DELETION REQUESTS ──────────────────────────────────────
 @router.get("/deletion-requests")
 def read_deletion_requests(
@@ -323,21 +469,43 @@ def read_deletion_requests(
 def request_deletion(
     *, db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
-    member_id: int, reason: str,
-    deletion_type: str = "SOFT"  # SOFT or PERMANENT
+    member_id: int,
+    reason: Optional[str] = None,
+    deletion_type: str = "SOFT",  # SOFT or PERMANENT
+    reason_id: Optional[int] = None,  # master-list reference (Mangalya parity)
 ) -> Any:
-    member = db.query(Member).filter(Member.id == member_id, Member.is_deleted == False).first()
+    from models.masters import DeletionReason
+    member = db.query(Member).filter(Member.id == member_id, Member.is_deleted == False).first()  # noqa: E712
     if not member:
         raise HTTPException(404, "Member not found")
     if deletion_type not in ("SOFT", "PERMANENT"):
         raise HTTPException(400, "deletion_type must be SOFT or PERMANENT")
+    if not reason and not reason_id:
+        raise HTTPException(400, "reason or reason_id is required")
+    if reason_id:
+        dr = db.query(DeletionReason).filter(
+            DeletionReason.id == reason_id, DeletionReason.is_deleted == False  # noqa: E712
+        ).first()
+        if not dr:
+            raise HTTPException(400, "Invalid reason_id")
+        # Snapshot the master's English name so the row stays self-contained.
+        if not reason:
+            reason = dr.name_en
     req = MemberDeletionRequest(
         member_id=member_id, requested_by=current_user.id,
-        reason=reason, deletion_type=deletion_type,
+        reason=reason, deletion_type=deletion_type, reason_id=reason_id,
         status="PENDING", created_by=current_user.id
     )
     db.add(req)
     db.commit()
+    db.refresh(req)
+    from services.approval_notify import notify_approvers
+    notify_approvers(
+        db,
+        title=f"Approval needed: Delete member ({deletion_type})",
+        body=f"{current_user.name} requested to delete member #{member_id}. Reason: {reason}",
+        data={"deletion_request_id": req.id, "member_id": member_id},
+    )
     return {"message": "Deletion request submitted"}
 
 @router.put("/deletion-requests/{id}/approve")
@@ -400,3 +568,129 @@ def reject_deletion(
     req.review_note = note
     db.commit()
     return {"message": "Deletion request rejected"}
+
+@router.put("/deletion-requests/bulk-approve")
+def bulk_approve_deletions(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("approvals.write")),
+    payload: BulkApprovalAction,
+) -> Any:
+    return _bulk_run(db, payload.ids, lambda i: approve_deletion(db=db, current_user=current_user, id=i, note=payload.note))
+
+@router.put("/deletion-requests/bulk-reject")
+def bulk_reject_deletions(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("approvals.write")),
+    payload: BulkRejectionAction,
+) -> Any:
+    return _bulk_run(db, payload.ids, lambda i: reject_deletion(db=db, current_user=current_user, id=i, note=payload.note))
+
+
+# ─── GENERIC APPROVAL REQUESTS (maker-checker for gated create/update/delete) ──
+@router.get("/requests")
+def read_generic_requests(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    module: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = 1, limit: int = 20,
+) -> Any:
+    from models.approval_requests import ApprovalRequest
+    q = db.query(ApprovalRequest)
+    if module:
+        q = q.filter(ApprovalRequest.module == module)
+    if status:
+        q = q.filter(ApprovalRequest.status == status)
+    return paginate(q.order_by(ApprovalRequest.id.desc()), page, limit)
+
+
+@router.put("/requests/{id}/approve")
+async def approve_generic_request(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("approvals.write")),
+    id: int, note: Optional[str] = None,
+) -> Any:
+    """Replay the originally-submitted call, as the original requester, via
+    services.approval_registry — the exact function the direct API call
+    would have run, so approved requests can never drift from live logic."""
+    import inspect as _inspect
+
+    from models.approval_requests import ApprovalRequest
+    from services import approval_registry
+
+    req = db.query(ApprovalRequest).filter(ApprovalRequest.id == id).first()
+    if not req:
+        raise HTTPException(404, "Approval request not found")
+    if req.status != "PENDING":
+        raise HTTPException(400, f"Request is already {req.status}")
+
+    action = approval_registry.get(req.module, req.action, req.entity_type)
+    if not action:
+        raise HTTPException(
+            500, f"No registered handler for {req.module}.{req.action}.{req.entity_type}"
+        )
+
+    requester = db.query(User).filter(User.id == req.requested_by).first()
+    if not requester:
+        raise HTTPException(409, "Original requester no longer exists")
+
+    kwargs = approval_registry.rebuild_kwargs(action, req.payload)
+    kwargs["db"] = db
+    kwargs["current_user"] = requester
+
+    try:
+        if _inspect.iscoroutinefunction(action.fn):
+            result = await action.fn(**kwargs)
+        else:
+            result = action.fn(**kwargs)
+    except HTTPException as exc:
+        req.error = str(exc.detail)
+        db.commit()
+        raise
+
+    now = _now()
+    req.status = "APPROVED"
+    req.reviewed_by = current_user.id
+    req.reviewed_at = now
+    req.review_note = note
+    req.executed_at = now
+    db.commit()
+
+    from core.pagination import _to_plain
+    return _to_plain(result, set())
+
+
+@router.put("/requests/{id}/reject")
+def reject_generic_request(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("approvals.write")),
+    id: int, note: str,
+) -> Any:
+    from models.approval_requests import ApprovalRequest
+    req = db.query(ApprovalRequest).filter(ApprovalRequest.id == id).first()
+    if not req:
+        raise HTTPException(404, "Approval request not found")
+    if req.status != "PENDING":
+        raise HTTPException(400, f"Request is already {req.status}")
+    req.status = "REJECTED"
+    req.reviewed_by = current_user.id
+    req.reviewed_at = _now()
+    req.review_note = note
+    db.commit()
+    return {"message": "Approval request rejected"}
+
+@router.put("/requests/bulk-approve")
+async def bulk_approve_generic_requests(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("approvals.write")),
+    payload: BulkApprovalAction,
+) -> Any:
+    return await _bulk_run_async(db, payload.ids, lambda i: approve_generic_request(db=db, current_user=current_user, id=i, note=payload.note))
+
+@router.put("/requests/bulk-reject")
+def bulk_reject_generic_requests(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("approvals.write")),
+    payload: BulkRejectionAction,
+) -> Any:
+    return _bulk_run(db, payload.ids, lambda i: reject_generic_request(db=db, current_user=current_user, id=i, note=payload.note))

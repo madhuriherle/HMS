@@ -24,9 +24,15 @@ class ReceiptItemBase(BaseModel):
 
 
 class ReceiptAllocationIn(BaseModel):
-    """Member mapping captured together with the receipt entry."""
+    """Payee mapping captured together with the receipt entry.
 
-    member_id: int
+    The payee is exactly one of: a member (lands in the member's profile
+    financial history) or an associate (donor/well-wisher who isn't a
+    member — receipt tracking maps those to engagements.associates).
+    """
+
+    member_id: Optional[int] = None
+    associate_id: Optional[int] = None
     membership_id: Optional[int] = None
     allocated_amount: float
 
@@ -36,6 +42,14 @@ class ReceiptAllocationIn(BaseModel):
         if v <= 0:
             raise ValueError("allocated_amount must be > 0")
         return v
+
+    @model_validator(mode="after")
+    def _exactly_one_payee(self):
+        if (self.member_id is None) == (self.associate_id is None):
+            raise ValueError("exactly one of member_id or associate_id is required")
+        if self.associate_id is not None and self.membership_id is not None:
+            raise ValueError("membership_id can only be set for member allocations")
+        return self
 
 
 class ReceiptBase(BaseModel):
@@ -48,6 +62,11 @@ class ReceiptBase(BaseModel):
     discount_amount: float = 0.0
     net_amount: float
     source: ReceiptSource = "ONLINE"
+    # First registration vs renewal (Mangalya parity).
+    is_renewal: bool = False
+    # Cheque capture when payment_mode=CHEQUE.
+    cheque_number: Optional[str] = None
+    cheque_date: Optional[date] = None
     notes: Optional[str] = None
 
     @field_validator("gross_amount", "discount_amount", "net_amount")
@@ -81,6 +100,9 @@ class ReceiptUpdate(BaseModel):
     discount_amount: Optional[float] = None
     net_amount: Optional[float] = None
     source: Optional[ReceiptSource] = None
+    is_renewal: Optional[bool] = None
+    cheque_number: Optional[str] = None
+    cheque_date: Optional[date] = None
     notes: Optional[str] = None
 
     @field_validator("gross_amount", "discount_amount", "net_amount")
@@ -106,7 +128,8 @@ class Receipt(ReceiptInDBBase):
 
 
 class ReceiptAllocationCreate(BaseModel):
-    member_id: int
+    member_id: Optional[int] = None
+    associate_id: Optional[int] = None
     membership_id: Optional[int] = None
     allocated_amount: float
 
@@ -117,11 +140,20 @@ class ReceiptAllocationCreate(BaseModel):
             raise ValueError("allocated_amount must be > 0")
         return v
 
+    @model_validator(mode="after")
+    def _exactly_one_payee(self):
+        if (self.member_id is None) == (self.associate_id is None):
+            raise ValueError("exactly one of member_id or associate_id is required")
+        if self.associate_id is not None and self.membership_id is not None:
+            raise ValueError("membership_id can only be set for member allocations")
+        return self
+
 
 class ReceiptAllocation(BaseModel):
     id: int
     receipt_id: int
     member_id: Optional[int] = None
+    associate_id: Optional[int] = None
     membership_id: Optional[int] = None
     allocated_amount: float
     created_at: datetime
@@ -130,6 +162,7 @@ class ReceiptAllocation(BaseModel):
 
 class ReceiptAllocationWithMember(ReceiptAllocation):
     member_name: Optional[str] = None
+    associate_name: Optional[str] = None
 
 
 class ReceiptCancellationCreate(BaseModel):

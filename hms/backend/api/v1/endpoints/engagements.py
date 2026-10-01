@@ -1,5 +1,6 @@
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from api import deps
 from models.users import User
@@ -12,8 +13,10 @@ from models.engagements import (
     CommitteeMember, CommitteeMemberLink
 )
 from schemas import engagements as schemas_engagements
+from schemas.common import PendingApproval
 from crud import engagements as crud_engagements
 from core.pagination import paginate
+from services import approval_gate
 
 router = APIRouter()
 
@@ -30,8 +33,9 @@ def read_affiliations(
         q = q.filter(Affiliation.magazine_enabled == magazine_enabled)
     return paginate(q, page, limit)
 
-@router.post("/affiliations", response_model=schemas_engagements.Affiliation, status_code=201)
-def create_affiliation(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), aff_in: schemas_engagements.AffiliationCreate) -> Any:
+@router.post("/affiliations", response_model=Union[schemas_engagements.Affiliation, PendingApproval], status_code=201)
+@approval_gate.gated("engagements", "CREATE", "Affiliation", "engagements.create")
+def create_affiliation(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.create")), aff_in: schemas_engagements.AffiliationCreate) -> Any:
     return crud_engagements.affiliation.create(db=db, obj_in=aff_in, created_by=current_user.id)
 
 @router.get("/affiliations/{id}", response_model=schemas_engagements.Affiliation)
@@ -40,14 +44,16 @@ def read_affiliation(*, db: Session = Depends(deps.get_db), current_user: User =
     if not obj: raise HTTPException(404, "Affiliation not found")
     return obj
 
-@router.put("/affiliations/{id}", response_model=schemas_engagements.Affiliation)
-def update_affiliation(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), id: int, aff_in: schemas_engagements.AffiliationUpdate) -> Any:
+@router.put("/affiliations/{id}", response_model=Union[schemas_engagements.Affiliation, PendingApproval])
+@approval_gate.gated("engagements", "UPDATE", "Affiliation", "engagements.update")
+def update_affiliation(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.update")), id: int, aff_in: schemas_engagements.AffiliationUpdate) -> Any:
     obj = crud_engagements.affiliation.get(db, id)
     if not obj: raise HTTPException(404, "Affiliation not found")
     return crud_engagements.affiliation.update(db, db_obj=obj, obj_in=aff_in, updated_by=current_user.id)
 
-@router.delete("/affiliations/{id}", response_model=schemas_engagements.Affiliation)
-def delete_affiliation(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), id: int) -> Any:
+@router.delete("/affiliations/{id}", response_model=Union[schemas_engagements.Affiliation, PendingApproval])
+@approval_gate.gated("engagements", "DELETE", "Affiliation", "engagements.delete")
+def delete_affiliation(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.delete")), id: int) -> Any:
     return crud_engagements.affiliation.remove(db, id=id, deleted_by=current_user.id)
 
 @router.get("/affiliations/{id}/contacts")
@@ -70,10 +76,11 @@ def read_affiliation_contacts(
         } for c in contacts
     ]}
 
-@router.post("/affiliations/{id}/contacts", response_model=schemas_engagements.AffiliationContact, status_code=201)
+@router.post("/affiliations/{id}/contacts", response_model=Union[schemas_engagements.AffiliationContact, PendingApproval], status_code=201)
+@approval_gate.gated("engagements", "CREATE", "AffiliationContact", "engagements.create")
 def add_affiliation_contact(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("engagements.write")),
+    current_user: User = Depends(deps.require_permission("engagements.create")),
     id: int, contact_in: schemas_engagements.AffiliationContactCreate,
 ) -> Any:
     """Add a contact person to an affiliate group."""
@@ -93,33 +100,127 @@ def add_affiliation_contact(
     db.refresh(contact)
     return contact
 
+@router.put("/affiliations/{id}/contacts/{contact_id}", response_model=Union[schemas_engagements.AffiliationContact, PendingApproval])
+@approval_gate.gated("engagements", "UPDATE", "AffiliationContact", "engagements.update")
+def update_affiliation_contact(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("engagements.update")),
+    id: int, contact_id: int, contact_in: schemas_engagements.AffiliationContactUpdate,
+) -> Any:
+    c = db.query(AffiliationContact).filter(
+        AffiliationContact.id == contact_id, AffiliationContact.affiliation_id == id,
+        AffiliationContact.is_deleted == False).first()
+    if not c:
+        raise HTTPException(404, "Contact not found")
+    for k, v in contact_in.model_dump(exclude_unset=True).items():
+        setattr(c, k, v)
+    c.updated_by = current_user.id
+    db.commit(); db.refresh(c)
+    return c
+
+@router.delete("/affiliations/{id}/contacts/{contact_id}")
+@approval_gate.gated("engagements", "DELETE", "AffiliationContact", "engagements.delete")
+def delete_affiliation_contact(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("engagements.delete")),
+    id: int, contact_id: int,
+) -> Any:
+    c = db.query(AffiliationContact).filter(
+        AffiliationContact.id == contact_id, AffiliationContact.affiliation_id == id,
+        AffiliationContact.is_deleted == False).first()
+    if not c:
+        raise HTTPException(404, "Contact not found")
+    c.is_deleted = True; c.deleted_by = current_user.id
+    db.commit()
+    return {"message": "Deleted"}
+
+def _magazine_setting(db: Session, model, fk_name: str, owner_id: int, owner, user_id: int, data=None):
+    """Per-recipient magazine delivery setting (enabled + address override),
+    created on first touch; `enabled` stays in sync with the owner's flag."""
+    row = db.query(model).filter(getattr(model, fk_name) == owner_id, model.is_deleted == False).first()
+    if not row:
+        row = model(**{fk_name: owner_id}, enabled=owner.magazine_enabled, created_by=user_id)
+        db.add(row)
+    if data:
+        for k, v in data.model_dump(exclude_unset=True).items():
+            setattr(row, k, v)
+        if data.enabled is not None:
+            owner.magazine_enabled = data.enabled
+        row.updated_by = user_id
+    db.commit(); db.refresh(row)
+    return {"id": row.id, fk_name: owner_id, "enabled": row.enabled, "address_override": row.address_override}
+
+@router.get("/affiliations/{id}/magazine-setting")
+def get_affiliation_magazine_setting(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:
+    o = crud_engagements.affiliation.get(db, id)
+    if not o: raise HTTPException(404, "Affiliation not found")
+    return _magazine_setting(db, AffiliationMagazineSetting, "affiliation_id", id, o, current_user.id)
+
+@router.put("/affiliations/{id}/magazine-setting")
+def put_affiliation_magazine_setting(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.update")), id: int, data: schemas_engagements.MagazineSettingUpdate) -> Any:
+    o = crud_engagements.affiliation.get(db, id)
+    if not o: raise HTTPException(404, "Affiliation not found")
+    return _magazine_setting(db, AffiliationMagazineSetting, "affiliation_id", id, o, current_user.id, data)
+
 # ─── ASSOCIATES ────────────────────────────────────────────
 @router.get("/associates")
 def read_associates(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
     magazine_enabled: Optional[bool] = None,
+    search: Optional[str] = None,
     page: int = 1, limit: int = 20
 ) -> Any:
     q = db.query(Associate).filter(Associate.is_deleted == False)
     if magazine_enabled is not None:
         q = q.filter(Associate.magazine_enabled == magazine_enabled)
-    return paginate(q, page, limit)
+    if search:
+        like = f"%{search}%"
+        # name / organization / mobile / email — the donor-picker on the
+        # receipt entry form searches this list.
+        q = q.filter(or_(
+            Associate.name.ilike(like),
+            Associate.organization.ilike(like),
+            Associate.mobile.ilike(like),
+            Associate.email.ilike(like),
+        ))
+    return paginate(q.order_by(Associate.id.desc()), page, limit)
 
-@router.post("/associates", response_model=schemas_engagements.Associate, status_code=201)
-def create_associate(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), assoc_in: schemas_engagements.AssociateCreate) -> Any:
+@router.post("/associates", response_model=Union[schemas_engagements.Associate, PendingApproval], status_code=201)
+@approval_gate.gated("engagements", "CREATE", "Associate", "engagements.create")
+def create_associate(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.create")), assoc_in: schemas_engagements.AssociateCreate) -> Any:
     """Register an associate engaged with the Mahasabha (not a member)."""
     return crud_engagements.associate.create(db=db, obj_in=assoc_in, created_by=current_user.id)
 
-@router.put("/associates/{id}", response_model=schemas_engagements.Associate)
-def update_associate(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), id: int, assoc_in: schemas_engagements.AssociateUpdate) -> Any:
+@router.get("/associates/{id}", response_model=schemas_engagements.Associate)
+def read_associate(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:
+    obj = db.query(Associate).filter(Associate.id == id, Associate.is_deleted == False).first()
+    if not obj: raise HTTPException(404, "Associate not found")
+    return obj
+
+@router.get("/associates/{id}/magazine-setting")
+def get_associate_magazine_setting(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:
+    o = db.query(Associate).filter(Associate.id == id, Associate.is_deleted == False).first()
+    if not o: raise HTTPException(404, "Associate not found")
+    return _magazine_setting(db, AssociateMagazineSetting, "associate_id", id, o, current_user.id)
+
+@router.put("/associates/{id}/magazine-setting")
+def put_associate_magazine_setting(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.update")), id: int, data: schemas_engagements.MagazineSettingUpdate) -> Any:
+    o = db.query(Associate).filter(Associate.id == id, Associate.is_deleted == False).first()
+    if not o: raise HTTPException(404, "Associate not found")
+    return _magazine_setting(db, AssociateMagazineSetting, "associate_id", id, o, current_user.id, data)
+
+@router.put("/associates/{id}", response_model=Union[schemas_engagements.Associate, PendingApproval])
+@approval_gate.gated("engagements", "UPDATE", "Associate", "engagements.update")
+def update_associate(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.update")), id: int, assoc_in: schemas_engagements.AssociateUpdate) -> Any:
     """Update associate details, including the magazine delivery toggle."""
     obj = db.query(Associate).filter(Associate.id == id, Associate.is_deleted == False).first()
     if not obj: raise HTTPException(404, "Associate not found")
     return crud_engagements.associate.update(db, db_obj=obj, obj_in=assoc_in, updated_by=current_user.id)
 
 @router.delete("/associates/{id}")
-def delete_associate(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), id: int) -> Any:
+@approval_gate.gated("engagements", "DELETE", "Associate", "engagements.delete")
+def delete_associate(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.delete")), id: int) -> Any:
     obj = db.query(Associate).filter(Associate.id == id).first()
     if not obj: raise HTTPException(404, "Associate not found")
     obj.is_deleted = True; obj.deleted_by = current_user.id
@@ -132,27 +233,57 @@ def read_press_media(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
     magazine_enabled: Optional[bool] = None,
+    search: Optional[str] = None,
     page: int = 1, limit: int = 20
 ) -> Any:
     q = db.query(PressMedia).filter(PressMedia.is_deleted == False)
     if magazine_enabled is not None:
         q = q.filter(PressMedia.magazine_enabled == magazine_enabled)
-    return paginate(q, page, limit)
+    if search:
+        like = f"%{search}%"
+        q = q.filter(or_(
+            PressMedia.organization_name.ilike(like),
+            PressMedia.reporter_name.ilike(like),
+            PressMedia.mobile.ilike(like),
+            PressMedia.email.ilike(like),
+        ))
+    return paginate(q.order_by(PressMedia.id.desc()), page, limit)
 
-@router.post("/press-media", response_model=schemas_engagements.PressMedia, status_code=201)
-def create_press_media(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), press_in: schemas_engagements.PressMediaCreate) -> Any:
+@router.post("/press-media", response_model=Union[schemas_engagements.PressMedia, PendingApproval], status_code=201)
+@approval_gate.gated("engagements", "CREATE", "PressMedia", "engagements.create")
+def create_press_media(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.create")), press_in: schemas_engagements.PressMediaCreate) -> Any:
     """Register a press/media house engaged with the Mahasabha."""
     return crud_engagements.press_media.create(db=db, obj_in=press_in, created_by=current_user.id)
 
-@router.put("/press-media/{id}", response_model=schemas_engagements.PressMedia)
-def update_press_media(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), id: int, press_in: schemas_engagements.PressMediaUpdate) -> Any:
+@router.get("/press-media/{id}", response_model=schemas_engagements.PressMedia)
+def read_press_media_one(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:
+    obj = db.query(PressMedia).filter(PressMedia.id == id, PressMedia.is_deleted == False).first()
+    if not obj: raise HTTPException(404, "Press/Media not found")
+    return obj
+
+@router.get("/press-media/{id}/magazine-setting")
+def get_press_magazine_setting(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:
+    o = db.query(PressMedia).filter(PressMedia.id == id, PressMedia.is_deleted == False).first()
+    if not o: raise HTTPException(404, "Press/Media not found")
+    return _magazine_setting(db, PressMediaMagazineSetting, "press_media_id", id, o, current_user.id)
+
+@router.put("/press-media/{id}/magazine-setting")
+def put_press_magazine_setting(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.update")), id: int, data: schemas_engagements.MagazineSettingUpdate) -> Any:
+    o = db.query(PressMedia).filter(PressMedia.id == id, PressMedia.is_deleted == False).first()
+    if not o: raise HTTPException(404, "Press/Media not found")
+    return _magazine_setting(db, PressMediaMagazineSetting, "press_media_id", id, o, current_user.id, data)
+
+@router.put("/press-media/{id}", response_model=Union[schemas_engagements.PressMedia, PendingApproval])
+@approval_gate.gated("engagements", "UPDATE", "PressMedia", "engagements.update")
+def update_press_media(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.update")), id: int, press_in: schemas_engagements.PressMediaUpdate) -> Any:
     """Update press/media details, including the magazine delivery toggle."""
     obj = db.query(PressMedia).filter(PressMedia.id == id, PressMedia.is_deleted == False).first()
     if not obj: raise HTTPException(404, "Press/Media not found")
     return crud_engagements.press_media.update(db, db_obj=obj, obj_in=press_in, updated_by=current_user.id)
 
 @router.delete("/press-media/{id}")
-def delete_press_media(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), id: int) -> Any:
+@approval_gate.gated("engagements", "DELETE", "PressMedia", "engagements.delete")
+def delete_press_media(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.delete")), id: int) -> Any:
     obj = db.query(PressMedia).filter(PressMedia.id == id).first()
     if not obj: raise HTTPException(404, "Press/Media not found")
     obj.is_deleted = True; obj.deleted_by = current_user.id
@@ -172,10 +303,11 @@ def read_committee_categories(
         q = q.filter(CommitteeCategory.display_on_website == display_on_website)
     return paginate(q.order_by(CommitteeCategory.id), page, limit)
 
-@router.post("/committee/categories", response_model=schemas_engagements.CommitteeCategory, status_code=201)
+@router.post("/committee/categories", response_model=Union[schemas_engagements.CommitteeCategory, PendingApproval], status_code=201)
+@approval_gate.gated("engagements", "CREATE", "CommitteeCategory", "engagements.create")
 def create_committee_category(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("engagements.write")),
+    current_user: User = Depends(deps.require_permission("engagements.create")),
     category_in: schemas_engagements.CommitteeCategoryCreate,
 ) -> Any:
     """Add a committee category, e.g. ಬೆಂಗಳೂರು ಕ್ಷೇತ್ರ, ಆಡಳಿತ ಮಂಡಳಿಯ
@@ -188,10 +320,11 @@ def read_committee_category(*, db: Session = Depends(deps.get_db), current_user:
     if not obj: raise HTTPException(404, "Category not found")
     return obj
 
-@router.put("/committee/categories/{id}", response_model=schemas_engagements.CommitteeCategory)
+@router.put("/committee/categories/{id}", response_model=Union[schemas_engagements.CommitteeCategory, PendingApproval])
+@approval_gate.gated("engagements", "UPDATE", "CommitteeCategory", "engagements.update")
 def update_committee_category(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("engagements.write")),
+    current_user: User = Depends(deps.require_permission("engagements.update")),
     id: int, category_in: schemas_engagements.CommitteeCategoryUpdate,
 ) -> Any:
     """Rename a category or toggle its website display."""
@@ -200,9 +333,10 @@ def update_committee_category(
     return crud_engagements.committee_category.update(db, db_obj=obj, obj_in=category_in, updated_by=current_user.id)
 
 @router.delete("/committee/categories/{id}")
+@approval_gate.gated("engagements", "DELETE", "CommitteeCategory", "engagements.delete")
 def delete_committee_category(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("engagements.write")),
+    current_user: User = Depends(deps.require_permission("engagements.delete")),
     id: int,
 ) -> Any:
     obj = db.query(CommitteeCategory).filter(CommitteeCategory.id == id, CommitteeCategory.is_deleted == False).first()
@@ -229,10 +363,11 @@ def read_committee_subcategories(
         q = q.filter(CommitteeSubcategory.category_id == category_id)
     return paginate(q.order_by(CommitteeSubcategory.id), page, limit)
 
-@router.post("/committee/subcategories", response_model=schemas_engagements.CommitteeSubcategory, status_code=201)
+@router.post("/committee/subcategories", response_model=Union[schemas_engagements.CommitteeSubcategory, PendingApproval], status_code=201)
+@approval_gate.gated("engagements", "CREATE", "CommitteeSubcategory", "engagements.create")
 def create_committee_subcategory(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("engagements.write")),
+    current_user: User = Depends(deps.require_permission("engagements.create")),
     sub_in: schemas_engagements.CommitteeSubcategoryCreate,
 ) -> Any:
     """Add a sub-category under a committee category."""
@@ -243,10 +378,11 @@ def create_committee_subcategory(
         raise HTTPException(400, "Unknown category_id")
     return crud_engagements.committee_subcategory.create(db=db, obj_in=sub_in, created_by=current_user.id)
 
-@router.put("/committee/subcategories/{id}", response_model=schemas_engagements.CommitteeSubcategory)
+@router.put("/committee/subcategories/{id}", response_model=Union[schemas_engagements.CommitteeSubcategory, PendingApproval])
+@approval_gate.gated("engagements", "UPDATE", "CommitteeSubcategory", "engagements.update")
 def update_committee_subcategory(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("engagements.write")),
+    current_user: User = Depends(deps.require_permission("engagements.update")),
     id: int, sub_in: schemas_engagements.CommitteeSubcategoryUpdate,
 ) -> Any:
     obj = db.query(CommitteeSubcategory).filter(CommitteeSubcategory.id == id, CommitteeSubcategory.is_deleted == False).first()
@@ -260,9 +396,10 @@ def update_committee_subcategory(
     return crud_engagements.committee_subcategory.update(db, db_obj=obj, obj_in=sub_in, updated_by=current_user.id)
 
 @router.delete("/committee/subcategories/{id}")
+@approval_gate.gated("engagements", "DELETE", "CommitteeSubcategory", "engagements.delete")
 def delete_committee_subcategory(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("engagements.write")),
+    current_user: User = Depends(deps.require_permission("engagements.delete")),
     id: int,
 ) -> Any:
     obj = db.query(CommitteeSubcategory).filter(CommitteeSubcategory.id == id, CommitteeSubcategory.is_deleted == False).first()
@@ -372,10 +509,11 @@ def read_committee_members(
     ])
     return page_data
 
-@router.post("/committee/members", response_model=schemas_engagements.CommitteeMember, status_code=201)
+@router.post("/committee/members", response_model=Union[schemas_engagements.CommitteeMember, PendingApproval], status_code=201)
+@approval_gate.gated("engagements", "CREATE", "CommitteeMember", "engagements.create")
 def create_committee_member(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("engagements.write")),
+    current_user: User = Depends(deps.require_permission("engagements.create")),
     member_in: schemas_engagements.CommitteeMemberCreate,
 ) -> Any:
     """Add a current committee member under a category (+ optional subcategory
@@ -419,10 +557,11 @@ def create_committee_member(
     db.refresh(obj)
     return obj
 
-@router.put("/committee/members/{id}", response_model=schemas_engagements.CommitteeMember)
+@router.put("/committee/members/{id}", response_model=Union[schemas_engagements.CommitteeMember, PendingApproval])
+@approval_gate.gated("engagements", "UPDATE", "CommitteeMember", "engagements.update")
 def update_committee_member(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("engagements.write")),
+    current_user: User = Depends(deps.require_permission("engagements.update")),
     id: int, member_in: schemas_engagements.CommitteeMemberUpdate,
 ) -> Any:
     obj = db.query(CommitteeMember).filter(CommitteeMember.id == id, CommitteeMember.is_deleted == False).first()
@@ -464,9 +603,10 @@ def update_committee_member(
     return obj
 
 @router.delete("/committee/members/{id}")
+@approval_gate.gated("engagements", "DELETE", "CommitteeMember", "engagements.delete")
 def delete_committee_member(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("engagements.write")),
+    current_user: User = Depends(deps.require_permission("engagements.delete")),
     id: int,
 ) -> Any:
     obj = db.query(CommitteeMember).filter(CommitteeMember.id == id, CommitteeMember.is_deleted == False).first()
@@ -480,11 +620,37 @@ def delete_committee_member(
 def read_committee_terms(db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), page: int = 1, limit: int = 100) -> Any:
     return paginate(db.query(CommitteeTerm).filter(CommitteeTerm.is_deleted == False).order_by(CommitteeTerm.id.desc()), page, limit)
 
-@router.post("/committee/terms", response_model=schemas_engagements.CommitteeTerm, status_code=201)
-def create_committee_term(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), term_in: schemas_engagements.CommitteeTermCreate) -> Any:
+@router.post("/committee/terms", response_model=Union[schemas_engagements.CommitteeTerm, PendingApproval], status_code=201)
+@approval_gate.gated("engagements", "CREATE", "CommitteeTerm", "engagements.create")
+def create_committee_term(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.create")), term_in: schemas_engagements.CommitteeTermCreate) -> Any:
     if term_in.is_current:
         db.query(CommitteeTerm).filter(CommitteeTerm.is_current == True).update({"is_current": False})
     return crud_engagements.committee_term.create(db=db, obj_in=term_in, created_by=current_user.id)
+
+
+@router.put("/committee/terms/{id}", response_model=Union[schemas_engagements.CommitteeTerm, PendingApproval])
+@approval_gate.gated("engagements", "UPDATE", "CommitteeTerm", "engagements.update")
+def update_committee_term(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.update")), id: int, term_in: schemas_engagements.CommitteeTermUpdate) -> Any:
+    t = db.query(CommitteeTerm).filter(CommitteeTerm.id == id, CommitteeTerm.is_deleted == False).first()
+    if not t: raise HTTPException(404, "Term not found")
+    if term_in.is_current:
+        db.query(CommitteeTerm).filter(CommitteeTerm.id != id, CommitteeTerm.is_current == True).update({"is_current": False})
+    for k, v in term_in.model_dump(exclude_unset=True).items():
+        setattr(t, k, v)
+    t.updated_by = current_user.id
+    db.commit(); db.refresh(t)
+    return t
+
+@router.delete("/committee/terms/{id}")
+@approval_gate.gated("engagements", "DELETE", "CommitteeTerm", "engagements.delete")
+def delete_committee_term(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.delete")), id: int) -> Any:
+    t = db.query(CommitteeTerm).filter(CommitteeTerm.id == id, CommitteeTerm.is_deleted == False).first()
+    if not t: raise HTTPException(404, "Term not found")
+    if db.query(CommitteeMember).filter(CommitteeMember.term_id == id, CommitteeMember.is_deleted == False).count():
+        raise HTTPException(409, "Term still has committee members; reassign or delete them first")
+    t.is_deleted = True; t.deleted_by = current_user.id
+    db.commit()
+    return {"message": "Deleted"}
 
 
 # ─── PUBLIC WEBSITE COMMITTEE PAGE ────────────────────────────

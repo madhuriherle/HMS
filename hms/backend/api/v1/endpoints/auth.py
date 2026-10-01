@@ -60,11 +60,38 @@ def login(
         User.is_deleted == False
     ).first()
     if not user or not verify_password(form_data.password, user.password_hash):
+        # Audit the failure — with the user's id when the username exists so
+        # brute-force attempts against a known account are visible (Mangalya
+        # parity: login_audits records success AND failure).
+        if user:
+            record_activity(
+                db,
+                user_id=user.id,
+                action="LOGIN_FAILED",
+                entity_type="users",
+                entity_id=user.id,
+                details={"reason": "BAD_PASSWORD"},
+                ip_address=client_ip,
+            )
+            db.commit()
+        else:
+            record_activity(
+                db,
+                user_id=None,
+                action="LOGIN_FAILED",
+                entity_type="users",
+                entity_id=None,
+                details={"reason": "UNKNOWN_USERNAME", "username": form_data.username},
+                ip_address=client_ip,
+            )
+            db.commit()
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     if not user.status:
         raise HTTPException(status_code=403, detail="Account is inactive")
     now = datetime.now(timezone.utc)
     user.last_login_at = now
+    user.login_count = (user.login_count or 0) + 1
+    user.last_login_method = "PASSWORD"
     record_activity(
         db,
         user_id=user.id,

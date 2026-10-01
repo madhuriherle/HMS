@@ -1,4 +1,4 @@
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Union
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from api import deps
@@ -13,10 +13,12 @@ from models.magazines import (
     MagazineSubscription,
 )
 from schemas import magazines as schemas_magazines
+from schemas.common import PendingApproval
 from crud import magazines as crud_magazines
 from core.config import settings
 from core.pagination import paginate
 from services.whatsapp import whatsapp_service
+from services import approval_gate
 from datetime import datetime, date, timezone
 import hashlib
 import secrets
@@ -64,10 +66,11 @@ def read_subscription(
     return sub
 
 
-@router.post("/subscriptions", response_model=schemas_magazines.MagazineSubscription, status_code=201)
+@router.post("/subscriptions", response_model=Union[schemas_magazines.MagazineSubscription, PendingApproval], status_code=201)
+@approval_gate.gated("magazines", "CREATE", "MagazineSubscription", "magazines.create")
 def create_subscription(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.create")),
     sub_in: schemas_magazines.MagazineSubscriptionCreate
 ) -> Any:
     """Start magazine delivery for a member (after registration)."""
@@ -79,13 +82,20 @@ def create_subscription(
     existing = _get_member_subscription(db, sub_in.member_id)
     if existing:
         raise HTTPException(409, f"Member already has a subscription (id={existing.id}, status={existing.delivery_status})")
-    return crud_magazines.subscription.create(db=db, obj_in=sub_in, created_by=current_user.id)
+    sub = crud_magazines.subscription.create(db=db, obj_in=sub_in, created_by=current_user.id)
+    # Mirror into the member's generic service opt-in list so "Magazine" shows
+    # on the profile without a second manual opt-in.
+    from services.service_types import sync_magazine_optin
+    sync_magazine_optin(db, member_id=sub_in.member_id, linked_id=sub.id, created_by=current_user.id)
+    db.commit()
+    return sub
 
 
-@router.put("/subscriptions/{sub_id}", response_model=schemas_magazines.MagazineSubscription)
+@router.put("/subscriptions/{sub_id}", response_model=Union[schemas_magazines.MagazineSubscription, PendingApproval])
+@approval_gate.gated("magazines", "UPDATE", "MagazineSubscription", "magazines.update", id_param="sub_id")
 def update_subscription(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.update")),
     sub_id: int,
     sub_in: schemas_magazines.MagazineSubscriptionUpdate,
 ) -> Any:
@@ -100,16 +110,23 @@ def update_subscription(
     return crud_magazines.subscription.update(db, db_obj=sub, obj_in=data, updated_by=current_user.id)
 
 
-@router.delete("/subscriptions/{sub_id}", response_model=schemas_magazines.MagazineSubscription)
+@router.delete("/subscriptions/{sub_id}", response_model=Union[schemas_magazines.MagazineSubscription, PendingApproval])
+@approval_gate.gated("magazines", "DELETE", "MagazineSubscription", "magazines.delete", id_param="sub_id")
 def delete_subscription(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.delete")),
     sub_id: int,
 ) -> Any:
+    """Remove a magazine subscription (the member's service opt-in for
+    Magazine is cancelled, not deleted, so the profile keeps the history)."""
     sub = crud_magazines.subscription.get(db, sub_id)
     if not sub:
         raise HTTPException(404, "Subscription not found")
-    return crud_magazines.subscription.remove(db, id=sub_id, deleted_by=current_user.id)
+    result = crud_magazines.subscription.remove(db, id=sub_id, deleted_by=current_user.id)
+    from services.service_types import sync_magazine_optin
+    sync_magazine_optin(db, member_id=sub.member_id, linked_id=None)
+    db.commit()
+    return result
 
 
 # ─────────────── DELIVERY PAUSES ───────────────
@@ -134,10 +151,11 @@ def read_pauses(
     return paginate(q.order_by(MagazineDeliveryPause.id.desc()), page, limit)
 
 
-@router.post("/pauses", response_model=schemas_magazines.MagazineDeliveryPause, status_code=201)
+@router.post("/pauses", response_model=Union[schemas_magazines.MagazineDeliveryPause, PendingApproval], status_code=201)
+@approval_gate.gated("magazines", "CREATE", "MagazineDeliveryPause", "magazines.create")
 def pause_subscription(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.create")),
     pause_in: schemas_magazines.MagazineDeliveryPauseCreate
 ) -> Any:
     """Pause delivery for a period, with the member's note as the reason.
@@ -172,10 +190,11 @@ def pause_subscription(
     return crud_magazines.pause.create(db=db, obj_in=pause_in, created_by=current_user.id)
 
 
-@router.put("/pauses/{pause_id}", response_model=schemas_magazines.MagazineDeliveryPause)
+@router.put("/pauses/{pause_id}", response_model=Union[schemas_magazines.MagazineDeliveryPause, PendingApproval])
+@approval_gate.gated("magazines", "UPDATE", "MagazineDeliveryPause", "magazines.update", id_param="pause_id")
 def update_pause(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.update")),
     pause_id: int,
     pause_in: schemas_magazines.MagazineDeliveryPauseUpdate,
 ) -> Any:
@@ -193,10 +212,11 @@ def update_pause(
     return crud_magazines.pause.update(db, db_obj=pause, obj_in=data, updated_by=current_user.id)
 
 
-@router.post("/pauses/{pause_id}/resume", response_model=schemas_magazines.MagazineDeliveryPause)
+@router.post("/pauses/{pause_id}/resume", response_model=Union[schemas_magazines.MagazineDeliveryPause, PendingApproval])
+@approval_gate.gated("magazines", "CREATE", "MagazineDeliveryPauseResume", "magazines.create", id_param="pause_id")
 def resume_pause(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.create")),
     pause_id: int,
     resume_date: Optional[date] = None,
 ) -> Any:
@@ -242,11 +262,12 @@ def read_returns(
     return paginate(q.order_by(MagazineReturn.id.desc()), page, limit)
 
 
-@router.post("/returns", response_model=schemas_magazines.MagazineReturn, status_code=201)
+@router.post("/returns", response_model=Union[schemas_magazines.MagazineReturn, PendingApproval], status_code=201)
+@approval_gate.gated("magazines", "CREATE", "MagazineReturn", "magazines.create")
 def create_return(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.create")),
     return_in: schemas_magazines.MagazineReturnCreate,
 ) -> Any:
     """Mark a magazine return for a member's subscription and issue month.
@@ -279,11 +300,12 @@ def create_return(
     return obj
 
 
-@router.put("/returns/{return_id}", response_model=schemas_magazines.MagazineReturn)
+@router.put("/returns/{return_id}", response_model=Union[schemas_magazines.MagazineReturn, PendingApproval])
+@approval_gate.gated("magazines", "UPDATE", "MagazineReturn", "magazines.update", id_param="return_id")
 def update_return(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.update")),
     return_id: int,
     return_in: schemas_magazines.MagazineReturnUpdate,
 ) -> Any:
@@ -309,11 +331,12 @@ def _update_return(db: Session, obj: MagazineReturn, data: dict, user_id: int) -
     return obj
 
 
-@router.delete("/returns/{return_id}", response_model=schemas_magazines.MagazineReturn)
+@router.delete("/returns/{return_id}", response_model=Union[schemas_magazines.MagazineReturn, PendingApproval])
+@approval_gate.gated("magazines", "DELETE", "MagazineReturn", "magazines.delete", id_param="return_id")
 def delete_return(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.delete")),
     return_id: int,
 ) -> Any:
     """Undo a return marking (e.g. entered in the wrong month)."""
@@ -350,11 +373,12 @@ def read_delivery_batches(
     )
 
 
-@router.post("/delivery-batches", response_model=schemas_magazines.MagazineDeliveryBatch)
+@router.post("/delivery-batches", response_model=Union[schemas_magazines.MagazineDeliveryBatch, PendingApproval])
+@approval_gate.gated("magazines", "CREATE", "MagazineDeliveryBatch", "magazines.create")
 def create_delivery_batch(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.create")),
     batch_in: schemas_magazines.MagazineDeliveryBatchCreate,
 ) -> Any:
     batch = MagazineDeliveryBatch(**batch_in.model_dump(), created_by=current_user.id)
@@ -366,10 +390,11 @@ def create_delivery_batch(
 
 # ─────────────── LABEL GENERATION ───────────────
 @router.post("/generate-labels")
+@approval_gate.gated("magazines", "CREATE", "MagazineLabelBatch", "magazines.create")
 def generate_labels(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.create")),
     issue_month_year: str,
     state_id: Optional[int] = None,
     district_id: Optional[int] = None,
@@ -463,22 +488,28 @@ def generate_labels(
             created_by=current_user.id
         ))
 
+    from models.engagements import AffiliationMagazineSetting, AssociateMagazineSetting, PressMediaMagazineSetting
+
+    def _override(model, fk, owner):
+        r = db.query(model).filter(getattr(model, fk) == owner.id, model.is_deleted == False).first()
+        return r.address_override if r and r.address_override else None
+
     for aff in db.query(Affiliation).filter(Affiliation.magazine_enabled == True, Affiliation.is_deleted == False).all():  # noqa: E712
         items.append(MagazineLabelBatchItem(
             label_batch_id=batch.id, recipient_type="AFFILIATION",
-            recipient_id=aff.id, label_address=aff.address, created_by=current_user.id
+            recipient_id=aff.id, label_address=_override(AffiliationMagazineSetting, 'affiliation_id', aff) or aff.address, created_by=current_user.id
         ))
 
     for assoc in db.query(Associate).filter(Associate.magazine_enabled == True, Associate.is_deleted == False).all():  # noqa: E712
         items.append(MagazineLabelBatchItem(
             label_batch_id=batch.id, recipient_type="ASSOCIATE",
-            recipient_id=assoc.id, label_address=assoc.address, created_by=current_user.id
+            recipient_id=assoc.id, label_address=_override(AssociateMagazineSetting, 'associate_id', assoc) or assoc.address, created_by=current_user.id
         ))
 
     for press in db.query(PressMedia).filter(PressMedia.magazine_enabled == True, PressMedia.is_deleted == False).all():  # noqa: E712
         items.append(MagazineLabelBatchItem(
             label_batch_id=batch.id, recipient_type="PRESS",
-            recipient_id=press.id, label_address=press.address, created_by=current_user.id
+            recipient_id=press.id, label_address=_override(PressMediaMagazineSetting, 'press_media_id', press) or press.address, created_by=current_user.id
         ))
 
     db.bulk_save_objects(items)
@@ -495,10 +526,12 @@ def generate_labels(
 
 # KYC Link
 @router.post("/members/{member_id}/send-kyc-link")
+# Not @approval_gate.gated: takes a BackgroundTasks param (see the note on
+# approve_member in members.py).
 async def send_kyc_link(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.create")),
     member_id: int,
     background_tasks: BackgroundTasks,
     channel: str = "LINK",  # LINK (WhatsApp link) or APP (app notification nudge)
@@ -538,6 +571,92 @@ async def send_kyc_link(
     if channel == "LINK":
         response["kyc_url"] = f"{kyc_service.KYC_BASE_URL}?token={token}"
     return response
+
+
+@router.post("/members/kyc-reminders")
+# Not @approval_gate.gated: takes a BackgroundTasks param (see the note on
+# send_kyc_link above).
+def send_kyc_reminders(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("magazines.create")),
+    background_tasks: BackgroundTasks,
+    interval_days: int = 180,
+    channel: str = "LINK",
+    limit: int = 500,
+) -> Any:
+    """Scan approved, active members and (re)send the KYC update request to
+    anyone who has never been asked, or whose last request was sent more
+    than `interval_days` days ago — the "regular specified intervals" nudge
+    the spec calls for. Like POST /notifications/expiry-reminders, this is
+    run on a schedule: set SCHEDULER_ENABLED + KYC_REMINDER_ENABLED to
+    have services.scheduler call this daily, or hit it from cron.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import func
+
+    from services import kyc as kyc_service
+
+    if channel not in ("LINK", "APP"):
+        raise HTTPException(400, "channel must be LINK or APP")
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=interval_days)
+
+    def _aware(dt):
+        """SQLite returns naive datetimes; assume they are UTC."""
+        return dt.replace(tzinfo=timezone.utc) if dt and dt.tzinfo is None else dt
+
+    last_sent_subq = (
+        db.query(
+            MemberKycRequest.member_id.label("member_id"),
+            func.max(MemberKycRequest.sent_at).label("last_sent_at"),
+        )
+        .group_by(MemberKycRequest.member_id)
+        .subquery()
+    )
+
+    rows = (
+        db.query(Member, last_sent_subq.c.last_sent_at)
+        .outerjoin(last_sent_subq, last_sent_subq.c.member_id == Member.id)
+        .filter(
+            Member.is_deleted == False,  # noqa: E712
+            Member.member_status == "ACTIVE",
+            Member.approval_status == "APPROVED",
+            Member.mobile.isnot(None),
+        )
+        .all()
+    )
+
+    eligible = []
+    for member, last_sent_at in rows:
+        if _aware(last_sent_at) is None or _aware(last_sent_at) < cutoff:
+            eligible.append(member)
+        if len(eligible) >= limit:
+            break
+
+    queued = []
+    for member in eligible:
+        kyc, token = kyc_service.create_kyc_request(db, member, created_by=current_user.id)
+        msg = (
+            kyc_service.link_message(member, token)
+            if channel == "LINK"
+            else kyc_service.app_message(member)
+        )
+
+        async def _send(mobile_country_code=member.mobile_country_code, mobile=member.mobile, message=msg):
+            await whatsapp_service.send_message(to=f"{mobile_country_code}{mobile}", message=message)
+
+        background_tasks.add_task(_send)
+        queued.append(member.id)
+
+    return {
+        "queued": len(queued),
+        "member_ids": queued,
+        "interval_days": interval_days,
+        "channel": channel,
+    }
 
 
 # ─── LABEL BATCHES ────────────────────────────────────────
@@ -633,18 +752,17 @@ def read_label_batch(
 def download_label_pdf(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
+    current_user: User = Depends(deps.require_permission("magazines.update")),
     batch_id: int,
 ) -> Any:
     """Render a label batch as a printable A4 PDF (3×7 grid), highlighting
     returned issues, and remember the generated file on the batch."""
-    import io
     import os
 
-    from reportlab.lib.pagesizes import A4
-    from reportlab.pdfgen import canvas as pdf_canvas
-
+    from fpdf import FPDF
     from fastapi.responses import FileResponse
+
+    from models.members import Member
 
     batch = db.query(MagazineLabelBatch).filter(
         MagazineLabelBatch.id == batch_id,
@@ -663,73 +781,76 @@ def download_label_pdf(
         .all()
     )
     names = _label_names(db, items)
+    member_ids = {i.recipient_id for i in items if i.recipient_type == "MEMBER"}
+    names_kn = {
+        m.id: m.full_name_kn
+        for m in db.query(Member).filter(Member.id.in_(member_ids or {0})).all()
+        if m.full_name_kn
+    }
 
-    def wrap(canvas, text, font, size, max_width):
-        lines = []
-        for paragraph in (text or "").splitlines() or [""]:
-            words = paragraph.split()
-            if not words:
-                lines.append("")
-                continue
-            current = words[0]
-            for word in words[1:]:
-                trial = f"{current} {word}"
-                if canvas.stringWidth(trial, font, size) <= max_width:
-                    current = trial
-                else:
-                    lines.append(current)
-                    current = word
-            lines.append(current)
-        return lines
-
-    page_w, page_h = A4
+    # Noto Sans (Latin) + Noto Sans Kannada, with HarfBuzz shaping so Kannada
+    # conjuncts render correctly. Latin is primary; Kannada is the fallback.
+    fonts = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "assets", "fonts")
     cols, rows = 3, 7
-    label_w, label_h = page_w / cols, page_h / rows
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.set_auto_page_break(False)
+    pdf.set_title(f"Labels {batch.batch_name}")
+    pdf.add_font("Lbl", "", os.path.join(fonts, "NotoSans-Regular.ttf"))
+    pdf.add_font("Lbl", "B", os.path.join(fonts, "NotoSans-Bold.ttf"))
+    pdf.add_font("LblKn", "", os.path.join(fonts, "NotoSansKannada-Regular.ttf"))
+    pdf.add_font("LblKn", "B", os.path.join(fonts, "NotoSansKannada-Bold.ttf"))
+    pdf.set_fallback_fonts(["LblKn"])
+    pdf.set_text_shaping(True)
+
+    label_w, label_h = pdf.w / cols, pdf.h / rows
     per_page = cols * rows
 
-    buffer = io.BytesIO()
-    canvas = pdf_canvas.Canvas(buffer, pagesize=A4)
-    canvas.setTitle(f"Labels {batch.batch_name}")
-
+    pdf.add_page()
     if not items:
-        canvas.setFont("Helvetica", 12)
-        canvas.drawString(40, page_h - 40, "No labels in this batch.")
+        pdf.set_font("Lbl", "", 12)
+        pdf.text(10, 15, "No labels in this batch.")
     for index, item in enumerate(items):
         slot = index % per_page
         if index and slot == 0:
-            canvas.showPage()
-        col = slot % cols
-        page_row = slot // cols
-        x = col * label_w
-        y_top = page_h - page_row * label_h
+            pdf.add_page()
+        x = (slot % cols) * label_w
+        y = (slot // cols) * label_h
 
-        canvas.setStrokeColorRGB(0.65, 0.65, 0.65)
-        canvas.setFillColorRGB(0, 0, 0)
-        canvas.rect(x + 2, y_top - label_h + 2, label_w - 4, label_h - 4)
+        pdf.set_draw_color(165, 165, 165)
+        pdf.set_text_color(0, 0, 0)
+        pdf.rect(x + 1, y + 1, label_w - 2, label_h - 2)
 
-        y = y_top - 11
-        canvas.setFont("Helvetica-Bold", 9)
+        inner_w = label_w - 6
+        pdf.set_xy(x + 3, y + 3)
+        pdf.set_font("Lbl", "B", 9)
         name = names.get((item.recipient_type, item.recipient_id), item.recipient_type.title())
-        canvas.drawString(x + 6, y, name[:42])
-        y -= 11
-        canvas.setFont("Helvetica", 8)
-        for line in wrap(canvas, item.label_address, "Helvetica", 8, label_w - 14)[:6]:
-            canvas.drawString(x + 6, y, line[:48])
-            y -= 9.5
+        pdf.multi_cell(inner_w, 4, name, max_line_height=4)
+        kn = names_kn.get(item.recipient_id) if item.recipient_type == "MEMBER" else None
+        if kn:
+            pdf.set_x(x + 3)
+            pdf.multi_cell(inner_w, 4, kn, max_line_height=4)
+        pdf.set_font("Lbl", "", 8)
+        pdf.set_x(x + 3)
+        # keep the address inside the label box
+        remaining = (y + label_h - 8) - pdf.get_y()
+        max_lines = max(int(remaining // 3.6), 1)
+        text = item.label_address or ""
+        wrapped = pdf.multi_cell(inner_w, 3.6, text, dry_run=True, output="LINES")
+        pdf.multi_cell(inner_w, 3.6, chr(10).join(wrapped[:max_lines]))
         if item.is_return:
-            canvas.setFillColorRGB(0.75, 0, 0)
-            canvas.setFont("Helvetica-Bold", 8)
-            canvas.drawString(x + 6, y_top - label_h + 7, "RETURNED ISSUE")
-            canvas.setFillColorRGB(0, 0, 0)
+            pdf.set_text_color(190, 0, 0)
+            pdf.set_font("Lbl", "B", 8)
+            pdf.text(x + 3, y + label_h - 3, "RETURNED ISSUE")
+            pdf.set_text_color(0, 0, 0)
 
-    canvas.save()
+    pdf_bytes = bytes(pdf.output())
 
     folder = os.path.join(settings.UPLOAD_DIR, "label_batches")
     os.makedirs(folder, exist_ok=True)
     filename = f"labels_{batch.id}_{batch.issue_month_year}.pdf"
     filepath = os.path.join(folder, filename)
     with open(filepath, "wb") as fh:
-        fh.write(buffer.getvalue())
+        fh.write(pdf_bytes)
     batch.file_path = filepath
     batch.updated_by = current_user.id
     db.commit()

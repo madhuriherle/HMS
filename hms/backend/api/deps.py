@@ -46,6 +46,39 @@ def get_current_active_superuser(current_user: User = Depends(get_current_user))
         raise HTTPException(status_code=403, detail="Not enough privileges")
     return current_user
 
+def permission_requires_approval(db: Session, user: User, permission_code: str) -> bool:
+    """True if the user must go through approval to exercise this permission.
+
+    A permission is held via one or more role grants (role_permissions rows),
+    each independently flagged requires_approval. If ANY grant the user holds
+    for this code is un-gated (requires_approval=False), they can act
+    directly — the most permissive grant wins. Only when every grant they
+    hold is flagged does the action need to be filed for approval instead.
+
+    Assumes the caller already confirmed the user holds the permission at
+    all (e.g. via require_permission) — a user with no grant at all gets
+    False here (nothing to gate), and SUPERADMIN always bypasses.
+    """
+    if user.user_type == "SUPERADMIN":
+        return False
+    from models.users import Permission, RolePermission, UserRole
+    grants = (
+        db.query(RolePermission.requires_approval)
+        .join(Permission, Permission.id == RolePermission.permission_id)
+        .join(UserRole, UserRole.role_id == RolePermission.role_id)
+        .filter(
+            Permission.code == permission_code,
+            UserRole.user_id == user.id,
+            UserRole.is_deleted == False,
+            RolePermission.is_deleted == False,
+        )
+        .all()
+    )
+    if not grants:
+        return False
+    return all(gated for (gated,) in grants)
+
+
 def require_permission(permission_code: str):
     """Dependency factory to check if user has a specific permission.
 

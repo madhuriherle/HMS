@@ -1,7 +1,8 @@
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from api import deps
@@ -12,7 +13,9 @@ from models.masters import (
 )
 from core.pagination import paginate
 from schemas import masters as schemas_masters
+from schemas.common import PendingApproval
 from crud import masters as crud_masters
+from services import approval_gate
 
 router = APIRouter()
 
@@ -66,11 +69,12 @@ def read_state(
     return obj
 
 
-@router.post("/states", response_model=schemas_masters.State)
+@router.post("/states", response_model=Union[schemas_masters.State, PendingApproval])
+@approval_gate.gated("masters", "CREATE", "State", "masters.create")
 def create_state(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.create")),
     state_in: schemas_masters.StateCreate,
 ) -> Any:
     dup = db.query(State).filter(
@@ -81,11 +85,12 @@ def create_state(
     return crud_masters.state.create(db=db, obj_in=state_in, created_by=current_user.id)
 
 
-@router.put("/states/{id}", response_model=schemas_masters.State)
+@router.put("/states/{id}", response_model=Union[schemas_masters.State, PendingApproval])
+@approval_gate.gated("masters", "UPDATE", "State", "masters.update")
 def update_state(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.update")),
     id: int,
     state_in: schemas_masters.StateUpdate,
 ) -> Any:
@@ -102,11 +107,12 @@ def update_state(
     return crud_masters.state.update(db, db_obj=obj, obj_in=state_in, updated_by=current_user.id)
 
 
-@router.delete("/states/{id}", response_model=schemas_masters.State)
+@router.delete("/states/{id}", response_model=Union[schemas_masters.State, PendingApproval])
+@approval_gate.gated("masters", "DELETE", "State", "masters.delete")
 def delete_state(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
 ) -> Any:
     obj = crud_masters.state.get(db, id)
@@ -148,11 +154,12 @@ def read_district(
     return obj
 
 
-@router.post("/districts", response_model=schemas_masters.District)
+@router.post("/districts", response_model=Union[schemas_masters.District, PendingApproval])
+@approval_gate.gated("masters", "CREATE", "District", "masters.create")
 def create_district(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.create")),
     district_in: schemas_masters.DistrictCreate,
 ) -> Any:
     _ensure_state(db, district_in.state_id)
@@ -166,11 +173,12 @@ def create_district(
     return crud_masters.district.create(db=db, obj_in=district_in, created_by=current_user.id)
 
 
-@router.put("/districts/{id}", response_model=schemas_masters.District)
+@router.put("/districts/{id}", response_model=Union[schemas_masters.District, PendingApproval])
+@approval_gate.gated("masters", "UPDATE", "District", "masters.update")
 def update_district(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.update")),
     id: int,
     district_in: schemas_masters.DistrictUpdate,
 ) -> Any:
@@ -193,11 +201,12 @@ def update_district(
     return crud_masters.district.update(db, db_obj=obj, obj_in=district_in, updated_by=current_user.id)
 
 
-@router.delete("/districts/{id}", response_model=schemas_masters.District)
+@router.delete("/districts/{id}", response_model=Union[schemas_masters.District, PendingApproval])
+@approval_gate.gated("masters", "DELETE", "District", "masters.delete")
 def delete_district(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
 ) -> Any:
     obj = crud_masters.district.get(db, id)
@@ -241,11 +250,12 @@ def read_taluk(
     return obj
 
 
-@router.post("/taluks", response_model=schemas_masters.Taluk)
+@router.post("/taluks", response_model=Union[schemas_masters.Taluk, PendingApproval])
+@approval_gate.gated("masters", "CREATE", "Taluk", "masters.create")
 def create_taluk(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.create")),
     taluk_in: schemas_masters.TalukCreate,
 ) -> Any:
     _ensure_district(db, taluk_in.district_id)
@@ -259,11 +269,12 @@ def create_taluk(
     return crud_masters.taluk.create(db=db, obj_in=taluk_in, created_by=current_user.id)
 
 
-@router.put("/taluks/{id}", response_model=schemas_masters.Taluk)
+@router.put("/taluks/{id}", response_model=Union[schemas_masters.Taluk, PendingApproval])
+@approval_gate.gated("masters", "UPDATE", "Taluk", "masters.update")
 def update_taluk(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.update")),
     id: int,
     taluk_in: schemas_masters.TalukUpdate,
 ) -> Any:
@@ -286,11 +297,12 @@ def update_taluk(
     return crud_masters.taluk.update(db, db_obj=obj, obj_in=taluk_in, updated_by=current_user.id)
 
 
-@router.delete("/taluks/{id}", response_model=schemas_masters.Taluk)
+@router.delete("/taluks/{id}", response_model=Union[schemas_masters.Taluk, PendingApproval])
+@approval_gate.gated("masters", "DELETE", "Taluk", "masters.delete")
 def delete_taluk(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
 ) -> Any:
     obj = crud_masters.taluk.get(db, id)
@@ -354,11 +366,12 @@ def read_postal_code(
     return obj
 
 
-@router.post("/postal-codes", response_model=schemas_masters.PostalCode)
+@router.post("/postal-codes", response_model=Union[schemas_masters.PostalCode, PendingApproval])
+@approval_gate.gated("masters", "CREATE", "PostalCode", "masters.create")
 def create_postal_code(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.create")),
     pc_in: schemas_masters.PostalCodeCreate,
 ) -> Any:
     _ensure_state(db, pc_in.state_id)
@@ -371,11 +384,12 @@ def create_postal_code(
     return crud_masters.postal_code.create(db=db, obj_in=pc_in, created_by=current_user.id)
 
 
-@router.put("/postal-codes/{id}", response_model=schemas_masters.PostalCode)
+@router.put("/postal-codes/{id}", response_model=Union[schemas_masters.PostalCode, PendingApproval])
+@approval_gate.gated("masters", "UPDATE", "PostalCode", "masters.update")
 def update_postal_code(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.update")),
     id: int,
     pc_in: schemas_masters.PostalCodeUpdate,
 ) -> Any:
@@ -399,11 +413,12 @@ def update_postal_code(
     return crud_masters.postal_code.update(db, db_obj=obj, obj_in=pc_in, updated_by=current_user.id)
 
 
-@router.delete("/postal-codes/{id}", response_model=schemas_masters.PostalCode)
+@router.delete("/postal-codes/{id}", response_model=Union[schemas_masters.PostalCode, PendingApproval])
+@approval_gate.gated("masters", "DELETE", "PostalCode", "masters.delete")
 def delete_postal_code(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
 ) -> Any:
     obj = crud_masters.postal_code.get(db, id)
@@ -471,11 +486,12 @@ def read_membership_type(
     return _serialize_type_with_price(db, obj)
 
 
-@router.post("/membership-types", response_model=schemas_masters.MembershipTypeWithPrice)
+@router.post("/membership-types", response_model=Union[schemas_masters.MembershipTypeWithPrice, PendingApproval])
+@approval_gate.gated("masters", "CREATE", "MembershipTypeWithPrice", "masters.create")
 def create_membership_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.create")),
     mt_in: schemas_masters.MembershipTypeCreate,
 ) -> Any:
     dup = db.query(MembershipType).filter(
@@ -487,11 +503,12 @@ def create_membership_type(
     return _serialize_type_with_price(db, obj)
 
 
-@router.put("/membership-types/{id}", response_model=schemas_masters.MembershipTypeWithPrice)
+@router.put("/membership-types/{id}", response_model=Union[schemas_masters.MembershipTypeWithPrice, PendingApproval])
+@approval_gate.gated("masters", "UPDATE", "MembershipTypeWithPrice", "masters.update")
 def update_membership_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.update")),
     id: int,
     mt_in: schemas_masters.MembershipTypeUpdate,
 ) -> Any:
@@ -511,11 +528,12 @@ def update_membership_type(
     return _serialize_type_with_price(db, obj)
 
 
-@router.delete("/membership-types/{id}", response_model=schemas_masters.MembershipTypeWithPrice)
+@router.delete("/membership-types/{id}", response_model=Union[schemas_masters.MembershipTypeWithPrice, PendingApproval])
+@approval_gate.gated("masters", "DELETE", "MembershipTypeWithPrice", "masters.delete")
 def delete_membership_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
 ) -> Any:
     from models.members import MemberMembership
@@ -553,11 +571,12 @@ def read_membership_type_prices(
     return paginate(q, page, limit)
 
 
-@router.post("/membership-types/{id}/prices", response_model=schemas_masters.MembershipTypePrice)
+@router.post("/membership-types/{id}/prices", response_model=Union[schemas_masters.MembershipTypePrice, PendingApproval])
+@approval_gate.gated("masters", "CREATE", "MembershipTypePrice", "masters.create")
 def create_membership_type_price(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.create")),
     id: int,
     price_in: schemas_masters.MembershipTypePriceCreate,
 ) -> Any:
@@ -652,11 +671,12 @@ def read_membership_type_current_price(
     return price
 
 
-@router.put("/membership-types/{id}/prices/{price_id}", response_model=schemas_masters.MembershipTypePrice)
+@router.put("/membership-types/{id}/prices/{price_id}", response_model=Union[schemas_masters.MembershipTypePrice, PendingApproval])
+@approval_gate.gated("masters", "UPDATE", "MembershipTypePrice", "masters.update")
 def update_membership_type_price(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.update")),
     id: int,
     price_id: int,
     price_in: schemas_masters.MembershipTypePriceUpdate,
@@ -691,11 +711,12 @@ def read_document_types(
     )
 
 
-@router.post("/document-types", response_model=schemas_masters.DocumentType)
+@router.post("/document-types", response_model=Union[schemas_masters.DocumentType, PendingApproval])
+@approval_gate.gated("masters", "CREATE", "DocumentType", "masters.create")
 def create_document_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.create")),
     dt_in: schemas_masters.DocumentTypeCreate,
 ) -> Any:
     dup = db.query(DocumentType).filter(
@@ -706,11 +727,12 @@ def create_document_type(
     return crud_masters.document_type.create(db=db, obj_in=dt_in, created_by=current_user.id)
 
 
-@router.put("/document-types/{id}", response_model=schemas_masters.DocumentType)
+@router.put("/document-types/{id}", response_model=Union[schemas_masters.DocumentType, PendingApproval])
+@approval_gate.gated("masters", "UPDATE", "DocumentType", "masters.update")
 def update_document_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.update")),
     id: int,
     dt_in: schemas_masters.DocumentTypeUpdate,
 ) -> Any:
@@ -720,11 +742,12 @@ def update_document_type(
     return crud_masters.document_type.update(db, db_obj=obj, obj_in=dt_in, updated_by=current_user.id)
 
 
-@router.delete("/document-types/{id}", response_model=schemas_masters.DocumentType)
+@router.delete("/document-types/{id}", response_model=Union[schemas_masters.DocumentType, PendingApproval])
+@approval_gate.gated("masters", "DELETE", "DocumentType", "masters.delete")
 def delete_document_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
 ) -> Any:
     from models.members import MemberDocument
@@ -767,11 +790,12 @@ def read_service_type(
     return obj
 
 
-@router.post("/service-types", response_model=schemas_masters.ServiceType)
+@router.post("/service-types", response_model=Union[schemas_masters.ServiceType, PendingApproval])
+@approval_gate.gated("masters", "CREATE", "ServiceType", "masters.create")
 def create_service_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.create")),
     st_in: schemas_masters.ServiceTypeCreate,
 ) -> Any:
     dup = db.query(ServiceType).filter(
@@ -782,11 +806,12 @@ def create_service_type(
     return crud_masters.service_type.create(db=db, obj_in=st_in, created_by=current_user.id)
 
 
-@router.put("/service-types/{id}", response_model=schemas_masters.ServiceType)
+@router.put("/service-types/{id}", response_model=Union[schemas_masters.ServiceType, PendingApproval])
+@approval_gate.gated("masters", "UPDATE", "ServiceType", "masters.update")
 def update_service_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.update")),
     id: int,
     st_in: schemas_masters.ServiceTypeUpdate,
 ) -> Any:
@@ -796,14 +821,271 @@ def update_service_type(
     return crud_masters.service_type.update(db, db_obj=obj, obj_in=st_in, updated_by=current_user.id)
 
 
-@router.delete("/service-types/{id}", response_model=schemas_masters.ServiceType)
+@router.delete("/service-types/{id}", response_model=Union[schemas_masters.ServiceType, PendingApproval])
+@approval_gate.gated("masters", "DELETE", "ServiceType", "masters.delete")
 def delete_service_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.write")),
+    current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
 ) -> Any:
     obj = crud_masters.service_type.get(db, id)
     if not obj:
         raise HTTPException(404, "Service type not found")
+    # In-use guard: a service_type with live member opt-ins must not be
+    # deleted, or the profile's service list would silently lose entries.
+    from models.members import MemberServiceOptin
+    in_use = db.query(MemberServiceOptin).filter(
+        MemberServiceOptin.service_type_id == id,
+        MemberServiceOptin.is_deleted == False,  # noqa: E712
+    ).first()
+    if in_use:
+        raise HTTPException(
+            409,
+            f"Service type '{obj.code}' is in use by member {in_use.member_id} "
+            f"(opt-in id={in_use.id})",
+        )
     return crud_masters.service_type.remove(db, id=id, deleted_by=current_user.id)
+
+
+from crud.base import CRUDBase
+from services.personal_masters import PERSONAL_MASTERS as _PERSONAL_MASTERS, PersonalMasterSpec as _PersonalMasterSpec
+
+
+def _personal_master_crud(spec: _PersonalMasterSpec) -> CRUDBase:
+    return getattr(crud_masters, spec.crud_attr)
+
+
+def _dup_check(db: Session, spec: _PersonalMasterSpec, name_en: str, exclude_id: Optional[int] = None):
+    q = db.query(spec.model).filter(
+        spec.model.name_en == name_en,
+        spec.model.is_deleted == False,  # noqa: E712
+    )
+    if exclude_id is not None:
+        q = q.filter(spec.model.id != exclude_id)
+    if q.first():
+        raise HTTPException(409, f"{spec.label} '{name_en}' already exists")
+
+
+@router.get("/personal-masters")
+def read_personal_masters_overview(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """One-shot list of every personal master with its row count — handy for
+    building the profile form's dropdowns in a single request."""
+    overview = {}
+    for spec in _PERSONAL_MASTERS:
+        overview[spec.route_prefix.replace("-", "_")] = {
+            "label": spec.label,
+            "count": db.query(spec.model).filter(spec.model.is_deleted == False).count(),  # noqa: E712
+        }
+    return overview
+
+
+for _spec in _PERSONAL_MASTERS:
+    _crud = _personal_master_crud(_spec)
+    _resp = schemas_masters.NativePlace if _spec.uses_district else schemas_masters.PersonalMaster
+
+    def _make_list(_spec=_spec):
+        def read_personal_master(
+            db: Session = Depends(deps.get_db),
+            current_user: User = Depends(deps.get_current_user),
+            district_id: Optional[int] = None,
+            search: Optional[str] = None,
+            status: Optional[bool] = None,
+            page: int = 1,
+            limit: int = 100,
+        ) -> Any:
+            q = db.query(_spec.model).filter(_spec.model.is_deleted == False)  # noqa: E712
+            if _spec.uses_district and district_id:
+                q = q.filter(_spec.model.district_id == district_id)
+            if search:
+                q = q.filter(_spec.model.name_en.ilike(f"%{search}%"))
+            if status is not None:
+                q = q.filter(_spec.model.status == status)
+            return paginate(q, page, limit)
+
+        read_personal_master.__name__ = f"read_{_spec.route_prefix.replace('-', '_')}"
+        return read_personal_master
+
+    router.get(f"/{_spec.route_prefix}")( _make_list())
+
+    def _make_get(_spec=_spec, _crud=_crud):
+        def read_personal_master_item(
+            *,
+            db: Session = Depends(deps.get_db),
+            current_user: User = Depends(deps.get_current_user),
+            id: int,
+        ) -> Any:
+            obj = _crud.get(db, id)
+            if not obj:
+                raise HTTPException(404, f"{_spec.label} not found")
+            return obj
+
+        read_personal_master_item.__name__ = f"read_{_spec.route_prefix.replace('-', '_')}_item"
+        return read_personal_master_item
+
+    router.get(f"/{_spec.route_prefix}/{{id}}", response_model=_resp)(_make_get())
+
+    def _make_create(_spec=_spec, _crud=_crud):
+        def create_personal_master(
+            *,
+            db: Session = Depends(deps.get_db),
+            current_user: User = Depends(deps.require_permission("masters.create")),
+            obj_in: schemas_masters.NativePlaceCreate if _spec.uses_district else schemas_masters.PersonalMasterCreate,
+        ) -> Any:
+            _dup_check(db, _spec, obj_in.name_en)
+            if _spec.uses_district and obj_in.district_id:
+                _ensure_district(db, obj_in.district_id)
+            return _crud.create(db=db, obj_in=obj_in, created_by=current_user.id)
+
+        create_personal_master.__name__ = f"create_{_spec.route_prefix.replace('-', '_')}"
+        return approval_gate.gated("masters", "CREATE", _spec.label, "masters.create")(create_personal_master)
+
+    router.post(f"/{_spec.route_prefix}", response_model=Union[_resp, PendingApproval], status_code=201)(_make_create())
+
+    def _make_update(_spec=_spec, _crud=_crud):
+        def update_personal_master(
+            *,
+            db: Session = Depends(deps.get_db),
+            current_user: User = Depends(deps.require_permission("masters.update")),
+            id: int,
+            obj_in: schemas_masters.NativePlaceUpdate if _spec.uses_district else schemas_masters.PersonalMasterUpdate,
+        ) -> Any:
+            obj = _crud.get(db, id)
+            if not obj:
+                raise HTTPException(404, f"{_spec.label} not found")
+            data = obj_in.model_dump(exclude_unset=True)
+            if "name_en" in data and data["name_en"] != obj.name_en:
+                _dup_check(db, _spec, data["name_en"], exclude_id=id)
+            if _spec.uses_district and data.get("district_id"):
+                _ensure_district(db, data["district_id"])
+            return _crud.update(db, db_obj=obj, obj_in=obj_in, updated_by=current_user.id)
+
+        update_personal_master.__name__ = f"update_{_spec.route_prefix.replace('-', '_')}"
+        return approval_gate.gated("masters", "UPDATE", _spec.label, "masters.update")(update_personal_master)
+
+    router.put(f"/{_spec.route_prefix}/{{id}}", response_model=Union[_resp, PendingApproval])(_make_update())
+
+    def _make_delete(_spec=_spec, _crud=_crud):
+        def delete_personal_master(
+            *,
+            db: Session = Depends(deps.get_db),
+            current_user: User = Depends(deps.require_permission("masters.delete")),
+            id: int,
+        ) -> Any:
+            obj = _crud.get(db, id)
+            if not obj:
+                raise HTTPException(404, f"{_spec.label} not found")
+            # Block deletion while members reference this master.
+            fk_name = _spec.member_field
+            if fk_name:
+                from models.members import Member
+                col = getattr(Member, fk_name)
+                if db.query(Member).filter(
+                    col == id, Member.is_deleted == False  # noqa: E712
+                ).first():
+                    raise HTTPException(409, f"{_spec.label} is assigned to members and cannot be deleted")
+            return _crud.remove(db, id=id, deleted_by=current_user.id)
+
+        delete_personal_master.__name__ = f"delete_{_spec.route_prefix.replace('-', '_')}"
+        return approval_gate.gated("masters", "DELETE", _spec.label, "masters.delete")(delete_personal_master)
+
+    router.delete(f"/{_spec.route_prefix}/{{id}}", response_model=Union[_resp, PendingApproval])(_make_delete())
+
+
+
+# ─────────────── DELETION REASONS (Mangalya parity: delete_reason) ────────────────
+@router.get("/deletion-reasons")
+def read_deletion_reasons(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    applies_to: Optional[str] = None,
+    status: Optional[bool] = None,
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 100,
+) -> Any:
+    """Deletion-reason master. ``applies_to=SOFT|PERMANENT`` narrows to reasons
+    flagged for that deletion type (reasons without a flag always match)."""
+    from models.masters import DeletionReason
+    q = db.query(DeletionReason).filter(DeletionReason.is_deleted == False)  # noqa: E712
+    if applies_to:
+        if applies_to not in ("SOFT", "PERMANENT"):
+            raise HTTPException(400, "applies_to must be SOFT or PERMANENT")
+        q = q.filter(or_(DeletionReason.applies_to == applies_to, DeletionReason.applies_to.is_(None)))
+    if status is not None:
+        q = q.filter(DeletionReason.status == status)
+    if search:
+        q = q.filter(DeletionReason.name_en.ilike(f"%{search}%"))
+    return paginate(q.order_by(DeletionReason.id), page, limit)
+
+
+@router.post("/deletion-reasons", response_model=Union[schemas_masters.DeletionReason, PendingApproval], status_code=201)
+@approval_gate.gated("masters", "CREATE", "DeletionReason", "masters.create")
+def create_deletion_reason(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("masters.create")),
+    obj_in: schemas_masters.DeletionReasonCreate,
+) -> Any:
+    from models.masters import DeletionReason
+    if obj_in.applies_to and obj_in.applies_to not in ("SOFT", "PERMANENT"):
+        raise HTTPException(422, "applies_to must be SOFT or PERMANENT")
+    dup = db.query(DeletionReason).filter(
+        DeletionReason.name_en == obj_in.name_en,
+        DeletionReason.is_deleted == False,  # noqa: E712
+    ).first()
+    if dup:
+        raise HTTPException(409, f"Deletion reason '{obj_in.name_en}' already exists")
+    return crud_masters.deletion_reason.create(db=db, obj_in=obj_in, created_by=current_user.id)
+
+
+@router.put("/deletion-reasons/{id}", response_model=Union[schemas_masters.DeletionReason, PendingApproval])
+@approval_gate.gated("masters", "UPDATE", "DeletionReason", "masters.update")
+def update_deletion_reason(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("masters.update")),
+    id: int,
+    obj_in: schemas_masters.DeletionReasonUpdate,
+) -> Any:
+    from models.masters import DeletionReason
+    obj = crud_masters.deletion_reason.get(db, id)
+    if not obj:
+        raise HTTPException(404, "Deletion reason not found")
+    data = obj_in.model_dump(exclude_unset=True)
+    if data.get("applies_to") and data["applies_to"] not in ("SOFT", "PERMANENT"):
+        raise HTTPException(422, "applies_to must be SOFT or PERMANENT")
+    if "name_en" in data and data["name_en"] != obj.name_en:
+        dup = db.query(DeletionReason).filter(
+            DeletionReason.name_en == data["name_en"],
+            DeletionReason.is_deleted == False,  # noqa: E712
+            DeletionReason.id != id,
+        ).first()
+        if dup:
+            raise HTTPException(409, f"Deletion reason '{data['name_en']}' already exists")
+    return crud_masters.deletion_reason.update(db, db_obj=obj, obj_in=obj_in, updated_by=current_user.id)
+
+
+@router.delete("/deletion-reasons/{id}", response_model=Union[schemas_masters.DeletionReason, PendingApproval])
+@approval_gate.gated("masters", "DELETE", "DeletionReason", "masters.delete")
+def delete_deletion_reason(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("masters.delete")),
+    id: int,
+) -> Any:
+    from models.members import MemberDeletionRequest
+    from models.masters import DeletionReason
+    obj = crud_masters.deletion_reason.get(db, id)
+    if not obj:
+        raise HTTPException(404, "Deletion reason not found")
+    in_use = db.query(MemberDeletionRequest).filter(
+        MemberDeletionRequest.reason_id == id,
+        MemberDeletionRequest.is_deleted == False,  # noqa: E712
+    ).first()
+    if in_use:
+        raise HTTPException(409, "Deletion reason is used by deletion requests and cannot be deleted")
+    return crud_masters.deletion_reason.remove(db, id=id, deleted_by=current_user.id)

@@ -1,15 +1,19 @@
-from typing import Any, Optional
+from typing import Any, Optional, Union
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from api import deps
 from models.users import User
 from models.members import Member
 from schemas import events as schemas_events
+from schemas.common import PendingApproval
 from crud import events as crud_events
 from core.pagination import paginate
 from services.file_upload import save_upload
 from services.whatsapp import whatsapp_service
 from services.template_renderer import render
+from services import approval_gate
 from models.events import Event, EventParticipant, EventAttachment, EventMemberLink
 
 router = APIRouter()
@@ -30,11 +34,18 @@ def read_events(
     current_user: User = Depends(deps.get_current_user),
     page: int = 1, limit: int = 20,
     upcoming_only: bool = False,
+    search: Optional[str] = None,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
 ) -> Any:
     q = db.query(Event).filter(Event.is_deleted == False)
     if upcoming_only:
-        from datetime import date
         q = q.filter(Event.event_date >= date.today())
+    if search:
+        like = f"%{search}%"
+        q = q.filter(or_(Event.title.ilike(like), Event.location.ilike(like)))
+    if from_date: q = q.filter(Event.event_date >= from_date)
+    if to_date: q = q.filter(Event.event_date <= to_date)
     return paginate(q.order_by(Event.event_date.desc()), page, limit)
 
 
@@ -61,8 +72,9 @@ def read_upcoming_events(
     ]}
 
 
-@router.post("/", response_model=schemas_events.Event)
-def create_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.write")), event_in: schemas_events.EventCreate) -> Any:
+@router.post("/", response_model=Union[schemas_events.Event, PendingApproval])
+@approval_gate.gated("events", "CREATE", "Event", "events.create")
+def create_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.create")), event_in: schemas_events.EventCreate) -> Any:
     return crud_events.event.create(db=db, obj_in=event_in, created_by=current_user.id)
 
 
@@ -146,25 +158,28 @@ def read_event_detail(
     }
 
 
-@router.put("/{id}", response_model=schemas_events.Event)
-def update_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.write")), id: int, event_in: schemas_events.EventUpdate) -> Any:
+@router.put("/{id}", response_model=Union[schemas_events.Event, PendingApproval])
+@approval_gate.gated("events", "UPDATE", "Event", "events.update")
+def update_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.update")), id: int, event_in: schemas_events.EventUpdate) -> Any:
     obj = crud_events.event.get(db, id)
     if not obj: raise HTTPException(404, "Event not found")
     return crud_events.event.update(db, db_obj=obj, obj_in=event_in, updated_by=current_user.id)
 
 
-@router.delete("/{id}", response_model=schemas_events.Event)
-def delete_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.write")), id: int) -> Any:
+@router.delete("/{id}", response_model=Union[schemas_events.Event, PendingApproval])
+@approval_gate.gated("events", "DELETE", "Event", "events.delete")
+def delete_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.delete")), id: int) -> Any:
     return crud_events.event.remove(db, id=id, deleted_by=current_user.id)
 
 
 # ─────────────── invitation copy upload ───────────────
 
 @router.post("/{id}/invitation")
+# Not @approval_gate.gated: UploadFile bytes can't be captured/replayed.
 async def upload_invitation(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("events.write")),
+    current_user: User = Depends(deps.require_permission("events.create")),
     id: int,
     file: UploadFile = File(...),
 ) -> Any:
@@ -192,9 +207,10 @@ async def upload_invitation(
 
 
 @router.post("/{event_id}/attachment")
+# Not @approval_gate.gated: UploadFile bytes can't be captured/replayed.
 async def upload_event_attachment(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("events.write")),
+    current_user: User = Depends(deps.require_permission("events.create")),
     event_id: int, file: UploadFile = File(...)
 ) -> Any:
     """Additional event documents (agenda, photos, …)."""
@@ -257,11 +273,12 @@ def read_participants(
     }
 
 
-@router.post("/{event_id}/participants", response_model=schemas_events.EventParticipant, status_code=201)
+@router.post("/{event_id}/participants", response_model=Union[schemas_events.EventParticipant, PendingApproval], status_code=201)
+@approval_gate.gated("events", "CREATE", "EventParticipant", "events.create", id_param="event_id")
 def add_participant(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("events.write")),
+    current_user: User = Depends(deps.require_permission("events.create")),
     event_id: int,
     participant_in: schemas_events.EventParticipantCreate,
 ) -> Any:
@@ -290,11 +307,12 @@ def add_participant(
     return p
 
 
-@router.put("/{event_id}/participants/{participant_id}", response_model=schemas_events.EventParticipant)
+@router.put("/{event_id}/participants/{participant_id}", response_model=Union[schemas_events.EventParticipant, PendingApproval])
+@approval_gate.gated("events", "UPDATE", "EventParticipant", "events.update", id_param="participant_id")
 def update_participant(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("events.write")),
+    current_user: User = Depends(deps.require_permission("events.update")),
     event_id: int,
     participant_id: int,
     participant_in: schemas_events.EventParticipantUpdate,
@@ -326,11 +344,12 @@ def update_participant(
     return p
 
 
-@router.delete("/{event_id}/participants/{participant_id}", response_model=schemas_events.EventParticipant)
+@router.delete("/{event_id}/participants/{participant_id}", response_model=Union[schemas_events.EventParticipant, PendingApproval])
+@approval_gate.gated("events", "DELETE", "EventParticipant", "events.delete", id_param="participant_id")
 def remove_participant(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("events.write")),
+    current_user: User = Depends(deps.require_permission("events.delete")),
     event_id: int,
     participant_id: int,
 ) -> Any:
@@ -349,10 +368,11 @@ def remove_participant(
 
 
 @router.post("/{event_id}/links")
+@approval_gate.gated("events", "CREATE", "EventMemberLink", "events.create", id_param="event_id")
 def link_member(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("events.write")),
+    current_user: User = Depends(deps.require_permission("events.create")),
     event_id: int,
     member_id: int,
     role: Optional[str] = None,
@@ -385,10 +405,11 @@ def link_member(
 # ─────────────── event notifications ───────────────
 
 @router.post("/{event_id}/notify")
+# Not @approval_gate.gated: takes a BackgroundTasks param.
 async def notify_event_members(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.write")),
+    current_user: User = Depends(deps.require_permission("notifications.create")),
     event_id: int,
     background_tasks: BackgroundTasks,
     template_id: Optional[int] = None,

@@ -46,6 +46,7 @@ from models.members import (
     MemberMembership,
     MemberProfileChangeRequest,
     MemberProfileHistory,
+    MemberServiceOptin,
     MembershipTypeChangeRequest,
     MembershipTypeHistory,
 )

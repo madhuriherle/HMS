@@ -43,7 +43,8 @@ class CRUDReceipt(CRUDBase[Receipt, ReceiptCreate, ReceiptUpdate]):
                 alloc_data = alloc.model_dump()
             db.add(ReceiptAllocation(
                 receipt_id=db_obj.id,
-                member_id=alloc_data["member_id"],
+                member_id=alloc_data.get("member_id"),
+                associate_id=alloc_data.get("associate_id"),
                 membership_id=alloc_data.get("membership_id"),
                 allocated_amount=alloc_data["allocated_amount"],
                 created_by=created_by,

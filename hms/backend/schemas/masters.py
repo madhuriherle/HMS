@@ -245,3 +245,60 @@ class HmsSetting(HmsSettingBase):
     id: int
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+# ─── Mangalya-parity personal masters (gotra, nakshatra, …) ───
+
+class PersonalMasterBase(BaseModel):
+    name_en: str
+    name_kn: Optional[str] = None
+    status: bool = True
+
+class PersonalMasterCreate(PersonalMasterBase):
+    pass
+
+class PersonalMasterUpdate(BaseModel):
+    name_en: Optional[str] = None
+    name_kn: Optional[str] = None
+    status: Optional[bool] = None
+
+class PersonalMaster(PersonalMasterBase):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NativePlaceCreate(PersonalMasterBase):
+    district_id: Optional[int] = None
+
+class NativePlaceUpdate(PersonalMasterUpdate):
+    district_id: Optional[int] = None
+
+class NativePlace(PersonalMaster):
+    district_id: Optional[int] = None
+
+
+# ─── Deletion reason master (Mangalya parity: delete_reason) ───
+
+class DeletionReasonBase(BaseModel):
+    name_en: str
+    name_kn: Optional[str] = None
+    applies_to: Optional[str] = None  # SOFT | PERMANENT | None (= both)
+    status: bool = True
+
+
+class DeletionReasonCreate(DeletionReasonBase):
+    pass
+
+
+class DeletionReasonUpdate(BaseModel):
+    name_en: Optional[str] = None
+    name_kn: Optional[str] = None
+    applies_to: Optional[str] = None
+    status: Optional[bool] = None
+
+
+class DeletionReason(DeletionReasonBase):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)

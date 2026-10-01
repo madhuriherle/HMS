@@ -1,8 +1,9 @@
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from api import deps
 from models.members import Member, MemberMembership
+from models.engagements import Associate
 from models.users import User
 from models.receipts import (
     PaymentTransaction,
@@ -12,15 +13,28 @@ from models.receipts import (
     RefundTransaction,
 )
 from schemas import receipts as schemas_receipts
+from schemas.common import PendingApproval
 from crud import receipts as crud_receipts
 from crud.receipts import allocated_total
 from core.pagination import paginate
 from services.sequences import generate_next_number
-from datetime import date
+from services import approval_gate
+from services.exports import render_export
+from datetime import date, datetime, timedelta, timezone
+from sqlalchemy import func, or_
+from models.masters import MembershipType
 
 router = APIRouter()
 
-VALID_RECEIPT_TYPES = {"MEMBERSHIP", "DONATION", "MAGAZINE", "EVENT", "OTHER"}
+VALID_RECEIPT_TYPES = {
+    "MEMBERSHIP",          # membership fee / renewal
+    "GENERAL_DONATION",    # unrestricted donation
+    "SCHOLARSHIP",         # scholarship fund contribution
+    "DONATION",            # (legacy alias of GENERAL_DONATION, still accepted)
+    "MAGAZINE",
+    "EVENT",
+    "OTHER",
+}
 VALID_PAYMENT_MODES = {"CASH", "CHEQUE", "UPI", "CARD", "NETBANKING", "OTHER"}
 
 
@@ -50,6 +64,19 @@ def _validate_membership(db: Session, member_id: int, membership_id: Optional[in
         raise HTTPException(
             400, f"membership_id {membership_id} does not belong to member {member_id}"
         )
+
+
+def _validate_payee(db: Session, member_id: Optional[int], associate_id: Optional[int]) -> None:
+    """Payee must exist; member beats associate if both are somehow given
+    (schema already refuses that pair)."""
+    if member_id is not None:
+        _get_member_or_404(db, member_id)
+    elif associate_id is not None:
+        associate = db.query(Associate).filter(
+            Associate.id == associate_id, Associate.is_deleted == False  # noqa: E712
+        ).first()
+        if not associate:
+            raise HTTPException(400, f"Associate {associate_id} not found")
 
 
 def _validate_allocation_amount(
@@ -93,15 +120,20 @@ def read_receipts(
     receipt_type: Optional[str] = None,
     source: Optional[str] = None,
     member_id: Optional[int] = None,
+    is_renewal: Optional[bool] = None,
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
+    search: Optional[str] = None,
 ) -> Any:
     """Receipt entries with filters; source=ONLINE|OFFLINE, member_id narrows
-    to receipts mapped to that member."""
+    to receipts mapped to that member. ``search`` matches payer name,
+    receipt number, transaction/cheque reference, or the linked payee's
+    name (member or associate)."""
     q = db.query(Receipt).filter(Receipt.is_deleted == False)
     if payment_status: q = q.filter(Receipt.payment_status == payment_status)
     if payment_mode: q = q.filter(Receipt.payment_mode == payment_mode)
     if receipt_type: q = q.filter(Receipt.receipt_type == receipt_type)
+    if is_renewal is not None: q = q.filter(Receipt.is_renewal == is_renewal)
     if source:
         if source not in ("ONLINE", "OFFLINE"):
             raise HTTPException(400, "source must be ONLINE or OFFLINE")
@@ -113,14 +145,40 @@ def read_receipts(
         ).distinct()
     if from_date: q = q.filter(Receipt.receipt_date >= from_date)
     if to_date: q = q.filter(Receipt.receipt_date <= to_date)
+    if search:
+        like = f"%{search}%"
+        payee_receipt_ids = (
+            db.query(ReceiptAllocation.receipt_id)
+            .outerjoin(Member, Member.id == ReceiptAllocation.member_id)
+            .outerjoin(Associate, Associate.id == ReceiptAllocation.associate_id)
+            .filter(
+                ReceiptAllocation.is_deleted == False,
+                or_(
+                    Member.first_name_en.ilike(like),
+                    Member.last_name_en.ilike(like),
+                    Member.full_name_kn.ilike(like),
+                    Member.member_code.ilike(like),
+                    Member.mobile.ilike(like),
+                    Associate.name.ilike(like),
+                ),
+            )
+        )
+        q = q.filter(or_(
+            Receipt.payer_name.ilike(like),
+            Receipt.receipt_number.ilike(like),
+            Receipt.transaction_reference.ilike(like),
+            Receipt.cheque_number.ilike(like),
+            Receipt.id.in_(payee_receipt_ids),
+        ))
     return paginate(q.order_by(Receipt.id.desc()), page, limit)
 
 
-@router.post("/", response_model=schemas_receipts.Receipt, status_code=201)
+@router.post("/", response_model=Union[schemas_receipts.Receipt, PendingApproval], status_code=201)
+@approval_gate.gated("receipts", "CREATE", "Receipt", "receipts.create")
 def create_receipt(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.write")),
+    current_user: User = Depends(deps.require_permission("receipts.create")),
     receipt_in: schemas_receipts.ReceiptCreate,
 ) -> Any:
     """Receipt entry for ONLINE (website/app) and OFFLINE (counter) registrations.
@@ -131,10 +189,10 @@ def create_receipt(
     _validate_enum(receipt_in.receipt_type, VALID_RECEIPT_TYPES, "receipt_type")
     _validate_enum(receipt_in.payment_mode, VALID_PAYMENT_MODES, "payment_mode")
 
-    # Pre-validate member mappings so the whole entry fails before anything is written.
+    # Pre-validate payee mappings so the whole entry fails before anything is written.
     inline_total = 0.0
     for alloc in receipt_in.allocations:
-        _get_member_or_404(db, alloc.member_id)
+        _validate_payee(db, alloc.member_id, alloc.associate_id)
         _validate_membership(db, alloc.member_id, alloc.membership_id)
         inline_total += alloc.allocated_amount
     if inline_total > receipt_in.net_amount + 0.01:
@@ -148,6 +206,337 @@ def create_receipt(
     return crud_receipts.receipt.create_with_items(
         db=db, obj_in=receipt_in, created_by=current_user.id, receipt_number=receipt_no
     )
+
+
+@router.get("/tracking")
+def read_receipt_tracking(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    page: int = 1, limit: int = 20,
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    payment_mode: Optional[str] = None,
+    receipt_type: Optional[str] = None,
+    is_renewal: Optional[bool] = None,
+    member_id: Optional[int] = None,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
+    search: Optional[str] = None,
+    export: Optional[str] = None,  # "csv" or "excel"
+) -> Any:
+    """Receipt register for the Receipt Tracking screen.
+
+    Use export=csv or export=excel to download the whole filtered register
+    (the Tracking screen's Export button); it renders every data row and
+    ignores page/limit.
+
+    Every row carries the linked profile (via allocations) — name, member id,
+    member_code, membership_number, mobile, approval_status and the
+    membership's expiry date — plus a per-payment-mode summary across the
+    whole (filtered) register, so the totals bar needs no extra request.
+    """
+    filters = [
+        Receipt.is_deleted == False,            # noqa: E712
+        Receipt.payment_status != "CANCELLED",  # cancelled money is not revenue
+    ]
+    if year:
+        filters.append(func.extract("year", Receipt.receipt_date) == year)
+    if month:
+        filters.append(func.extract("month", Receipt.receipt_date) == month)
+    if payment_mode: filters.append(Receipt.payment_mode == payment_mode)
+    if receipt_type: filters.append(Receipt.receipt_type == receipt_type)
+    if is_renewal is not None: filters.append(Receipt.is_renewal == is_renewal)
+    if member_id:
+        filters.append(
+            Receipt.id.in_(
+                db.query(ReceiptAllocation.receipt_id).filter(
+                    ReceiptAllocation.member_id == member_id,
+                    ReceiptAllocation.is_deleted == False,  # noqa: E712
+                )
+            )
+        )
+    if from_date: filters.append(Receipt.receipt_date >= from_date)
+    if to_date: filters.append(Receipt.receipt_date <= to_date)
+    if search:
+        like = f"%{search}%"
+        # Payee names live in members/associates via allocations, so search
+        # there first and match receipts by id — keeps this composable with
+        # the plain filter list above.
+        payee_receipt_ids = (
+            db.query(ReceiptAllocation.receipt_id)
+            .outerjoin(Member, Member.id == ReceiptAllocation.member_id)
+            .outerjoin(Associate, Associate.id == ReceiptAllocation.associate_id)
+            .filter(
+                ReceiptAllocation.is_deleted == False,
+                or_(
+                    Member.first_name_en.ilike(like),
+                    Member.last_name_en.ilike(like),
+                    Member.full_name_kn.ilike(like),
+                    Member.member_code.ilike(like),
+                    Member.mobile.ilike(like),
+                    Associate.name.ilike(like),
+                ),
+            )
+        )
+        filters.append(or_(
+            Receipt.payer_name.ilike(like),
+            Receipt.receipt_number.ilike(like),
+            Receipt.transaction_reference.ilike(like),
+            Receipt.cheque_number.ilike(like),
+            Receipt.id.in_(payee_receipt_ids),
+        ))
+
+    # Per-mode summary over the SAME filter set, before pagination narrows it.
+    mode_summary = dict(
+        db.query(Receipt.payment_mode, func.count())
+        .filter(*filters)
+        .group_by(Receipt.payment_mode)
+        .all()
+    )
+    total = db.query(func.count(Receipt.id)).filter(*filters).scalar()
+
+    rows = (
+        db.query(Receipt)
+        .filter(*filters)
+        .order_by(Receipt.id.desc())
+        .offset((page - 1) * limit)
+        .limit(limit)
+        .all()
+    )
+    receipt_ids = [r.id for r in rows]
+
+    allocs = (
+        db.query(ReceiptAllocation, Member, MemberMembership, Associate)
+        .outerjoin(Member, Member.id == ReceiptAllocation.member_id)
+        .outerjoin(MemberMembership, MemberMembership.id == ReceiptAllocation.membership_id)
+        .outerjoin(Associate, Associate.id == ReceiptAllocation.associate_id)
+        .filter(
+            ReceiptAllocation.receipt_id.in_(receipt_ids) if receipt_ids else False,
+            ReceiptAllocation.is_deleted == False,
+        )
+        .all()
+    )
+    by_receipt: dict[int, list] = {}
+    for alloc, member, membership, associate in allocs:
+        by_receipt.setdefault(alloc.receipt_id, []).append((member, membership, associate))
+
+    data = []
+    for r in rows:
+        links = by_receipt.get(r.id, [])
+        first_member, first_membership, first_associate = (links[0] if links else (None, None, None))
+        member_name = (
+            " ".join(p for p in (first_member.first_name_en, first_member.last_name_en) if p)
+            if first_member else None
+        )
+        data.append({
+            "id": r.id,
+            "receipt_number": r.receipt_number,
+            "receipt_date": r.receipt_date,
+            "receipt_type": r.receipt_type,
+            "payer_name": r.payer_name,
+            "amount": float(r.net_amount),
+            "payment_mode": r.payment_mode,
+            "payment_status": r.payment_status,
+            "transaction_reference": r.transaction_reference,
+            "cheque_number": r.cheque_number,
+            "cheque_date": r.cheque_date,
+            "is_renewal": r.is_renewal,
+            "source": r.source,
+            # Payee columns: a member (profile-linked) or an associate
+            # (non-member donor). payee_type tells the UI which detail to open.
+            "member_id": first_member.id if first_member else None,
+            "member_name": member_name,
+            "member_code": first_member.member_code if first_member else None,
+            "mobile": first_member.mobile if first_member else None,
+            "approval_status": first_member.approval_status if first_member else None,
+            "associate_id": first_associate.id if first_associate else None,
+            "associate_name": first_associate.name if first_associate else None,
+            "payee_name": member_name or (first_associate.name if first_associate else None),
+            "membership_id": first_membership.id if first_membership else None,
+            "membership_number": first_membership.membership_number if first_membership else None,
+            "membership_expiry_date": first_membership.expires_at if first_membership else None,
+            "allocation_count": len(links),
+        })
+
+    if export:
+        return render_export(
+            db, current_user, "receipt_tracking", export,
+            {
+                "year": year, "month": month, "payment_mode": payment_mode,
+                "receipt_type": receipt_type, "is_renewal": is_renewal,
+                "member_id": member_id, "from_date": from_date, "to_date": to_date,
+                "search": search,
+            },
+            data, "receipt_tracking",
+        )
+
+    return {
+        "summary": {
+            "total_receipts": total,
+            "by_payment_mode": mode_summary,
+        },
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit if limit else 0,
+        "data": data,
+    }
+
+
+@router.get("/renewals-due")
+def read_renewals_due(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    page: int = 1, limit: int = 20,
+    days_ahead: int = 30,
+    include_expired: bool = True,
+    export: Optional[str] = None,  # "csv" or "excel"
+) -> Any:
+    """Renewal worklist: ACTIVE memberships whose expires_at falls within
+    ``days_ahead`` days (or already expired when include_expired=true).
+
+    Backs the Receipt Entry screen's UNAPPROVED RENEWAL PAYMENT LIST —
+    the operator picks a member here, then records their renewal receipt
+    (receipt_type=MEMBERSHIP, is_renewal=true) and allocates it.
+    """
+    now = datetime.now(timezone.utc)
+    horizon = now + timedelta(days=max(0, days_ahead))
+    q = (
+        db.query(MemberMembership, Member, MembershipType)
+        .join(Member, Member.id == MemberMembership.member_id)
+        .outerjoin(MembershipType, MembershipType.id == MemberMembership.membership_type_id)
+        .filter(
+            MemberMembership.is_deleted == False,
+            MemberMembership.status == "ACTIVE",
+            MemberMembership.expires_at.isnot(None),
+            Member.is_deleted == False,
+        )
+    )
+    if include_expired:
+        q = q.filter(MemberMembership.expires_at <= horizon)
+    else:
+        q = q.filter(MemberMembership.expires_at >= now, MemberMembership.expires_at <= horizon)
+
+    q = q.order_by(MemberMembership.expires_at.asc())
+    total = q.count()
+    rows = q.offset((max(1, page) - 1) * limit).limit(min(max(1, limit), 500)).all()
+
+    def _date_only(dt):
+        return dt.date() if dt else None
+
+    data = [{
+        "membership_id": m.id,
+        "member_id": member.id,
+        "member_name": " ".join(p for p in (member.first_name_en, member.last_name_en) if p),
+        "member_code": member.member_code,
+        "mobile": member.mobile,
+        "approval_status": member.approval_status,
+        "membership_number": m.membership_number,
+        "membership_type_id": t.id if t else None,
+        "membership_type": t.name_en if t else None,
+        "status": m.status,
+        "expiry_date": _date_only(m.expires_at),
+        "days_to_expiry": (_date_only(m.expires_at) - now.date()).days if m.expires_at else None,
+    } for m, member, t in rows]
+
+    if export:
+        return render_export(
+            db, current_user, "renewals_due", export,
+            {"days_ahead": days_ahead, "include_expired": include_expired},
+            data, "renewals_due",
+        )
+
+    return {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit if limit else 0,
+        "data": data,
+    }
+
+
+@router.post("/{id}/activate-member")
+# entity_type is "MemberActivation", not "Member" — the registry is keyed on
+# (module, action, entity_type) and last-wins; reusing "Member" would clobber
+# PUT /members/{id}'s replay handler.
+@approval_gate.gated("members", "UPDATE", "MemberActivation", "members.update", id_param="id")
+def activate_member_from_receipt(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.update")),
+    id: int,
+) -> Any:
+    """Activate (approve) the unapproved profile linked to this receipt.
+
+    The offline counter workflow records the money first (Receipt Entry), then
+    the operator opens Receipt Tracking and activates the profile that receipt
+    was paid against — same mutations as PUT /members/{id}/approve (shared
+    core, so member_code and membership numbers are minted identically), just
+    reached from the receipt instead of the members worklist. Refuses receipts
+    without exactly one linked profile, and profiles already APPROVED.
+    """
+    receipt = crud_receipts.receipt.get(db, id)
+    if not receipt:
+        raise HTTPException(404, "Receipt not found")
+
+    allocs = (
+        db.query(ReceiptAllocation)
+        .filter(
+            ReceiptAllocation.receipt_id == id,
+            ReceiptAllocation.is_deleted == False,
+        )
+        .all()
+    )
+    if not allocs:
+        raise HTTPException(
+            400, "Receipt has no member allocation; allocate it before activating"
+    )
+    member_ids = {a.member_id for a in allocs if a.member_id}
+    if not member_ids:
+        raise HTTPException(
+            400,
+            "Receipt is allocated to associate(s) only, not a member — "
+            "there is no profile to activate",
+        )
+    if len(member_ids) != 1:
+        raise HTTPException(
+            400,
+            f"Activate expects exactly one linked member, found {len(member_ids)}; "
+            f"activate from the members worklist instead",
+        )
+
+    member = db.query(Member).filter(
+        Member.id == member_ids.pop(), Member.is_deleted == False  # noqa: E712
+    ).first()
+    if not member:
+        raise HTTPException(404, "Linked member not found")
+    if member.approval_status == "APPROVED":
+        raise HTTPException(409, "Linked member is already approved/active")
+
+    from services.member_activation import activate_member
+    member = activate_member(db, member, activated_by=current_user.id)
+    db.commit()
+    db.refresh(member)
+
+    return {
+        "message": "Member activated from receipt",
+        "receipt_id": id,
+        "member": {
+            "id": member.id,
+            "member_code": member.member_code,
+            "approval_status": member.approval_status,
+            "membership_numbers": [
+                m.membership_number
+                for m in db.query(MemberMembership)
+                .filter(
+                    MemberMembership.member_id == member.id,
+                    MemberMembership.is_deleted == False,  # noqa: E712
+                )
+                .all()
+                if m.membership_number
+            ],
+        },
+    }
 
 
 @router.get("/allocations")
@@ -164,14 +553,19 @@ def read_allocations(
     if member_id: q = q.filter(ReceiptAllocation.member_id == member_id)
     q = q.order_by(ReceiptAllocation.id.desc())
     page_data = paginate(q, page, limit)
-
     member_ids = {a["member_id"] for a in page_data["data"] if a.get("member_id")}
-    names = {}
+    associate_ids = {a["associate_id"] for a in page_data["data"] if a.get("associate_id")}
+    names, associate_names = {}, {}
     if member_ids:
         for m in db.query(Member).filter(Member.id.in_(member_ids)).all():
             names[m.id] = " ".join(p for p in (m.first_name_en, m.last_name_en) if p)
+    if associate_ids:
+        for a in db.query(Associate).filter(Associate.id.in_(associate_ids)).all():
+            associate_names[a.id] = a.name
     for a in page_data["data"]:
         a["member_name"] = names.get(a.get("member_id"))
+        a["associate_name"] = associate_names.get(a.get("associate_id"))
+        a["payee_name"] = a["member_name"] or a["associate_name"]
     return page_data
 
 
@@ -182,11 +576,12 @@ def read_receipt(*, db: Session = Depends(deps.get_db), current_user: User = Dep
     return obj
 
 
-@router.put("/{id}", response_model=schemas_receipts.Receipt)
+@router.put("/{id}", response_model=Union[schemas_receipts.Receipt, PendingApproval])
+@approval_gate.gated("receipts", "UPDATE", "Receipt", "receipts.update")
 def update_receipt(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.write")),
+    current_user: User = Depends(deps.require_permission("receipts.update")),
     id: int,
     receipt_in: schemas_receipts.ReceiptUpdate,
 ) -> Any:
@@ -225,11 +620,12 @@ def update_receipt(
     return crud_receipts.receipt.update(db, db_obj=receipt, obj_in=data, updated_by=current_user.id)
 
 
-@router.delete("/{id}", response_model=schemas_receipts.Receipt)
+@router.delete("/{id}", response_model=Union[schemas_receipts.Receipt, PendingApproval])
+@approval_gate.gated("receipts", "DELETE", "Receipt", "receipts.delete")
 def delete_receipt(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.write")),
+    current_user: User = Depends(deps.require_permission("receipts.delete")),
     id: int,
 ) -> Any:
     receipt = crud_receipts.receipt.get(db, id)
@@ -242,17 +638,19 @@ def delete_receipt(
     return crud_receipts.receipt.remove(db, id=id, deleted_by=current_user.id)
 
 
-@router.post("/{id}/allocate", response_model=schemas_receipts.ReceiptAllocation, status_code=201)
+@router.post("/{id}/allocate", response_model=Union[schemas_receipts.ReceiptAllocation, PendingApproval], status_code=201)
+@approval_gate.gated("receipts", "CREATE", "ReceiptAllocation", "receipts.create")
 def allocate_receipt(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.write")),
+    current_user: User = Depends(deps.require_permission("receipts.create")),
     id: int,
     payload: schemas_receipts.ReceiptAllocationCreate,
 ) -> Any:
-    """Map a created receipt to a member (and optionally their membership).
+    """Map a created receipt to a payee — a member (optionally their
+    membership) or an associate for non-member donors.
 
-    Once mapped, the member enters the magazine label print list (generate
-    labels with only_paid=true).
+    Once mapped to a member, the member enters the magazine label print list
+    (generate labels with only_paid=true).
     """
     receipt = crud_receipts.receipt.get(db, id)
     if not receipt:
@@ -260,7 +658,7 @@ def allocate_receipt(
     if receipt.payment_status == "CANCELLED":
         raise HTTPException(400, "Cannot allocate a cancelled receipt")
 
-    _get_member_or_404(db, payload.member_id)
+    _validate_payee(db, payload.member_id, payload.associate_id)
     _validate_membership(db, payload.member_id, payload.membership_id)
     _validate_allocation_amount(
         db, receipt, allocated_amount=payload.allocated_amount
@@ -269,6 +667,7 @@ def allocate_receipt(
     alloc = ReceiptAllocation(
         receipt_id=id,
         member_id=payload.member_id,
+        associate_id=payload.associate_id,
         membership_id=payload.membership_id,
         allocated_amount=payload.allocated_amount,
         created_by=current_user.id,
@@ -300,23 +699,29 @@ def read_receipt_allocations(
         .all()
     )
     member_ids = {a.member_id for a in allocs if a.member_id}
-    names = {}
+    associate_ids = {a.associate_id for a in allocs if a.associate_id}
+    names, associate_names = {}, {}
     if member_ids:
         for m in db.query(Member).filter(Member.id.in_(member_ids)).all():
             names[m.id] = " ".join(p for p in (m.first_name_en, m.last_name_en) if p)
+    if associate_ids:
+        for a in db.query(Associate).filter(Associate.id.in_(associate_ids)).all():
+            associate_names[a.id] = a.name
     result = []
     for a in allocs:
         item = schemas_receipts.ReceiptAllocationWithMember.model_validate(a)
         item.member_name = names.get(a.member_id)
+        item.associate_name = associate_names.get(a.associate_id)
         result.append(item)
     return result
 
 
-@router.delete("/{id}/allocations/{allocation_id}", response_model=schemas_receipts.ReceiptAllocation)
+@router.delete("/{id}/allocations/{allocation_id}", response_model=Union[schemas_receipts.ReceiptAllocation, PendingApproval])
+@approval_gate.gated("receipts", "DELETE", "ReceiptAllocation", "receipts.delete", id_param="allocation_id")
 def remove_allocation(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.write")),
+    current_user: User = Depends(deps.require_permission("receipts.delete")),
     id: int,
     allocation_id: int,
 ) -> Any:
@@ -339,10 +744,11 @@ def remove_allocation(
 
 
 @router.post("/{id}/cancel")
+@approval_gate.gated("receipts", "CREATE", "ReceiptCancellation", "receipts.create")
 def cancel_receipt(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.write")),
+    current_user: User = Depends(deps.require_permission("receipts.create")),
     id: int,
     payload: schemas_receipts.ReceiptCancellationCreate,
 ) -> Any:
@@ -365,11 +771,12 @@ def cancel_receipt(
     return {"message": "Receipt cancelled successfully"}
 
 
-@router.post("/{id}/refund", response_model=schemas_receipts.RefundTransaction)
+@router.post("/{id}/refund", response_model=Union[schemas_receipts.RefundTransaction, PendingApproval])
+@approval_gate.gated("receipts", "CREATE", "RefundTransaction", "receipts.create")
 def create_refund(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.write")),
+    current_user: User = Depends(deps.require_permission("receipts.create")),
     id: int,
     payload: schemas_receipts.RefundTransactionCreate,
 ) -> Any:
@@ -389,11 +796,12 @@ def create_refund(
     return refund
 
 
-@router.post("/{id}/payment-transactions", response_model=schemas_receipts.PaymentTransaction)
+@router.post("/{id}/payment-transactions", response_model=Union[schemas_receipts.PaymentTransaction, PendingApproval])
+@approval_gate.gated("receipts", "CREATE", "PaymentTransaction", "receipts.create")
 def create_payment_transaction(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.write")),
+    current_user: User = Depends(deps.require_permission("receipts.create")),
     id: int,
     payload: schemas_receipts.PaymentTransactionCreate,
 ) -> Any:

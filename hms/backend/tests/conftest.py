@@ -14,7 +14,10 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 _TMP = tempfile.mkdtemp(prefix="hms_test_")
-os.environ["DATABASE_URL"] = f"sqlite:///{_TMP}/test.db"
+# Set TEST_DATABASE_URL=postgresql://... to run the suite on a real PostgreSQL
+# database (use a throwaway DB, e.g. one built with `alembic upgrade head`).
+_PG = os.environ.get("TEST_DATABASE_URL")
+os.environ["DATABASE_URL"] = _PG or f"sqlite:///{_TMP}/test.db"
 os.environ["UPLOAD_DIR"] = os.path.join(_TMP, "uploads")
 os.environ["BOOTSTRAP_ADMIN_USERNAME"] = "admin"
 os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "admintest123"
@@ -35,18 +38,20 @@ def app_engine():
 
     # Enforce foreign keys in SQLite so the tests exercise the same referential
     # guarantees (and delete ordering) as PostgreSQL.
-    @event.listens_for(engine, "connect")
-    def _enable_foreign_keys(dbapi_connection, connection_record):
-        cursor = dbapi_connection.cursor()
-        cursor.execute("PRAGMA foreign_keys=ON")
-        cursor.close()
+    if engine.dialect.name == "sqlite":
+        @event.listens_for(engine, "connect")
+        def _enable_foreign_keys(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
 
     # SQLite cannot autoincrement BIGINT primary keys (PostgreSQL can), so the
     # primary key columns are downgraded to INTEGER for the test schema only.
-    for table in Base.metadata.tables.values():
-        for column in table.columns:
-            if column.primary_key:
-                column.type = INTEGER()
+    if engine.dialect.name == "sqlite":
+        for table in Base.metadata.tables.values():
+            for column in table.columns:
+                if column.primary_key:
+                    column.type = INTEGER()
 
     Base.metadata.create_all(bind=engine)
     return engine

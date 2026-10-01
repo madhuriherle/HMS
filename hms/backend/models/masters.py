@@ -84,3 +84,37 @@ class ServiceType(AuditMixin, Base):
     name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+# ─── Personal masters ───
+# Generic id+name(+Kannada)+status shape. Horoscope masters (gothra,
+# nakshatra, rashi, masa, mithi, samvathsara) were removed in migration 0014
+# — Mangalya/matrimony owns that data.
+
+class Qualification(AuditMixin, Base):
+    __tablename__ = "qualifications"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    name_en: Mapped[str] = mapped_column(String(100), nullable=False)
+    name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
+    status: Mapped[bool] = mapped_column(Boolean, default=True)
+
+class NativePlace(AuditMixin, Base):
+    __tablename__ = "native_places"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    name_en: Mapped[str] = mapped_column(String(100), nullable=False)
+    name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
+    district_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("districts.id"), nullable=True)
+    status: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class DeletionReason(AuditMixin, Base):
+    """Master for member-deletion reasons (Mangalya parity: delete_reason).
+    Deletion requests pick from this list; free text remains as fallback."""
+
+    __tablename__ = "deletion_reasons"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    name_en: Mapped[str] = mapped_column(String(150), nullable=False)
+    name_kn: Mapped[str] = mapped_column(String(200), nullable=True)
+    # Applies to SOFT and/or PERMANENT deletion flows (both when NULL).
+    applies_to: Mapped[str] = mapped_column(String(10), nullable=True)
+    status: Mapped[bool] = mapped_column(Boolean, default=True)

@@ -82,6 +82,16 @@ class AffiliationContactBase(BaseModel):
 class AffiliationContactCreate(AffiliationContactBase):
     pass
 
+class AffiliationContactUpdate(BaseModel):
+    name: Optional[str] = None
+    mobile: Optional[str] = None
+    email: Optional[str] = None
+    designation: Optional[str] = None
+
+class MagazineSettingUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    address_override: Optional[str] = None
+
 class AffiliationContact(AffiliationContactBase):
     id: int
     affiliation_id: int

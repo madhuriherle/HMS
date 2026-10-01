@@ -1,16 +1,19 @@
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from crud import members as crud_members
 from schemas import members as schemas_members
+from schemas.common import PendingApproval
 from api import deps
-from models.members import Member, MemberApprovalHistory, MemberMembership
+from models.masters import ServiceType
+from models.members import Member, MemberApprovalHistory, MemberMembership, MemberServiceOptin
 from models.users import User
 from core.pagination import paginate
 from services.sequences import generate_next_number
 from services.pricing import active_price
 from services.file_upload import save_upload
+from services import approval_gate
 from datetime import datetime, timezone
 
 router = APIRouter()
@@ -29,6 +32,7 @@ def read_members(
     gender: Optional[str] = None,
     approval_status: Optional[str] = None,
     member_status: Optional[str] = None,
+    is_active: Optional[bool] = None,
     membership_type_id: Optional[int] = None,
     registration_source: Optional[str] = None,
     include_deleted: bool = False,
@@ -53,6 +57,8 @@ def read_members(
         query = query.filter(Member.approval_status == approval_status)
     if member_status:
         query = query.filter(Member.member_status == member_status)
+    if is_active is not None:
+        query = query.filter(Member.member_status == "ACTIVE") if is_active else query.filter(Member.member_status != "ACTIVE")
     if registration_source:
         query = query.filter(Member.registration_source == registration_source)
     if membership_type_id:
@@ -76,11 +82,12 @@ def read_members(
     return paginate(query, page, limit)
 
 
-@router.post("/", response_model=schemas_members.Member, status_code=201)
+@router.post("/", response_model=Union[schemas_members.Member, PendingApproval], status_code=201)
+@approval_gate.gated("members", "CREATE", "Member", "members.create")
 def create_member(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.write")),
+    current_user: User = Depends(deps.require_permission("members.create")),
     member_in: schemas_members.MemberCreate,
 ) -> Any:
     """Register a member (offline form or website) with duplicate validation.
@@ -153,6 +160,9 @@ def create_member(
         if member_in.district_id and taluk.district_id != member_in.district_id:
             raise HTTPException(status_code=400, detail="taluk_id does not belong to district_id")
 
+    # Mangalya-parity personal master references must exist.
+    _member_master_checks(db, member_in.model_dump(exclude_unset=False))
+
     db_obj = MemberModel(**member_in.model_dump(), created_by=current_user.id)
     db.add(db_obj)
     db.flush()
@@ -190,11 +200,12 @@ def read_member(
         raise HTTPException(status_code=404, detail="Member not found")
     return member
 
-@router.put("/{id}", response_model=schemas_members.Member)
+@router.put("/{id}", response_model=Union[schemas_members.Member, PendingApproval])
+@approval_gate.gated("members", "UPDATE", "Member", "members.update")
 def update_member(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.write")),
+    current_user: User = Depends(deps.require_permission("members.update")),
     id: int,
     member_in: schemas_members.MemberUpdate,
 ) -> Any:
@@ -231,13 +242,92 @@ def update_member(
         if taluk.district_id != data.get("district_id", member.district_id):
             raise HTTPException(400, "taluk_id does not belong to district_id")
 
+    # Mangalya-parity personal master references must exist.
+    _member_master_checks(db, data)
+
     return crud_members.member.update(db=db, db_obj=member, obj_in=data, updated_by=current_user.id)
 
+
+def _member_master_checks(db: Session, data: dict) -> None:
+    """Validate native-place/qualification/referred-by
+    references against services.personal_masters.PERSONAL_MASTERS — the
+    same registry masters.py's CRUD routes and delete guard use, so a new
+    personal master only needs to be added there, not here too."""
+    from services.personal_masters import PERSONAL_MASTERS
+
+    for spec in PERSONAL_MASTERS:
+        value = data.get(spec.member_field)
+        if value:
+            if not db.query(spec.model).filter(
+                spec.model.id == value, spec.model.is_deleted == False  # noqa: E712
+            ).first():
+                raise HTTPException(400, f"Invalid {spec.member_field}")
+
+    if data.get("referred_by_member_id"):
+        if not db.query(Member).filter(
+            Member.id == data["referred_by_member_id"], Member.is_deleted == False  # noqa: E712
+        ).first():
+            raise HTTPException(400, "Invalid referred_by_member_id")
+
+
+def _member_master_details(db: Session, member: Member) -> dict:
+    """Resolved names for the member's master-backed fields (profile screen).
+
+    One UNION ALL query across every personal-master table instead of one
+    SELECT per field (was ~9 sequential round-trips on every profile read —
+    this is the hottest path that touches PERSONAL_MASTERS)."""
+    from sqlalchemy import literal, select, union_all
+
+    from services.personal_masters import PERSONAL_MASTERS
+
+    selects = []
+    for spec in PERSONAL_MASTERS:
+        member_value = getattr(member, spec.member_field, None)
+        if not member_value:
+            continue
+        selects.append(
+            select(
+                literal(spec.key).label("spec_key"),
+                spec.model.id.label("id"),
+                spec.model.name_en.label("name_en"),
+                spec.model.name_kn.label("name_kn"),
+            ).where(spec.model.id == member_value, spec.model.is_deleted == False)  # noqa: E712
+        )
+
+    resolved_by_key = {}
+    if selects:
+        stmt = union_all(*selects) if len(selects) > 1 else selects[0]
+        for row in db.execute(stmt).all():
+            resolved_by_key[row.spec_key] = {"id": row.id, "name_en": row.name_en, "name_kn": row.name_kn}
+
+    referred = None
+    if member.referred_by_member_id:
+        ref = db.query(Member).filter(Member.id == member.referred_by_member_id).first()
+        if ref:
+            referred = {
+                "id": ref.id,
+                "member_code": ref.member_code,
+                "name": ref.full_name_kn or f"{ref.first_name_en} {ref.last_name_en or ''}".strip(),
+            }
+
+    result = {}
+    for spec in PERSONAL_MASTERS:
+        resolved = resolved_by_key.get(spec.key)
+        if not resolved and spec.text_field:
+            text_value = getattr(member, spec.text_field, None)
+            resolved = {"id": None, "name_en": text_value, "name_kn": None} if text_value else None
+        result[spec.key] = resolved
+    result["referred_by"] = referred
+    return result
+
 @router.put("/{id}/approve", response_model=schemas_members.Member)
+# Not @approval_gate.gated: takes a BackgroundTasks param, which the generic
+# engine can't capture into a JSON payload or usefully replay later (queued
+# tasks only run inside the live ASGI request that created them).
 def approve_member(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.write")),
+    current_user: User = Depends(deps.require_permission("members.update")),
     background_tasks: BackgroundTasks,
     id: int,
 ) -> Any:
@@ -246,40 +336,10 @@ def approve_member(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
 
-    now = datetime.now(timezone.utc)
-    old_status = member.approval_status
-
-    # Auto-generate member_code
-    if not member.member_code:
-        member.member_code = generate_next_number(db, "MEMBER_CODE", "HMS")
-    member.approval_status = "APPROVED"
-    member.approved_by = current_user.id
-    member.approved_at = now
-    db.add(MemberApprovalHistory(
-        member_id=member.id,
-        action="APPROVE",
-        old_status=old_status,
-        new_status="APPROVED",
-        acted_by=current_user.id,
-        acted_at=now,
-        created_by=current_user.id,
-    ))
-
-    # Spec: activation assigns the permanent membership number to the member's
-    # membership rows (numbers are minted by the sequence generator).
-    memberships = (
-        db.query(MemberMembership)
-        .filter(
-            MemberMembership.member_id == member.id,
-            MemberMembership.is_deleted == False,
-            MemberMembership.membership_number == None,
-        )
-        .all()
-    )
-    for membership in memberships:
-        membership.membership_number = generate_next_number(db, "MEMBERSHIP_NO", "HMSM")
-        membership.activated_at = now
-        membership.updated_by = current_user.id
+    # Shared activation core with POST /receipts/{id}/activate-member so the
+    # two entry points can never drift.
+    from services.member_activation import activate_member
+    member = activate_member(db, member, activated_by=current_user.id)
 
     db.commit()
     db.refresh(member)
@@ -348,11 +408,12 @@ def _queue_activation_notification(
 
     background_tasks.add_task(_send)
 
-@router.post("/{id}/memberships", response_model=schemas_members.MemberMembership)
+@router.post("/{id}/memberships", response_model=Union[schemas_members.MemberMembership, PendingApproval])
+@approval_gate.gated("members", "CREATE", "MemberMembership", "members.create")
 def create_membership(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.write")),
+    current_user: User = Depends(deps.require_permission("members.create")),
     id: int,
     membership_in: schemas_members.MembershipCreate,
 ) -> Any:
@@ -381,6 +442,7 @@ def create_membership(
         price_id=price.id if price else None,
         applied_at=now,
         status=membership_in.status,
+        family_membership_number=membership_in.family_membership_number,
         created_by=current_user.id,
     )
     if member.approval_status == "APPROVED":
@@ -392,10 +454,12 @@ def create_membership(
     return obj
 
 @router.post("/{id}/photo")
+# Not @approval_gate.gated: an UploadFile's bytes can't be captured into a
+# JSON payload and replayed later.
 async def upload_member_photo(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.write")),
+    current_user: User = Depends(deps.require_permission("members.create")),
     id: int,
     file: UploadFile = File(...),
 ) -> Any:
@@ -410,10 +474,12 @@ async def upload_member_photo(
     return {"photo_path": meta["file_path"]}
 
 @router.post("/documents/", response_model=schemas_members.MemberDocument)
+# Not @approval_gate.gated: an UploadFile's bytes can't be captured into a
+# JSON payload and replayed later.
 async def upload_member_document(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.write")),
+    current_user: User = Depends(deps.require_permission("members.create")),
     member_id: int,
     document_type_id: int,
     file: UploadFile = File(...),
@@ -436,25 +502,55 @@ async def upload_member_document(
     return doc
 
 @router.delete("/{id}")
+# Not @approval_gate.gated (generic engine): uses its own bespoke
+# MemberDeletionRequest routing below instead — richer semantics
+# (SOFT/PERMANENT, reason_id, cascading purge) than the generic engine's
+# replay model would cleanly capture.
 def delete_member(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.write")),
+    current_user: User = Depends(deps.require_permission("members.delete")),
     id: int,
     reason: str,
     mode: str = "SOFT",
 ) -> Any:
-    """Direct delete (no approval workflow): soft or permanent, with reason.
+    """Delete a member — soft or permanent.
 
-    PERMANENT hard-deletes the member and their dependent rows in one
-    transaction; the money trail (receipt allocations) is detached, not
-    destroyed. Soft delete keeps every row, flagged deleted.
+    Approval-gated per role grant, not hardcoded: if every role granting
+    this caller members.delete has requires_approval=True (see
+    POST/PUT /users/roles/{id}/permissions), the exact same call doesn't
+    execute — it files a pending MemberDeletionRequest instead, for anyone
+    holding approvals.write to approve/reject. A caller with at least one
+    un-gated members.delete grant gets an immediate delete.
     """
     member = crud_members.member.get(db=db, id=id)
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
     if mode not in ("SOFT", "PERMANENT"):
         raise HTTPException(status_code=400, detail="mode must be SOFT or PERMANENT")
+
+    if deps.permission_requires_approval(db, current_user, "members.delete"):
+        from models.members import MemberDeletionRequest
+        from services.approval_notify import notify_approvers
+        req = MemberDeletionRequest(
+            member_id=id, requested_by=current_user.id,
+            reason=reason, deletion_type=mode,
+            status="PENDING", created_by=current_user.id,
+        )
+        db.add(req)
+        db.commit()
+        db.refresh(req)
+        notify_approvers(
+            db,
+            title=f"Approval needed: Delete member ({mode})",
+            body=f"{current_user.name} requested to delete member #{id}. Reason: {reason}",
+            data={"deletion_request_id": req.id, "member_id": id},
+        )
+        return {
+            "message": "Your role requires approval to delete members; submitted for approval",
+            "deletion_request_id": req.id,
+            "status": "PENDING",
+        }
 
     now = datetime.now(timezone.utc)
 
@@ -482,6 +578,262 @@ def delete_member(
     return {"message": "Member soft-deleted", "member_id": id, "reason": reason, "mode": "SOFT"}
 
 
+# ─── SERVICE OPT-INS (Magazine, Temple, Mangalya, Hall, …) ──────
+def _optin_payload(db: Session, optin: MemberServiceOptin) -> dict:
+    """Optin row + its service_type's names, ready for the response schema."""
+    st = db.query(ServiceType).filter(ServiceType.id == optin.service_type_id).first()
+    return {
+        "id": optin.id,
+        "member_id": optin.member_id,
+        "service_type_id": optin.service_type_id,
+        "status": optin.status,
+        "opted_at": optin.opted_at,
+        "opted_via": optin.opted_via,
+        "linked_type": optin.linked_type,
+        "linked_id": optin.linked_id,
+        "notes": optin.notes,
+        "service_code": st.code if st else None,
+        "service_name_en": st.name_en if st else None,
+        "service_name_kn": st.name_kn if st else None,
+    }
+
+
+def _resolve_service_type(db: Session, service_type_id: int) -> ServiceType:
+    st = db.query(ServiceType).filter(
+        ServiceType.id == service_type_id, ServiceType.is_deleted == False  # noqa: E712
+    ).first()
+    if not st:
+        raise HTTPException(400, f"Invalid service_type_id {service_type_id}")
+    return st
+
+
+def _dedicated_link(db: Session, member_id: int, service_type: ServiceType) -> tuple[Optional[str], Optional[int]]:
+    """(linked_type, linked_id) for a service that owns a dedicated table.
+
+    Only Magazine does today; it stays an explicit lookup rather than a
+    convention so the next service with its own table is added here, not
+    guessed at from the service code.
+    """
+    if service_type.code == "MAGAZINE":
+        from models.magazines import MagazineSubscription
+
+        sub = db.query(MagazineSubscription).filter(
+            MagazineSubscription.member_id == member_id,
+            MagazineSubscription.is_deleted == False,  # noqa: E712
+        ).first()
+        if sub:
+            return "MAGAZINE_SUBSCRIPTION", sub.id
+    return None, None
+
+
+@router.get("/{id}/service-optins")
+def read_member_service_optins(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    id: int,
+    status: Optional[str] = None,
+) -> Any:
+    """Every service this member has opted into (and, with status=CANCELLED,
+    the ones they have withdrawn). Backs the profile's service list."""
+    member = crud_members.member.get(db=db, id=id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    q = db.query(MemberServiceOptin).filter(
+        MemberServiceOptin.member_id == id,
+        MemberServiceOptin.is_deleted == False,
+    )
+    if status:
+        q = q.filter(MemberServiceOptin.status == status.upper())
+    return {
+        "member_id": id,
+        "total": q.count(),
+        "data": [_optin_payload(db, o) for o in q.order_by(MemberServiceOptin.opted_at.desc()).all()],
+    }
+
+
+@router.post("/{id}/service-optins", response_model=Union[schemas_members.MemberServiceOptin, PendingApproval], status_code=201)
+@approval_gate.gated("members", "CREATE", "MemberServiceOptin", "members.create", id_param="id")
+def create_service_optin(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.create")),
+    id: int,
+    optin_in: schemas_members.MemberServiceOptinCreate,
+) -> Any:
+    """Opt a member into a service.
+
+    One live opt-in per (member, service) — a second POST for a service the
+    member already has returns 409, unless the existing opt-in is CANCELLED,
+    in which case it's reinstated rather than duplicated (so the partial
+    unique index never has to be worked around). For a service that has its
+    own dedicated table (Magazine), linked_id is filled in automatically
+    rather than being the caller's problem.
+    """
+    member = crud_members.member.get(db=db, id=id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    st = _resolve_service_type(db, optin_in.service_type_id)
+
+    existing = crud_members.service_optin.get_active(
+        db, member_id=id, service_type_id=optin_in.service_type_id
+    )
+    if existing:
+        if existing.status != "CANCELLED":
+            raise HTTPException(
+                409,
+                f"Member {id} already has an ACTIVE opt-in for service "
+                f"'{st.code}' (optin id={existing.id})",
+            )
+        existing.status = "ACTIVE"
+        existing.opted_at = datetime.now(timezone.utc)
+        existing.opted_via = optin_in.opted_via
+        if optin_in.notes is not None:
+            existing.notes = optin_in.notes
+        existing.updated_by = current_user.id
+        db.add(existing)
+        db.commit()
+        db.refresh(existing)
+        return _optin_payload(db, existing)
+
+    linked_type, linked_id = optin_in.linked_type, optin_in.linked_id
+    if linked_id is None:
+        linked_type, linked_id = _dedicated_link(db, id, st)
+
+    obj = MemberServiceOptin(
+        member_id=id,
+        service_type_id=st.id,
+        status=optin_in.status or "ACTIVE",
+        opted_at=datetime.now(timezone.utc),
+        opted_via=optin_in.opted_via or "ADMIN",
+        linked_type=linked_type,
+        linked_id=linked_id,
+        notes=optin_in.notes,
+        created_by=current_user.id,
+    )
+    db.add(obj)
+    db.commit()
+    db.refresh(obj)
+    return _optin_payload(db, obj)
+
+
+@router.post("/{id}/service-optins/bulk", response_model=schemas_members.BulkServiceOptinResult, status_code=201)
+# Not @approval_gate.gated: the generic engine captures kwargs as JSON and
+# would replay this as a single opt-in, not the whole set — filing one request
+# per service instead would be a half-truth in the approver's queue. Instead it
+# demands the grant for BOTH sides of the change (adding and withdrawing), so
+# no permission gap opens up next to the gated single-service routes.
+def bulk_set_service_optins(
+    *,
+    db: Session = Depends(deps.get_db),
+    _create_granted: User = Depends(deps.require_permission("members.create")),
+    current_user: User = Depends(deps.require_permission("members.update")),
+    id: int,
+    optin_in: schemas_members.BulkServiceOptin,
+) -> Any:
+    """Set a member's full service selection in one call (the registration
+    form's checkbox group). Services in `opt_out` that they currently hold are
+    cancelled; `opt_in` adds or reinstates. Returns the resulting list.
+    """
+    member = crud_members.member.get(db=db, id=id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+
+    now = datetime.now(timezone.utc)
+    created, updated = [], []
+
+    for service_type_id in optin_in.opt_in:
+        st = _resolve_service_type(db, service_type_id)
+        existing = crud_members.service_optin.get_active(
+            db, member_id=id, service_type_id=service_type_id
+        )
+        if existing:
+            if existing.status == "CANCELLED":
+                existing.status = "ACTIVE"
+                existing.opted_at = now
+                existing.updated_by = current_user.id
+                db.add(existing)
+                updated.append(service_type_id)
+            continue
+        linked_type, linked_id = _dedicated_link(db, id, st)
+        db.add(MemberServiceOptin(
+            member_id=id, service_type_id=st.id, status="ACTIVE",
+            opted_at=now, opted_via=optin_in.opted_via or "ADMIN",
+            linked_type=linked_type, linked_id=linked_id,
+            created_by=current_user.id,
+        ))
+        created.append(service_type_id)
+
+    for service_type_id in optin_in.opt_out:
+        _resolve_service_type(db, service_type_id)
+        existing = crud_members.service_optin.get_active(
+            db, member_id=id, service_type_id=service_type_id
+        )
+        if existing and existing.status == "ACTIVE":
+            existing.status = "CANCELLED"
+            existing.updated_by = current_user.id
+            db.add(existing)
+            updated.append(service_type_id)
+
+    db.commit()
+
+    q = db.query(MemberServiceOptin).filter(
+        MemberServiceOptin.member_id == id, MemberServiceOptin.is_deleted == False  # noqa: E712
+    ).order_by(MemberServiceOptin.opted_at.desc()).all()
+    return {
+        "member_id": id,
+        "opted_in": created,
+        "changed": updated,
+        "data": [_optin_payload(db, o) for o in q],
+    }
+
+
+@router.put("/{id}/service-optins/{optin_id}", response_model=Union[schemas_members.MemberServiceOptin, PendingApproval])
+@approval_gate.gated("members", "UPDATE", "MemberServiceOptin", "members.update", id_param="optin_id")
+def update_service_optin(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.update")),
+    id: int,
+    optin_id: int,
+    optin_in: schemas_members.MemberServiceOptinUpdate,
+) -> Any:
+    """Change an opt-in — typically status ACTIVE→CANCELLED when a member
+    withdraws from a service."""
+    optin = _member_optin_or_404(db, id, optin_id)
+    data = optin_in.model_dump(exclude_unset=True)
+    crud_members.service_optin.update(db, db_obj=optin, obj_in=data, updated_by=current_user.id)
+    db.refresh(optin)
+    return _optin_payload(db, optin)
+
+
+@router.delete("/{id}/service-optins/{optin_id}", response_model=Union[schemas_members.MemberServiceOptin, PendingApproval])
+@approval_gate.gated("members", "DELETE", "MemberServiceOptin", "members.delete", id_param="optin_id")
+def delete_service_optin(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.delete")),
+    id: int,
+    optin_id: int,
+) -> Any:
+    """Remove an opt-in outright (soft delete, so it stays in the audit trail
+    and the member timeline). Use PUT with status=CANCELLED to withdraw while
+    keeping the history visible."""
+    optin = _member_optin_or_404(db, id, optin_id)
+    return crud_members.service_optin.remove(db, id=optin_id, deleted_by=current_user.id)
+
+
+def _member_optin_or_404(db: Session, member_id: int, optin_id: int) -> MemberServiceOptin:
+    optin = db.query(MemberServiceOptin).filter(
+        MemberServiceOptin.id == optin_id,
+        MemberServiceOptin.member_id == member_id,   # don't let /members/1/... touch another member's optin
+        MemberServiceOptin.is_deleted == False,       # noqa: E712
+    ).first()
+    if not optin:
+        raise HTTPException(404, "Service opt-in not found for this member")
+    return optin
+
+
 @router.get("/{id}/profile")
 def read_member_profile(
     *,
@@ -499,7 +851,7 @@ def read_member_profile(
         MemberDocument, MemberProfileChangeRequest, MemberProfileHistory,
         MembershipTypeHistory, MemberDeletionRequest, MemberKycRequest,
     )
-    from models.masters import MembershipType
+    from models.masters import MembershipType, ServiceType
     from models.magazines import MagazineSubscription, MagazineReturn
     from models.events import EventMemberLink, Event, EventParticipant
     from models.receipts import Receipt, ReceiptAllocation
@@ -599,6 +951,20 @@ def read_member_profile(
         .order_by(MembershipTypeHistory.changed_at.desc())
         .all()
     )
+    # Generic service opt-in list (Temple, Mangalya, Hall, …) joined to the
+    # service_types catalogue, so the profile screen can render one loop
+    # instead of a hand-written block per service.
+    service_optins = (
+        db.query(MemberServiceOptin, ServiceType)
+        .join(ServiceType, ServiceType.id == MemberServiceOptin.service_type_id)
+        .filter(
+            MemberServiceOptin.member_id == id,
+            MemberServiceOptin.is_deleted == False,  # noqa: E712
+            MemberServiceOptin.status == "ACTIVE",
+        )
+        .order_by(ServiceType.name_en)
+        .all()
+    )
 
     return {
         "personal": {
@@ -608,6 +974,26 @@ def read_member_profile(
         },
         "memberships": membership_list,
         "services": {
+            # Generic opt-ins (Temple, Mangalya, Hall, …) — the catalogue is
+            # driven, so a new service_type row shows up here with no code
+            # change. Magazine also appears here, but its lifecycle detail
+            # (address override, pauses, returns) lives in the blocks below.
+            "opted": [
+                {
+                    "id": o.id,
+                    "service_type_id": t.id,
+                    "service_code": t.code,
+                    "service_name_en": t.name_en,
+                    "service_name_kn": t.name_kn,
+                    "status": o.status,
+                    "opted_at": o.opted_at,
+                    "opted_via": o.opted_via,
+                    "linked_type": o.linked_type,
+                    "linked_id": o.linked_id,
+                    "notes": o.notes,
+                }
+                for o, t in service_optins
+            ],
             "magazine": [
                 {
                     "id": s.id,
@@ -650,6 +1036,7 @@ def read_member_profile(
                 for p, e in guest_honours
             ],
         },
+        "personal_masters": _member_master_details(db, member),
         "financial": {
             "receipts": [
                 {
@@ -743,4 +1130,69 @@ def request_profile_change(
     Deliberately left at authentication-only: members submit these themselves
     from the mobile app, and they only take effect after approval.
     """
-    return crud_members.profile_change.create(db=db, obj_in=req_in, created_by=current_user.id)
+    created = crud_members.profile_change.create(db=db, obj_in=req_in, created_by=current_user.id)
+    from services.approval_notify import notify_approvers
+    notify_approvers(
+        db,
+        title="Approval needed: Member profile change",
+        body=f"{current_user.name} requested a profile change for member #{req_in.member_id}.",
+        data={"profile_change_request_id": created.id, "member_id": req_in.member_id},
+    )
+    return created
+
+
+# ─── ACTIVATION REQUEST ──────────────────────────────────────
+class _LoopTasks:
+    """BackgroundTasks stand-in for replays run inside an already-running
+    event loop (the generic approval engine), where no request-scoped
+    BackgroundTasks exists."""
+    def add_task(self, fn, *args, **kwargs):
+        import asyncio
+        asyncio.get_running_loop().create_task(fn(*args, **kwargs))
+
+
+def activate_member_request(*, db: Session, current_user: User, id: int) -> Any:
+    """Replay target for a filed activation request: assigns the permanent
+    membership number (shared core) and sends the activation WhatsApp."""
+    from services.member_activation import activate_member
+    member = crud_members.member.get(db=db, id=id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    member = activate_member(db, member, activated_by=current_user.id)
+    db.commit()
+    db.refresh(member)
+    _queue_activation_notification(db, _LoopTasks(), member, activated_by=current_user.id)
+    return member
+
+
+import inspect as _inspect
+from services import approval_registry as _approval_registry
+_approval_registry.register("members", "ACTIVATE", "Member", activate_member_request, _inspect.signature(activate_member_request))
+
+
+@router.post("/{id}/request-activation")
+def request_member_activation(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.create")),
+    id: int,
+) -> Any:
+    """File an activation request (permanent membership number assignment).
+    An approver with approvals.write approves it from the approvals queue,
+    which runs the same activation core as PUT /members/{id}/approve."""
+    from models.approval_requests import ApprovalRequest
+    from services.approval_gate import _file_request
+
+    member = crud_members.member.get(db=db, id=id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    if member.approval_status == "APPROVED" and member.member_code:
+        raise HTTPException(status_code=400, detail="Member is already activated")
+    dup = db.query(ApprovalRequest).filter(
+        ApprovalRequest.module == "members", ApprovalRequest.action == "ACTIVATE",
+        ApprovalRequest.entity_id == id, ApprovalRequest.status == "PENDING",
+    ).first()
+    if dup:
+        raise HTTPException(status_code=409, detail=f"Activation already requested (request {dup.id})")
+    return _file_request(db, current_user, "members", "ACTIVATE", "Member",
+                         "members.activate", {"id": id}, "id")

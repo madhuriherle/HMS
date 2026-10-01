@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: Optional[str] = None
     TWILIO_AUTH_TOKEN: Optional[str] = None
 
+    # In-process scheduler (off by default; tests and multi-worker deployments
+    # should leave it off and trigger the endpoints from cron instead).
+    SCHEDULER_ENABLED: bool = False
+    SCHEDULER_TICK_SECONDS: int = 300
+    KYC_REMINDER_ENABLED: bool = False
+    KYC_REMINDER_INTERVAL_DAYS: int = 180
+    KYC_REMINDER_CHANNEL: str = "LINK"  # LINK | APP
+    EXPIRY_REMINDER_ENABLED: bool = False
+    EXPIRY_REMINDER_DAYS_AHEAD: int = 30
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property

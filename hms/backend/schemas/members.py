@@ -1,19 +1,26 @@
-from typing import Optional, Set
+from typing import List, Optional, Set
 from datetime import datetime, date
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Fields a member may propose changing themselves (profile/KYC flows).
 # Anything outside this set (approval_status, member_code, is_deleted, …)
 # must never be updatable through a change request.
 EDITABLE_MEMBER_FIELDS: Set[str] = {
-    "mobile", "mobile_country_code", "alternate_mobile", "email",
+    "mobile", "mobile_country_code", "alternate_mobile", "whatsapp_number", "email",
     "address_line1", "address_line2", "locality",
     "address_line1_kn", "address_line2_kn", "locality_kn",
     "full_name_kn", "gender", "date_of_birth",
+    "father_husband_name", "blood_group", "native_place_id",
+    "native_place_text", "qualification_id", "qualification_text", "occupation",
+
+    "aadhaar_number", "referred_by_member_id",
     "state_id", "district_id", "taluk_id", "pincode_id",
 }
 
 VALID_GENDERS = {"MALE", "FEMALE", "OTHER"}
+
+VALID_SERVICE_OPTIN_STATUSES = {"ACTIVE", "CANCELLED"}
+VALID_SERVICE_OPTIN_SOURCES = {"ADMIN", "MOBILE_APP", "WEBSITE"}
 
 
 class MemberBase(BaseModel):
@@ -23,6 +30,18 @@ class MemberBase(BaseModel):
     full_name_kn: Optional[str] = None
     gender: Optional[str] = None
     date_of_birth: Optional[date] = None
+    # Mangalya-parity personal fields.
+    father_husband_name: Optional[str] = None
+    blood_group: Optional[str] = None
+    native_place_id: Optional[int] = None
+    native_place_text: Optional[str] = None
+    qualification_id: Optional[int] = None
+    qualification_text: Optional[str] = None
+    occupation: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    referred_by_member_id: Optional[int] = None
+
     mobile: Optional[str] = None
     mobile_country_code: str = "+91"
     alternate_mobile: Optional[str] = None
@@ -40,6 +59,16 @@ class MemberBase(BaseModel):
     pincode_id: Optional[int] = None
 
     registration_source: str = "ONLINE"
+
+    @field_validator("whatsapp_number", "alternate_mobile")
+    @classmethod
+    def _validate_whatsapp(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        v = v.strip()
+        if not v.isdigit() or not (10 <= len(v) <= 12):
+            raise ValueError("whatsapp_number must be 10-12 digits")
+        return v
 
     @field_validator("gender")
     @classmethod
@@ -83,6 +112,18 @@ class MemberUpdate(BaseModel):
     full_name_kn: Optional[str] = None
     gender: Optional[str] = None
     date_of_birth: Optional[date] = None
+    # Mangalya-parity personal fields.
+    father_husband_name: Optional[str] = None
+    blood_group: Optional[str] = None
+    native_place_id: Optional[int] = None
+    native_place_text: Optional[str] = None
+    qualification_id: Optional[int] = None
+    qualification_text: Optional[str] = None
+    occupation: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    referred_by_member_id: Optional[int] = None
+
     mobile: Optional[str] = None
     mobile_country_code: Optional[str] = None
     alternate_mobile: Optional[str] = None
@@ -145,6 +186,7 @@ class MemberMembershipBase(BaseModel):
     member_id: int
     membership_type_id: int
     membership_number: Optional[str] = None
+    family_membership_number: Optional[str] = None
     status: str = "ACTIVE"
 
 
@@ -184,6 +226,130 @@ class MemberDocument(MemberDocumentBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MemberServiceOptinBase(BaseModel):
+    """Body for POST /members/{id}/service-optins — member_id comes from the path."""
+
+    service_type_id: int
+    status: str = "ACTIVE"
+    opted_via: str = "ADMIN"
+    linked_type: Optional[str] = None
+    linked_id: Optional[int] = None
+    notes: Optional[str] = None
+
+    @field_validator("status")
+    @classmethod
+    def _validate_status(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        v = v.strip().upper()
+        if v not in VALID_SERVICE_OPTIN_STATUSES:
+            raise ValueError(f"status must be one of: {', '.join(sorted(VALID_SERVICE_OPTIN_STATUSES))}")
+        return v
+
+    @field_validator("opted_via")
+    @classmethod
+    def _validate_opted_via(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        v = v.strip().upper()
+        if v not in VALID_SERVICE_OPTIN_SOURCES:
+            raise ValueError(f"opted_via must be one of: {', '.join(sorted(VALID_SERVICE_OPTIN_SOURCES))}")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_link_pair(self):
+        # linked_type names the dedicated table, linked_id the row in it —
+        # half a pair is always a bug, never a default.
+        if (self.linked_type is None) != (self.linked_id is None):
+            raise ValueError("linked_type and linked_id must be provided together")
+        return self
+
+
+class MemberServiceOptinCreate(MemberServiceOptinBase):
+    pass
+
+
+class MemberServiceOptinUpdate(BaseModel):
+    status: Optional[str] = None
+    notes: Optional[str] = None
+    linked_type: Optional[str] = None
+    linked_id: Optional[int] = None
+
+    @field_validator("status")
+    @classmethod
+    def _validate_status(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        v = v.strip().upper()
+        if v not in VALID_SERVICE_OPTIN_STATUSES:
+            raise ValueError(f"status must be one of: {', '.join(sorted(VALID_SERVICE_OPTIN_STATUSES))}")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_link_pair(self):
+        if (self.linked_type is None) != (self.linked_id is None):
+            raise ValueError("linked_type and linked_id must be provided together")
+        return self
+
+
+class MemberServiceOptin(MemberServiceOptinBase):
+    id: int
+    member_id: int
+    opted_at: datetime
+    # Resolved from service_types for display on the profile screen.
+    service_code: Optional[str] = None
+    service_name_en: Optional[str] = None
+    service_name_kn: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BulkServiceOptin(BaseModel):
+    """Body for POST /members/{id}/service-optins/bulk — the registration
+    form's checkbox group applied as one set."""
+
+    opt_in: List[int] = Field(default_factory=list)
+    opt_out: List[int] = Field(default_factory=list)
+    opted_via: Optional[str] = None
+
+    @field_validator("opted_via")
+    @classmethod
+    def _validate_opted_via(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        v = v.strip().upper()
+        if v not in VALID_SERVICE_OPTIN_SOURCES:
+            raise ValueError(f"opted_via must be one of: {', '.join(sorted(VALID_SERVICE_OPTIN_SOURCES))}")
+        return v
+
+    @field_validator("opt_in", "opt_out")
+    @classmethod
+    def _validate_dedupe(cls, v: List[int]) -> List[int]:
+        if len(set(v)) != len(v):
+            raise ValueError("service ids must not repeat")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_no_overlap(self):
+        both = set(self.opt_in) & set(self.opt_out)
+        if both:
+            raise ValueError(
+                f"service ids cannot be in both opt_in and opt_out: {sorted(both)}"
+            )
+        return self
+
+
+class BulkServiceOptinResult(BaseModel):
+    """Response of POST /members/{id}/service-optins/bulk — the service_type_ids
+    newly added, the ones whose status flipped, and the member's full opt-in
+    list afterwards, so the caller renders from one response."""
+
+    member_id: int
+    opted_in: List[int] = Field(default_factory=list)
+    changed: List[int] = Field(default_factory=list)
+    data: List[MemberServiceOptin] = Field(default_factory=list)
+
+
 class MemberProfileChangeRequestBase(BaseModel):
     member_id: int
     new_values: dict
@@ -209,6 +375,7 @@ class MembershipCreate(BaseModel):
     """Body for POST /members/{id}/memberships — member comes from the path."""
     membership_type_id: int
     status: str = "ACTIVE"
+    family_membership_number: Optional[str] = None
 
 
 class MemberProfileChangeRequestUpdate(BaseModel):

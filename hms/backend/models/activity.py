@@ -5,7 +5,9 @@ from models.base import Base, AuditMixin
 class UserActivityLog(AuditMixin, Base):
     __tablename__ = "user_activity_logs"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
+    # Nullable so unauthenticated events (e.g. failed login with an unknown
+    # username) can still be recorded; identified failures set user_id.
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
     action: Mapped[str] = mapped_column(String(50), nullable=False) 
     entity_type: Mapped[str] = mapped_column(String(50), nullable=True) 
     entity_id: Mapped[int] = mapped_column(BigInteger, nullable=True)

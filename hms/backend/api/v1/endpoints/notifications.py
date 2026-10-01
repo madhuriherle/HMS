@@ -1,7 +1,8 @@
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, UploadFile, File
+from sqlalchemy import or_ as sa_or
 from sqlalchemy.orm import Session
 from api import deps
 from core.config import settings
@@ -19,9 +20,15 @@ from services.whatsapp import whatsapp_service
 from services.template_renderer import render, template_variables
 from core.pagination import paginate
 from schemas import notifications as schemas_notifications
+from schemas.common import PendingApproval
+from services import approval_gate
+import models.inbox  # noqa: F401  # register inbox tables on Base.metadata
 
 router = APIRouter()
 
+# Purposes the reminder/scan flow looks up. A template with one of these
+# purposes and an active status drives the expiry reminder campaign.
+EXPIRY_PURPOSE = "MEMBERSHIP_EXPIRY"
 VALID_MEMBER_FILTERS = {
     "district_id", "taluk_id", "state_id", "gender", "approval_status",
     "member_status", "membership_type_id", "registration_source",
@@ -78,11 +85,12 @@ def read_templates(db: Session = Depends(deps.get_db), current_user: User = Depe
         q = q.filter(NotificationTemplate.purpose == purpose)
     return paginate(q, page, limit)
 
-@router.post("/templates", response_model=schemas_notifications.NotificationTemplate)
+@router.post("/templates", response_model=Union[schemas_notifications.NotificationTemplate, PendingApproval])
+@approval_gate.gated("notifications", "CREATE", "NotificationTemplate", "notifications.create")
 def create_template(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.write")),
+    current_user: User = Depends(deps.require_permission("notifications.create")),
     template_in: schemas_notifications.NotificationTemplateCreate,
 ) -> Any:
     from crud import notifications as crud_notif
@@ -140,11 +148,12 @@ def read_campaign_recipients(
     return paginate(q.order_by(NotificationRecipient.id), page, limit)
 
 
-@router.post("/campaigns", response_model=schemas_notifications.NotificationCampaign)
+@router.post("/campaigns", response_model=Union[schemas_notifications.NotificationCampaign, PendingApproval])
+@approval_gate.gated("notifications", "CREATE", "NotificationCampaign", "notifications.create")
 def create_campaign(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.write")),
+    current_user: User = Depends(deps.require_permission("notifications.create")),
     campaign_in: schemas_notifications.NotificationCampaignCreate,
 ) -> Any:
     template = db.query(NotificationTemplate).filter(NotificationTemplate.id == campaign_in.template_id).first()
@@ -234,10 +243,11 @@ def _resolve_csv_recipients(db: Session, campaign_id: int) -> List[dict]:
 
 
 @router.post("/campaigns/csv", response_model=schemas_notifications.NotificationCampaign)
+# Not @approval_gate.gated: UploadFile + BackgroundTasks (see notes elsewhere).
 async def create_csv_campaign(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.write")),
+    current_user: User = Depends(deps.require_permission("notifications.create")),
     campaign_name: str,
     template_id: int,
     background_tasks: BackgroundTasks,
@@ -289,10 +299,11 @@ async def create_csv_campaign(
 
 
 @router.post("/send-individual")
+# Not @approval_gate.gated: takes a BackgroundTasks param.
 async def send_individual_notification(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.write")),
+    current_user: User = Depends(deps.require_permission("notifications.create")),
     member_id: int,
     template_id: int,
     variables: Optional[dict] = None,
@@ -358,10 +369,11 @@ async def send_individual_notification(
 
 
 @router.post("/send-bulk")
+# Not @approval_gate.gated: takes a BackgroundTasks param.
 async def send_bulk_notification(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.write")),
+    current_user: User = Depends(deps.require_permission("notifications.create")),
     payload: schemas_notifications.BulkSendRequest,
     background_tasks: BackgroundTasks = None,
 ) -> Any:
@@ -414,10 +426,11 @@ async def send_bulk_notification(
 
 
 @router.post("/campaigns/{campaign_id}/send")
+# Not @approval_gate.gated: takes a BackgroundTasks param.
 async def send_campaign(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.write")),
+    current_user: User = Depends(deps.require_permission("notifications.create")),
     campaign_id: int,
     background_tasks: BackgroundTasks,
 ) -> Any:
@@ -519,3 +532,348 @@ def notification_callback(
     db.add(log)
     db.commit()
     return {"message": "Delivery status updated"}
+
+
+# ── Membership expiry reminders ─────────────────────────────
+
+@router.post("/expiry-reminders")
+# Not @approval_gate.gated: takes a BackgroundTasks param.
+def send_expiry_reminders(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("notifications.create")),
+    days_ahead: int = 30,
+    background_tasks: BackgroundTasks,
+) -> Any:
+    """Scan memberships expiring within `days_ahead` days and queue the
+    MEMBERSHIP_EXPIRY WhatsApp template for each member (Mangalya-parity
+    renewal reminders driven by member_memberships.expires_at).
+
+    Members reminded within the last 7 days are skipped so repeated runs
+    don't spam. Every send is logged to notification_messages.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from models.members import MemberMembership
+
+    template = (
+        db.query(NotificationTemplate)
+        .filter(
+            NotificationTemplate.purpose == EXPIRY_PURPOSE,
+            NotificationTemplate.status == True,  # noqa: E712
+            NotificationTemplate.is_deleted == False,
+        )
+        .first()
+    )
+    if not template:
+        raise HTTPException(400, f"No active template with purpose={EXPIRY_PURPOSE}")
+
+    now = datetime.now(timezone.utc)
+    deadline = now + timedelta(days=days_ahead)
+
+    def _aware(dt):
+        """SQLite returns naive datetimes; assume they are UTC."""
+        return dt.replace(tzinfo=timezone.utc) if dt and dt.tzinfo is None else dt
+
+    expiring = (
+        db.query(MemberMembership, Member)
+        .join(Member, Member.id == MemberMembership.member_id)
+        .filter(
+            MemberMembership.is_deleted == False,
+            MemberMembership.status == "ACTIVE",
+            MemberMembership.expires_at.isnot(None),
+            MemberMembership.expires_at >= now,
+            MemberMembership.expires_at <= deadline,
+            Member.is_deleted == False,
+            Member.member_status == "ACTIVE",
+            Member.mobile.isnot(None),
+        )
+        .all()
+    )
+
+    # Skip members already reminded in the last 7 days (message rows carry
+    # the campaign id; only this reminder flow creates expiry campaigns).
+    cutoff = now - timedelta(days=7)
+    reminder_campaign_ids = [
+        row.id
+        for row in db.query(NotificationCampaign.id).filter(
+            NotificationCampaign.is_deleted == False,
+            NotificationCampaign.target_audience.like("EXPIRY|%"),
+            NotificationCampaign.created_at >= cutoff,
+        )
+    ]
+    reminded_member_ids = {
+        row.member_id
+        for row in db.query(NotificationMessage.member_id).filter(
+            NotificationMessage.is_deleted == False,
+            NotificationMessage.campaign_id.in_(reminder_campaign_ids),
+        )
+        if row.member_id is not None
+    } if reminder_campaign_ids else set()
+
+    recipients = []
+    for membership, member in expiring:
+        expires = _aware(membership.expires_at)
+        if member.id in reminded_member_ids:
+            continue
+        recipients.append((membership, member, expires))
+    if not recipients:
+        return {"queued": 0, "template_id": template.id, "days_ahead": days_ahead}
+
+    campaign = NotificationCampaign(
+        campaign_name=f"Expiry reminders {now:%Y-%m-%d %H:%M}",
+        template_id=template.id,
+        target_audience=f"EXPIRY|{days_ahead}d",
+        source="MEMBERS",
+        status="PENDING",
+        total_recipients=len(recipients),
+        created_by=current_user.id,
+    )
+    db.add(campaign)
+    db.flush()
+
+    jobs = []
+    for membership, member, expires in recipients:
+        variables = {
+            **_member_variables(member),
+            "expiry_date": expires.strftime("%d-%m-%Y") if expires else "",
+            "days_left": str(max((expires - now).days, 0)) if expires else "",
+        }
+        content = render(template.content, variables)
+        to_number = f"{member.mobile_country_code}{member.mobile}"
+        db.add(NotificationRecipient(
+            campaign_id=campaign.id,
+            member_id=member.id,
+            mobile=to_number,
+            variables=variables,
+            created_by=current_user.id,
+        ))
+        jobs.append((member.id, to_number, content))
+    db.commit()
+
+    campaign_id = campaign.id
+    provider_template_id = template.provider_template_id
+
+    async def _send_all():
+        from db.session import SessionLocal
+
+        results = []
+        for member_id, to_number, content in jobs:
+            status, response = "FAILED", None
+            try:
+                from services.whatsapp import whatsapp_service as svc
+                response = await svc.send_message(
+                    to=to_number, message=content, template_id=provider_template_id
+                )
+                status = "SENT"
+            except Exception as exc:
+                response = {"error": str(exc)}
+            results.append({"ok": status == "SENT", "member_id": member_id,
+                            "to": to_number, "content": content, "response": response})
+
+        session = SessionLocal()
+        try:
+            for r in results:
+                session.add(NotificationMessage(
+                    campaign_id=campaign_id,
+                    member_id=r["member_id"],
+                    recipient_number=r["to"],
+                    message_content=r["content"],
+                    delivery_status="SENT" if r["ok"] else "FAILED",
+                    provider_response=r["response"],
+                    created_by=current_user.id,
+                ))
+            session.commit()
+            _finish_campaign(campaign_id, results)
+        finally:
+            session.close()
+
+    background_tasks.add_task(_send_all)
+    return {
+        "queued": len(recipients),
+        "template_id": template.id,
+        "campaign_id": campaign_id,
+        "days_ahead": days_ahead,
+    }
+
+
+# ── In-app notification inbox ───────────────────────────────
+
+@router.get("/inbox")
+def read_inbox(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    page: int = 1,
+    limit: int = 20,
+    unread_only: bool = False,
+) -> Any:
+    """Signed-in user's in-app notifications: personal rows plus broadcasts
+    (user_id IS NULL). Read-state is tracked per user without fan-out."""
+    from models.inbox import AppNotification, AppNotificationRead
+
+    q = (
+        db.query(AppNotification)
+        .outerjoin(AppNotificationRead, (AppNotificationRead.notification_id == AppNotification.id)
+                   & (AppNotificationRead.user_id == current_user.id)
+                   & (AppNotificationRead.is_deleted == False))
+        .filter(
+            AppNotification.is_deleted == False,
+            sa_or(
+                AppNotification.user_id == current_user.id,
+                AppNotification.user_id.is_(None),
+            ),
+        )
+    )
+    if unread_only:
+        q = q.filter(AppNotificationRead.id.is_(None))
+    q = q.order_by(AppNotification.id.desc())
+    return paginate(q, page, limit)
+
+
+@router.get("/inbox/unread-count")
+def read_inbox_unread_count(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    from models.inbox import AppNotification, AppNotificationRead
+
+    count = (
+        db.query(AppNotification)
+        .outerjoin(AppNotificationRead, (AppNotificationRead.notification_id == AppNotification.id)
+                   & (AppNotificationRead.user_id == current_user.id)
+                   & (AppNotificationRead.is_deleted == False))
+        .filter(
+            AppNotification.is_deleted == False,
+            AppNotificationRead.id.is_(None),
+            sa_or(
+                AppNotification.user_id == current_user.id,
+                AppNotification.user_id.is_(None),
+            ),
+        )
+        .count()
+    )
+    return {"unread": count}
+
+
+@router.post("/inbox/{notification_id}/read")
+def mark_inbox_read(
+    notification_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Mark one inbox notification as read (idempotent)."""
+    from datetime import datetime, timezone
+
+    from models.inbox import AppNotification, AppNotificationRead
+
+    notification = db.query(AppNotification).filter(
+        AppNotification.id == notification_id,
+        AppNotification.is_deleted == False,
+        sa_or(
+            AppNotification.user_id == current_user.id,
+            AppNotification.user_id.is_(None),
+        ),
+    ).first()
+    if not notification:
+        raise HTTPException(404, "Notification not found")
+
+    existing = db.query(AppNotificationRead).filter(
+        AppNotificationRead.notification_id == notification_id,
+        AppNotificationRead.user_id == current_user.id,
+        AppNotificationRead.is_deleted == False,
+    ).first()
+    if not existing:
+        db.add(AppNotificationRead(
+            notification_id=notification_id,
+            user_id=current_user.id,
+            read_at=datetime.now(timezone.utc),
+            created_by=current_user.id,
+        ))
+        db.commit()
+    return {"id": notification_id, "read": True}
+
+
+@router.post("/inbox/broadcast")
+@approval_gate.gated("notifications", "CREATE", "AppNotificationBroadcast", "notifications.create")
+def broadcast_inbox(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("notifications.create")),
+    payload: schemas_notifications.InboxBroadcastCreate,
+) -> Any:
+    """Staff broadcast: a single row visible to every user (no fan-out)."""
+    from datetime import datetime, timezone
+
+    from models.inbox import AppNotification
+
+    notification = AppNotification(
+        title=payload.title,
+        body=payload.body,
+        source=payload.source or "MANUAL",
+        data=payload.data,
+        sent_at=datetime.now(timezone.utc),
+        created_by=current_user.id,
+    )
+    db.add(notification)
+    db.commit()
+    db.refresh(notification)
+    from core.pagination import _to_plain
+    return _to_plain(notification, set())
+
+
+# ── Push device tokens ──────────────────────────────────────
+
+@router.post("/devices")
+def register_device(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    payload: schemas_notifications.DeviceTokenCreate,
+) -> Any:
+    """Register (or refresh) a push token for the signed-in user — the
+    mobile app calls this after login. Idempotent per user+token."""
+    from datetime import datetime, timezone
+
+    from models.inbox import UserDeviceToken
+
+    row = db.query(UserDeviceToken).filter(
+        UserDeviceToken.user_id == current_user.id,
+        UserDeviceToken.device_token == payload.device_token,
+        UserDeviceToken.is_deleted == False,
+    ).first()
+    if row:
+        row.last_used_at = datetime.now(timezone.utc)
+        row.device_name = payload.device_name or row.device_name
+    else:
+        row = UserDeviceToken(
+            user_id=current_user.id,
+            device_token=payload.device_token,
+            platform=payload.platform,
+            device_name=payload.device_name,
+            last_used_at=datetime.now(timezone.utc),
+            created_by=current_user.id,
+        )
+        db.add(row)
+    db.commit()
+    db.refresh(row)
+    return {"id": row.id, "registered": True}
+
+
+@router.delete("/devices/{token_id}")
+def deregister_device(
+    token_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    from models.inbox import UserDeviceToken
+
+    row = db.query(UserDeviceToken).filter(
+        UserDeviceToken.id == token_id,
+        UserDeviceToken.user_id == current_user.id,
+        UserDeviceToken.is_deleted == False,
+    ).first()
+    if not row:
+        raise HTTPException(404, "Device not found")
+    row.is_deleted = True
+    db.commit()
+    return {"message": "Device removed"}

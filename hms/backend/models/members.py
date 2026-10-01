@@ -21,6 +21,20 @@ class Member(AuditMixin, Base):
     full_name_kn: Mapped[str] = mapped_column(String(250), nullable=True)
     gender: Mapped[str] = mapped_column(String(20), nullable=True)
     date_of_birth: Mapped[Date] = mapped_column(Date, nullable=True)
+    # Sabha-register personal fields (father/husband name, blood group, …).
+    # Horoscope fields (gotra/nakshatra/rashi/masa/mithi/samvathsara) were
+    # removed in migration 0014 — Mangalya/matrimony owns those.
+    father_husband_name: Mapped[str] = mapped_column(String(150), nullable=True)
+    blood_group: Mapped[str] = mapped_column(String(10), nullable=True)
+    native_place_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    native_place_text: Mapped[str] = mapped_column(String(150), nullable=True)
+    qualification_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    qualification_text: Mapped[str] = mapped_column(String(150), nullable=True)
+    occupation: Mapped[str] = mapped_column(String(150), nullable=True)
+    aadhaar_number: Mapped[str] = mapped_column(String(20), nullable=True)
+    # WhatsApp number when different from mobile (notifications prefer it).
+    whatsapp_number: Mapped[str] = mapped_column(String(20), nullable=True)
+    login_count: Mapped[int] = mapped_column(BigInteger, default=0)
     mobile: Mapped[str] = mapped_column(String(20), nullable=True)
     mobile_country_code: Mapped[str] = mapped_column(String(5), default="+91")
     alternate_mobile: Mapped[str] = mapped_column(String(20), nullable=True)
@@ -36,6 +50,8 @@ class Member(AuditMixin, Base):
     district_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
     taluk_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
     photo_path: Mapped[str] = mapped_column(Text, nullable=True)
+    # Referral: which member brought this person in.
+    referred_by_member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=True)
     registration_source: Mapped[str] = mapped_column(String(20), default="ONLINE")
     registration_status: Mapped[str] = mapped_column(String(20), default="PENDING")
     approval_status: Mapped[str] = mapped_column(String(20), default="UNAPPROVED")
@@ -50,6 +66,9 @@ class MemberMembership(AuditMixin, Base):
     membership_type_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("membership_types.id"), nullable=False)
     price_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("membership_type_prices.id"), nullable=True)
     membership_number: Mapped[str] = mapped_column(String(30), unique=True, nullable=True)
+    # Family membership: dependents point at the head's number (Mangalya
+    # parity: family_membership_number / family_membership_name).
+    family_membership_number: Mapped[str] = mapped_column(String(30), nullable=True)
     applied_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
     activated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -130,12 +149,52 @@ class MembershipTypeHistory(AuditMixin, Base):
     changed_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=True)
 
+class MemberServiceOptin(AuditMixin, Base):
+    """Which HMS services a member has opted into (spec: 'service opted
+    details — Magazine, Temple, Mangalya, Hall etc').
+
+    ServiceType is the catalogue; this table is the per-member opt-in against
+    it, so the profile screen can render one generic list instead of a
+    hand-maintained block per service. Services that need richer lifecycle
+    (Magazine: pause/returns/address override) keep their own dedicated table
+    and set linked_type/linked_id here rather than being duplicated — the
+    optin stays the index of "what did this member opt into", the dedicated
+    table stays the source of truth for the details.
+    """
+
+    __tablename__ = "member_service_optins"
+    __table_args__ = (
+        # One opt-in per (member, service) among live rows; a re-opt-in after a
+        # cancellation is a new row, and the old one stays soft-deleted.
+        Index(
+            "uq_member_service_optin_active", "member_id", "service_type_id",
+            unique=True,
+            postgresql_where=text("is_deleted = false"),
+            sqlite_where=text("is_deleted = false"),
+        ),
+    )
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=False)
+    service_type_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("service_types.id"), nullable=False)
+    # ACTIVE | CANCELLED — an opt-in is either on or explicitly withdrawn.
+    status: Mapped[str] = mapped_column(String(20), default="ACTIVE")
+    opted_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+    opted_via: Mapped[str] = mapped_column(String(20), default="ADMIN")  # ADMIN | MOBILE_APP | WEBSITE
+    # Set when this service has a dedicated table (e.g. MAGAZINE →
+    # magazine_subscriptions.id) so the profile can join to it.
+    linked_type: Mapped[str] = mapped_column(String(30), nullable=True)
+    linked_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    notes: Mapped[str] = mapped_column(Text, nullable=True)
+
+
 class MemberDeletionRequest(AuditMixin, Base):
     __tablename__ = "member_deletion_requests"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
     member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=False)
     requested_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
+    # Master-list reference (Mangalya parity: delete_reason); free text still allowed.
+    reason_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("deletion_reasons.id"), nullable=True)
     deletion_type: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="PENDING")
     reviewed_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)

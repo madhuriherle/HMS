@@ -16,6 +16,11 @@ class Receipt(AuditMixin, Base):
     net_amount: Mapped[float] = mapped_column(Numeric(12,2), nullable=False)
     payment_status: Mapped[str] = mapped_column(String(20), default="SUCCESS")
     source: Mapped[str] = mapped_column(String(20), default="ONLINE")
+    # NEW (first registration) vs RENEWAL (Mangalya parity: receipts.renewal).
+    is_renewal: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Cheque capture (Mangalya parity: cheque_number / cheque_date).
+    cheque_number: Mapped[str] = mapped_column(String(50), nullable=True)
+    cheque_date: Mapped[Date] = mapped_column(Date, nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
 
 class ReceiptItem(AuditMixin, Base):
@@ -30,7 +35,11 @@ class ReceiptAllocation(AuditMixin, Base):
     __tablename__ = "receipt_allocations"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
     receipt_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("receipts.id"), nullable=False)
+    # Payee: exactly one of member (profile history) or associate (donor/
+    # well-wisher recorded in engagements). Enforced at the endpoint, not the
+    # DB — SQLite can't ADD COLUMN with a CHECK.
     member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=True)
+    associate_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("associates.id"), nullable=True)
     membership_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("member_memberships.id"), nullable=True)
     allocated_amount: Mapped[float] = mapped_column(Numeric(12,2), nullable=False)
 

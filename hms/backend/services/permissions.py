@@ -14,35 +14,107 @@ from core.config import settings
 logger = logging.getLogger("hms.permissions")
 
 # (code, module, name, description)
-PERMISSION_CATALOG = [
-    ("masters.write", "masters", "Manage masters", "Create/update states, districts, taluks, pincodes, membership types"),
-    ("users.write", "users", "Manage users", "Create/update users, roles and role permissions"),
-    ("members.write", "members", "Manage members", "Register, edit, approve and delete members"),
-    ("receipts.write", "receipts", "Manage receipts", "Create, allocate, cancel and refund receipts"),
-    ("magazines.write", "magazines", "Manage magazine", "Subscriptions, pauses, returns, labels and KYC links"),
-    ("events.write", "events", "Manage events", "Create/update events, participants and attachments"),
-    ("engagements.write", "engagements", "Manage engagements", "Affiliates, associates, press/media and committee"),
-    ("notifications.write", "notifications", "Send notifications", "Templates, campaigns and WhatsApp sends"),
-    ("approvals.write", "approvals", "Approve requests", "Approve/reject profile, type-change and deletion requests"),
-    ("imports.write", "imports", "Bulk imports", "CSV imports such as postal codes"),
-    ("reports.write", "reports", "Manage reports", "Create, update and delete saved reports"),
+#
+# Each module gets up to three granular permissions — create/update/delete —
+# instead of one coarse "<module>.write", so a role's grant of any one of
+# them can independently be flagged requires_approval (see
+# role_permissions.requires_approval, api.deps.permission_requires_approval)
+# without gating the others. "approvals" is the meta-permission for
+# reviewing requests and is deliberately NOT itself split/gated — approving
+# an approval doesn't make sense. "imports" only has a create-shaped action
+# (a bulk import IS a create).
+_CRUD_MODULES = {
+    "masters": "masters, membership types and personal-master lookups (qualification, native place, …)",
+    "users": "users, roles, role-permission grants and the modules master",
+    "members": "members — profile, memberships, documents",
+    "receipts": "receipts and receipt allocations",
+    "magazines": "magazine subscriptions, pauses, returns and delivery labels",
+    "events": "events, participants and attachments",
+    "engagements": "affiliations, associates, press/media and committee records",
+    "notifications": "notification templates, campaigns and sends",
+    "reports": "saved reports",
+}
+
+PERMISSION_CATALOG = []
+for _module, _desc in _CRUD_MODULES.items():
+    PERMISSION_CATALOG.append((f"{_module}.create", _module, f"Create {_module}", f"Create {_desc}"))
+    PERMISSION_CATALOG.append((f"{_module}.update", _module, f"Update {_module}", f"Update {_desc}"))
+    PERMISSION_CATALOG.append((f"{_module}.delete", _module, f"Delete {_module}", f"Delete {_desc}"))
+
+PERMISSION_CATALOG += [
+    ("approvals.write", "approvals", "Approve requests", "Approve/reject profile, type-change, deletion and generic approval requests"),
+    ("imports.create", "imports", "Bulk imports", "CSV imports such as postal codes"),
+]
+
+# (code, display name) — the distinct modules referenced by PERMISSION_CATALOG,
+# seeded into the `modules` master so they're a managed/listable table rather
+# than bare strings on Permission.module.
+MODULE_CATALOG = [
+    ("masters", "Masters"),
+    ("users", "Users"),
+    ("members", "Membership"),
+    ("receipts", "Receipts"),
+    ("magazines", "Magazine"),
+    ("events", "Events"),
+    ("engagements", "Engagements"),
+    ("notifications", "Notifications"),
+    ("approvals", "Approvals"),
+    ("imports", "Imports"),
+    ("reports", "Reports"),
 ]
 
 
+def seed_modules(db) -> int:
+    """Insert any missing module rows. Returns the number created."""
+    from models.users import Module
+
+    existing = {
+        m.code
+        for m in db.query(Module).filter(Module.is_deleted == False).all()
+    }
+    created = 0
+    for code, name_en in MODULE_CATALOG:
+        if code in existing:
+            continue
+        db.add(Module(code=code, name_en=name_en))
+        created += 1
+    if created:
+        db.commit()
+    return created
+
+
 def seed_permissions(db) -> int:
-    """Insert any missing permission rows. Returns the number created."""
-    from models.users import Permission
+    """Insert any missing permission rows. Returns the number created.
+
+    Requires seed_modules() to have already run: a permission whose module
+    code has no matching modules row is skipped (with a logged error)
+    rather than inserted with a dangling module_id.
+    """
+    from models.users import Permission, Module
 
     existing = {
         p.code
         for p in db.query(Permission).filter(Permission.is_deleted == False).all()
     }
+    modules_by_code = {
+        m.code: m for m in db.query(Module).filter(Module.is_deleted == False).all()
+    }
     created = 0
     for code, module, name, description in PERMISSION_CATALOG:
         if code in existing:
             continue
+        module_row = modules_by_code.get(module)
+        if not module_row:
+            logger.error(
+                "Permission '%s' references unknown module '%s' — not seeded. "
+                "Add it to MODULE_CATALOG first.", code, module,
+            )
+            continue
         db.add(
-            Permission(module=module, name=name, code=code, description=description)
+            Permission(
+                module=module, module_id=module_row.id,
+                name=name, code=code, description=description,
+            )
         )
         created += 1
     if created:
@@ -91,6 +163,9 @@ def run_bootstrap(db) -> None:
     Never raises — a broken/absent schema must not prevent the API from booting.
     """
     try:
+        created_modules = seed_modules(db)
+        if created_modules:
+            logger.info("Seeded %s new module(s).", created_modules)
         created = seed_permissions(db)
         if created:
             logger.info("Seeded %s new permission(s).", created)

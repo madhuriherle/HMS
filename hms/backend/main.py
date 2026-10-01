@@ -26,19 +26,32 @@ logger = logging.getLogger("hms")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Validate config, configure logging, then seed permissions + first admin."""
+    """Validate config, configure logging, then seed permissions,
+    service types and the first admin."""
     validate_secret_key(settings)
     setup_logging()
 
     from db.session import SessionLocal
     from services.permissions import run_bootstrap
+    from services.service_types import seed_service_types
 
     db = SessionLocal()
     try:
         run_bootstrap(db)
+        seed_service_types(db)
     finally:
         db.close()
-    yield
+
+    scheduler_task = None
+    if settings.SCHEDULER_ENABLED:
+        import asyncio
+        from services.scheduler import run_forever
+        scheduler_task = asyncio.create_task(run_forever())
+    try:
+        yield
+    finally:
+        if scheduler_task:
+            scheduler_task.cancel()
 
 
 app = FastAPI(

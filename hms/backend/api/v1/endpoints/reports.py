@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from datetime import datetime, date, timezone
@@ -16,8 +16,11 @@ from models.magazines import (
 from models.reports import ReportExportLog, SavedReport
 from api import deps
 from models.users import User
+from services.exports import render_export as _export_response, log_report_export
 from core.pagination import paginate
 from schemas import reports as schemas_reports
+from schemas.common import PendingApproval
+from services import approval_gate
 import pandas as pd
 import io
 import re
@@ -48,37 +51,8 @@ KANNADA_HEADERS = {
 
 # ─────────────── shared helpers ───────────────
 
-def _export_response(
-    db: Session,
-    current_user: User,
-    report_key: str,
-    export: str,
-    filters: dict,
-    data: List[dict],
-    filename: str,
-):
-    """Render rows as CSV (with Kannada-safe BOM) or Excel, logging the export."""
-    if export not in ("csv", "excel"):
-        raise HTTPException(400, "export must be 'csv' or 'excel'")
-    log_report_export(db, current_user.id, report_key, export, filters)
-    df = pd.DataFrame(data)
-    if export == "csv":
-        stream = io.StringIO()
-        df.to_csv(stream, index=False)
-        return Response(
-            # BOM so Excel opens Kannada content correctly
-            content="\ufeff" + stream.getvalue(),
-            media_type="text/csv; charset=utf-8",
-            headers={"Content-Disposition": f"attachment; filename={filename}.csv"},
-        )
-    stream = io.BytesIO()
-    df.to_excel(stream, index=False, engine="openpyxl")
-    stream.seek(0)
-    return Response(
-        content=stream.read(),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename={filename}.xlsx"},
-    )
+# CSV/Excel rendering + export audit logging moved to services.exports so
+# operational screens (receipt tracking, renewals-due) share the Export button.
 
 
 def _member_name(m: Member) -> str:
@@ -966,15 +940,9 @@ def report_summary(
 
 
 def log_report_export(db: Session, user_id: int, report_key: str, export_format: str, filters: dict) -> None:
-    db.add(ReportExportLog(
-        report_key=report_key,
-        filters={key: value for key, value in filters.items() if value is not None},
-        format=export_format,
-        exported_by=user_id,
-        exported_at=datetime.now(timezone.utc),
-        created_by=user_id,
-    ))
-    db.commit()
+    """Deprecated shim → services.exports (kept so existing imports keep working)."""
+    from services.exports import log_report_export as _log
+    _log(db, user_id, report_key, export_format, filters)
 
 
 @router.get("/saved")
@@ -990,11 +958,12 @@ def read_saved_reports(
         q = q.filter(SavedReport.report_key == report_key)
     return paginate(q, page, limit)
 
-@router.post("/saved", response_model=schemas_reports.SavedReport)
+@router.post("/saved", response_model=Union[schemas_reports.SavedReport, PendingApproval])
+@approval_gate.gated("reports", "CREATE", "SavedReport", "reports.create")
 def create_saved_report(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("reports.write")),
+    current_user: User = Depends(deps.require_permission("reports.create")),
     report_in: schemas_reports.SavedReportCreate,
 ) -> Any:
     report = SavedReport(**report_in.model_dump(), created_by=current_user.id)
@@ -1003,11 +972,12 @@ def create_saved_report(
     db.refresh(report)
     return report
 
-@router.put("/saved/{id}", response_model=schemas_reports.SavedReport)
+@router.put("/saved/{id}", response_model=Union[schemas_reports.SavedReport, PendingApproval])
+@approval_gate.gated("reports", "UPDATE", "SavedReport", "reports.update")
 def update_saved_report(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("reports.write")),
+    current_user: User = Depends(deps.require_permission("reports.update")),
     id: int,
     report_in: schemas_reports.SavedReportUpdate,
 ) -> Any:
@@ -1022,10 +992,11 @@ def update_saved_report(
     return report
 
 @router.delete("/saved/{id}")
+@approval_gate.gated("reports", "DELETE", "SavedReport", "reports.delete")
 def delete_saved_report(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("reports.write")),
+    current_user: User = Depends(deps.require_permission("reports.delete")),
     id: int,
 ) -> Any:
     report = db.query(SavedReport).filter(SavedReport.id == id, SavedReport.is_deleted == False).first()
