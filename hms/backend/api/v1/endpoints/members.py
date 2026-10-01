@@ -911,6 +911,36 @@ def _member_optin_or_404(db: Session, member_id: int, optin_id: int) -> MemberSe
     return optin
 
 
+@router.get("/{id}/membership-credit")
+def read_membership_credit(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    id: int,
+) -> Any:
+    """What the member has paid toward membership, which type that buys, and
+    what is left over for the next one (see services/membership_credit)."""
+    from services import membership_credit
+    if not crud_members.member.get(db=db, id=id):
+        raise HTTPException(status_code=404, detail="Member not found")
+    return membership_credit.summary(db, id)
+
+
+@router.post("/{id}/membership-credit/recalculate")
+def recalculate_membership_credit(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.write")),
+    id: int,
+) -> Any:
+    """Re-run the auto-upgrade for one member (e.g. after correcting receipts
+    or changing the membership prices). Only ever upgrades."""
+    from services import membership_credit
+    if not crud_members.member.get(db=db, id=id):
+        raise HTTPException(status_code=404, detail="Member not found")
+    change = membership_credit.apply_auto_upgrade(db, id, current_user.id)
+    db.commit()
+    return {"changed": change, **membership_credit.summary(db, id)}
+
+
 @router.get("/{id}/profile")
 def read_member_profile(
     *,
@@ -1050,6 +1080,7 @@ def read_member_profile(
             if c.name not in ("is_deleted", "deleted_by", "deleted_at")
         },
         "memberships": membership_list,
+        "membership_credit": __import__("services.membership_credit", fromlist=["summary"]).summary(db, id),
         "services": {
             # Generic opt-ins (Temple, Mangalya, Hall, …) — the catalogue is
             # driven, so a new service_type row shows up here with no code

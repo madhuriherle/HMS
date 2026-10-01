@@ -1,4 +1,4 @@
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -725,6 +725,32 @@ def create_document_type(
     if dup:
         raise HTTPException(409, f"Document type code '{dt_in.code}' already exists")
     return crud_masters.document_type.create(db=db, obj_in=dt_in, created_by=current_user.id)
+
+
+# ─────────────── MEMBERSHIP CREDIT SETTING ───────────────
+@router.get("/membership-credit-settings")
+def read_membership_credit_settings(db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user)) -> Any:
+    """Receipt types whose allocated money counts toward a member's
+    membership total (and so toward auto-upgrade)."""
+    from services import membership_credit
+    return {
+        "receipt_types": membership_credit.credit_receipt_types(db),
+        "default": membership_credit.DEFAULT_RECEIPT_TYPES,
+    }
+
+
+@router.put("/membership-credit-settings")
+def update_membership_credit_settings(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("masters.write")),
+    receipt_types: List[str],
+) -> Any:
+    from services import membership_credit
+    if not receipt_types:
+        raise HTTPException(400, "Give at least one receipt type")
+    saved = membership_credit.set_credit_receipt_types(db, receipt_types, current_user.id)
+    db.commit()
+    return {"receipt_types": saved}
 
 
 @router.get("/document-types/{id}", response_model=schemas_masters.DocumentType)

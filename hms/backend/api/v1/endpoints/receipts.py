@@ -24,6 +24,8 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import func, or_
 from models.masters import MembershipType
 
+from services import membership_credit
+
 router = APIRouter()
 
 VALID_RECEIPT_TYPES = {
@@ -203,9 +205,16 @@ def create_receipt(
         )
 
     receipt_no = generate_next_number(db, "RECEIPT", "REC")
-    return crud_receipts.receipt.create_with_items(
+    created = crud_receipts.receipt.create_with_items(
         db=db, obj_in=receipt_in, created_by=current_user.id, receipt_number=receipt_no
     )
+    if receipt_in.allocations:
+        membership_credit.recompute_members(
+            db, [a.member_id for a in receipt_in.allocations], current_user.id
+        )
+        db.commit()
+        db.refresh(created)
+    return created
 
 
 @router.get("/tracking")
@@ -673,6 +682,9 @@ def allocate_receipt(
         created_by=current_user.id,
     )
     db.add(alloc)
+    db.flush()
+    # Payments add up: reaching a membership type's price upgrades the member.
+    membership_credit.recompute_members(db, [alloc.member_id], current_user.id)
     db.commit()
     db.refresh(alloc)
     return alloc

@@ -6277,3 +6277,90 @@ def test_monthly_marks_returned_R_and_pause_with_reason(client, admin_headers):
     grid = client.get(f"{M}/subscriptions/{sub['id']}/monthly", headers=admin_headers, params={"year": 2026}).json()
     assert grid["months"][2]["mark"] in ("", "P")
     assert client.get(f"{M}/members/99999999/monthly", headers=admin_headers).status_code == 404
+
+
+def test_membership_credit_auto_upgrade_with_remaining_carried(client, admin_headers):
+    H = admin_headers
+    # isolate the ladder: retire every other membership type from earlier tests
+    for t in client.get("/api/v1/masters/membership-types", headers=H, params={"limit": 500}).json()["data"]:
+        client.put(f"/api/v1/masters/membership-types/{t['id']}", headers=H, json={"status": False})
+
+    def mk_type(code, name, price):
+        t = _create_membership_type(client, H, code, name)
+        pr = client.post(f"/api/v1/masters/membership-types/{t['id']}/prices", headers=H,
+                         json={"amount": price, "effective_from": "2026-01-01"})
+        assert pr.status_code in (200, 201), pr.text
+        return t
+
+    poshaka = mk_type("LAD_POSHAKA", "Ladder Poshaka", 1000)
+    maha = mk_type("LAD_MAHA", "Ladder Mahaposhaka", 5000)
+
+    member = _create_member(client, H, "9633333333", "Ladder")
+    mid = member["id"]
+    credit = lambda: client.get(f"/api/v1/members/{mid}/membership-credit", headers=H).json()
+    pay = lambda amt, rtype="MEMBERSHIP": _make_receipt(
+        client, H, receipt_type=rtype, gross_amount=amt, net_amount=amt,
+        items=[{"item_type": rtype, "amount": amt}],
+        allocations=[{"member_id": mid, "allocated_amount": amt}],
+    )
+
+    # 600 is short of the cheapest type: nothing happens, 600 stays as remaining
+    pay(600)
+    c = credit()
+    assert c["credit_total"] == 600 and c["qualified_type"] is None and c["current_type"] is None
+    assert c["remaining_amount"] == 600 and c["next_type"]["code"] == "LAD_POSHAKA" and c["amount_to_next_type"] == 400
+
+    # +900 -> 1500: becomes Poshaka, 500 left over toward Mahaposhaka
+    pay(900)
+    c = credit()
+    assert c["current_type"]["code"] == "LAD_POSHAKA" and c["qualified_type"]["code"] == "LAD_POSHAKA"
+    assert c["remaining_amount"] == 500 and c["amount_to_next_type"] == 3500 and c["upgrade_pending"] is False
+    assert client.get(f"/api/v1/members/{mid}/profile", headers=H).json()["membership_credit"]["credit_total"] == 1500
+
+    # a general donation counts too: 1500 + 3500 = 5000 -> Mahaposhaka, nothing left over
+    donation = pay(3500, "GENERAL_DONATION")
+    c = credit()
+    assert c["current_type"]["code"] == "LAD_MAHA" and c["remaining_amount"] == 0 and c["next_type"] is None
+
+    # upgrade history was written
+    hist = client.get(f"/api/v1/members/{mid}/profile", headers=H).json()
+    assert any(m["membership_type_id"] == maha["id"] for m in hist["memberships"])
+
+    # scholarship money does NOT count until the setting says so
+    pay(10000, "SCHOLARSHIP")
+    assert credit()["credit_total"] == 5000
+    settings = client.get("/api/v1/masters/membership-credit-settings", headers=H).json()
+    assert "MEMBERSHIP" in settings["receipt_types"] and "SCHOLARSHIP" not in settings["receipt_types"]
+
+    # extra money beyond the top type is kept as remaining
+    pay(700)
+    assert credit()["remaining_amount"] == 700 and credit()["current_type"]["code"] == "LAD_MAHA"
+
+    # cancelling a receipt never downgrades; the summary just shows the shortfall
+    assert client.post(f"/api/v1/receipts/{donation['id']}/cancel", headers=H, json={"reason": "bounced"}).status_code == 200
+    c = credit()
+    assert c["credit_total"] == 2200 and c["current_type"]["code"] == "LAD_MAHA"
+    assert c["qualified_type"]["code"] == "LAD_POSHAKA" and c["remaining_amount"] == 1200
+    assert client.post(f"/api/v1/members/{mid}/membership-credit/recalculate", headers=H).json()["changed"] is None
+
+    # allocating later (receipt first, member mapped afterwards) also upgrades
+    m2 = _create_member(client, H, "9644444444", "Ladder Two")
+    r = _make_receipt(client, H, gross_amount=1000, net_amount=1000, items=[{"item_type": "MEMBERSHIP", "amount": 1000}])
+    assert client.get(f"/api/v1/members/{m2['id']}/membership-credit", headers=H).json()["current_type"] is None
+    assert client.post(f"/api/v1/receipts/{r['id']}/allocate", headers=H,
+                       json={"member_id": m2["id"], "allocated_amount": 1000}).status_code == 201
+    assert client.get(f"/api/v1/members/{m2['id']}/membership-credit", headers=H).json()["current_type"]["code"] == "LAD_POSHAKA"
+
+    # a refund reduces what the receipt contributes
+    m3 = _create_member(client, H, "9655555555", "Ladder Three")
+    r3 = _make_receipt(client, H, gross_amount=2000, net_amount=2000, items=[{"item_type": "MEMBERSHIP", "amount": 2000}],
+                       allocations=[{"member_id": m3["id"], "allocated_amount": 2000}])
+    assert client.get(f"/api/v1/members/{m3['id']}/membership-credit", headers=H).json()["credit_total"] == 2000
+    assert client.post(f"/api/v1/receipts/{r3['id']}/refund", headers=H, json={"amount": 1000, "status": "COMPLETED"}).status_code == 200
+    assert client.get(f"/api/v1/members/{m3['id']}/membership-credit", headers=H).json()["credit_total"] == 1000
+
+    # setting round trip
+    put = client.put("/api/v1/masters/membership-credit-settings", headers=H, json=["membership", "scholarship"])
+    assert put.status_code == 200 and put.json()["receipt_types"] == ["MEMBERSHIP", "SCHOLARSHIP"]
+    assert client.put("/api/v1/masters/membership-credit-settings", headers=H, json=[]).status_code == 400
+    client.put("/api/v1/masters/membership-credit-settings", headers=H, json=["MEMBERSHIP", "TYPE_CHANGE", "GENERAL_DONATION", "DONATION"])
