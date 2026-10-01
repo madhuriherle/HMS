@@ -6326,14 +6326,17 @@ def test_membership_credit_auto_upgrade_with_remaining_carried(client, admin_hea
     hist = client.get(f"/api/v1/members/{mid}/profile", headers=H).json()
     assert any(m["membership_type_id"] == maha["id"] for m in hist["memberships"])
 
-    # scholarship money does NOT count until the setting says so
-    pay(10000, "SCHOLARSHIP")
-    assert credit()["credit_total"] == 5000
+    # every fund counts by default (Don 1-3, P.Nidhi, scholarship), but a
+    # magazine payment is a purchase, not giving
     settings = client.get("/api/v1/masters/membership-credit-settings", headers=H).json()
-    assert "MEMBERSHIP" in settings["receipt_types"] and "SCHOLARSHIP" not in settings["receipt_types"]
+    assert {"DONATION_1", "DONATION_2", "DONATION_3", "P_NIDHI", "SCHOLARSHIP", "MEMBERSHIP"} <= set(settings["receipt_types"])
+    assert "MAGAZINE" not in settings["receipt_types"]
+    pay(100, "MAGAZINE")
+    assert credit()["credit_total"] == 5000
+    pay(100, "DONATION_1"); pay(100, "DONATION_2"); pay(100, "DONATION_3"); pay(100, "P_NIDHI"); pay(300, "SCHOLARSHIP")
+    assert credit()["credit_total"] == 5700
 
     # extra money beyond the top type is kept as remaining
-    pay(700)
     assert credit()["remaining_amount"] == 700 and credit()["current_type"]["code"] == "LAD_MAHA"
 
     # cancelling a receipt never downgrades; the summary just shows the shortfall
@@ -6363,4 +6366,5 @@ def test_membership_credit_auto_upgrade_with_remaining_carried(client, admin_hea
     put = client.put("/api/v1/masters/membership-credit-settings", headers=H, json=["membership", "scholarship"])
     assert put.status_code == 200 and put.json()["receipt_types"] == ["MEMBERSHIP", "SCHOLARSHIP"]
     assert client.put("/api/v1/masters/membership-credit-settings", headers=H, json=[]).status_code == 400
-    client.put("/api/v1/masters/membership-credit-settings", headers=H, json=["MEMBERSHIP", "TYPE_CHANGE", "GENERAL_DONATION", "DONATION"])
+    assert client.put("/api/v1/masters/membership-credit-settings", headers=H, json=["NOPE"]).status_code == 400
+    client.put("/api/v1/masters/membership-credit-settings", headers=H, json=settings["default"])

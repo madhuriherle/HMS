@@ -33,6 +33,9 @@ VALID_RECEIPT_TYPES = {
     "GENERAL_DONATION",    # unrestricted donation
     "SCHOLARSHIP",         # scholarship fund contribution
     "DONATION",            # (legacy alias of GENERAL_DONATION, still accepted)
+    # Funds from the legacy register's receipt grid (Don 1-3, P.Nidhi).
+    "DONATION_1", "DONATION_2", "DONATION_3",
+    "P_NIDHI",
     "MAGAZINE",
     "EVENT",
     "OTHER",

@@ -748,6 +748,10 @@ def update_membership_credit_settings(
     from services import membership_credit
     if not receipt_types:
         raise HTTPException(400, "Give at least one receipt type")
+    from api.v1.endpoints.receipts import VALID_RECEIPT_TYPES
+    unknown = {t.strip().upper() for t in receipt_types} - VALID_RECEIPT_TYPES - {"TYPE_CHANGE"}
+    if unknown:
+        raise HTTPException(400, f"Unknown receipt type(s): {', '.join(sorted(unknown))}")
     saved = membership_credit.set_credit_receipt_types(db, receipt_types, current_user.id)
     db.commit()
     return {"receipt_types": saved}

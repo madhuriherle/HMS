@@ -3,7 +3,7 @@
 A member's *credit* is the sum of the money allocated to them on receipts
 (successful, not cancelled, net of refunds) of the receipt types that count
 toward membership (setting ``membership_credit.receipt_types``; default
-MEMBERSHIP, TYPE_CHANGE and general donations).
+MEMBERSHIP, TYPE_CHANGE, donations incl. Don 1-3, P.Nidhi and scholarship).
 
 The membership *ladder* is the active membership types ordered by their
 current price. The member qualifies for the most expensive type whose price
@@ -27,7 +27,13 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 SETTING_KEY = "membership_credit.receipt_types"
-DEFAULT_RECEIPT_TYPES = ["MEMBERSHIP", "TYPE_CHANGE", "GENERAL_DONATION", "DONATION"]
+# Everything a member can give counts: membership fee, upgrade difference,
+# donations (incl. the legacy Don 1-3 funds), P.Nidhi and scholarship money.
+# Magazine / event / other receipts are payments for something, not giving.
+DEFAULT_RECEIPT_TYPES = [
+    "MEMBERSHIP", "TYPE_CHANGE", "GENERAL_DONATION", "DONATION",
+    "DONATION_1", "DONATION_2", "DONATION_3", "P_NIDHI", "SCHOLARSHIP",
+]
 # Receipt payment statuses that count as money received.
 COUNTED_STATUSES = ("SUCCESS", "PAID")
 # Refund statuses that mean the money did not go back.
