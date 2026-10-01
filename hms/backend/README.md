@@ -218,3 +218,14 @@ python scripts/dump_db_schema.py   # regenerates docs/db_schema.xlsx + docs/db_s
 | Reports | `/api/v1/reports` | Members, receipts, labels (CSV/Excel export) |
 | Activity | `/api/v1/activity` | User and member audit trails |
 | System | `/api/v1/system` | Authenticated file downloads, error logs |
+
+## Users, roles and privileges (Anegudde model)
+
+* **One role per user** (`users.role_id`). A role has a `rank_level` (1 = top, larger = weaker), an optional `is_all_access` flag and an optional scope `module_id`.
+* **Rank rules:** you can only see, create, edit or delete users and roles that are *strictly weaker* than your own role, and only assign roles weaker than yours. All-access roles bypass privilege checks, never the rank rules.
+* **Privileges** are `<module>.read` / `.write` / `.delete` (Users group: `users.management`, `roles`, `users.privileges`). GET endpoints of a module need `<module>.read`; writes need the endpoint's own privilege. Each grant can also be flagged `requires_approval` (maker-checker).
+* **Modules are data**: the `modules` table (tree: `parent_id`, `route`, `icon`, `display_order`, `status`, `min_rank_level`) and the `permissions` table drive the sidebar menu (`GET /users/modules/menu`), the role privilege screen (`GET /users/modules/privilege-tree`) and the module gates (disabled module / `min_rank_level` block every privilege linked to it). Module CRUD and `link-privileges` are Rank 1 only. Nothing is re-created from code at startup.
+* **Starting rows** come from `db/seed_defaults.py`: applied by migration `0015`, or on a bare database with `python scripts/seed_defaults.py`.
+* **Sessions:** changing a user's name/role/status/password (or your own profile / password) rotates `users.security_stamp`; tokens carry the stamp, so older sessions get 401 and must log in again.
+* **Passwords:** 8+ characters with upper-case, lower-case, a digit and a symbol.
+* Upgrading from the multi-role model: `user_roles` is folded into `users.role_id` (the strongest role wins; a user who had several roles keeps one — review them), `create`/`update` privileges merge into `write`, and roles that could change a module keep `read` on it. Existing custom roles start at rank 50.

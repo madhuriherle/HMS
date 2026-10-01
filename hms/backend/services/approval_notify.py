@@ -9,19 +9,27 @@ from sqlalchemy.orm import Session
 
 
 def _approvers_write_holders(db: Session) -> list:
-    """User ids holding approvals.write via any active role grant (SUPERADMIN
-    doesn't need a grant to act, but also doesn't need a nudge here — this is
-    for the staff actually configured to review approvals)."""
-    from models.users import Permission, RolePermission, UserRole
+    """User ids who can act on approvals: holders of approvals.write through
+    their (single) role, plus all-access roles."""
+    from models.users import Permission, Role, RolePermission, User
 
-    rows = (
-        db.query(UserRole.user_id)
-        .join(RolePermission, RolePermission.role_id == UserRole.role_id)
+    granted_roles = (
+        db.query(RolePermission.role_id)
         .join(Permission, Permission.id == RolePermission.permission_id)
         .filter(
             Permission.code == "approvals.write",
-            UserRole.is_deleted == False,  # noqa: E712
             RolePermission.is_deleted == False,  # noqa: E712
+        )
+    )
+    rows = (
+        db.query(User.id)
+        .join(Role, Role.id == User.role_id)
+        .filter(
+            User.is_deleted == False,  # noqa: E712
+            User.status == True,  # noqa: E712
+            Role.is_deleted == False,  # noqa: E712
+            Role.status == True,  # noqa: E712
+            (Role.is_all_access == True) | Role.id.in_(granted_roles),  # noqa: E712
         )
         .distinct()
         .all()

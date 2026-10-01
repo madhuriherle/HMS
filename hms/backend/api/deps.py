@@ -1,5 +1,5 @@
 from typing import Generator, Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from db.session import SessionLocal
@@ -35,79 +35,167 @@ def get_current_user(
         raise credentials_exception
     if not user.status:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+    # Session invalidation: a changed role/password/status rotates the stamp,
+    # which makes every token issued before the change worthless.
+    if user.security_stamp and user.security_stamp != payload.get("ss"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session invalidated. Please login again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     # Expose the acting user to the audit listener (services/audit.py).
     # FastAPI caches the get_db dependency per request, so this is the same
     # session instance every endpoint in the request uses.
     db._current_user_id = user.id
     return user
 
-def get_current_active_superuser(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.user_type != "SUPERADMIN":
-        raise HTTPException(status_code=403, detail="Not enough privileges")
+def get_user_role(db: Session, user: User):
+    """The user's single role (cached on the request session)."""
+    from models.users import Role
+    cache = db.info.setdefault("user_role", {})
+    if user.id not in cache:
+        cache[user.id] = (
+            db.query(Role).filter(Role.id == user.role_id, Role.is_deleted == False).first()  # noqa: E712
+            if user.role_id else None
+        )
+    return cache[user.id]
+
+
+def user_rank(db: Session, user: User) -> int:
+    role = get_user_role(db, user)
+    return role.rank_level if role else 99
+
+
+def is_all_access(db: Session, user: User) -> bool:
+    role = get_user_role(db, user)
+    return bool(role and role.status and role.is_all_access)
+
+
+def get_current_active_superuser(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+) -> User:
+    """Rank-1 only (module/privilege-catalog management, system settings)."""
+    if user_rank(db, current_user) != 1:
+        raise HTTPException(status_code=403, detail="Strictly reserved for Super Admin (Rank 1)")
     return current_user
 
+
+def user_permission_codes(db: Session, user: User) -> set:
+    """Active privilege codes granted to the user's role (not expanded for
+    all-access roles — callers check is_all_access first)."""
+    from models.users import Permission, RolePermission
+    role = get_user_role(db, user)
+    if not role or not role.status:
+        return set()
+    key = f"perm_codes:{user.id}"
+    if key not in db.info:
+        rows = (
+            db.query(Permission.code)
+            .join(RolePermission, RolePermission.permission_id == Permission.id)
+            .filter(
+                RolePermission.role_id == role.id,
+                RolePermission.is_deleted == False,  # noqa: E712
+                Permission.is_deleted == False,  # noqa: E712
+                Permission.status == True,  # noqa: E712
+            )
+            .all()
+        )
+        db.info[key] = {r[0] for r in rows}
+    return db.info[key]
+
+
 def permission_requires_approval(db: Session, user: User, permission_code: str) -> bool:
-    """True if the user must go through approval to exercise this permission.
-
-    A permission is held via one or more role grants (role_permissions rows),
-    each independently flagged requires_approval. If ANY grant the user holds
-    for this code is un-gated (requires_approval=False), they can act
-    directly — the most permissive grant wins. Only when every grant they
-    hold is flagged does the action need to be filed for approval instead.
-
-    Assumes the caller already confirmed the user holds the permission at
-    all (e.g. via require_permission) — a user with no grant at all gets
-    False here (nothing to gate), and SUPERADMIN always bypasses.
-    """
-    if user.user_type == "SUPERADMIN":
+    """True if the user's role grant for this permission is flagged
+    requires_approval (maker-checker): the action then files an approval
+    request instead of executing. All-access roles never need approval."""
+    role = get_user_role(db, user)
+    if not role or role.is_all_access:
         return False
-    from models.users import Permission, RolePermission, UserRole
-    grants = (
+    from models.users import Permission, RolePermission
+    gated = (
         db.query(RolePermission.requires_approval)
         .join(Permission, Permission.id == RolePermission.permission_id)
-        .join(UserRole, UserRole.role_id == RolePermission.role_id)
         .filter(
             Permission.code == permission_code,
-            UserRole.user_id == user.id,
-            UserRole.is_deleted == False,
-            RolePermission.is_deleted == False,
+            RolePermission.role_id == role.id,
+            RolePermission.is_deleted == False,  # noqa: E712
         )
-        .all()
+        .first()
     )
-    if not grants:
-        return False
-    return all(gated for (gated,) in grants)
+    return bool(gated and gated[0])
+
+
+def _module_gate(db: Session, user: User, permission_code: str) -> None:
+    """Module-level rules from the privilege's module: a disabled module
+    blocks everyone; min_rank_level blocks roles ranked worse than it."""
+    from models.users import Module, Permission
+    row = (
+        db.query(Module)
+        .join(Permission, Permission.module_id == Module.id)
+        .filter(Permission.code == permission_code, Permission.status == True)  # noqa: E712
+        .first()
+    )
+    if not row:
+        return
+    if not row.status:
+        raise HTTPException(403, f"The '{row.name_en}' module is currently disabled by administrator.")
+    if row.min_rank_level and user_rank(db, user) > row.min_rank_level:
+        raise HTTPException(403, f"This module requires Rank {row.min_rank_level} or higher access.")
 
 
 def require_permission(permission_code: str):
-    """Dependency factory to check if user has a specific permission.
-
-    SUPERADMIN bypasses permission checks. Everyone else needs the code through
-    one of their assigned roles (permissions are seeded at startup).
-    """
+    """Dependency factory: the user's role must hold the privilege (or be
+    all-access), and the privilege's module must be enabled and within the
+    role's rank."""
     def _check(
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)
     ) -> User:
-        if current_user.user_type == "SUPERADMIN":
-            return current_user
-
-        # Cached on the session (one per request) so parallel permission
-        # dependencies in the same request only hit the DB once.
-        codes = db.info.get("user_permission_codes")
-        if codes is None:
-            from models.users import UserRole, RolePermission, Permission
-            # Fetch all permission codes assigned to the user's roles
-            user_permissions = (
-                db.query(Permission.code)
-                .join(RolePermission, RolePermission.permission_id == Permission.id)
-                .join(UserRole, UserRole.role_id == RolePermission.role_id)
-                .filter(UserRole.user_id == current_user.id, UserRole.is_deleted == False)
-                .all()
-            )
-            codes = [p.code for p in user_permissions]
-            db.info["user_permission_codes"] = codes
-        if permission_code not in codes:
-            raise HTTPException(status_code=403, detail=f"Permission '{permission_code}' required")
+        role = get_user_role(db, current_user)
+        if not role or not role.status:
+            raise HTTPException(403, "No active role assigned to this user")
+        if not role.is_all_access and permission_code not in user_permission_codes(db, current_user):
+            raise HTTPException(403, f"Not enough permissions. Required: {permission_code}")
+        _module_gate(db, current_user, permission_code)
         return current_user
     return _check
+
+
+def require_any_permission(*permission_codes: str):
+    """Like require_permission but satisfied by any one of the codes."""
+    def _check(
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+    ) -> User:
+        role = get_user_role(db, current_user)
+        if not role or not role.status:
+            raise HTTPException(403, "No active role assigned to this user")
+        held = user_permission_codes(db, current_user)
+        matched = [c for c in permission_codes if role.is_all_access or c in held]
+        if not matched:
+            raise HTTPException(403, f"Not enough permissions. Required one of: {', '.join(permission_codes)}")
+        last = None
+        for code in matched:
+            try:
+                _module_gate(db, current_user, code)
+                return current_user
+            except HTTPException as exc:
+                last = exc
+        raise last
+    return _check
+
+
+def read_guard(module: str, exempt_prefixes: tuple = ()):
+    """Router-level dependency: GET/HEAD requests need `<module>.read`.
+    Writes keep their own per-endpoint guards (and unauthenticated webhooks
+    on the router, e.g. provider callbacks, are untouched). `exempt_prefixes`
+    are path prefixes (after the router prefix) that only need a login."""
+    async def _guard(request: Request, db: Session = Depends(get_db)) -> None:
+        if request.method not in ("GET", "HEAD"):
+            return
+        if any(f"/{module}{p}" in request.url.path for p in exempt_prefixes):
+            return
+        token = await oauth2_scheme(request)
+        current_user = get_current_user(db=db, token=token)
+        require_permission(f"{module}.read")(db=db, current_user=current_user)
+    return _guard

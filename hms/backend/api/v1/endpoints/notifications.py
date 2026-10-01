@@ -86,11 +86,11 @@ def read_templates(db: Session = Depends(deps.get_db), current_user: User = Depe
     return paginate(q, page, limit)
 
 @router.post("/templates", response_model=Union[schemas_notifications.NotificationTemplate, PendingApproval])
-@approval_gate.gated("notifications", "CREATE", "NotificationTemplate", "notifications.create")
+@approval_gate.gated("notifications", "CREATE", "NotificationTemplate", "notifications.write")
 def create_template(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.create")),
+    current_user: User = Depends(deps.require_permission("notifications.write")),
     template_in: schemas_notifications.NotificationTemplateCreate,
 ) -> Any:
     from crud import notifications as crud_notif
@@ -104,10 +104,10 @@ def read_template(*, db: Session = Depends(deps.get_db), current_user: User = De
     return t
 
 @router.put("/templates/{template_id}", response_model=Union[schemas_notifications.NotificationTemplate, PendingApproval])
-@approval_gate.gated("notifications", "UPDATE", "NotificationTemplate", "notifications.update", id_param="template_id")
+@approval_gate.gated("notifications", "UPDATE", "NotificationTemplate", "notifications.write", id_param="template_id")
 def update_template(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.update")),
+    current_user: User = Depends(deps.require_permission("notifications.write")),
     template_id: int, template_in: schemas_notifications.NotificationTemplateUpdate,
 ) -> Any:
     t = db.query(NotificationTemplate).filter(NotificationTemplate.id == template_id, NotificationTemplate.is_deleted == False).first()
@@ -193,11 +193,11 @@ def read_campaign_recipients(
 
 
 @router.post("/campaigns", response_model=Union[schemas_notifications.NotificationCampaign, PendingApproval])
-@approval_gate.gated("notifications", "CREATE", "NotificationCampaign", "notifications.create")
+@approval_gate.gated("notifications", "CREATE", "NotificationCampaign", "notifications.write")
 def create_campaign(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.create")),
+    current_user: User = Depends(deps.require_permission("notifications.write")),
     campaign_in: schemas_notifications.NotificationCampaignCreate,
 ) -> Any:
     template = db.query(NotificationTemplate).filter(NotificationTemplate.id == campaign_in.template_id).first()
@@ -291,7 +291,7 @@ def _resolve_csv_recipients(db: Session, campaign_id: int) -> List[dict]:
 async def create_csv_campaign(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.create")),
+    current_user: User = Depends(deps.require_permission("notifications.write")),
     campaign_name: str,
     template_id: int,
     background_tasks: BackgroundTasks,
@@ -347,7 +347,7 @@ async def create_csv_campaign(
 async def send_individual_notification(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.create")),
+    current_user: User = Depends(deps.require_permission("notifications.write")),
     member_id: int,
     template_id: int,
     variables: Optional[dict] = None,
@@ -417,7 +417,7 @@ async def send_individual_notification(
 async def send_bulk_notification(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.create")),
+    current_user: User = Depends(deps.require_permission("notifications.write")),
     payload: schemas_notifications.BulkSendRequest,
     background_tasks: BackgroundTasks = None,
 ) -> Any:
@@ -477,10 +477,10 @@ def read_campaign(*, db: Session = Depends(deps.get_db), current_user: User = De
     return c
 
 @router.put("/campaigns/{campaign_id}", response_model=Union[schemas_notifications.NotificationCampaign, PendingApproval])
-@approval_gate.gated("notifications", "UPDATE", "NotificationCampaign", "notifications.update", id_param="campaign_id")
+@approval_gate.gated("notifications", "UPDATE", "NotificationCampaign", "notifications.write", id_param="campaign_id")
 def update_campaign(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.update")),
+    current_user: User = Depends(deps.require_permission("notifications.write")),
     campaign_id: int, campaign_in: schemas_notifications.NotificationCampaignUpdate,
 ) -> Any:
     c = db.query(NotificationCampaign).filter(NotificationCampaign.id == campaign_id, NotificationCampaign.is_deleted == False).first()
@@ -519,7 +519,7 @@ def delete_campaign(
 async def send_campaign(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.create")),
+    current_user: User = Depends(deps.require_permission("notifications.write")),
     campaign_id: int,
     background_tasks: BackgroundTasks,
 ) -> Any:
@@ -630,7 +630,7 @@ def notification_callback(
 def send_expiry_reminders(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.create")),
+    current_user: User = Depends(deps.require_permission("notifications.write")),
     days_ahead: int = 30,
     background_tasks: BackgroundTasks,
 ) -> Any:
@@ -883,11 +883,11 @@ def mark_inbox_read(
 
 
 @router.post("/inbox/broadcast")
-@approval_gate.gated("notifications", "CREATE", "AppNotificationBroadcast", "notifications.create")
+@approval_gate.gated("notifications", "CREATE", "AppNotificationBroadcast", "notifications.write")
 def broadcast_inbox(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.create")),
+    current_user: User = Depends(deps.require_permission("notifications.write")),
     payload: schemas_notifications.InboxBroadcastCreate,
 ) -> Any:
     """Staff broadcast: a single row visible to every user (no fan-out)."""

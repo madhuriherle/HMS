@@ -23,11 +23,12 @@ _last_daily: dict = {}
 
 
 def _system_user(db):
-    from models.users import User
+    from models.users import Role, User
     return (
         db.query(User)
-        .filter(User.user_type.in_(("SUPERADMIN", "ADMIN")), User.is_deleted == False)  # noqa: E712
-        .order_by(User.id)
+        .join(Role, Role.id == User.role_id)
+        .filter(Role.is_all_access == True, User.is_deleted == False, User.status == True)  # noqa: E712
+        .order_by(Role.rank_level, User.id)
         .first()
     )
 

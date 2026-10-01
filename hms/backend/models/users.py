@@ -4,12 +4,6 @@ from models.base import Base, AuditMixin
 from typing import Optional
 import enum
 
-class ScopeTypeEnum(str, enum.Enum):
-    GLOBAL = "GLOBAL"
-    STATE = "STATE"
-    DISTRICT = "DISTRICT"
-    TALUK = "TALUK"
-
 class User(AuditMixin, Base):
     __tablename__ = "users"
     __table_args__ = (
@@ -32,6 +26,12 @@ class User(AuditMixin, Base):
     # Login tracking (Mangalya parity: userprofile.logincount / last_login_method).
     login_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     last_login_method: Mapped[str] = mapped_column(String(20), nullable=True)
+    # Exactly one role per user (Anegudde model): rank, privileges and the
+    # all-access flag all come from it.
+    role_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("roles.id"), nullable=True, index=True)
+    # Rotated whenever the account's identity/role/status/password changes;
+    # tokens carry it, so a mismatch invalidates every older session.
+    security_stamp: Mapped[str] = mapped_column(String(100), nullable=True)
 
 class Module(AuditMixin, Base):
     """RBAC module master (masters, users, members, receipts, …). Groups
@@ -44,6 +44,15 @@ class Module(AuditMixin, Base):
     name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Menu tree (sidebar): parent/child modules, the screen a leaf opens, and
+    # an optional rank gate (roles ranked worse than min_rank_level are locked
+    # out of every privilege in this module).
+    icon: Mapped[str] = mapped_column(String(50), nullable=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("modules.id"), nullable=True)
+    opens_module_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("modules.id"), nullable=True)
+    route: Mapped[str] = mapped_column(String(255), nullable=True)
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    min_rank_level: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
 class Role(AuditMixin, Base):
     __tablename__ = "roles"
@@ -52,6 +61,14 @@ class Role(AuditMixin, Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
+    # 1 = top; a larger number is a weaker role. Users/roles can only be
+    # managed by someone with a strictly smaller rank_level.
+    rank_level: Mapped[int] = mapped_column(Integer, nullable=False, default=99, server_default="99")
+    # All-access roles bypass privilege checks (rank and module-status rules
+    # still apply).
+    is_all_access: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # Optional scope: the role's menu starts from this module branch.
+    module_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("modules.id"), nullable=True)
 
 class Permission(AuditMixin, Base): # Added missing AuditMixin!
     __tablename__ = "permissions"
@@ -64,6 +81,7 @@ class Permission(AuditMixin, Base): # Added missing AuditMixin!
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     code: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
+    status: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=text("true"))
 
 class RolePermission(AuditMixin, Base):
     __tablename__ = "role_permissions"
@@ -84,21 +102,3 @@ class RolePermission(AuditMixin, Base):
     # executing (see api.deps.permission_requires_approval). Lets the same
     # permission code be "free" for one role and "gated" for another.
     requires_approval: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-class UserRole(AuditMixin, Base):
-    __tablename__ = "user_roles"
-    __table_args__ = (
-        Index(
-            "uq_user_roles_active", "user_id", "role_id",
-            unique=True,
-            postgresql_where=text("is_deleted = false"),
-            sqlite_where=text("is_deleted = false"),
-        ),
-    )
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
-    role_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("roles.id"), nullable=False)
-    assigned_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
-    assigned_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
-    scope_type: Mapped[ScopeTypeEnum] = mapped_column(Enum(ScopeTypeEnum), default=ScopeTypeEnum.GLOBAL)
-    scope_id: Mapped[int] = mapped_column(BigInteger, nullable=True)

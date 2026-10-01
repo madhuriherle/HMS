@@ -20,7 +20,7 @@ _PG = os.environ.get("TEST_DATABASE_URL")
 os.environ["DATABASE_URL"] = _PG or f"sqlite:///{_TMP}/test.db"
 os.environ["UPLOAD_DIR"] = os.path.join(_TMP, "uploads")
 os.environ["BOOTSTRAP_ADMIN_USERNAME"] = "admin"
-os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "admintest123"
+os.environ["BOOTSTRAP_ADMIN_PASSWORD"] = "Admintest@123"
 os.environ["WHATSAPP_CALLBACK_SECRET"] = "cb-secret-test"
 
 import pytest  # noqa: E402
@@ -54,6 +54,16 @@ def app_engine():
                     column.type = INTEGER()
 
     Base.metadata.create_all(bind=engine)
+
+    # Modules / privileges / roles live in tables now; load the defaults the
+    # migration would (db/seed_defaults.py). Idempotent, so a migrated
+    # PostgreSQL test database is fine too.
+    from db.seed_defaults import seed_modules, seed_permissions, seed_roles
+    from db.session import SessionLocal
+    with SessionLocal() as seed_db:
+        seed_modules(seed_db)
+        seed_permissions(seed_db)
+        seed_roles(seed_db)
     return engine
 
 
@@ -72,7 +82,7 @@ def client(app_engine):
 def admin_headers(client):
     response = client.post(
         "/api/v1/auth/login",
-        data={"username": "admin", "password": "admintest123"},
+        data={"username": "admin", "password": "Admintest@123"},
     )
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}

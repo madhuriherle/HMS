@@ -13,7 +13,7 @@ from models.base import Base
 
 # Import ALL models so Alembic auto-discovers every table
 from models.masters import State, District, Taluk, PostalCode, MembershipType, MembershipTypePrice, HmsSetting, DocumentType, ServiceType
-from models.users import User, Role, Permission, RolePermission, UserRole
+from models.users import User, Role, Permission, RolePermission
 from models.members import (
     Member, MemberMembership, MemberDocument, MemberApprovalHistory,
     MemberProfileChangeRequest, MemberProfileHistory, MembershipTypeChangeRequest,

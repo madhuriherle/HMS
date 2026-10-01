@@ -73,8 +73,8 @@ def read_upcoming_events(
 
 
 @router.post("/", response_model=Union[schemas_events.Event, PendingApproval])
-@approval_gate.gated("events", "CREATE", "Event", "events.create")
-def create_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.create")), event_in: schemas_events.EventCreate) -> Any:
+@approval_gate.gated("events", "CREATE", "Event", "events.write")
+def create_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.write")), event_in: schemas_events.EventCreate) -> Any:
     return crud_events.event.create(db=db, obj_in=event_in, created_by=current_user.id)
 
 
@@ -159,8 +159,8 @@ def read_event_detail(
 
 
 @router.put("/{id}", response_model=Union[schemas_events.Event, PendingApproval])
-@approval_gate.gated("events", "UPDATE", "Event", "events.update")
-def update_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.update")), id: int, event_in: schemas_events.EventUpdate) -> Any:
+@approval_gate.gated("events", "UPDATE", "Event", "events.write")
+def update_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.write")), id: int, event_in: schemas_events.EventUpdate) -> Any:
     obj = crud_events.event.get(db, id)
     if not obj: raise HTTPException(404, "Event not found")
     return crud_events.event.update(db, db_obj=obj, obj_in=event_in, updated_by=current_user.id)
@@ -179,7 +179,7 @@ def delete_event(*, db: Session = Depends(deps.get_db), current_user: User = Dep
 async def upload_invitation(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("events.create")),
+    current_user: User = Depends(deps.require_permission("events.write")),
     id: int,
     file: UploadFile = File(...),
 ) -> Any:
@@ -210,7 +210,7 @@ async def upload_invitation(
 # Not @approval_gate.gated: UploadFile bytes can't be captured/replayed.
 async def upload_event_attachment(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("events.create")),
+    current_user: User = Depends(deps.require_permission("events.write")),
     event_id: int, file: UploadFile = File(...)
 ) -> Any:
     """Additional event documents (agenda, photos, …)."""
@@ -274,11 +274,11 @@ def read_participants(
 
 
 @router.post("/{event_id}/participants", response_model=Union[schemas_events.EventParticipant, PendingApproval], status_code=201)
-@approval_gate.gated("events", "CREATE", "EventParticipant", "events.create", id_param="event_id")
+@approval_gate.gated("events", "CREATE", "EventParticipant", "events.write", id_param="event_id")
 def add_participant(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("events.create")),
+    current_user: User = Depends(deps.require_permission("events.write")),
     event_id: int,
     participant_in: schemas_events.EventParticipantCreate,
 ) -> Any:
@@ -308,11 +308,11 @@ def add_participant(
 
 
 @router.put("/{event_id}/participants/{participant_id}", response_model=Union[schemas_events.EventParticipant, PendingApproval])
-@approval_gate.gated("events", "UPDATE", "EventParticipant", "events.update", id_param="participant_id")
+@approval_gate.gated("events", "UPDATE", "EventParticipant", "events.write", id_param="participant_id")
 def update_participant(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("events.update")),
+    current_user: User = Depends(deps.require_permission("events.write")),
     event_id: int,
     participant_id: int,
     participant_in: schemas_events.EventParticipantUpdate,
@@ -368,11 +368,11 @@ def remove_participant(
 
 
 @router.post("/{event_id}/links")
-@approval_gate.gated("events", "CREATE", "EventMemberLink", "events.create", id_param="event_id")
+@approval_gate.gated("events", "CREATE", "EventMemberLink", "events.write", id_param="event_id")
 def link_member(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("events.create")),
+    current_user: User = Depends(deps.require_permission("events.write")),
     event_id: int,
     member_id: int,
     role: Optional[str] = None,
@@ -409,7 +409,7 @@ def link_member(
 async def notify_event_members(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("notifications.create")),
+    current_user: User = Depends(deps.require_permission("notifications.write")),
     event_id: int,
     background_tasks: BackgroundTasks,
     template_id: Optional[int] = None,

@@ -6,6 +6,7 @@ from api import deps
 from core.security import decode_token, get_password_hash, create_access_token, create_refresh_token
 from core.config import settings
 from models.users import User
+from schemas.users import ProfileUpdate
 from models.system import PasswordResetToken
 from services.whatsapp import whatsapp_service
 from services.audit import record_activity
@@ -17,6 +18,7 @@ from core.security import (
 )
 from datetime import datetime, timedelta, timezone
 import secrets
+import uuid
 
 router = APIRouter()
 
@@ -102,8 +104,8 @@ def login(
     )
     db.commit()
     return {
-        "access_token": create_access_token(user.id),
-        "refresh_token": create_refresh_token(user.id),
+        "access_token": create_access_token(user.id, security_stamp=user.security_stamp),
+        "refresh_token": create_refresh_token(user.id, security_stamp=user.security_stamp),
         "token_type": "bearer",
     }
 
@@ -141,12 +143,14 @@ def refresh_token(payload: RefreshRequest, db: Session = Depends(deps.get_db)) -
     data = decode_token(payload.refresh_token)
     if not data or data.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Invalid refresh token")
-    user = db.query(User).filter(User.id == int(data["sub"])).first()
-    if not user:
+    user = db.query(User).filter(User.id == int(data["sub"]), User.is_deleted == False).first()  # noqa: E712
+    if not user or not user.status:
         raise HTTPException(status_code=401, detail="User not found")
+    if user.security_stamp and user.security_stamp != data.get("ss"):
+        raise HTTPException(status_code=401, detail="Session invalidated. Please login again.")
     return {
-        "access_token": create_access_token(user.id),
-        "refresh_token": create_refresh_token(user.id),
+        "access_token": create_access_token(user.id, security_stamp=user.security_stamp),
+        "refresh_token": create_refresh_token(user.id, security_stamp=user.security_stamp),
         "token_type": "bearer",
     }
 
@@ -216,6 +220,7 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(deps.get
         raise HTTPException(status_code=404, detail="User not found")
 
     user.password_hash = get_password_hash(payload.new_password)
+    user.security_stamp = str(uuid.uuid4())  # sign out every existing session
     reset.used = True
     db.commit()
     return {"message": "Password reset successfully"}
@@ -233,11 +238,14 @@ def change_password(
     except PasswordPolicyError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     current_user.password_hash = get_password_hash(payload.new_password)
+    current_user.security_stamp = str(uuid.uuid4())  # sign out every existing session
     db.commit()
-    return {"message": "Password updated successfully"}
+    return {"message": "Password updated successfully. Please log in again."}
 
 @router.get("/me")
-def read_me(current_user: User = Depends(deps.get_current_user)) -> Any:
+def read_me(db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user)) -> Any:
+    """Current user with role, rank and the privilege list the UI needs."""
+    role = deps.get_user_role(db, current_user)
     return {
         "id": current_user.id,
         "name": current_user.name,
@@ -245,4 +253,40 @@ def read_me(current_user: User = Depends(deps.get_current_user)) -> Any:
         "email": current_user.email,
         "user_type": current_user.user_type,
         "status": current_user.status,
+        "role_id": role.id if role else None,
+        "role_name": role.name if role else None,
+        "role_rank_level": role.rank_level if role else None,
+        "is_all_access": bool(role and role.is_all_access),
+        "privileges": sorted(deps.user_permission_codes(db, current_user)),
     }
+
+
+@router.put("/me")
+def update_my_profile(
+    payload: ProfileUpdate,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Edit your own name / username / contact details. Role, status and
+    password are not editable here. Any change signs out your existing
+    sessions (security stamp rotates), so log in again afterwards."""
+    data = payload.model_dump(exclude_unset=True)
+    if "username" in data:
+        username = (data["username"] or "").strip()
+        if not username:
+            raise HTTPException(400, "Username is required")
+        if db.query(User).filter(User.username == username, User.id != current_user.id).first():
+            raise HTTPException(400, "Username already exists")
+        data["username"] = username
+    if "name" in data and not (data["name"] or "").strip():
+        raise HTTPException(400, "Name is required")
+    changed = False
+    for k, v in data.items():
+        if getattr(current_user, k) != v:
+            setattr(current_user, k, v)
+            changed = True
+    if changed:
+        current_user.security_stamp = str(uuid.uuid4())
+        current_user.updated_by = current_user.id
+        db.commit()
+    return {"message": "Profile updated. Please log in again." if changed else "No changes"}

@@ -966,11 +966,11 @@ def read_saved_report(*, db: Session = Depends(deps.get_db), current_user: User 
     return r
 
 @router.post("/saved", response_model=Union[schemas_reports.SavedReport, PendingApproval])
-@approval_gate.gated("reports", "CREATE", "SavedReport", "reports.create")
+@approval_gate.gated("reports", "CREATE", "SavedReport", "reports.write")
 def create_saved_report(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("reports.create")),
+    current_user: User = Depends(deps.require_permission("reports.write")),
     report_in: schemas_reports.SavedReportCreate,
 ) -> Any:
     report = SavedReport(**report_in.model_dump(), created_by=current_user.id)
@@ -980,11 +980,11 @@ def create_saved_report(
     return report
 
 @router.put("/saved/{id}", response_model=Union[schemas_reports.SavedReport, PendingApproval])
-@approval_gate.gated("reports", "UPDATE", "SavedReport", "reports.update")
+@approval_gate.gated("reports", "UPDATE", "SavedReport", "reports.write")
 def update_saved_report(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("reports.update")),
+    current_user: User = Depends(deps.require_permission("reports.write")),
     id: int,
     report_in: schemas_reports.SavedReportUpdate,
 ) -> Any:

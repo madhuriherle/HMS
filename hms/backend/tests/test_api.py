@@ -57,7 +57,7 @@ def test_permission_catalog_seeded(client, admin_headers):
     body = response.json()
     assert {"total", "page", "limit", "pages", "data"} <= set(body)
     codes = {p["code"] for p in body["data"]}
-    assert {"members.create", "users.create", "approvals.write"} <= codes
+    assert {"members.write", "users.management.write", "approvals.write"} <= codes
     assert body["total"] >= 11
     assert all(p["module_id"] is not None for p in body["data"]), "every seeded permission must resolve a module_id"
 
@@ -75,7 +75,7 @@ def test_module_catalog_seeded(client, admin_headers):
 
     # module_id on the permission actually resolves to this module's row (real FK, not just a string match)
     perms = client.get("/api/v1/users/permissions", headers=admin_headers).json()["data"]
-    members_create = next(p for p in perms if p["code"] == "members.create")
+    members_create = next(p for p in perms if p["code"] == "members.write")
     assert members_create["module_id"] == members_module["id"]
 
 
@@ -84,13 +84,13 @@ def test_seed_permissions_skips_unknown_module(client, admin_headers):
     inserted with a dangling module_id (guards the FK's integrity intent)."""
     from db.session import SessionLocal
     from models.users import Permission
-    from services.permissions import seed_permissions
+    from db.seed_defaults import seed_permissions
 
     with SessionLocal() as db:
         before = db.query(Permission).filter(Permission.code == "ghost.write").count()
         assert before == 0
 
-        import services.permissions as perm_service
+        import db.seed_defaults as perm_service
         original_catalog = perm_service.PERMISSION_CATALOG
         perm_service.PERMISSION_CATALOG = original_catalog + [
             ("ghost.write", "nonexistent_module", "Ghost", "Should not be seeded")
@@ -151,7 +151,7 @@ def test_generic_approval_engine_create_update_delete(client, admin_headers):
     gated_id, _, gated_headers = _staff_with_role(
         client, admin_headers, "gated_masters_editor", "Gated Masters Editor", "GATED_MASTERS_EDITOR",
         permission_grants=[
-            ("masters.create", True), ("masters.update", True), ("masters.delete", True),
+            ("masters.write", True), ("masters.write", True), ("masters.delete", True),
         ],
     )
 
@@ -244,7 +244,7 @@ def test_filing_an_approval_request_notifies_approvers(client, admin_headers):
     )
     _, _, requester_headers = _staff_with_role(
         client, admin_headers, "notify_requester", "Notify Requester", "NOTIFY_REQUESTER",
-        permission_grants=[("masters.create", True)],
+        permission_grants=[("masters.write", True)],
     )
 
     filed = client.post(
@@ -313,7 +313,7 @@ def test_generic_approval_engine_ungated_grant_executes_immediately(client, admi
     immediate execution, unaffected by the engine."""
     _, _, direct_headers = _staff_with_role(
         client, admin_headers, "direct_masters_editor", "Direct Masters Editor", "DIRECT_MASTERS_EDITOR",
-        permission_grants=[("masters.create", False)],
+        permission_grants=[("masters.write", False)],
     )
     created = client.post(
         "/api/v1/masters/states", headers=direct_headers, json={"name_en": "DirectEngineState"},
@@ -328,7 +328,7 @@ def test_generic_approval_engine_bulk_approve_and_reject(client, admin_headers):
     requests in one call, and one bad id doesn't abort the rest of the batch."""
     _, _, gated_headers = _staff_with_role(
         client, admin_headers, "bulk_masters_editor", "Bulk Masters Editor", "BULK_MASTERS_EDITOR",
-        permission_grants=[("masters.create", True)],
+        permission_grants=[("masters.write", True)],
     )
 
     req_ids = []
@@ -424,7 +424,7 @@ def test_generic_approval_engine_engagements_no_response_model(client, admin_hea
     a different code path through the engine than the masters.State test."""
     _, _, gated_headers = _staff_with_role(
         client, admin_headers, "gated_engagements_editor", "Gated Engagements Editor", "GATED_ENGAGEMENTS_EDITOR",
-        permission_grants=[("engagements.create", True), ("engagements.delete", True)],
+        permission_grants=[("engagements.write", True), ("engagements.delete", True)],
     )
 
     filed = client.post(
@@ -454,7 +454,7 @@ def test_generic_approval_engine_receipts_nested_and_decimal_fields(client, admi
     a stress test for the JSON round-trip through payload capture + replay."""
     _, _, gated_headers = _staff_with_role(
         client, admin_headers, "gated_receipts_editor", "Gated Receipts Editor", "GATED_RECEIPTS_EDITOR",
-        permission_grants=[("receipts.create", True)],
+        permission_grants=[("receipts.write", True)],
     )
 
     filed = client.post(
@@ -489,7 +489,7 @@ def test_password_fields_never_captured_by_generic_engine(client, admin_headers)
     body can carry a plaintext password."""
     _, _, gated_headers = _staff_with_role(
         client, admin_headers, "gated_user_admin", "Gated User Admin", "GATED_USER_ADMIN",
-        permission_grants=[("users.create", True), ("users.update", True)],
+        permission_grants=[("users.management.write", True), ("users.management.write", True)],
     )
 
     created = client.post(
@@ -497,8 +497,8 @@ def test_password_fields_never_captured_by_generic_engine(client, admin_headers)
         json={
             "name": "Directly Created",
             "username": "directly_created_user",
-            "password": "somepass123",
-            "user_type": "STAFF",
+            "password": "Somepass@123",
+            "role_id": _role_id(client, admin_headers, "MEMBER"),
         },
     )
     assert created.status_code == 200, created.text
@@ -511,7 +511,7 @@ def test_password_fields_never_captured_by_generic_engine(client, admin_headers)
 def test_login_writes_activity_log(client):
     response = client.post(
         "/api/v1/auth/login",
-        data={"username": "admin", "password": "admintest123"},
+        data={"username": "admin", "password": "Admintest@123"},
     )
     assert response.status_code == 200, response.text
 
@@ -608,102 +608,71 @@ def test_members_membership_type_filter(client, admin_headers):
 # ─────────────── RBAC ───────────────
 
 def test_rbac_blocks_then_grants_writes(client, admin_headers):
-    response = client.post(
-        "/api/v1/users/",
-        headers=admin_headers,
-        json={
-            "name": "Staff Member",
-            "username": "staff_rbac",
-            "password": "staffpass1",
-            "user_type": "STAFF",
-        },
+    # a staff user whose role has no privileges at all
+    uid, role_id, staff_headers = _staff_with_role(
+        client, admin_headers, "staff_rbac", "Empty Role", "EMPTY_ROLE", permission_grants=[],
     )
-    assert response.status_code == 200, response.text
-    staff_id = response.json()["id"]
 
-    login = client.post(
-        "/api/v1/auth/login",
-        data={"username": "staff_rbac", "password": "staffpass1"},
-    )
-    assert login.status_code == 200, login.text
-    staff_headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
-
-    # reads are open to any authenticated user
-    assert client.get("/api/v1/members/", headers=staff_headers).status_code == 200
-
-    # writes are denied without the permission
-    denied = client.post(
-        "/api/v1/members/",
-        headers=staff_headers,
-        json={"first_name_en": "Nope"},
-    )
+    # reads need <module>.read; writes need <module>.write
+    read_denied = client.get("/api/v1/members/", headers=staff_headers)
+    assert read_denied.status_code == 403 and "members.read" in read_denied.json()["detail"]
+    denied = client.post("/api/v1/members/", headers=staff_headers, json={"first_name_en": "Nope"})
     assert denied.status_code == 403, denied.text
-    assert "members.create" in denied.json()["detail"]
+    assert "members.write" in denied.json()["detail"]
 
-    # SUPERADMIN bypasses the permission check (this call succeeds)
+    # an all-access role bypasses the privilege check (this call succeeds)
     assert _create_member(client, admin_headers, "9000000005", "Super")["id"]
 
-    # grant the permission through a role and retry
-    role = client.post(
-        "/api/v1/users/roles",
-        headers=admin_headers,
-        json={"name": "Member Admin", "code": "MEMBER_ADMIN"},
-    )
-    assert role.status_code == 200, role.text
-
-    grant = client.post(
-        f"/api/v1/users/roles/{role.json()['id']}/permissions",
-        headers=admin_headers,
-        params={"code": "members.create"},
+    # grant the privileges to the role and retry with the same login
+    grant = client.put(
+        f"/api/v1/users/roles/{role_id}/permissions", headers=admin_headers,
+        json={"permission_codes": ["members.read", "members.write"]},
     )
     assert grant.status_code == 200, grant.text
-
-    assigned = client.post(
-        f"/api/v1/users/{staff_id}/assign-role",
-        headers=admin_headers,
-        params={"role_id": role.json()["id"]},
-    )
-    assert assigned.status_code == 200, assigned.text
-
+    assert client.get("/api/v1/members/", headers=staff_headers).status_code == 200
     allowed = client.post(
-        "/api/v1/members/",
-        headers=staff_headers,
+        "/api/v1/members/", headers=staff_headers,
         json={"first_name_en": "Now Allowed", "mobile": "9000000006"},
     )
     assert allowed.status_code == 201, allowed.text
 
-    # assigning the same role twice is idempotent (DB unique index backs it)
-    again = client.post(
-        f"/api/v1/users/{staff_id}/assign-role",
-        headers=admin_headers,
-        params={"role_id": role.json()["id"]},
-    )
-    assert again.status_code == 200, again.text
-    assert "already assigned" in again.json()["message"]
+    # revoking one privilege takes effect immediately
+    assert client.delete(f"/api/v1/users/roles/{role_id}/permissions/{[p['id'] for p in client.get(f'/api/v1/users/roles/{role_id}/permissions', headers=admin_headers).json() if p['code'] == 'members.write'][0]}", headers=admin_headers).status_code == 200
+    assert client.post("/api/v1/members/", headers=staff_headers, json={"first_name_en": "Again", "mobile": "9000000007"}).status_code == 403
 
 
-def _staff_with_role(client, admin_headers, username, role_name, role_code, permission_grants):
-    """Create a STAFF user + a role granting permission_grants
-    ([(code, requires_approval), ...]), assign it, return (user_id, headers)."""
-    user = client.post(
-        "/api/v1/users/",
-        headers=admin_headers,
-        json={"name": role_name, "username": username, "password": "staffpass1", "user_type": "STAFF"},
-    ).json()
+STAFF_PW = "Staffpass@1"
 
-    login = client.post("/api/v1/auth/login", data={"username": username, "password": "staffpass1"})
-    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
 
+def _role_id(client, admin_headers, code):
+    rows = client.get("/api/v1/users/roles", headers=admin_headers, params={"limit": 200}).json()["data"]
+    return next(r["id"] for r in rows if r["code"] == code)
+
+
+def _staff_with_role(client, admin_headers, username, role_name, role_code, permission_grants, rank_level=10):
+    """Create a role (rank 10) granting permission_grants ([(code, requires_approval), ...];
+    <module>.read is added for every module granted, as the migration does), create a user
+    holding it, log in, and return (user_id, role_id, headers)."""
     role = client.post(
         "/api/v1/users/roles", headers=admin_headers,
-        json={"name": role_name, "code": role_code},
+        json={"name": role_name, "code": role_code, "rank_level": rank_level},
     ).json()
+    grants = {}
     for code, requires_approval in permission_grants:
-        client.post(
-            f"/api/v1/users/roles/{role['id']}/permissions", headers=admin_headers,
-            params={"code": code, "requires_approval": requires_approval},
-        )
-    client.post(f"/api/v1/users/{user['id']}/assign-role", headers=admin_headers, params={"role_id": role["id"]})
+        grants[code] = grants.get(code, False) or requires_approval
+    for code in list(grants):
+        grants.setdefault(code.rsplit(".", 1)[0] + ".read", False)
+    resp = client.put(
+        f"/api/v1/users/roles/{role['id']}/permissions", headers=admin_headers,
+        json={"permission_codes": list(grants), "approval_required_codes": [c for c, v in grants.items() if v]},
+    )
+    assert resp.status_code == 200, resp.text
+    user = client.post(
+        "/api/v1/users/", headers=admin_headers,
+        json={"name": role_name, "username": username, "password": STAFF_PW, "role_id": role["id"]},
+    ).json()
+    login = client.post("/api/v1/auth/login", data={"username": username, "password": STAFF_PW})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
     return user["id"], role["id"], headers
 
 
@@ -741,7 +710,7 @@ def test_member_delete_gated_grant_files_approval_request(client, admin_headers)
 
     # a role with approvals.write can approve it
     _, _, admin_role_headers = _staff_with_role(
-        client, admin_headers, "gated_admin", "Admin", "ADMIN_GATED",
+        client, admin_headers, "gated_admin", "Gated Approver", "ADMIN_GATED",
         permission_grants=[("approvals.write", False)],
     )
     approved = client.put(
@@ -782,7 +751,7 @@ def test_member_delete_without_permission_denied(client, admin_headers):
 
     _, _, editor_headers = _staff_with_role(
         client, admin_headers, "editor_only", "Editor", "EDITOR_ONLY",
-        permission_grants=[("members.create", False), ("members.update", False)],
+        permission_grants=[("members.write", False), ("members.write", False)],
     )
 
     denied = client.delete(
@@ -793,28 +762,24 @@ def test_member_delete_without_permission_denied(client, admin_headers):
     assert "members.delete" in denied.json()["detail"]
 
 
-def test_member_delete_most_permissive_grant_wins(client, admin_headers):
-    """A user holding members.delete via two roles — one gated, one not —
-    can act directly: any un-gated grant beats a gated one."""
+def test_member_delete_ungating_the_grant_executes_directly(client, admin_headers):
+    """One role per user: once the role's members.delete grant is switched
+    from requires_approval to un-gated, the same user acts directly."""
     target = _create_member(client, admin_headers, "9000000099", "MixedGrantDelete")
 
-    user_id, gated_role_id, headers = _staff_with_role(
+    _, role_id, headers = _staff_with_role(
         client, admin_headers, "mixed_grant_user", "Gated Role", "GATED_ROLE",
         permission_grants=[("members.delete", True)],
     )
-    ungated_role = client.post(
-        "/api/v1/users/roles", headers=admin_headers,
-        json={"name": "Ungated Role", "code": "UNGATED_ROLE"},
-    ).json()
-    client.post(
-        f"/api/v1/users/roles/{ungated_role['id']}/permissions", headers=admin_headers,
-        params={"code": "members.delete", "requires_approval": False},
+    resync = client.put(
+        f"/api/v1/users/roles/{role_id}/permissions", headers=admin_headers,
+        json={"permission_codes": ["members.delete", "members.read"], "approval_required_codes": []},
     )
-    client.post(f"/api/v1/users/{user_id}/assign-role", headers=admin_headers, params={"role_id": ungated_role["id"]})
+    assert resync.status_code == 200, resync.text
 
     deleted = client.delete(
         f"/api/v1/members/{target['id']}", headers=headers,
-        params={"reason": "most permissive wins", "mode": "SOFT"},
+        params={"reason": "ungated now", "mode": "SOFT"},
     )
     assert deleted.status_code == 200, deleted.text
     assert deleted.json().get("status") != "PENDING"
@@ -1111,8 +1076,8 @@ def test_password_reset_roundtrip(client, admin_headers, monkeypatch):
         json={
             "name": "Mobile User",
             "username": "mobile_user",
-            "password": "oldpass123",
-            "user_type": "STAFF",
+            "password": "Oldpass@123",
+            "role_id": _role_id(client, admin_headers, "MEMBER"),
             "mobile": "9845000001",
         },
     )
@@ -1143,7 +1108,7 @@ def test_password_reset_roundtrip(client, admin_headers, monkeypatch):
 
     response = client.post(
         "/api/v1/auth/reset-password",
-        json={"token": token, "new_password": "brandnew123"},
+        json={"token": token, "new_password": "Brandnew@123"},
     )
     assert response.status_code == 200, response.text
 
@@ -1163,7 +1128,7 @@ def test_password_reset_roundtrip(client, admin_headers, monkeypatch):
 
     login = client.post(
         "/api/v1/auth/login",
-        data={"username": "mobile_user", "password": "brandnew123"},
+        data={"username": "mobile_user", "password": "Brandnew@123"},
     )
     assert login.status_code == 200, login.text
 
@@ -1866,258 +1831,287 @@ def test_role_lifecycle_with_privilege_configuration(client, admin_headers):
     role = client.post(
         "/api/v1/users/roles",
         headers=admin_headers,
-        json={"name": "Masters Manager", "code": "MASTERS_MGR"},
+        json={"name": "Masters Manager", "code": "MASTERS_MGR", "rank_level": 10},
     )
     assert role.status_code == 200, role.text
     role_id = role.json()["id"]
+    assert role.json()["rank_level"] == 10 and role.json()["is_all_access"] is False
 
     # detail starts empty
-    detail = client.get(f"/api/v1/users/roles/{role_id}", headers=admin_headers)
-    assert detail.status_code == 200, detail.text
-    body = detail.json()
-    assert body["permission_codes"] == []
-    assert body["user_count"] == 0
+    body = client.get(f"/api/v1/users/roles/{role_id}", headers=admin_headers).json()
+    assert body["permission_codes"] == [] and body["user_count"] == 0
 
     # bulk-configure privileges in one call
+    codes = ["masters.write", "members.write", "imports.write"]
     configured = client.put(
-        f"/api/v1/users/roles/{role_id}/permissions",
-        headers=admin_headers,
-        json={"permission_codes": ["masters.create", "members.create", "imports.create"]},
+        f"/api/v1/users/roles/{role_id}/permissions", headers=admin_headers,
+        json={"permission_codes": codes},
     )
     assert configured.status_code == 200, configured.text
-    conf_body = configured.json()
-    assert sorted(conf_body["granted"]) == ["imports.create", "masters.create", "members.create"]
-    assert sorted(conf_body["permission_codes"]) == ["imports.create", "masters.create", "members.create"]
+    assert sorted(configured.json()["granted"]) == sorted(codes)
 
     # unknown permission code rejected
     unknown = client.put(
-        f"/api/v1/users/roles/{role_id}/permissions",
-        headers=admin_headers,
-        json={"permission_codes": ["masters.create", "nope.write"]},
+        f"/api/v1/users/roles/{role_id}/permissions", headers=admin_headers,
+        json={"permission_codes": ["masters.write", "nope.write"]},
     )
     assert unknown.status_code == 400, unknown.text
 
     # re-sync with a different set revokes the absent ones
     resync = client.put(
-        f"/api/v1/users/roles/{role_id}/permissions",
-        headers=admin_headers,
-        json={"permission_codes": ["masters.create"]},
+        f"/api/v1/users/roles/{role_id}/permissions", headers=admin_headers,
+        json={"permission_codes": ["masters.write"]},
     )
     assert resync.status_code == 200, resync.text
-    assert sorted(resync.json()["revoked"]) == ["imports.create", "members.create"]
-    assert resync.json()["permission_codes"] == ["masters.create"]
+    assert sorted(resync.json()["revoked"]) == ["imports.write", "members.write"]
 
     # roles listing carries permission_codes + user_count
-    listing = client.get("/api/v1/users/roles", headers=admin_headers)
-    row = [r for r in listing.json()["data"] if r["id"] == role_id][0]
-    assert row["permission_codes"] == ["masters.create"]
-    assert row["user_count"] == 0
+    row = [r for r in client.get("/api/v1/users/roles", headers=admin_headers).json()["data"] if r["id"] == role_id][0]
+    assert row["permission_codes"] == ["masters.write"] and row["user_count"] == 0
+
+    # duplicate role name rejected
+    assert client.post("/api/v1/users/roles", headers=admin_headers,
+                       json={"name": "Masters Manager", "code": "OTHER", "rank_level": 10}).status_code == 400
 
     # delete blocked while a user holds the role
     staff = client.post(
-        "/api/v1/users/",
-        headers=admin_headers,
-        json={"name": "Role Holder", "username": "role_holder", "password": "holderpass1", "user_type": "STAFF"},
+        "/api/v1/users/", headers=admin_headers,
+        json={"name": "Role Holder", "username": "role_holder", "password": "Holderpass@1", "role_id": role_id},
     )
     assert staff.status_code == 200, staff.text
     staff_id = staff.json()["id"]
-    assigned = client.post(
-        f"/api/v1/users/{staff_id}/assign-role",
-        headers=admin_headers,
-        params={"role_id": role_id},
-    )
-    assert assigned.status_code == 200, assigned.text
-
-    blocked = client.delete(f"/api/v1/users/roles/{role_id}", headers=admin_headers)
-    assert blocked.status_code == 409, blocked.text
-
+    assert client.get(f"/api/v1/users/roles/{role_id}", headers=admin_headers).json()["user_count"] == 1
+    assert client.delete(f"/api/v1/users/roles/{role_id}", headers=admin_headers).status_code == 400
     # deactivating an in-use role is blocked too
-    deactivate = client.put(
-        f"/api/v1/users/roles/{role_id}", headers=admin_headers, json={"status": False}
-    )
-    assert deactivate.status_code == 409, deactivate.text
+    assert client.put(f"/api/v1/users/roles/{role_id}", headers=admin_headers, json={"status": False}).status_code == 409
 
-    # remove the assignment, then delete succeeds
-    removed = client.delete(
-        f"/api/v1/users/{staff_id}/roles/{role_id}", headers=admin_headers
-    )
-    assert removed.status_code == 200, removed.text
+    # free the role (delete the user), then deleting the role succeeds
+    assert client.delete(f"/api/v1/users/{staff_id}", headers=admin_headers).status_code == 200
     assert client.delete(f"/api/v1/users/roles/{role_id}", headers=admin_headers).status_code == 200
     assert client.get(f"/api/v1/users/roles/{role_id}", headers=admin_headers).status_code == 404
 
+    # built-in roles are protected
+    assert client.delete(f"/api/v1/users/roles/{_role_id(client, admin_headers, 'MEMBER')}", headers=admin_headers).status_code == 409
 
-def test_user_role_assignment_scopes_and_removal(client, admin_headers):
-    role = client.post(
-        "/api/v1/users/roles",
-        headers=admin_headers,
-        json={"name": "Scoped Role", "code": "SCOPED_ROLE"},
+
+def test_one_role_per_user_and_role_change(client, admin_headers):
+    staff_role, member_role = _role_id(client, admin_headers, "STAFF"), _role_id(client, admin_headers, "MEMBER")
+    user = client.post(
+        "/api/v1/users/", headers=admin_headers,
+        json={"name": "Changer", "username": "role_changer", "password": "Changer@123", "role_id": staff_role},
     )
-    assert role.status_code == 200, role.text
-    role_id = role.json()["id"]
+    assert user.status_code == 200, user.text
+    uid = user.json()["id"]
+    assert user.json()["role"]["code"] == "STAFF" and user.json()["user_type"] == "STAFF"
 
-    staff = client.post(
-        "/api/v1/users/",
-        headers=admin_headers,
-        json={"name": "Scoped User", "username": "scoped_user", "password": "scopedpass1", "user_type": "STAFF"},
-    )
-    assert staff.status_code == 200, staff.text
-    staff_id = staff.json()["id"]
+    # invalid role rejected; there is no multi-role assignment endpoint anymore
+    assert client.post("/api/v1/users/", headers=admin_headers,
+                       json={"name": "X", "username": "x_bad_role", "password": "Badrole@123", "role_id": 99999}).status_code == 400
+    assert client.post(f"/api/v1/users/{uid}/assign-role", headers=admin_headers, params={"role_id": member_role}).status_code in (404, 405)
 
-    # scoped assignment without scope_id rejected
-    no_scope = client.post(
-        f"/api/v1/users/{staff_id}/assign-role",
-        headers=admin_headers,
-        params={"role_id": role_id, "scope_type": "DISTRICT"},
-    )
-    assert no_scope.status_code == 400, no_scope.text
+    # changing the single role through update
+    changed = client.put(f"/api/v1/users/{uid}", headers=admin_headers, json={"role_id": member_role})
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["role"]["code"] == "MEMBER" and changed.json()["user_type"] == "MEMBER"
+    assert client.get(f"/api/v1/users/{uid}", headers=admin_headers).json()["role_id"] == member_role
 
-    # GLOBAL with a scope_id rejected
-    bad_global = client.post(
-        f"/api/v1/users/{staff_id}/assign-role",
-        headers=admin_headers,
-        params={"role_id": role_id, "scope_id": "3"},
-    )
-    assert bad_global.status_code == 400, bad_global.text
-
-    # unknown scope value rejected
-    bad_type = client.post(
-        f"/api/v1/users/{staff_id}/assign-role",
-        headers=admin_headers,
-        params={"role_id": role_id, "scope_type": "GALAXY"},
-    )
-    assert bad_type.status_code == 400, bad_type.text
-
-    # unknown scope target rejected
-    missing = client.post(
-        f"/api/v1/users/{staff_id}/assign-role",
-        headers=admin_headers,
-        params={"role_id": role_id, "scope_type": "STATE", "scope_id": "999999"},
-    )
-    assert missing.status_code == 400, missing.text
-
-    # valid GLOBAL assignment shows up in user detail and roles listing
-    state = client.post("/api/v1/masters/states", headers=admin_headers, json={"name_en": "Scope Nadu"}).json()
-    ok = client.post(
-        f"/api/v1/users/{staff_id}/assign-role",
-        headers=admin_headers,
-        params={"role_id": role_id, "scope_type": "STATE", "scope_id": state["id"]},
-    )
-    assert ok.status_code == 200, ok.text
-
-    detail = client.get(f"/api/v1/users/{staff_id}", headers=admin_headers)
-    assert detail.status_code == 200, detail.text
-    roles = detail.json()["roles"]
-    assert len(roles) == 1
-    assert roles[0]["role_code"] == "SCOPED_ROLE"
-    assert roles[0]["scope_type"] == "STATE"
-    assert roles[0]["scope_id"] == state["id"]
-
-    listed = client.get(f"/api/v1/users/{staff_id}/roles", headers=admin_headers)
-    assert listed.status_code == 200, listed.text
-    assert listed.json()[0]["role_name"] == "Scoped Role"
-
-    # removing an unassigned role 404s
-    assert client.delete(
-        f"/api/v1/users/{staff_id}/roles/999999", headers=admin_headers
-    ).status_code == 404
+    perms = client.get(f"/api/v1/users/{uid}/permissions", headers=admin_headers)
+    assert perms.status_code == 200 and perms.json() == []
 
 
 def test_user_update_password_reset_and_guards(client, admin_headers):
     staff = client.post(
-        "/api/v1/users/",
-        headers=admin_headers,
-        json={"name": "Resettable", "username": "resettable", "password": "oldpass123", "user_type": "STAFF"},
+        "/api/v1/users/", headers=admin_headers,
+        json={"name": "Resettable", "username": "resettable", "password": "Oldpass@123", "role_id": _role_id(client, admin_headers, "STAFF")},
     )
     assert staff.status_code == 200, staff.text
     staff_id = staff.json()["id"]
 
     # weak reset password rejected
-    weak = client.put(
-        f"/api/v1/users/{staff_id}", headers=admin_headers, json={"password": "short"}
-    )
-    assert weak.status_code == 400, weak.text
+    assert client.put(f"/api/v1/users/{staff_id}", headers=admin_headers, json={"password": "short"}).status_code == 400
 
     # strong reset works and old password stops working
-    reset = client.put(
-        f"/api/v1/users/{staff_id}", headers=admin_headers, json={"password": "brandnew456"}
-    )
-    assert reset.status_code == 200, reset.text
+    assert client.put(f"/api/v1/users/{staff_id}", headers=admin_headers, json={"password": "Brandnew@456"}).status_code == 200
+    assert client.post("/api/v1/auth/login", data={"username": "resettable", "password": "Oldpass@123"}).status_code == 401
+    assert client.post("/api/v1/auth/login", data={"username": "resettable", "password": "Brandnew@456"}).status_code == 200
 
-    old_login = client.post(
-        "/api/v1/auth/login", data={"username": "resettable", "password": "oldpass123"}
-    )
-    assert old_login.status_code == 401, old_login.text
-    new_login = client.post(
-        "/api/v1/auth/login", data={"username": "resettable", "password": "brandnew456"}
-    )
-    assert new_login.status_code == 200, new_login.text
-
-    # admin cannot deactivate themselves
-    self_deactivate = client.put(
-        "/api/v1/users/1", headers=admin_headers, json={"status": False}
-    )
-    assert self_deactivate.status_code == 400, self_deactivate.text
+    # admin cannot deactivate or delete themselves
+    assert client.put("/api/v1/users/1", headers=admin_headers, json={"status": False}).status_code == 400
+    assert client.delete("/api/v1/users/1", headers=admin_headers).status_code == 400
 
     # deactivating another user works
-    other = client.put(
-        f"/api/v1/users/{staff_id}", headers=admin_headers, json={"status": False}
-    )
-    assert other.status_code == 200, other.text
-    assert other.json()["status"] is False
+    other = client.put(f"/api/v1/users/{staff_id}", headers=admin_headers, json={"status": False})
+    assert other.status_code == 200 and other.json()["status"] is False
 
-    # deleting the user clears their role assignments
-    role = client.post(
-        "/api/v1/users/roles", headers=admin_headers, json={"name": "Doomed Holder", "code": "DOOMED_HOLDER"}
-    )
-    role_id = role.json()["id"]
-    client.post(f"/api/v1/users/{staff_id}/assign-role", headers=admin_headers, params={"role_id": role_id})
-
-    deleted = client.delete(f"/api/v1/users/{staff_id}", headers=admin_headers)
-    assert deleted.status_code == 200, deleted.text
-
-    # role is free again (assignment was cleaned up), so it can be deleted
-    assert client.delete(f"/api/v1/users/roles/{role_id}", headers=admin_headers).status_code == 200
-
-    # user detail 404s afterwards
+    # delete -> 404 afterwards
+    assert client.delete(f"/api/v1/users/{staff_id}", headers=admin_headers).status_code == 200
     assert client.get(f"/api/v1/users/{staff_id}", headers=admin_headers).status_code == 404
 
 
+def test_rank_hierarchy_rules(client, admin_headers):
+    """Anegudde rule: you only see / create / edit / delete users and roles
+    that are strictly weaker than your own role."""
+    # a rank-3 'manager' role that can manage users, roles and privileges
+    mgr_uid, mgr_role, mgr = _staff_with_role(
+        client, admin_headers, "rank3_mgr", "Rank Three Manager", "RANK3_MGR",
+        permission_grants=[
+            ("users.management.write", False), ("users.management.delete", False),
+            ("roles.write", False), ("roles.delete", False),
+            ("users.privileges.write", False), ("users.privileges.read", False),
+        ],
+        rank_level=3,
+    )
+    assert client.get("/api/v1/users/roles/%d" % mgr_role, headers=mgr).status_code == 403  # own rank is not reachable
+
+    # cannot create a role of the same / higher rank
+    assert client.post("/api/v1/users/roles", headers=mgr, json={"name": "Peer", "code": "PEER", "rank_level": 3}).status_code == 400
+    assert client.post("/api/v1/users/roles", headers=mgr, json={"name": "Boss", "code": "BOSS", "rank_level": 1}).status_code == 400
+    # cannot mint an all-access role
+    assert client.post("/api/v1/users/roles", headers=mgr, json={"name": "God", "code": "GOD", "rank_level": 20, "is_all_access": True}).status_code == 403
+    sub = client.post("/api/v1/users/roles", headers=mgr, json={"name": "Sub Role", "code": "SUB_ROLE", "rank_level": 20})
+    assert sub.status_code == 200, sub.text
+
+    # role list shows only weaker roles
+    listed = {r["code"] for r in client.get("/api/v1/users/roles", headers=mgr, params={"limit": 200}).json()["data"]}
+    assert "SUB_ROLE" in listed and "RANK3_MGR" not in listed and "SUPERADMIN" not in listed and "ADMIN" not in listed
+
+    # users: can create below, not at/above own rank; peers are invisible
+    ok = client.post("/api/v1/users/", headers=mgr,
+                     json={"name": "Sub", "username": "sub_user", "password": "Subuser@123", "role_id": sub.json()["id"]})
+    assert ok.status_code == 200, ok.text
+    assert client.post("/api/v1/users/", headers=mgr,
+                       json={"name": "Up", "username": "up_user", "password": "Upuser@1234", "role_id": _role_id(client, admin_headers, "ADMIN")}).status_code == 403
+    users = {u["username"] for u in client.get("/api/v1/users/", headers=mgr, params={"limit": 200}).json()["data"]}
+    assert "sub_user" in users and "admin" not in users and "rank3_mgr" not in users
+    assert client.get("/api/v1/users/1", headers=mgr).status_code == 403
+    assert client.put("/api/v1/users/1", headers=mgr, json={"name": "Hacked"}).status_code == 403
+    assert client.delete("/api/v1/users/1", headers=mgr).status_code == 403
+    # cannot hand someone a role at or above own rank
+    assert client.put(f"/api/v1/users/{ok.json()['id']}", headers=mgr,
+                      json={"role_id": mgr_role}).status_code == 403
+    # cannot change own role
+    assert client.put(f"/api/v1/users/{mgr_uid}", headers=mgr, json={"role_id": sub.json()["id"]}).status_code in (400, 401, 403)
+
+    # privileges: only weaker roles' privileges can be edited
+    assert client.put(f"/api/v1/users/roles/{mgr_role}/permissions", headers=mgr, json={"permission_codes": []}).status_code == 403
+    assert client.put(f"/api/v1/users/roles/{sub.json()['id']}/permissions", headers=mgr,
+                      json={"permission_codes": ["members.read"]}).status_code == 200
+
+
+def test_module_min_rank_status_and_system_module(client, admin_headers):
+    """Module rows (not code) decide who may use a privilege: min_rank_level
+    locks out weaker roles, and a disabled module blocks everyone."""
+    uid, role_id, headers = _staff_with_role(
+        client, admin_headers, "mod_gate_user", "Mod Gate Role", "MOD_GATE_ROLE",
+        permission_grants=[("masters.write", False)],
+    )
+    assert client.get("/api/v1/masters/states", headers=headers).status_code == 200
+
+    modules = {m["code"]: m for m in client.get("/api/v1/users/modules", headers=admin_headers, params={"limit": 200}).json()["data"]}
+    masters = modules["masters"]
+
+    # rank gate: role rank 10 vs min_rank_level 5 -> locked out
+    assert client.put(f"/api/v1/users/modules/{masters['id']}", headers=admin_headers, json={"min_rank_level": 5}).status_code == 200
+    assert client.get("/api/v1/masters/states", headers=headers).status_code == 403
+    assert client.get("/api/v1/masters/states", headers=admin_headers).status_code == 200  # rank 1 passes
+    assert client.put(f"/api/v1/users/modules/{masters['id']}", headers=admin_headers, json={"min_rank_level": None}).status_code == 200
+    assert client.get("/api/v1/masters/states", headers=headers).status_code == 200
+
+    # disabled module blocks even Rank 1
+    assert client.put(f"/api/v1/users/modules/{masters['id']}", headers=admin_headers, json={"status": False}).status_code == 200
+    assert client.get("/api/v1/masters/states", headers=admin_headers).status_code == 403
+    assert client.put(f"/api/v1/users/modules/{masters['id']}", headers=admin_headers, json={"status": True}).status_code == 200
+    assert client.get("/api/v1/masters/states", headers=admin_headers).status_code == 200
+
+    # module management is Rank 1 only
+    assert client.get("/api/v1/users/modules", headers=headers).status_code == 403
+    assert client.post("/api/v1/users/modules", headers=headers, json={"code": "zz", "name_en": "ZZ"}).status_code == 403
+
+    # system module is Rank-1-only via its own min_rank_level row
+    assert client.get("/api/v1/system/error-logs", headers=admin_headers).status_code == 200
+    assert client.get("/api/v1/system/error-logs", headers=headers).status_code == 403
+    # a role below rank 1 cannot even be granted it
+    r = client.put(f"/api/v1/users/roles/{role_id}/permissions", headers=admin_headers, json={"permission_codes": ["system.read"]})
+    assert r.status_code == 403, r.text
+
+
+def test_menu_and_privilege_tree_come_from_module_table(client, admin_headers):
+    uid, role_id, headers = _staff_with_role(
+        client, admin_headers, "menu_user", "Menu Role", "MENU_ROLE",
+        permission_grants=[("members.read", False)],
+    )
+    menu = client.get("/api/v1/users/modules/menu", headers=headers)
+    assert menu.status_code == 200, menu.text
+    assert [m["code"] for m in menu.json()] == ["members"]  # only the module they can read
+
+    full_menu = client.get("/api/v1/users/modules/menu", headers=admin_headers).json()
+    assert {"masters", "users", "members", "approvals"} <= {m["code"] for m in full_menu}
+    users_node = next(m for m in full_menu if m["code"] == "users")
+    assert {c["code"] for c in users_node["submodules"]} == {"users.management", "roles", "users.privileges"}
+
+    # a brand-new module row appears with no code change; privileges can be linked to it
+    created = client.post("/api/v1/users/modules", headers=admin_headers,
+                          json={"code": "inventory_demo", "name_en": "Inventory Demo", "route": "/inventory", "display_order": 500})
+    assert created.status_code == 200, created.text
+    mid = created.json()["id"]
+    assert "inventory_demo" in {m["code"] for m in client.get("/api/v1/users/modules/menu", headers=admin_headers).json()}
+    tree = client.get("/api/v1/users/modules/privilege-tree", headers=admin_headers).json()
+    assert "inventory_demo" not in {m["code"] for m in tree}  # nothing linked yet
+
+    perm = next(p for p in client.get("/api/v1/users/permissions", headers=admin_headers, params={"limit": 500}).json()["data"] if p["code"] == "events.delete")
+    orig_id = perm["module_id"]
+    linked = client.post(f"/api/v1/users/modules/{mid}/link-privileges", headers=admin_headers, json=[perm["id"]])
+    assert linked.status_code == 200, linked.text
+    tree = client.get("/api/v1/users/modules/privilege-tree", headers=admin_headers).json()
+    assert "inventory_demo" in {m["code"] for m in tree}
+    # put it back and drop the demo module
+    assert client.post(f"/api/v1/users/modules/{orig_id}/link-privileges", headers=admin_headers, json=[perm["id"]]).status_code == 200
+    assert client.delete(f"/api/v1/users/modules/{mid}", headers=admin_headers).status_code == 200
+
+
+def test_security_stamp_invalidates_sessions(client, admin_headers):
+    uid, role_id, headers = _staff_with_role(
+        client, admin_headers, "stamp_user", "Stamp Role", "STAMP_ROLE",
+        permission_grants=[("members.read", False)],
+    )
+    assert client.get("/api/v1/members/", headers=headers).status_code == 200
+    # changing the user's details rotates the stamp -> the old token dies
+    assert client.put(f"/api/v1/users/{uid}", headers=admin_headers, json={"name": "Renamed Stamp"}).status_code == 200
+    dead = client.get("/api/v1/members/", headers=headers)
+    assert dead.status_code == 401 and "invalidated" in dead.json()["detail"].lower()
+    # logging in again works
+    login = client.post("/api/v1/auth/login", data={"username": "stamp_user", "password": STAFF_PW})
+    assert login.status_code == 200
+    fresh = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    assert client.get("/api/v1/members/", headers=fresh).status_code == 200
+    # password change signs out every existing session, including refresh tokens
+    assert client.post("/api/v1/auth/change-password", headers=fresh,
+                       json={"current_password": STAFF_PW, "new_password": "Changed@12345"}).status_code == 200
+    assert client.get("/api/v1/members/", headers=fresh).status_code == 401
+    assert client.post("/api/v1/auth/refresh", json={"refresh_token": login.json()["refresh_token"]}).status_code == 401
+
+
+def test_me_returns_role_rank_and_privileges(client, admin_headers):
+    me = client.get("/api/v1/auth/me", headers=admin_headers).json()
+    assert me["is_all_access"] is True and me["role_rank_level"] == 1 and me["role_name"]
+    uid, role_id, headers = _staff_with_role(
+        client, admin_headers, "me_user", "Me Role", "ME_ROLE", permission_grants=[("masters.write", False)],
+    )
+    me2 = client.get("/api/v1/auth/me", headers=headers).json()
+    assert me2["is_all_access"] is False and me2["role_rank_level"] == 10
+    assert set(me2["privileges"]) == {"masters.write", "masters.read"}
+
+
 def test_superadmin_protections(client, admin_headers):
-    # cannot delete the SUPERADMIN account (even by itself)
-    assert client.delete("/api/v1/users/1", headers=admin_headers).status_code == 409
-
-    # SUPERADMIN cannot be deactivated via update either
-    assert client.put("/api/v1/users/1", headers=admin_headers, json={"status": False}).status_code in (400, 409)
-
-    # a second superadmin's last role cannot be stripped (never fully unprivileged)
-    sa2 = client.post(
-        "/api/v1/users/",
-        headers=admin_headers,
-        json={"name": "SA Two", "username": "sa_two", "password": "satwopass1", "user_type": "SUPERADMIN"},
-    )
-    assert sa2.status_code == 200, sa2.text
-    sa2_id = sa2.json()["id"]
-
-    role = client.post(
-        "/api/v1/users/roles", headers=admin_headers, json={"name": "SA Guard", "code": "SA_GUARD"}
-    )
-    role_id = role.json()["id"]
-    assigned = client.post(f"/api/v1/users/{sa2_id}/assign-role", headers=admin_headers, params={"role_id": role_id})
-    assert assigned.status_code == 200, assigned.text
-
-    # stripping their only role is blocked — a superadmin is never left unprivileged
-    removed = client.delete(f"/api/v1/users/{sa2_id}/roles/{role_id}", headers=admin_headers)
-    assert removed.status_code == 409, removed.text
-    assert "last role" in removed.json()["detail"]
-
-    # with a second role assigned, removing the first one works
-    role2 = client.post(
-        "/api/v1/users/roles", headers=admin_headers, json={"name": "SA Guard 2", "code": "SA_GUARD_2"}
-    )
-    role2_id = role2.json()["id"]
-    client.post(f"/api/v1/users/{sa2_id}/assign-role", headers=admin_headers, params={"role_id": role2_id})
-    removed_now = client.delete(f"/api/v1/users/{sa2_id}/roles/{role_id}", headers=admin_headers)
-    assert removed_now.status_code == 200, removed_now.text
+    # the built-in Super Admin role: rank 1, all-access, not deletable / editable
+    sa_role = _role_id(client, admin_headers, "SUPERADMIN")
+    assert client.delete(f"/api/v1/users/roles/{sa_role}", headers=admin_headers).status_code in (403, 409)
+    assert client.post("/api/v1/users/roles", headers=admin_headers,
+                       json={"name": "Another Top", "code": "ANOTHER_TOP", "rank_level": 1}).status_code == 400
+    assert client.put(f"/api/v1/users/roles/{sa_role}", headers=admin_headers, json={"rank_level": 50}).status_code == 403
+    # the admin account cannot delete or deactivate itself
+    assert client.delete("/api/v1/users/1", headers=admin_headers).status_code == 400
+    assert client.put("/api/v1/users/1", headers=admin_headers, json={"status": False}).status_code == 400
 
 
 # ─────────────── membership module ───────────────
@@ -3322,24 +3316,24 @@ def test_login_rate_limited(client):
 
 
 def test_password_policy_enforced(client, admin_headers):
-    weak = client.post(
-        "/api/v1/users/",
-        headers=admin_headers,
-        json={"name": "Weak", "username": "weakpass_user", "password": "short", "user_type": "STAFF"},
-    )
-    assert weak.status_code == 400, weak.text
-
-    numeric = client.post(
-        "/api/v1/users/",
-        headers=admin_headers,
-        json={"name": "Numeric", "username": "numericpass_user", "password": "12345678", "user_type": "STAFF"},
-    )
-    assert numeric.status_code == 400, numeric.text
+    role_id = _role_id(client, admin_headers, "STAFF")
+    for name, password in (
+        ("weak", "short"),            # too short
+        ("numeric", "12345678"),      # digits only
+        ("nosymbol", "Goodpass123"),  # no symbol
+        ("noupper", "goodpass@123"),  # no uppercase
+        ("nolower", "GOODPASS@123"),  # no lowercase
+        ("nodigit", "Goodpass@abc"),  # no digit
+    ):
+        r = client.post(
+            "/api/v1/users/", headers=admin_headers,
+            json={"name": name, "username": f"{name}_pw_user", "password": password, "role_id": role_id},
+        )
+        assert r.status_code == 400, f"{name}: {r.text}"
 
     fine = client.post(
-        "/api/v1/users/",
-        headers=admin_headers,
-        json={"name": "Fine", "username": "goodpass_user", "password": "goodpass123", "user_type": "STAFF"},
+        "/api/v1/users/", headers=admin_headers,
+        json={"name": "Fine", "username": "goodpass_user", "password": "Goodpass@123", "role_id": role_id},
     )
     assert fine.status_code == 200, fine.text
 
@@ -3386,12 +3380,12 @@ def test_permission_revoke_and_regrant(client, admin_headers):
     grant = client.post(
         f"/api/v1/users/roles/{role_id}/permissions",
         headers=admin_headers,
-        params={"code": "events.create"},
+        params={"code": "events.write"},
     )
     assert grant.status_code == 200, grant.text
 
     perms = client.get(f"/api/v1/users/roles/{role_id}/permissions", headers=admin_headers).json()
-    permission_id = [p["id"] for p in perms if p["code"] == "events.create"][0]
+    permission_id = [p["id"] for p in perms if p["code"] == "events.write"][0]
 
     revoke = client.delete(
         f"/api/v1/users/roles/{role_id}/permissions/{permission_id}",
@@ -3403,13 +3397,13 @@ def test_permission_revoke_and_regrant(client, admin_headers):
     regrant = client.post(
         f"/api/v1/users/roles/{role_id}/permissions",
         headers=admin_headers,
-        params={"code": "events.create"},
+        params={"code": "events.write"},
     )
     assert regrant.status_code == 200, regrant.text
     assert "already has" not in regrant.json()["message"]
 
     perms = client.get(f"/api/v1/users/roles/{role_id}/permissions", headers=admin_headers).json()
-    assert len([p for p in perms if p["code"] == "events.create"]) == 1
+    assert len([p for p in perms if p["code"] == "events.write"]) == 1
 
     # a second ACTIVE grant is impossible at the DB level
     from sqlalchemy.exc import IntegrityError
@@ -4666,7 +4660,7 @@ def test_logout_activity_and_member_timeline(client, admin_headers):
     # logout records LOGOUT activity
     login = client.post(
         "/api/v1/auth/login",
-        data={"username": "admin", "password": "admintest123"},
+        data={"username": "admin", "password": "Admintest@123"},
     )
     token = login.json()["access_token"]
     logout = client.post(
@@ -4899,7 +4893,7 @@ def test_login_failure_audit_and_login_count(client, admin_headers):
     assert (row.details or {}).get("username") == "no_such_user_xy"
 
     # successful login increments login_count
-    login = client.post("/api/v1/auth/login", data={"username": "admin", "password": "admintest123"})
+    login = client.post("/api/v1/auth/login", data={"username": "admin", "password": "Admintest@123"})
     assert login.status_code == 200
     with SessionLocal() as db:
         from models.users import User
@@ -5906,7 +5900,7 @@ def test_activate_member_from_receipt_requires_permission(client, admin_headers)
     role must be refused."""
     _, _, receipts_only_headers = _staff_with_role(
         client, admin_headers, "receipts_only_user", "Receipts Only", "RECEIPTS_ONLY",
-        permission_grants=[("receipts.create", False), ("receipts.update", False)],
+        permission_grants=[("receipts.write", False), ("receipts.write", False)],
     )
     member = _create_member(client, admin_headers, "9800000006", "NoPermTarget")
     receipt = _make_receipt(client, admin_headers, payer_name="Perm Check")
@@ -5917,7 +5911,7 @@ def test_activate_member_from_receipt_requires_permission(client, admin_headers)
 
     r = client.post(f"/api/v1/receipts/{receipt['id']}/activate-member", headers=receipts_only_headers)
     assert r.status_code == 403
-    assert "members.update" in r.json()["detail"]
+    assert "members.write" in r.json()["detail"]
 
 
 # ─────────────── receipt screen gaps: tracking export + renewals due ───────────────
@@ -6176,3 +6170,17 @@ def test_remaining_get_delete_endpoints(client, admin_headers):
     if sr.status_code in (200, 201):
         assert client.get(f"/api/v1/reports/saved/{sr.json()['id']}", headers=admin_headers).status_code == 200
     assert client.get("/api/v1/masters/deletion-reasons/99999999", headers=admin_headers).status_code == 404
+
+
+def test_update_own_profile_rotates_session(client, admin_headers):
+    uid, role_id, headers = _staff_with_role(
+        client, admin_headers, "prof_user", "Prof Role", "PROF_ROLE", permission_grants=[],
+    )
+    taken = client.put("/api/v1/auth/me", headers=headers, json={"username": "admin"})
+    assert taken.status_code == 400
+    ok = client.put("/api/v1/auth/me", headers=headers, json={"name": "New Name", "email": "n@x.com"})
+    assert ok.status_code == 200, ok.text
+    assert client.get("/api/v1/auth/me", headers=headers).status_code == 401  # old session invalidated
+    fresh = client.post("/api/v1/auth/login", data={"username": "prof_user", "password": STAFF_PW}).json()
+    me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {fresh['access_token']}"}).json()
+    assert me["name"] == "New Name" and me["email"] == "n@x.com"

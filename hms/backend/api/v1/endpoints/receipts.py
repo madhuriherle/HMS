@@ -174,11 +174,11 @@ def read_receipts(
 
 
 @router.post("/", response_model=Union[schemas_receipts.Receipt, PendingApproval], status_code=201)
-@approval_gate.gated("receipts", "CREATE", "Receipt", "receipts.create")
+@approval_gate.gated("receipts", "CREATE", "Receipt", "receipts.write")
 def create_receipt(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.create")),
+    current_user: User = Depends(deps.require_permission("receipts.write")),
     receipt_in: schemas_receipts.ReceiptCreate,
 ) -> Any:
     """Receipt entry for ONLINE (website/app) and OFFLINE (counter) registrations.
@@ -459,11 +459,11 @@ def read_renewals_due(
 # entity_type is "MemberActivation", not "Member" — the registry is keyed on
 # (module, action, entity_type) and last-wins; reusing "Member" would clobber
 # PUT /members/{id}'s replay handler.
-@approval_gate.gated("members", "UPDATE", "MemberActivation", "members.update", id_param="id")
+@approval_gate.gated("members", "UPDATE", "MemberActivation", "members.write", id_param="id")
 def activate_member_from_receipt(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.update")),
+    current_user: User = Depends(deps.require_permission("members.write")),
     id: int,
 ) -> Any:
     """Activate (approve) the unapproved profile linked to this receipt.
@@ -577,11 +577,11 @@ def read_receipt(*, db: Session = Depends(deps.get_db), current_user: User = Dep
 
 
 @router.put("/{id}", response_model=Union[schemas_receipts.Receipt, PendingApproval])
-@approval_gate.gated("receipts", "UPDATE", "Receipt", "receipts.update")
+@approval_gate.gated("receipts", "UPDATE", "Receipt", "receipts.write")
 def update_receipt(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.update")),
+    current_user: User = Depends(deps.require_permission("receipts.write")),
     id: int,
     receipt_in: schemas_receipts.ReceiptUpdate,
 ) -> Any:
@@ -639,10 +639,10 @@ def delete_receipt(
 
 
 @router.post("/{id}/allocate", response_model=Union[schemas_receipts.ReceiptAllocation, PendingApproval], status_code=201)
-@approval_gate.gated("receipts", "CREATE", "ReceiptAllocation", "receipts.create")
+@approval_gate.gated("receipts", "CREATE", "ReceiptAllocation", "receipts.write")
 def allocate_receipt(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.create")),
+    current_user: User = Depends(deps.require_permission("receipts.write")),
     id: int,
     payload: schemas_receipts.ReceiptAllocationCreate,
 ) -> Any:
@@ -744,11 +744,11 @@ def remove_allocation(
 
 
 @router.post("/{id}/cancel")
-@approval_gate.gated("receipts", "CREATE", "ReceiptCancellation", "receipts.create")
+@approval_gate.gated("receipts", "CREATE", "ReceiptCancellation", "receipts.write")
 def cancel_receipt(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.create")),
+    current_user: User = Depends(deps.require_permission("receipts.write")),
     id: int,
     payload: schemas_receipts.ReceiptCancellationCreate,
 ) -> Any:
@@ -772,11 +772,11 @@ def cancel_receipt(
 
 
 @router.post("/{id}/refund", response_model=Union[schemas_receipts.RefundTransaction, PendingApproval])
-@approval_gate.gated("receipts", "CREATE", "RefundTransaction", "receipts.create")
+@approval_gate.gated("receipts", "CREATE", "RefundTransaction", "receipts.write")
 def create_refund(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.create")),
+    current_user: User = Depends(deps.require_permission("receipts.write")),
     id: int,
     payload: schemas_receipts.RefundTransactionCreate,
 ) -> Any:
@@ -797,11 +797,11 @@ def create_refund(
 
 
 @router.post("/{id}/payment-transactions", response_model=Union[schemas_receipts.PaymentTransaction, PendingApproval])
-@approval_gate.gated("receipts", "CREATE", "PaymentTransaction", "receipts.create")
+@approval_gate.gated("receipts", "CREATE", "PaymentTransaction", "receipts.write")
 def create_payment_transaction(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("receipts.create")),
+    current_user: User = Depends(deps.require_permission("receipts.write")),
     id: int,
     payload: schemas_receipts.PaymentTransactionCreate,
 ) -> Any:

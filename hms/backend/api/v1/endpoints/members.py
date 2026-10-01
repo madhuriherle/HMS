@@ -83,11 +83,11 @@ def read_members(
 
 
 @router.post("/", response_model=Union[schemas_members.Member, PendingApproval], status_code=201)
-@approval_gate.gated("members", "CREATE", "Member", "members.create")
+@approval_gate.gated("members", "CREATE", "Member", "members.write")
 def create_member(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.create")),
+    current_user: User = Depends(deps.require_permission("members.write")),
     member_in: schemas_members.MemberCreate,
 ) -> Any:
     """Register a member (offline form or website) with duplicate validation.
@@ -174,12 +174,15 @@ def create_member(
     if not db.query(UserModel).filter(UserModel.username == login_username).first():
         import secrets
         temp_password = secrets.token_urlsafe(12)
+        from services.permissions import get_role_by_code
+        member_role = get_role_by_code(db, "MEMBER")
         db.add(UserModel(
             name=f"{member_in.first_name_en} {member_in.last_name_en or ''}".strip(),
             username=login_username,
             mobile=member_in.mobile,
             password_hash=get_password_hash(temp_password),
             user_type="MEMBER",
+            role_id=member_role.id if member_role else None,
             member_id=db_obj.id,
             created_by=current_user.id,
         ))
@@ -201,11 +204,11 @@ def read_member(
     return member
 
 @router.put("/{id}", response_model=Union[schemas_members.Member, PendingApproval])
-@approval_gate.gated("members", "UPDATE", "Member", "members.update")
+@approval_gate.gated("members", "UPDATE", "Member", "members.write")
 def update_member(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.update")),
+    current_user: User = Depends(deps.require_permission("members.write")),
     id: int,
     member_in: schemas_members.MemberUpdate,
 ) -> Any:
@@ -327,7 +330,7 @@ def _member_master_details(db: Session, member: Member) -> dict:
 def approve_member(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.update")),
+    current_user: User = Depends(deps.require_permission("members.write")),
     background_tasks: BackgroundTasks,
     id: int,
 ) -> Any:
@@ -409,11 +412,11 @@ def _queue_activation_notification(
     background_tasks.add_task(_send)
 
 @router.post("/{id}/memberships", response_model=Union[schemas_members.MemberMembership, PendingApproval])
-@approval_gate.gated("members", "CREATE", "MemberMembership", "members.create")
+@approval_gate.gated("members", "CREATE", "MemberMembership", "members.write")
 def create_membership(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.create")),
+    current_user: User = Depends(deps.require_permission("members.write")),
     id: int,
     membership_in: schemas_members.MembershipCreate,
 ) -> Any:
@@ -459,7 +462,7 @@ def create_membership(
 async def upload_member_photo(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.create")),
+    current_user: User = Depends(deps.require_permission("members.write")),
     id: int,
     file: UploadFile = File(...),
 ) -> Any:
@@ -479,7 +482,7 @@ async def upload_member_photo(
 async def upload_member_document(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.create")),
+    current_user: User = Depends(deps.require_permission("members.write")),
     member_id: int,
     document_type_id: int,
     file: UploadFile = File(...),
@@ -548,7 +551,7 @@ def download_member_document(
 @router.put("/documents/{doc_id}", response_model=schemas_members.MemberDocument)
 def verify_member_document(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.update")),
+    current_user: User = Depends(deps.require_permission("members.write")),
     doc_id: int, doc_in: schemas_members.MemberDocumentUpdate,
 ) -> Any:
     """Mark a document VERIFIED / REJECTED / PENDING."""
@@ -727,11 +730,11 @@ def read_member_service_optins(
 
 
 @router.post("/{id}/service-optins", response_model=Union[schemas_members.MemberServiceOptin, PendingApproval], status_code=201)
-@approval_gate.gated("members", "CREATE", "MemberServiceOptin", "members.create", id_param="id")
+@approval_gate.gated("members", "CREATE", "MemberServiceOptin", "members.write", id_param="id")
 def create_service_optin(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.create")),
+    current_user: User = Depends(deps.require_permission("members.write")),
     id: int,
     optin_in: schemas_members.MemberServiceOptinCreate,
 ) -> Any:
@@ -800,8 +803,8 @@ def create_service_optin(
 def bulk_set_service_optins(
     *,
     db: Session = Depends(deps.get_db),
-    _create_granted: User = Depends(deps.require_permission("members.create")),
-    current_user: User = Depends(deps.require_permission("members.update")),
+    _create_granted: User = Depends(deps.require_permission("members.write")),
+    current_user: User = Depends(deps.require_permission("members.write")),
     id: int,
     optin_in: schemas_members.BulkServiceOptin,
 ) -> Any:
@@ -863,11 +866,11 @@ def bulk_set_service_optins(
 
 
 @router.put("/{id}/service-optins/{optin_id}", response_model=Union[schemas_members.MemberServiceOptin, PendingApproval])
-@approval_gate.gated("members", "UPDATE", "MemberServiceOptin", "members.update", id_param="optin_id")
+@approval_gate.gated("members", "UPDATE", "MemberServiceOptin", "members.write", id_param="optin_id")
 def update_service_optin(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.update")),
+    current_user: User = Depends(deps.require_permission("members.write")),
     id: int,
     optin_id: int,
     optin_in: schemas_members.MemberServiceOptinUpdate,
@@ -1248,7 +1251,7 @@ _approval_registry.register("members", "ACTIVATE", "Member", activate_member_req
 def request_member_activation(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("members.create")),
+    current_user: User = Depends(deps.require_permission("members.write")),
     id: int,
 ) -> Any:
     """File an activation request (permanent membership number assignment).
@@ -1269,4 +1272,4 @@ def request_member_activation(
     if dup:
         raise HTTPException(status_code=409, detail=f"Activation already requested (request {dup.id})")
     return _file_request(db, current_user, "members", "ACTIVATE", "Member",
-                         "members.activate", {"id": id}, "id")
+                         "members.write", {"id": id}, "id")

@@ -16,7 +16,7 @@ router = APIRouter()
 async def import_postal_codes(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("imports.create")),
+    current_user: User = Depends(deps.require_permission("imports.write")),
     file: UploadFile = File(...),
 ) -> Any:
     """

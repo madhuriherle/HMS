@@ -3,8 +3,8 @@
 Usage — two small changes to an existing endpoint, no body rewrite:
 
     @router.post("/states", response_model=Union[schemas_masters.State, PendingApproval])
-    @approval_gate.gated("masters", "CREATE", "State", "masters.create")
-    def create_state(*, db=Depends(get_db), current_user=Depends(require_permission("masters.create")), state_in: StateCreate) -> Any:
+    @approval_gate.gated("masters", "CREATE", "State", "masters.write")
+    def create_state(*, db=Depends(get_db), current_user=Depends(require_permission("masters.write")), state_in: StateCreate) -> Any:
         ...unchanged body...
 
 When the caller's grant of `permission_code` has requires_approval=True

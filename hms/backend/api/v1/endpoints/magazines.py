@@ -67,10 +67,10 @@ def read_subscription(
 
 
 @router.post("/subscriptions", response_model=Union[schemas_magazines.MagazineSubscription, PendingApproval], status_code=201)
-@approval_gate.gated("magazines", "CREATE", "MagazineSubscription", "magazines.create")
+@approval_gate.gated("magazines", "CREATE", "MagazineSubscription", "magazines.write")
 def create_subscription(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.create")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     sub_in: schemas_magazines.MagazineSubscriptionCreate
 ) -> Any:
     """Start magazine delivery for a member (after registration)."""
@@ -92,10 +92,10 @@ def create_subscription(
 
 
 @router.put("/subscriptions/{sub_id}", response_model=Union[schemas_magazines.MagazineSubscription, PendingApproval])
-@approval_gate.gated("magazines", "UPDATE", "MagazineSubscription", "magazines.update", id_param="sub_id")
+@approval_gate.gated("magazines", "UPDATE", "MagazineSubscription", "magazines.write", id_param="sub_id")
 def update_subscription(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.update")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     sub_id: int,
     sub_in: schemas_magazines.MagazineSubscriptionUpdate,
 ) -> Any:
@@ -152,10 +152,10 @@ def read_pauses(
 
 
 @router.post("/pauses", response_model=Union[schemas_magazines.MagazineDeliveryPause, PendingApproval], status_code=201)
-@approval_gate.gated("magazines", "CREATE", "MagazineDeliveryPause", "magazines.create")
+@approval_gate.gated("magazines", "CREATE", "MagazineDeliveryPause", "magazines.write")
 def pause_subscription(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.create")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     pause_in: schemas_magazines.MagazineDeliveryPauseCreate
 ) -> Any:
     """Pause delivery for a period, with the member's note as the reason.
@@ -218,10 +218,10 @@ def read_delivery_batch(*, db: Session = Depends(deps.get_db), current_user: Use
     return b
 
 @router.put("/delivery-batches/{batch_id}", response_model=Union[schemas_magazines.MagazineDeliveryBatch, PendingApproval])
-@approval_gate.gated("magazines", "UPDATE", "MagazineDeliveryBatch", "magazines.update", id_param="batch_id")
+@approval_gate.gated("magazines", "UPDATE", "MagazineDeliveryBatch", "magazines.write", id_param="batch_id")
 def update_delivery_batch(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.update")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     batch_id: int, batch_in: schemas_magazines.MagazineDeliveryBatchUpdate,
 ) -> Any:
     b = db.query(MagazineDeliveryBatch).filter(MagazineDeliveryBatch.id == batch_id, MagazineDeliveryBatch.is_deleted == False).first()
@@ -242,10 +242,10 @@ def delete_delivery_batch(*, db: Session = Depends(deps.get_db), current_user: U
     return {"message": "Deleted"}
 
 @router.put("/pauses/{pause_id}", response_model=Union[schemas_magazines.MagazineDeliveryPause, PendingApproval])
-@approval_gate.gated("magazines", "UPDATE", "MagazineDeliveryPause", "magazines.update", id_param="pause_id")
+@approval_gate.gated("magazines", "UPDATE", "MagazineDeliveryPause", "magazines.write", id_param="pause_id")
 def update_pause(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.update")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     pause_id: int,
     pause_in: schemas_magazines.MagazineDeliveryPauseUpdate,
 ) -> Any:
@@ -264,10 +264,10 @@ def update_pause(
 
 
 @router.post("/pauses/{pause_id}/resume", response_model=Union[schemas_magazines.MagazineDeliveryPause, PendingApproval])
-@approval_gate.gated("magazines", "CREATE", "MagazineDeliveryPauseResume", "magazines.create", id_param="pause_id")
+@approval_gate.gated("magazines", "CREATE", "MagazineDeliveryPauseResume", "magazines.write", id_param="pause_id")
 def resume_pause(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.create")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     pause_id: int,
     resume_date: Optional[date] = None,
 ) -> Any:
@@ -314,11 +314,11 @@ def read_returns(
 
 
 @router.post("/returns", response_model=Union[schemas_magazines.MagazineReturn, PendingApproval], status_code=201)
-@approval_gate.gated("magazines", "CREATE", "MagazineReturn", "magazines.create")
+@approval_gate.gated("magazines", "CREATE", "MagazineReturn", "magazines.write")
 def create_return(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.create")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     return_in: schemas_magazines.MagazineReturnCreate,
 ) -> Any:
     """Mark a magazine return for a member's subscription and issue month.
@@ -352,11 +352,11 @@ def create_return(
 
 
 @router.put("/returns/{return_id}", response_model=Union[schemas_magazines.MagazineReturn, PendingApproval])
-@approval_gate.gated("magazines", "UPDATE", "MagazineReturn", "magazines.update", id_param="return_id")
+@approval_gate.gated("magazines", "UPDATE", "MagazineReturn", "magazines.write", id_param="return_id")
 def update_return(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.update")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     return_id: int,
     return_in: schemas_magazines.MagazineReturnUpdate,
 ) -> Any:
@@ -425,11 +425,11 @@ def read_delivery_batches(
 
 
 @router.post("/delivery-batches", response_model=Union[schemas_magazines.MagazineDeliveryBatch, PendingApproval])
-@approval_gate.gated("magazines", "CREATE", "MagazineDeliveryBatch", "magazines.create")
+@approval_gate.gated("magazines", "CREATE", "MagazineDeliveryBatch", "magazines.write")
 def create_delivery_batch(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.create")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     batch_in: schemas_magazines.MagazineDeliveryBatchCreate,
 ) -> Any:
     batch = MagazineDeliveryBatch(**batch_in.model_dump(), created_by=current_user.id)
@@ -441,11 +441,11 @@ def create_delivery_batch(
 
 # ─────────────── LABEL GENERATION ───────────────
 @router.post("/generate-labels")
-@approval_gate.gated("magazines", "CREATE", "MagazineLabelBatch", "magazines.create")
+@approval_gate.gated("magazines", "CREATE", "MagazineLabelBatch", "magazines.write")
 def generate_labels(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.create")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     issue_month_year: str,
     state_id: Optional[int] = None,
     district_id: Optional[int] = None,
@@ -582,7 +582,7 @@ def generate_labels(
 async def send_kyc_link(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.create")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     member_id: int,
     background_tasks: BackgroundTasks,
     channel: str = "LINK",  # LINK (WhatsApp link) or APP (app notification nudge)
@@ -630,7 +630,7 @@ async def send_kyc_link(
 def send_kyc_reminders(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.create")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     background_tasks: BackgroundTasks,
     interval_days: int = 180,
     channel: str = "LINK",
@@ -803,7 +803,7 @@ def read_label_batch(
 def download_label_pdf(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.update")),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
     batch_id: int,
 ) -> Any:
     """Render a label batch as a printable A4 PDF (3×7 grid), highlighting

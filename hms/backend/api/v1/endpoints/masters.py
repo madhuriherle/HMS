@@ -70,11 +70,11 @@ def read_state(
 
 
 @router.post("/states", response_model=Union[schemas_masters.State, PendingApproval])
-@approval_gate.gated("masters", "CREATE", "State", "masters.create")
+@approval_gate.gated("masters", "CREATE", "State", "masters.write")
 def create_state(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.create")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     state_in: schemas_masters.StateCreate,
 ) -> Any:
     dup = db.query(State).filter(
@@ -86,11 +86,11 @@ def create_state(
 
 
 @router.put("/states/{id}", response_model=Union[schemas_masters.State, PendingApproval])
-@approval_gate.gated("masters", "UPDATE", "State", "masters.update")
+@approval_gate.gated("masters", "UPDATE", "State", "masters.write")
 def update_state(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.update")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     id: int,
     state_in: schemas_masters.StateUpdate,
 ) -> Any:
@@ -155,11 +155,11 @@ def read_district(
 
 
 @router.post("/districts", response_model=Union[schemas_masters.District, PendingApproval])
-@approval_gate.gated("masters", "CREATE", "District", "masters.create")
+@approval_gate.gated("masters", "CREATE", "District", "masters.write")
 def create_district(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.create")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     district_in: schemas_masters.DistrictCreate,
 ) -> Any:
     _ensure_state(db, district_in.state_id)
@@ -174,11 +174,11 @@ def create_district(
 
 
 @router.put("/districts/{id}", response_model=Union[schemas_masters.District, PendingApproval])
-@approval_gate.gated("masters", "UPDATE", "District", "masters.update")
+@approval_gate.gated("masters", "UPDATE", "District", "masters.write")
 def update_district(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.update")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     id: int,
     district_in: schemas_masters.DistrictUpdate,
 ) -> Any:
@@ -251,11 +251,11 @@ def read_taluk(
 
 
 @router.post("/taluks", response_model=Union[schemas_masters.Taluk, PendingApproval])
-@approval_gate.gated("masters", "CREATE", "Taluk", "masters.create")
+@approval_gate.gated("masters", "CREATE", "Taluk", "masters.write")
 def create_taluk(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.create")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     taluk_in: schemas_masters.TalukCreate,
 ) -> Any:
     _ensure_district(db, taluk_in.district_id)
@@ -270,11 +270,11 @@ def create_taluk(
 
 
 @router.put("/taluks/{id}", response_model=Union[schemas_masters.Taluk, PendingApproval])
-@approval_gate.gated("masters", "UPDATE", "Taluk", "masters.update")
+@approval_gate.gated("masters", "UPDATE", "Taluk", "masters.write")
 def update_taluk(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.update")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     id: int,
     taluk_in: schemas_masters.TalukUpdate,
 ) -> Any:
@@ -367,11 +367,11 @@ def read_postal_code(
 
 
 @router.post("/postal-codes", response_model=Union[schemas_masters.PostalCode, PendingApproval])
-@approval_gate.gated("masters", "CREATE", "PostalCode", "masters.create")
+@approval_gate.gated("masters", "CREATE", "PostalCode", "masters.write")
 def create_postal_code(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.create")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     pc_in: schemas_masters.PostalCodeCreate,
 ) -> Any:
     _ensure_state(db, pc_in.state_id)
@@ -385,11 +385,11 @@ def create_postal_code(
 
 
 @router.put("/postal-codes/{id}", response_model=Union[schemas_masters.PostalCode, PendingApproval])
-@approval_gate.gated("masters", "UPDATE", "PostalCode", "masters.update")
+@approval_gate.gated("masters", "UPDATE", "PostalCode", "masters.write")
 def update_postal_code(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.update")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     id: int,
     pc_in: schemas_masters.PostalCodeUpdate,
 ) -> Any:
@@ -487,11 +487,11 @@ def read_membership_type(
 
 
 @router.post("/membership-types", response_model=Union[schemas_masters.MembershipTypeWithPrice, PendingApproval])
-@approval_gate.gated("masters", "CREATE", "MembershipTypeWithPrice", "masters.create")
+@approval_gate.gated("masters", "CREATE", "MembershipTypeWithPrice", "masters.write")
 def create_membership_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.create")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     mt_in: schemas_masters.MembershipTypeCreate,
 ) -> Any:
     dup = db.query(MembershipType).filter(
@@ -504,11 +504,11 @@ def create_membership_type(
 
 
 @router.put("/membership-types/{id}", response_model=Union[schemas_masters.MembershipTypeWithPrice, PendingApproval])
-@approval_gate.gated("masters", "UPDATE", "MembershipTypeWithPrice", "masters.update")
+@approval_gate.gated("masters", "UPDATE", "MembershipTypeWithPrice", "masters.write")
 def update_membership_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.update")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     id: int,
     mt_in: schemas_masters.MembershipTypeUpdate,
 ) -> Any:
@@ -572,11 +572,11 @@ def read_membership_type_prices(
 
 
 @router.post("/membership-types/{id}/prices", response_model=Union[schemas_masters.MembershipTypePrice, PendingApproval])
-@approval_gate.gated("masters", "CREATE", "MembershipTypePrice", "masters.create")
+@approval_gate.gated("masters", "CREATE", "MembershipTypePrice", "masters.write")
 def create_membership_type_price(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.create")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     id: int,
     price_in: schemas_masters.MembershipTypePriceCreate,
 ) -> Any:
@@ -672,11 +672,11 @@ def read_membership_type_current_price(
 
 
 @router.put("/membership-types/{id}/prices/{price_id}", response_model=Union[schemas_masters.MembershipTypePrice, PendingApproval])
-@approval_gate.gated("masters", "UPDATE", "MembershipTypePrice", "masters.update")
+@approval_gate.gated("masters", "UPDATE", "MembershipTypePrice", "masters.write")
 def update_membership_type_price(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.update")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     id: int,
     price_id: int,
     price_in: schemas_masters.MembershipTypePriceUpdate,
@@ -712,11 +712,11 @@ def read_document_types(
 
 
 @router.post("/document-types", response_model=Union[schemas_masters.DocumentType, PendingApproval])
-@approval_gate.gated("masters", "CREATE", "DocumentType", "masters.create")
+@approval_gate.gated("masters", "CREATE", "DocumentType", "masters.write")
 def create_document_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.create")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     dt_in: schemas_masters.DocumentTypeCreate,
 ) -> Any:
     dup = db.query(DocumentType).filter(
@@ -740,11 +740,11 @@ def read_deletion_reason(*, db: Session = Depends(deps.get_db), current_user: Us
     return obj
 
 @router.put("/document-types/{id}", response_model=Union[schemas_masters.DocumentType, PendingApproval])
-@approval_gate.gated("masters", "UPDATE", "DocumentType", "masters.update")
+@approval_gate.gated("masters", "UPDATE", "DocumentType", "masters.write")
 def update_document_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.update")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     id: int,
     dt_in: schemas_masters.DocumentTypeUpdate,
 ) -> Any:
@@ -803,11 +803,11 @@ def read_service_type(
 
 
 @router.post("/service-types", response_model=Union[schemas_masters.ServiceType, PendingApproval])
-@approval_gate.gated("masters", "CREATE", "ServiceType", "masters.create")
+@approval_gate.gated("masters", "CREATE", "ServiceType", "masters.write")
 def create_service_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.create")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     st_in: schemas_masters.ServiceTypeCreate,
 ) -> Any:
     dup = db.query(ServiceType).filter(
@@ -819,11 +819,11 @@ def create_service_type(
 
 
 @router.put("/service-types/{id}", response_model=Union[schemas_masters.ServiceType, PendingApproval])
-@approval_gate.gated("masters", "UPDATE", "ServiceType", "masters.update")
+@approval_gate.gated("masters", "UPDATE", "ServiceType", "masters.write")
 def update_service_type(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.update")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     id: int,
     st_in: schemas_masters.ServiceTypeUpdate,
 ) -> Any:
@@ -944,7 +944,7 @@ for _spec in _PERSONAL_MASTERS:
         def create_personal_master(
             *,
             db: Session = Depends(deps.get_db),
-            current_user: User = Depends(deps.require_permission("masters.create")),
+            current_user: User = Depends(deps.require_permission("masters.write")),
             obj_in: schemas_masters.NativePlaceCreate if _spec.uses_district else schemas_masters.PersonalMasterCreate,
         ) -> Any:
             _dup_check(db, _spec, obj_in.name_en)
@@ -953,7 +953,7 @@ for _spec in _PERSONAL_MASTERS:
             return _crud.create(db=db, obj_in=obj_in, created_by=current_user.id)
 
         create_personal_master.__name__ = f"create_{_spec.route_prefix.replace('-', '_')}"
-        return approval_gate.gated("masters", "CREATE", _spec.label, "masters.create")(create_personal_master)
+        return approval_gate.gated("masters", "CREATE", _spec.label, "masters.write")(create_personal_master)
 
     router.post(f"/{_spec.route_prefix}", response_model=Union[_resp, PendingApproval], status_code=201)(_make_create())
 
@@ -961,7 +961,7 @@ for _spec in _PERSONAL_MASTERS:
         def update_personal_master(
             *,
             db: Session = Depends(deps.get_db),
-            current_user: User = Depends(deps.require_permission("masters.update")),
+            current_user: User = Depends(deps.require_permission("masters.write")),
             id: int,
             obj_in: schemas_masters.NativePlaceUpdate if _spec.uses_district else schemas_masters.PersonalMasterUpdate,
         ) -> Any:
@@ -976,7 +976,7 @@ for _spec in _PERSONAL_MASTERS:
             return _crud.update(db, db_obj=obj, obj_in=obj_in, updated_by=current_user.id)
 
         update_personal_master.__name__ = f"update_{_spec.route_prefix.replace('-', '_')}"
-        return approval_gate.gated("masters", "UPDATE", _spec.label, "masters.update")(update_personal_master)
+        return approval_gate.gated("masters", "UPDATE", _spec.label, "masters.write")(update_personal_master)
 
     router.put(f"/{_spec.route_prefix}/{{id}}", response_model=Union[_resp, PendingApproval])(_make_update())
 
@@ -1035,11 +1035,11 @@ def read_deletion_reasons(
 
 
 @router.post("/deletion-reasons", response_model=Union[schemas_masters.DeletionReason, PendingApproval], status_code=201)
-@approval_gate.gated("masters", "CREATE", "DeletionReason", "masters.create")
+@approval_gate.gated("masters", "CREATE", "DeletionReason", "masters.write")
 def create_deletion_reason(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.create")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     obj_in: schemas_masters.DeletionReasonCreate,
 ) -> Any:
     from models.masters import DeletionReason
@@ -1055,11 +1055,11 @@ def create_deletion_reason(
 
 
 @router.put("/deletion-reasons/{id}", response_model=Union[schemas_masters.DeletionReason, PendingApproval])
-@approval_gate.gated("masters", "UPDATE", "DeletionReason", "masters.update")
+@approval_gate.gated("masters", "UPDATE", "DeletionReason", "masters.write")
 def update_deletion_reason(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("masters.update")),
+    current_user: User = Depends(deps.require_permission("masters.write")),
     id: int,
     obj_in: schemas_masters.DeletionReasonUpdate,
 ) -> Any:

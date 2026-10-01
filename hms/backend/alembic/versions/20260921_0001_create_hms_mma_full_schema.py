@@ -76,7 +76,7 @@ from models.system import (
     RefreshToken,
     SystemErrorLog,
 )
-from models.users import Permission, Role, RolePermission, User, UserRole
+from models.users import Permission, Role, RolePermission, User
 from models.base import Base
 
 revision = "20260921_0001"
