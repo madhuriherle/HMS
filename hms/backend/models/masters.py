@@ -87,9 +87,16 @@ class ServiceType(AuditMixin, Base):
 
 
 # ─── Personal masters ───
-# Generic id+name(+Kannada)+status shape. Horoscope masters (gothra,
-# nakshatra, rashi, masa, mithi, samvathsara) were removed in migration 0014
-# — Mangalya/matrimony owns that data.
+# Generic id+name(+Kannada)+status shape. Gotra is part of the Sabha's own
+# member register (kept); the other horoscope masters (nakshatra, rashi, masa,
+# mithi, samvathsara) were removed in migration 0014 — Mangalya owns them.
+
+class Gotra(AuditMixin, Base):
+    __tablename__ = "gotras"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    name_en: Mapped[str] = mapped_column(String(100), nullable=False)
+    name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
+    status: Mapped[bool] = mapped_column(Boolean, default=True)
 
 class Qualification(AuditMixin, Base):
     __tablename__ = "qualifications"

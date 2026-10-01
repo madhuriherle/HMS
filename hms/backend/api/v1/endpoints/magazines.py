@@ -187,7 +187,16 @@ def pause_subscription(
             f"Pause {open_pause.id} is still open (no end date); resume it before pausing again",
         )
 
-    return crud_magazines.pause.create(db=db, obj_in=pause_in, created_by=current_user.id)
+    created = crud_magazines.pause.create(db=db, obj_in=pause_in, created_by=current_user.id)
+    # A pause that covers today flips the subscription to PAUSED (a STOPPED
+    # subscription stays STOPPED).
+    if sub.delivery_status == "ACTIVE" and pause_in.pause_start_date <= date.today() and (
+        pause_in.pause_end_date is None or pause_in.pause_end_date >= date.today()
+    ):
+        sub.delivery_status = "PAUSED"
+        sub.updated_by = current_user.id
+        db.commit()
+    return created
 
 
 @router.get("/pauses/{pause_id}", response_model=schemas_magazines.MagazineDeliveryPause)
@@ -204,6 +213,152 @@ def delete_pause(*, db: Session = Depends(deps.get_db), current_user: User = Dep
     p.is_deleted = True; p.deleted_by = current_user.id
     db.commit()
     return {"message": "Deleted"}
+
+# ─────────────── MONTHLY MARKS (the 1–12 boxes) ───────────────
+def _month_bounds(year: int, month: int):
+    from calendar import monthrange
+    return date(year, month, 1), date(year, month, monthrange(year, month)[1])
+
+
+def _monthly_grid(db: Session, sub: MagazineSubscription, year: int) -> dict:
+    """One box per month of `year`: 'R' = issue returned (not delivered),
+    'P' = service paused that month, '' = nothing recorded."""
+    returns = {
+        r.issue_month_year: r for r in db.query(MagazineReturn).filter(
+            MagazineReturn.subscription_id == sub.id,
+            MagazineReturn.is_deleted == False,  # noqa: E712
+            MagazineReturn.issue_month_year.like(f"{year}-%"),
+        ).all()
+    }
+    pauses = db.query(MagazineDeliveryPause).filter(
+        MagazineDeliveryPause.subscription_id == sub.id,
+        MagazineDeliveryPause.is_deleted == False,  # noqa: E712
+    ).all()
+    months = []
+    for m in range(1, 13):
+        first, last = _month_bounds(year, m)
+        key = f"{year}-{m:02d}"
+        ret = returns.get(key)
+        pause = next((p for p in pauses if p.pause_start_date <= last and (p.pause_end_date is None or p.pause_end_date >= first)), None)
+        months.append({
+            "month": m, "issue_month_year": key,
+            "mark": "R" if ret else ("P" if pause else ""),
+            "returned": bool(ret), "return_id": ret.id if ret else None,
+            "return_reason": ret.return_reason if ret else None,
+            "paused": bool(pause), "pause_reason": pause.reason if pause else None,
+        })
+    return months
+
+
+def _recent_returns(db: Session, subscription_id: int, months: int = 12) -> int:
+    today = date.today()
+    y, m = today.year, today.month - (months - 1)
+    while m <= 0:
+        m += 12
+        y -= 1
+    since = f"{y}-{m:02d}"
+    return db.query(MagazineReturn).filter(
+        MagazineReturn.subscription_id == subscription_id,
+        MagazineReturn.is_deleted == False,  # noqa: E712
+        MagazineReturn.issue_month_year >= since,
+    ).count()
+
+
+def _grid_response(db: Session, sub: MagazineSubscription, year: int) -> dict:
+    months = _monthly_grid(db, sub, year)
+    recent = _recent_returns(db, sub.id)
+    paused_now = sub.delivery_status == "PAUSED"
+    return {
+        "subscription_id": sub.id, "member_id": sub.member_id, "year": year,
+        "delivery_status": sub.delivery_status,
+        "months": months,
+        "returned_in_year": sum(1 for x in months if x["returned"]),
+        "returned_last_12_months": recent,
+        # two or more returns in a year is the cue to pause the service
+        "suggest_pause": recent >= 2 and not paused_now and sub.delivery_status == "ACTIVE",
+    }
+
+
+@router.get("/subscriptions/{sub_id}/monthly")
+def subscription_monthly_marks(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    sub_id: int, year: Optional[int] = None,
+) -> Any:
+    sub = db.query(MagazineSubscription).filter(MagazineSubscription.id == sub_id, MagazineSubscription.is_deleted == False).first()  # noqa: E712
+    if not sub:
+        raise HTTPException(404, "Subscription not found")
+    return _grid_response(db, sub, year or date.today().year)
+
+
+@router.get("/members/{member_id}/monthly")
+def member_monthly_marks(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    member_id: int, year: Optional[int] = None,
+) -> Any:
+    """The member's 1–12 monthly boxes for the magazine (R = returned)."""
+    sub = db.query(MagazineSubscription).filter(
+        MagazineSubscription.member_id == member_id, MagazineSubscription.is_deleted == False,  # noqa: E712
+    ).order_by(MagazineSubscription.id.desc()).first()
+    if not sub:
+        raise HTTPException(404, "This member has no magazine subscription")
+    return _grid_response(db, sub, year or date.today().year)
+
+
+@router.get("/returns/repeat")
+def repeat_returns(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    min_returns: int = 2, months: int = 12, only_unpaused: bool = True,
+    page: int = 1, limit: int = 50,
+) -> Any:
+    """Subscriptions whose magazine came back `min_returns`+ times in the
+    last `months` months — candidates to pause until the address is fixed."""
+    from sqlalchemy import func
+    from models.members import Member
+
+    today = date.today()
+    y, m = today.year, today.month - (months - 1)
+    while m <= 0:
+        m += 12
+        y -= 1
+    since = f"{y}-{m:02d}"
+    counts = (
+        db.query(
+            MagazineReturn.subscription_id.label("sid"),
+            func.count(MagazineReturn.id).label("n"),
+            func.max(MagazineReturn.issue_month_year).label("last_issue"),
+        )
+        .filter(MagazineReturn.is_deleted == False, MagazineReturn.issue_month_year >= since)  # noqa: E712
+        .group_by(MagazineReturn.subscription_id)
+        .having(func.count(MagazineReturn.id) >= min_returns)
+        .subquery()
+    )
+    q = (
+        db.query(MagazineSubscription, Member, counts.c.n, counts.c.last_issue)
+        .join(counts, counts.c.sid == MagazineSubscription.id)
+        .join(Member, Member.id == MagazineSubscription.member_id)
+        .filter(MagazineSubscription.is_deleted == False)  # noqa: E712
+    )
+    if only_unpaused:
+        q = q.filter(MagazineSubscription.delivery_status == "ACTIVE")
+    total = q.count()
+    rows = q.order_by(counts.c.n.desc(), MagazineSubscription.id).offset((max(page, 1) - 1) * limit).limit(limit).all()
+    return {
+        "total": total, "page": page, "limit": limit,
+        "pages": (total + limit - 1) // limit,
+        "data": [
+            {
+                "subscription_id": sub.id, "member_id": mem.id, "member_code": mem.member_code,
+                "name": " ".join(p for p in (mem.first_name_en, mem.last_name_en) if p),
+                "mobile": mem.mobile, "delivery_status": sub.delivery_status,
+                "returns_in_period": n, "last_returned_issue": last_issue,
+            }
+            for sub, mem, n, last_issue in rows
+        ],
+    }
+
 
 @router.get("/returns/{return_id}", response_model=schemas_magazines.MagazineReturn)
 def read_return(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), return_id: int) -> Any:
@@ -285,6 +440,17 @@ def resume_pause(
         raise HTTPException(400, "resume date cannot be before pause_start_date")
     pause.pause_end_date = end
     pause.updated_by = current_user.id
+    sub = db.query(MagazineSubscription).filter(MagazineSubscription.id == pause.subscription_id).first()
+    if sub and sub.delivery_status == "PAUSED" and end <= date.today():
+        still_paused = db.query(MagazineDeliveryPause).filter(
+            MagazineDeliveryPause.subscription_id == sub.id,
+            MagazineDeliveryPause.id != pause.id,
+            MagazineDeliveryPause.is_deleted == False,  # noqa: E712
+            MagazineDeliveryPause.pause_start_date <= date.today(),
+            (MagazineDeliveryPause.pause_end_date == None) | (MagazineDeliveryPause.pause_end_date >= date.today()),  # noqa: E711
+        ).first()
+        if not still_paused:
+            sub.delivery_status = "ACTIVE"
     db.commit()
     db.refresh(pause)
     return pause
@@ -440,6 +606,17 @@ def create_delivery_batch(
 
 
 # ─────────────── LABEL GENERATION ───────────────
+def _member_label_address(member) -> str:
+    """Postal address lines for a label: street lines, then the village-style
+    parts (area / place / grama / village), then the locality."""
+    lines = [
+        ", ".join(p for p in (member.address_line1, member.address_line2) if p),
+        ", ".join(p for p in (member.area, member.place, member.grama, member.village) if p),
+        member.locality or "",
+    ]
+    return chr(10).join(l for l in lines if l)
+
+
 @router.post("/generate-labels")
 @approval_gate.gated("magazines", "CREATE", "MagazineLabelBatch", "magazines.write")
 def generate_labels(
@@ -529,7 +706,7 @@ def generate_labels(
     for sub, member in rows:
         if sub.id in paused_sub_ids:
             continue
-        address = sub.address_override or f"{member.address_line1 or ''}, {member.locality or ''}"
+        address = sub.address_override or _member_label_address(member)
         items.append(MagazineLabelBatchItem(
             label_batch_id=batch.id,
             recipient_type="MEMBER",

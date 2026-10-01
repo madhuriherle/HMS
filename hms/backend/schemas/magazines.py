@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime, date
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 class MagazineSubscriptionBase(BaseModel):
     member_id: int
@@ -32,7 +32,17 @@ class MagazineDeliveryPauseBase(BaseModel):
     reason: Optional[str] = None
 
 class MagazineDeliveryPauseCreate(MagazineDeliveryPauseBase):
-    pass
+    """Pausing needs a reason (e.g. 'returned twice') and starts today unless
+    a date is given."""
+    pause_start_date: date = Field(default_factory=date.today)
+    reason: str
+
+    @field_validator("reason")
+    @classmethod
+    def reason_required(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("A reason is required to pause the magazine service")
+        return v.strip()
 
 class MagazineDeliveryPauseUpdate(BaseModel):
     pause_end_date: Optional[date] = None
@@ -53,7 +63,7 @@ class MagazineReturnBase(BaseModel):
 
 
 class MagazineReturnCreate(MagazineReturnBase):
-    pass
+    return_date: date = Field(default_factory=date.today)
 
 
 class MagazineReturnUpdate(BaseModel):

@@ -1,8 +1,9 @@
 """Single source of truth for the personal-master lookups that live on
-Member (qualification, native place).
+Member (qualification, gotra, native place).
 
-Horoscope masters (gotra, nakshatra, rashi, masa, mithi, samvathsara) were
-removed in migration 0014 — Mangalya/matrimony owns that data.
+The other horoscope masters (nakshatra, rashi, masa, mithi, samvathsara) were
+removed in migration 0014 — Mangalya/matrimony owns that data. Gotra stays: the
+Sabha's own member register records it.
 
 Shared by api/v1/endpoints/masters.py (the CRUD routes + delete in-use
 guard) and api/v1/endpoints/members.py (create/update validation + profile
@@ -14,7 +15,7 @@ from dataclasses import dataclass
 from typing import Optional, Type
 
 from models.masters import (
-    Qualification, NativePlace,
+    Qualification, NativePlace, Gotra,
 )
 
 
@@ -32,6 +33,7 @@ class PersonalMasterSpec:
 
 PERSONAL_MASTERS = [
     PersonalMasterSpec("qualification", "qualifications", Qualification, "qualification_id", "qualification", "Qualification", text_field="qualification_text"),
+    PersonalMasterSpec("gotra", "gotras", Gotra, "gotra_id", "gotra", "Gotra", text_field="gotra_text"),
     PersonalMasterSpec(
         "native_place", "native-places", NativePlace, "native_place_id", "native_place",
         "Native place", uses_district=True, text_field="native_place_text",

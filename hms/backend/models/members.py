@@ -30,6 +30,8 @@ class Member(AuditMixin, Base):
     native_place_text: Mapped[str] = mapped_column(String(150), nullable=True)
     qualification_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
     qualification_text: Mapped[str] = mapped_column(String(150), nullable=True)
+    gotra_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    gotra_text: Mapped[str] = mapped_column(String(100), nullable=True)
     occupation: Mapped[str] = mapped_column(String(150), nullable=True)
     aadhaar_number: Mapped[str] = mapped_column(String(20), nullable=True)
     # WhatsApp number when different from mobile (notifications prefer it).
@@ -42,6 +44,13 @@ class Member(AuditMixin, Base):
     address_line1: Mapped[str] = mapped_column(String(255), nullable=True)
     address_line2: Mapped[str] = mapped_column(String(255), nullable=True)
     locality: Mapped[str] = mapped_column(String(150), nullable=True)
+    # Village-style address parts carried over from the legacy register.
+    area: Mapped[str] = mapped_column(String(150), nullable=True)
+    place: Mapped[str] = mapped_column(String(150), nullable=True)
+    grama: Mapped[str] = mapped_column(String(150), nullable=True)
+    village: Mapped[str] = mapped_column(String(150), nullable=True)
+    label_point: Mapped[str] = mapped_column(String(100), nullable=True)
+    address_remarks: Mapped[str] = mapped_column(Text, nullable=True)
     address_line1_kn: Mapped[str] = mapped_column(String(255), nullable=True)
     address_line2_kn: Mapped[str] = mapped_column(String(255), nullable=True)
     locality_kn: Mapped[str] = mapped_column(String(150), nullable=True)

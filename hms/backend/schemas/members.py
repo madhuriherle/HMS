@@ -12,6 +12,8 @@ EDITABLE_MEMBER_FIELDS: Set[str] = {
     "full_name_kn", "gender", "date_of_birth",
     "father_husband_name", "blood_group", "native_place_id",
     "native_place_text", "qualification_id", "qualification_text", "occupation",
+    "gotra_id", "gotra_text",
+    "area", "place", "grama", "village", "label_point", "address_remarks",
 
     "aadhaar_number", "referred_by_member_id",
     "state_id", "district_id", "taluk_id", "pincode_id",
@@ -37,6 +39,8 @@ class MemberBase(BaseModel):
     native_place_text: Optional[str] = None
     qualification_id: Optional[int] = None
     qualification_text: Optional[str] = None
+    gotra_id: Optional[int] = None
+    gotra_text: Optional[str] = None
     occupation: Optional[str] = None
     aadhaar_number: Optional[str] = None
     whatsapp_number: Optional[str] = None
@@ -50,6 +54,12 @@ class MemberBase(BaseModel):
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None
     locality: Optional[str] = None
+    area: Optional[str] = None
+    place: Optional[str] = None
+    grama: Optional[str] = None
+    village: Optional[str] = None
+    label_point: Optional[str] = None
+    address_remarks: Optional[str] = None
     address_line1_kn: Optional[str] = None
     address_line2_kn: Optional[str] = None
     locality_kn: Optional[str] = None
@@ -119,6 +129,8 @@ class MemberUpdate(BaseModel):
     native_place_text: Optional[str] = None
     qualification_id: Optional[int] = None
     qualification_text: Optional[str] = None
+    gotra_id: Optional[int] = None
+    gotra_text: Optional[str] = None
     occupation: Optional[str] = None
     aadhaar_number: Optional[str] = None
     whatsapp_number: Optional[str] = None
@@ -131,6 +143,12 @@ class MemberUpdate(BaseModel):
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None
     locality: Optional[str] = None
+    area: Optional[str] = None
+    place: Optional[str] = None
+    grama: Optional[str] = None
+    village: Optional[str] = None
+    label_point: Optional[str] = None
+    address_remarks: Optional[str] = None
     address_line1_kn: Optional[str] = None
     address_line2_kn: Optional[str] = None
     locality_kn: Optional[str] = None

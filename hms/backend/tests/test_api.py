@@ -2614,7 +2614,7 @@ def test_magazine_pause_resume_cycle(client, admin_headers):
     dup_pause = client.post(
         "/api/v1/magazines/pauses",
         headers=admin_headers,
-        json={"subscription_id": sub["id"], "pause_start_date": "2026-02-01"},
+        json={"subscription_id": sub["id"], "pause_start_date": "2026-02-01", "reason": "test pause"},
     )
     assert dup_pause.status_code == 409, dup_pause.text
 
@@ -2622,7 +2622,7 @@ def test_magazine_pause_resume_cycle(client, admin_headers):
     bad = client.post(
         "/api/v1/magazines/pauses",
         headers=admin_headers,
-        json={"subscription_id": sub["id"], "pause_start_date": "2026-03-01", "pause_end_date": "2026-02-01"},
+        json={"subscription_id": sub["id"], "pause_start_date": "2026-03-01", "pause_end_date": "2026-02-01", "reason": "test pause"},
     )
     assert bad.status_code == 400, bad.text
 
@@ -2646,7 +2646,7 @@ def test_magazine_pause_resume_cycle(client, admin_headers):
     pause2 = client.post(
         "/api/v1/magazines/pauses",
         headers=admin_headers,
-        json={"subscription_id": sub["id"], "pause_start_date": "2026-05-01", "pause_end_date": "2026-05-10"},
+        json={"subscription_id": sub["id"], "pause_start_date": "2026-05-01", "pause_end_date": "2026-05-10", "reason": "test pause"},
     ).json()
     extended = client.put(
         f"/api/v1/magazines/pauses/{pause2['id']}",
@@ -2771,7 +2771,7 @@ def test_label_generation_skips_stopped_and_paused(client, admin_headers):
     client.post(
         "/api/v1/magazines/pauses",
         headers=admin_headers,
-        json={"subscription_id": sub_p["id"], "pause_start_date": "2020-01-01"},  # open-ended
+        json={"subscription_id": sub_p["id"], "pause_start_date": "2020-01-01", "reason": "test pause"},  # open-ended
     )
 
     issue = (date.today()).strftime("%Y-%m")
@@ -3471,7 +3471,7 @@ def test_permanent_delete_cascades(client, admin_headers):
     pause = client.post(
         "/api/v1/magazines/pauses",
         headers=admin_headers,
-        json={"subscription_id": subscription_id, "pause_start_date": "2026-01-01"},
+        json={"subscription_id": subscription_id, "pause_start_date": "2026-01-01", "reason": "test pause"},
     )
     assert pause.status_code in (200, 201), pause.text
 
@@ -4719,7 +4719,7 @@ def test_personal_masters_crud_and_member_usage(client, admin_headers):
     assert overview.status_code == 200, overview.text
     assert "qualifications" in overview.json()
     assert "native_places" in overview.json()
-    assert "gotras" not in overview.json()
+    assert "gotras" in overview.json() and "nakshatras" not in overview.json()
 
     # list + search + update
     lst = client.get("/api/v1/masters/qualifications", headers=admin_headers, params={"search": "B.E"})
@@ -4759,10 +4759,10 @@ def test_personal_masters_crud_and_member_usage(client, admin_headers):
     r = client.post(
         "/api/v1/members/",
         headers=admin_headers,
-        json={"first_name_en": "Horo", "mobile": "9600000005", "nakshatra_id": 1, "gotra_id": 1},
+        json={"first_name_en": "Horo", "mobile": "9600000005", "nakshatra_id": 1},
     )
     assert r.status_code == 201, r.text
-    assert "nakshatra_id" not in r.json() and "gotra_id" not in r.json()
+    assert "nakshatra_id" not in r.json()
 
     # invalid master reference rejected
     bad = client.post(
@@ -4778,14 +4778,14 @@ def test_personal_masters_crud_and_member_usage(client, admin_headers):
     pm = profile.json()["personal_masters"]
     assert pm["native_place"]["name_en"] == "Siddapura"
     assert pm["qualification"]["name_en"] == "B.E"
-    assert "gotra" not in pm and "nakshatra" not in pm
+    assert "nakshatra" not in pm
 
     # delete guard: master in use by a member
     r = client.delete(f"/api/v1/masters/qualifications/{qualification['id']}", headers=admin_headers)
     assert r.status_code == 409
 
-    # horoscope master routes are gone
-    for slug in ("gotras", "nakshatras", "rashis", "masas", "mithis", "samvathraras"):
+    # the other horoscope master routes are gone (gotra stays)
+    for slug in ("nakshatras", "rashis", "masas", "mithis", "samvathraras"):
         resp = client.get(f"/api/v1/masters/{slug}", headers=admin_headers)
         assert resp.status_code == 404, f"{slug} should be removed ({resp.status_code})"
 
@@ -6184,3 +6184,96 @@ def test_update_own_profile_rotates_session(client, admin_headers):
     fresh = client.post("/api/v1/auth/login", data={"username": "prof_user", "password": STAFF_PW}).json()
     me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {fresh['access_token']}"}).json()
     assert me["name"] == "New Name" and me["email"] == "n@x.com"
+
+
+def test_gotra_master_and_extra_address_fields(client, admin_headers):
+    g = client.post("/api/v1/masters/gotras", headers=admin_headers, json={"name_en": "Gowtama", "name_kn": "ಗೌತಮ"})
+    assert g.status_code == 201, g.text
+    assert client.post("/api/v1/masters/gotras", headers=admin_headers, json={"name_en": "Gowtama"}).status_code == 409
+    assert "gotras" in client.get("/api/v1/masters/personal-masters", headers=admin_headers).json()
+
+    m = client.post("/api/v1/members/", headers=admin_headers, json={
+        "first_name_en": "Gotra", "last_name_en": "Holder", "mobile": "9611111111",
+        "gotra_id": g.json()["id"], "address_line1": "Souhardha Marike House", "address_line2": "Post Aryapu",
+        "area": "Sullia Road", "place": "Puttur", "grama": "Aryapu", "village": "Kolthige",
+        "label_point": "DK", "address_remarks": "ask for the gate key",
+    })
+    assert m.status_code == 201, m.text
+    body = m.json()
+    assert body["gotra_id"] == g.json()["id"] and body["village"] == "Kolthige" and body["label_point"] == "DK"
+    assert body["address_remarks"] == "ask for the gate key"
+
+    # free-text fallback + invalid master reference
+    t = client.post("/api/v1/members/", headers=admin_headers, json={"first_name_en": "Txt", "mobile": "9611111112", "gotra_text": "Kashyapa"})
+    assert t.status_code == 201 and t.json()["gotra_text"] == "Kashyapa"
+    assert client.post("/api/v1/members/", headers=admin_headers, json={"first_name_en": "Bad", "mobile": "9611111113", "gotra_id": 999999}).status_code == 400
+
+    # profile resolves it; edit works; in-use master cannot be deleted
+    prof = client.get(f"/api/v1/members/{body['id']}/profile", headers=admin_headers).json()
+    assert prof["personal_masters"]["gotra"]["name_en"] == "Gowtama"
+    upd = client.put(f"/api/v1/members/{body['id']}", headers=admin_headers, json={"place": "Bantwal"})
+    assert upd.status_code == 200 and upd.json()["place"] == "Bantwal"
+    assert client.delete(f"/api/v1/masters/gotras/{g.json()['id']}", headers=admin_headers).status_code == 409
+
+    # the label address carries the village-style parts
+    sub = client.post("/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": body["id"]})
+    assert sub.status_code in (200, 201), sub.text
+    gen = client.post("/api/v1/magazines/generate-labels", headers=admin_headers, params={"issue_month_year": "2026-06"})
+    assert gen.status_code == 200, gen.text
+    items = client.get(f"/api/v1/magazines/label-batches/{gen.json()['batch_id']}", headers=admin_headers).json()
+    text = str(items)
+    assert "Souhardha Marike House, Post Aryapu" in text and "Bantwal, Aryapu, Kolthige" in text
+
+
+def test_monthly_marks_returned_R_and_pause_with_reason(client, admin_headers):
+    M = "/api/v1/magazines"
+    member = _create_member(client, admin_headers, "9622222222", "Returned Twice")
+    sub = client.post(f"{M}/subscriptions", headers=admin_headers, json={"member_id": member["id"]}).json()
+
+    # no marks yet: 12 empty boxes, no pause suggestion
+    grid = client.get(f"{M}/subscriptions/{sub['id']}/monthly", headers=admin_headers, params={"year": 2026}).json()
+    assert [b["mark"] for b in grid["months"]] == [""] * 12 and grid["suggest_pause"] is False
+
+    # mark R for two issues (return_date defaults to today)
+    for month in ("2026-03", "2026-07"):
+        r = client.post(f"{M}/returns", headers=admin_headers,
+                        json={"subscription_id": sub["id"], "issue_month_year": month, "return_reason": "door locked"})
+        assert r.status_code == 201, r.text
+    grid = client.get(f"{M}/members/{member['id']}/monthly", headers=admin_headers, params={"year": 2026}).json()
+    marks = {b["month"]: b["mark"] for b in grid["months"]}
+    assert marks[3] == "R" and marks[7] == "R" and marks[1] == ""
+    assert grid["returned_in_year"] == 2 and grid["months"][2]["return_reason"] == "door locked"
+
+    # repeat-return list + suggestion once it is within the last 12 months
+    from datetime import date
+    this_month = date.today().strftime("%Y-%m")
+    client.post(f"{M}/returns", headers=admin_headers, json={"subscription_id": sub["id"], "issue_month_year": this_month})
+    repeat = client.get(f"{M}/returns/repeat", headers=admin_headers, params={"min_returns": 2}).json()
+    row = next(r for r in repeat["data"] if r["subscription_id"] == sub["id"])
+    assert row["returns_in_period"] >= 2 and row["member_id"] == member["id"]
+    cur = client.get(f"{M}/subscriptions/{sub['id']}/monthly", headers=admin_headers).json()
+    assert cur["suggest_pause"] is True
+
+    # pausing needs a reason...
+    assert client.post(f"{M}/pauses", headers=admin_headers, json={"subscription_id": sub["id"]}).status_code == 422
+    assert client.post(f"{M}/pauses", headers=admin_headers, json={"subscription_id": sub["id"], "reason": "   "}).status_code == 422
+    # ...starts today by default and flips the subscription to PAUSED
+    pause = client.post(f"{M}/pauses", headers=admin_headers, json={"subscription_id": sub["id"], "reason": "returned twice"})
+    assert pause.status_code == 201, pause.text
+    assert pause.json()["pause_start_date"] == date.today().isoformat() and pause.json()["reason"] == "returned twice"
+    assert client.get(f"{M}/subscriptions/{sub['id']}", headers=admin_headers).json()["delivery_status"] == "PAUSED"
+    cur = client.get(f"{M}/subscriptions/{sub['id']}/monthly", headers=admin_headers).json()
+    assert cur["suggest_pause"] is False
+    assert not any(r["subscription_id"] == sub["id"] for r in client.get(f"{M}/returns/repeat", headers=admin_headers).json()["data"])
+    assert next(b for b in cur["months"] if b["issue_month_year"] == this_month)["mark"] in ("R", "P")
+
+    # resume puts it back to ACTIVE
+    assert client.post(f"{M}/pauses/{pause.json()['id']}/resume", headers=admin_headers).status_code == 200
+    assert client.get(f"{M}/subscriptions/{sub['id']}", headers=admin_headers).json()["delivery_status"] == "ACTIVE"
+
+    # unmark an R
+    ret = client.get(f"{M}/returns", headers=admin_headers, params={"subscription_id": sub["id"], "issue_month_year": "2026-03"}).json()["data"][0]
+    assert client.delete(f"{M}/returns/{ret['id']}", headers=admin_headers).status_code == 200
+    grid = client.get(f"{M}/subscriptions/{sub['id']}/monthly", headers=admin_headers, params={"year": 2026}).json()
+    assert grid["months"][2]["mark"] in ("", "P")
+    assert client.get(f"{M}/members/99999999/monthly", headers=admin_headers).status_code == 404
