@@ -116,6 +116,11 @@ app.add_exception_handler(IntegrityError, integrity_error_handler)
 # ── Auto Audit Listeners ───────────────────
 setup_audit_listeners(engine)
 
+# FK + filter-column indexes (db/indexes.py) so create_all matches migration 0017
+from db.indexes import ensure_indexes
+from models.base import Base as _Base
+ensure_indexes(_Base.metadata)
+
 # ── API Routes ───────────────────────────────
 app.include_router(api_router, prefix=settings.API_V1_STR)
 

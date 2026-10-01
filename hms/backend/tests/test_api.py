@@ -6404,3 +6404,24 @@ def test_membership_credit_checkbox_options_api(client, admin_headers):
     assert client.put("/api/v1/masters/membership-credit-settings", headers=H, json=[]).status_code == 400
     reset = client.post("/api/v1/masters/membership-credit-settings/reset", headers=H)
     assert reset.status_code == 200 and set(reset.json()["receipt_types"]) == set(cfg["default"])
+
+
+def test_every_foreign_key_and_filter_column_is_indexed(client):
+    """Guards db/indexes.py: a new FK column must not ship without an index."""
+    from sqlalchemy import inspect
+    from db.session import engine
+    from db.indexes import EXTRA_INDEXES
+
+    insp = inspect(engine)
+    missing = []
+    for table in insp.get_table_names():
+        first_cols = {i["column_names"][0] for i in insp.get_indexes(table) if i["column_names"]}
+        first_cols |= set(insp.get_pk_constraint(table).get("constrained_columns", [])[:1])
+        first_cols |= {u["column_names"][0] for u in insp.get_unique_constraints(table) if u["column_names"]}
+        for fk in insp.get_foreign_keys(table):
+            if fk["constrained_columns"][0] not in first_cols:
+                missing.append(f"{table}.{fk['constrained_columns'][0]}")
+        for t, c in EXTRA_INDEXES:
+            if t == table and c not in first_cols:
+                missing.append(f"{table}.{c}")
+    assert not missing, f"unindexed: {missing}"

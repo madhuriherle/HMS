@@ -87,6 +87,8 @@ depends_on = None
 
 def upgrade() -> None:
     bind = op.get_bind()
+    from db.indexes import ensure_indexes
+    ensure_indexes(Base.metadata)
     Base.metadata.create_all(bind=bind)
 
 
