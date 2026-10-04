@@ -13,6 +13,12 @@ class NotificationTemplate(AuditMixin, Base):
     # the activation hook looks its template up by this key.
     purpose: Mapped[str] = mapped_column(String(50), default="GENERAL", nullable=False)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Provider-side approval state for WhatsApp templates (Meta/gupshup/wati):
+    # PENDING while under review by the provider, APPROVED once usable,
+    # REJECTED when refused. NULL for templates that were never submitted.
+    provider_approval_status: Mapped[str] = mapped_column(String(20), nullable=True)
+    provider_approval_synced_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
+    provider_approval_note: Mapped[str] = mapped_column(Text, nullable=True)
 
 class NotificationCampaign(AuditMixin, Base):
     __tablename__ = "notification_campaigns"

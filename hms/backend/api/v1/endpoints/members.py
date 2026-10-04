@@ -1,5 +1,7 @@
 from typing import Any, List, Optional, Union
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks, Request
+import pydantic
+from pydantic import model_validator, ConfigDict
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from crud import members as crud_members
@@ -190,6 +192,181 @@ def create_member(
     db.commit()
     db.refresh(db_obj)
     return db_obj
+
+# ─── PUBLIC WEBSITE REGISTRATION ─────────────────────────────
+
+# Fields a website visitor may set on themselves. Deliberately narrower than
+# MemberCreate: no registration_source/registration_status (forced to
+# ONLINE/PENDING), no referred_by_member_id (self-referrals would poison the
+# referral stats), no aadhaar (KYC document flow owns that).
+_PUBLIC_REGISTER_ALLOWED = {
+    "first_name_en", "middle_name_en", "last_name_en", "full_name_kn",
+    "gender", "date_of_birth", "father_husband_name", "blood_group",
+    "native_place_id", "native_place_text", "qualification_id",
+    "qualification_text", "gotra_id", "gotra_text", "occupation",
+    "mobile", "mobile_country_code", "alternate_mobile", "whatsapp_number",
+    "email", "address_line1", "address_line2", "locality", "area", "place",
+    "grama", "village", "label_point", "address_remarks",
+    "address_line1_kn", "address_line2_kn", "locality_kn",
+    "state_id", "district_id", "taluk_id", "pincode_id",
+}
+
+
+class PublicMemberRegister(schemas_members.MemberCreate):
+    """Website signup body — unknown/private fields rejected outright."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    registration_source: str = "ONLINE"  # keep the base validator happy; forced below
+
+    @model_validator(mode="after")
+    def _reject_private_fields(self) -> "PublicMemberRegister":
+        supplied = set(self.model_dump(exclude_unset=True))
+        private = sorted(supplied - _PUBLIC_REGISTER_ALLOWED)
+        if private:
+            raise ValueError(f"Fields not allowed on public registration: {', '.join(private)}")
+        if not (self.mobile or self.email):
+            raise ValueError("mobile or email is required")
+        return self
+
+
+@router.post("/public-register", status_code=201)
+def public_register_member(
+    *,
+    request: Request,
+    db: Session = Depends(deps.get_db),
+    member_in: PublicMemberRegister,
+) -> Any:
+    """Self-registration from the public website — no authentication.
+
+    The website cannot call POST /members (that needs a members.write token),
+    so this is the website's own door. Safety rails:
+    * rate limited 5 / hour per IP (the limiter is in-process like auth's);
+    * every identity/status column is forced: registration_source=ONLINE,
+      approval_status=UNAPPROVED, member_status=ACTIVE, no member_code —
+      the payload cannot mint an approved member;
+    * the same duplicate checks as staff registration (mobile, or Kannada
+      name + date of birth) so a 409 tells the visitor they are already
+      registered;
+    * the MEMBER login account is provisioned exactly as staff registration
+      does, so the mobile app works from day one.
+    Members appear in the unapproved list for an admin to approve.
+    """
+    from core.ratelimit import rate_limiter
+
+    client_ip = request.client.host if request.client else "unknown"
+    if not rate_limiter.check(f"public-register:{client_ip}", max_hits=5, window_seconds=3600):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many registration attempts from this address. Please try again later.",
+        )
+
+    from models.masters import PostalCode, State, District, Taluk
+    from models.members import Member as MemberModel
+
+    # ── Duplicate validation (same rules as staff registration) ──
+    if member_in.mobile:
+        existing = db.query(MemberModel).filter(
+            MemberModel.mobile == member_in.mobile,
+            MemberModel.is_deleted == False,  # noqa: E712
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Duplicate: a member with mobile {member_in.mobile} is already "
+                    f"registered (ID: {existing.id})"
+                ),
+            )
+    if member_in.full_name_kn and member_in.date_of_birth:
+        existing_kn = db.query(MemberModel).filter(
+            MemberModel.full_name_kn == member_in.full_name_kn,
+            MemberModel.date_of_birth == member_in.date_of_birth,
+            MemberModel.is_deleted == False,  # noqa: E712
+        ).first()
+        if existing_kn:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Duplicate: a member with Kannada name '{member_in.full_name_kn}' "
+                    f"and the same date of birth is already registered (ID: {existing_kn.id})"
+                ),
+            )
+
+    # ── Geography cross-checks (same rules as staff registration) ──
+    if member_in.pincode_id:
+        pc = db.query(PostalCode).filter(PostalCode.id == member_in.pincode_id).first()
+        if not pc:
+            raise HTTPException(status_code=400, detail="Invalid pincode_id")
+        if not member_in.state_id:
+            member_in.state_id = pc.state_id
+        if not member_in.district_id:
+            member_in.district_id = pc.district_id
+        if not member_in.taluk_id and pc.taluk_id:
+            member_in.taluk_id = pc.taluk_id
+    if member_in.state_id and not db.query(State).filter(State.id == member_in.state_id).first():
+        raise HTTPException(status_code=400, detail="Invalid state_id")
+    if member_in.district_id:
+        district = db.query(District).filter(District.id == member_in.district_id).first()
+        if not district:
+            raise HTTPException(status_code=400, detail="Invalid district_id")
+        if member_in.state_id and district.state_id != member_in.state_id:
+            raise HTTPException(status_code=400, detail="district_id does not belong to state_id")
+    if member_in.taluk_id:
+        taluk = db.query(Taluk).filter(Taluk.id == member_in.taluk_id).first()
+        if not taluk:
+            raise HTTPException(status_code=400, detail="Invalid taluk_id")
+        if member_in.district_id and taluk.district_id != member_in.district_id:
+            raise HTTPException(status_code=400, detail="taluk_id does not belong to district_id")
+
+    _member_master_checks(db, member_in.model_dump(exclude_unset=False))
+
+    from core.security import get_password_hash
+    from models.users import User as UserModel
+    from services.permissions import get_role_by_code
+
+    data = member_in.model_dump(exclude_unset=True)
+    data.pop("registration_source", None)  # always ONLINE below, never caller-chosen
+    db_obj = MemberModel(
+        **data,
+        registration_source="ONLINE",
+        registration_status="PENDING",
+        approval_status="UNAPPROVED",
+        member_status="ACTIVE",
+        created_by=None,
+    )
+    db.add(db_obj)
+    db.flush()
+
+    # MEMBER login account, same as staff registration (mobile-as-username).
+    login_username = member_in.mobile or f"member{db_obj.id}"
+    if not db.query(UserModel).filter(UserModel.username == login_username).first():
+        import secrets
+        temp_password = secrets.token_urlsafe(12)
+        member_role = get_role_by_code(db, "MEMBER")
+        db.add(UserModel(
+            name=f"{member_in.first_name_en} {member_in.last_name_en or ''}".strip(),
+            username=login_username,
+            mobile=member_in.mobile,
+            password_hash=get_password_hash(temp_password),
+            user_type="MEMBER",
+            role_id=member_role.id if member_role else None,
+            member_id=db_obj.id,
+            created_by=None,
+        ))
+
+    db.commit()
+    db.refresh(db_obj)
+
+    # Confirm to the visitor without echoing the full record: id, name,
+    # member_code (always null until approval) and the pending status.
+    return {
+        "message": "Registration received. It will be visible after the sabha approves it.",
+        "member_id": db_obj.id,
+        "member_code": db_obj.member_code,
+        "approval_status": db_obj.approval_status,
+    }
+
 
 @router.get("/{id}", response_model=schemas_members.Member)
 def read_member(

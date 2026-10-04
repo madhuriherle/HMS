@@ -1,5 +1,7 @@
 from typing import Optional
 from datetime import datetime
+from enum import Enum
+
 from pydantic import BaseModel, ConfigDict
 
 class NotificationTemplateBase(BaseModel):
@@ -9,6 +11,25 @@ class NotificationTemplateBase(BaseModel):
     content: str
     purpose: str = "GENERAL"
     status: bool = True
+
+
+class ProviderApprovalStatus(str, Enum):
+    """WhatsApp provider template-review states we track per template."""
+
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+class TemplateApprovalStatusUpdate(BaseModel):
+    """Body for PUT /notifications/templates/{id}/approval-status.
+
+    Records what the provider dashboard says so the bulk-send screen can
+    filter on 'approved templates only'."""
+
+    provider_approval_status: ProviderApprovalStatus
+    provider_template_id: Optional[str] = None
+    note: Optional[str] = None
 
 class NotificationTemplateCreate(NotificationTemplateBase):
     pass
@@ -24,6 +45,9 @@ class NotificationTemplateUpdate(BaseModel):
 class NotificationTemplate(NotificationTemplateBase):
     id: int
     created_at: datetime
+    provider_approval_status: Optional[str] = None
+    provider_approval_synced_at: Optional[datetime] = None
+    provider_approval_note: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 

@@ -79,11 +79,62 @@ def _finish_campaign(campaign_id: int, results: list) -> None:
 
 
 @router.get("/templates")
-def read_templates(db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), page: int = 1, limit: int = 50, purpose: Optional[str] = None) -> Any:
+def read_templates(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    page: int = 1,
+    limit: int = 50,
+    purpose: Optional[str] = None,
+    approval_status: Optional[str] = None,
+) -> Any:
+    """List templates. approval_status=PENDING|APPROVED|REJECTED filters on the
+    provider-side review state, NONE matches never-submitted templates — the
+    bulk-send screen uses APPROVED to offer only usable templates."""
     q = db.query(NotificationTemplate).filter(NotificationTemplate.is_deleted == False)
     if purpose:
         q = q.filter(NotificationTemplate.purpose == purpose)
+    if approval_status:
+        wanted = approval_status.upper()
+        if wanted == "NONE":
+            q = q.filter(NotificationTemplate.provider_approval_status.is_(None))
+        else:
+            if wanted not in ("PENDING", "APPROVED", "REJECTED"):
+                raise HTTPException(400, "approval_status must be PENDING, APPROVED, REJECTED or NONE")
+            q = q.filter(NotificationTemplate.provider_approval_status == wanted)
     return paginate(q, page, limit)
+
+
+@router.put("/templates/{template_id}/approval-status", response_model=schemas_notifications.NotificationTemplate)
+def update_template_approval_status(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("notifications.write")),
+    template_id: int,
+    status_in: schemas_notifications.TemplateApprovalStatusUpdate,
+) -> Any:
+    """Record the provider's template-review verdict for a WhatsApp template.
+
+    There is no uniform cross-provider status API (gupshup/wati/Meta each
+    differ), so the sync is a manual record-keeping step today — when a
+    provider gains a status endpoint, its client can call this with what it
+    fetched. Only templates that were actually submitted carry a status;
+    clearing provider_template_id clears the review state with it."""
+    from datetime import datetime, timezone
+
+    t = db.query(NotificationTemplate).filter(
+        NotificationTemplate.id == template_id, NotificationTemplate.is_deleted == False
+    ).first()
+    if not t:
+        raise HTTPException(404, "Template not found")
+    t.provider_approval_status = status_in.provider_approval_status.value
+    t.provider_approval_synced_at = datetime.now(timezone.utc)
+    t.provider_approval_note = status_in.note
+    if status_in.provider_template_id is not None:
+        t.provider_template_id = status_in.provider_template_id
+    t.updated_by = current_user.id
+    db.commit()
+    db.refresh(t)
+    return t
 
 @router.post("/templates", response_model=Union[schemas_notifications.NotificationTemplate, PendingApproval])
 @approval_gate.gated("notifications", "CREATE", "NotificationTemplate", "notifications.write")
