@@ -20,21 +20,33 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("notification_templates", sa.Column("provider_approval_status", sa.String(20), nullable=True))
-    op.add_column("notification_templates", sa.Column("provider_approval_synced_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("notification_templates", sa.Column("provider_approval_note", sa.Text(), nullable=True))
-    op.create_index(
-        "ix_notification_templates_provider_approval_status",
-        "notification_templates",
-        ["provider_approval_status"],
-    )
+    # Migration 0001 creates the schema from current ORM metadata, so on a
+    # fresh database these columns may already exist — add only the missing
+    # ones instead of failing on DuplicateColumn.
+    existing = {c["name"] for c in sa.inspect(op.get_bind()).get_columns("notification_templates")}
+    if "provider_approval_status" not in existing:
+        op.add_column("notification_templates", sa.Column("provider_approval_status", sa.String(20), nullable=True))
+    if "provider_approval_synced_at" not in existing:
+        op.add_column("notification_templates", sa.Column("provider_approval_synced_at", sa.DateTime(timezone=True), nullable=True))
+    if "provider_approval_note" not in existing:
+        op.add_column("notification_templates", sa.Column("provider_approval_note", sa.Text(), nullable=True))
+    if "provider_approval_status" not in existing:
+        op.create_index(
+            "ix_notification_templates_provider_approval_status",
+            "notification_templates",
+            ["provider_approval_status"],
+        )
 
 
 def downgrade() -> None:
-    op.drop_index(
-        "ix_notification_templates_provider_approval_status",
-        table_name="notification_templates",
-    )
-    op.drop_column("notification_templates", "provider_approval_note")
-    op.drop_column("notification_templates", "provider_approval_synced_at")
-    op.drop_column("notification_templates", "provider_approval_status")
+    existing = {c["name"] for c in sa.inspect(op.get_bind()).get_columns("notification_templates")}
+    if "provider_approval_status" in existing:
+        op.drop_index(
+            "ix_notification_templates_provider_approval_status",
+            table_name="notification_templates",
+        )
+        op.drop_column("notification_templates", "provider_approval_status")
+    if "provider_approval_synced_at" in existing:
+        op.drop_column("notification_templates", "provider_approval_synced_at")
+    if "provider_approval_note" in existing:
+        op.drop_column("notification_templates", "provider_approval_note")

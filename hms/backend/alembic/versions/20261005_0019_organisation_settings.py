@@ -25,7 +25,14 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_table(
+    # Migration 0001 creates the schema from current ORM metadata, so on a
+    # fresh database the table may already exist — create it only when
+    # missing (and the index only when we created the table).
+    insp = sa.inspect(op.get_bind())
+    created_here = False
+    if "organisation_settings" not in insp.get_table_names():
+        created_here = True
+        op.create_table(
         "organisation_settings",
         sa.Column("id", sa.BigInteger(), primary_key=True),
         # Organisation profile
@@ -73,8 +80,13 @@ def upgrade() -> None:
         sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("deleted_by", sa.BigInteger(), nullable=True),
         sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-    )
-    op.create_index("ix_organisation_settings_id", "organisation_settings", ["id"])
+        )
+        op.create_index("ix_organisation_settings_id", "organisation_settings", ["id"])
+    else:
+        # Table pre-existed via 0001: make sure the id index does too.
+        existing_idx = {i["name"] for i in insp.get_indexes("organisation_settings")}
+        if "ix_organisation_settings_id" not in existing_idx:
+            op.create_index("ix_organisation_settings_id", "organisation_settings", ["id"])
 
     # Seed the new privilege and the default settings row (db/seed_defaults.py).
     session = Session(bind=op.get_bind())
@@ -88,5 +100,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    insp = sa.inspect(op.get_bind())
+    if "organisation_settings" not in insp.get_table_names():
+        return
     op.drop_index("ix_organisation_settings_id", table_name="organisation_settings")
     op.drop_table("organisation_settings")

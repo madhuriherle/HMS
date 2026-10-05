@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # Database
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/hms_mma"
+    DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/hms_mma"
 
     # JWT
     SECRET_KEY: str = "CHANGE_THIS_TO_A_VERY_LONG_RANDOM_SECRET_KEY"
