@@ -231,3 +231,81 @@ def test_template_approval_status_requires_permission(client):
         json={"provider_approval_status": "APPROVED"},
     )
     assert response.status_code in (401, 403), response.text
+
+
+# ─────────────── organisation settings screen ───────────────
+
+def test_get_organisation_settings_defaults(client, admin_headers):
+    """First read creates the singleton row with the receipt-book defaults."""
+    response = client.get("/api/v1/system/settings", headers=admin_headers)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    # Profile — defaults mirror the printed receipt book
+    assert body["id"] == 1
+    assert body["name_en"] == "Sri Akhila Havyaka Mahasabha (R)"
+    assert body["name_kn"].startswith("ಶ್ರೀ")
+    assert "560003" in body["address_en"]
+    assert body["registration_no"] == "9001-2015"
+    assert body["iso_cert_no"] == "ISO-OM-2104068"
+    # Contact
+    assert body["phone"] == "080-23481913"
+    assert body["email"] == "srhavyaka@gmail.com"
+    # Print header
+    assert body["print_header_enabled"] is True
+    assert body["president_title_kn"] == "ಅಧ್ಯಕ್ಷರು"
+    assert body["secretary_title_en"] == "Secretary"
+    assert body["pay_mode_upi_kn"] == "ಯು.ಪಿ.ಐ"
+    assert "realisation" in body["receipt_footer_note_en"]
+    # Notification toggles
+    assert body["notify_whatsapp_enabled"] is True
+
+
+def test_put_organisation_settings_partial_update(client, admin_headers):
+    """Only the fields in the body change; everything else is preserved."""
+    original = client.get("/api/v1/system/settings", headers=admin_headers).json()
+
+    response = client.put(
+        "/api/v1/system/settings",
+        headers=admin_headers,
+        json={"name_en": "Sri Akhila Havyaka Mahasabha (R) — Edited", "mobile": "90000 00000"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["name_en"] == "Sri Akhila Havyaka Mahasabha (R) — Edited"
+    assert body["mobile"] == "90000 00000"
+    assert body["updated_by"] is not None
+
+    # Untouched fields keep their values (and Kannada is unaffected).
+    assert body["email"] == original["email"]
+    assert body["name_kn"] == original["name_kn"]
+    assert body["receipt_footer_note_en"] == original["receipt_footer_note_en"]
+
+    # And the change is visible on the next read.
+    assert client.get("/api/v1/system/settings", headers=admin_headers).json()["mobile"] == "90000 00000"
+
+
+def test_put_organisation_settings_rejects_unknown_fields(client, admin_headers):
+    response = client.put(
+        "/api/v1/system/settings",
+        headers=admin_headers,
+        json={"nmae_en": "Typo"},  # misspelled on purpose
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_put_organisation_settings_requires_login(client):
+    response = client.put("/api/v1/system/settings", json={"name_en": "Nope"})
+    assert response.status_code == 401, response.text
+
+
+def test_toggle_print_header_and_notification_settings(client, admin_headers):
+    response = client.put(
+        "/api/v1/system/settings",
+        headers=admin_headers,
+        json={"print_header_enabled": False, "notify_sms_enabled": False},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["print_header_enabled"] is False
+    assert body["notify_sms_enabled"] is False
+    assert body["notify_email_enabled"] is True  # untouched toggle stays

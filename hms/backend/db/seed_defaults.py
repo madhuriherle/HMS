@@ -65,7 +65,7 @@ _DESC = {
     "events": "events, participants and attachments",
     "engagements": "affiliations, associates, press/media and committee records",
     "imports": "bulk imports such as postal codes",
-    "system": "files, attachments and error logs",
+    "system": "files, attachments, error logs and organisation settings",
 }
 
 # (code, module, name, description)
@@ -79,8 +79,44 @@ for _m in ("users.privileges", "approvals"):
 PERMISSION_CATALOG += [
     ("activity.read", "activity", "Read activity", f"Read {_DESC['activity']}"),
     ("system.read", "system", "Read system", f"Read {_DESC['system']}"),
+    ("system.write", "system", "Write system", f"Edit {_DESC['system']}"),
     ("imports.write", "imports", "Bulk imports", "CSV imports such as postal codes"),
 ]
+
+# ── organisation settings (singleton row, id = 1) ────────────
+# Defaults mirror the Sabha's printed receipt book so the receipt/label
+# print-header works out of the box; the office edits everything on the
+# Settings screen.
+ORGANISATION_SETTINGS_DEFAULTS = {
+    "id": 1,
+    "name_en": "Sri Akhila Havyaka Mahasabha (R)",
+    "name_kn": "ಶ್ರೀ ಅಖಿಲ ಹವ್ಯಕ ಮಹಾಸಭಾ (ರ)",
+    "address_en": "101/A, 6th Cross, 11th Main, Malleshwaram, Bengaluru-560003",
+    "address_kn": "101/A, 6ನೇ ಅಡ್ಡರಸ್ತೆ, 11ನೇ ಮುಖ್ಯ ರಸ್ತೆ, ಮಲ್ಲೇಶ್ವರಂ, ಬೆಂಗಳೂರು-560003",
+    "registration_no": "9001-2015",
+    "iso_cert_no": "ISO-OM-2104068",
+    "phone": "080-23481913",
+    "mobile": "91484 59191",
+    "email": "srhavyaka@gmail.com",
+    "print_header_enabled": True,
+    "receipt_footer_note_en": "Cheques are subject to realisation.",
+    "receipt_footer_note_kn": "ಚೆಕ್ಕು ಜಮಾ ಆಗುವವರೆಗೆ ಈ ರಸೀದಿ ಪರಿಗಣಿತವಾಗುವುದಿಲ್ಲ.",
+    "president_title_en": "President",
+    "president_title_kn": "ಅಧ್ಯಕ್ಷರು",
+    "secretary_title_en": "Secretary",
+    "secretary_title_kn": "ಕಾರ್ಯದರ್ಶಿಗಳು",
+    "pay_mode_cash_en": "Cash",
+    "pay_mode_cash_kn": "ನಗದು",
+    "pay_mode_cheque_en": "Cheque",
+    "pay_mode_cheque_kn": "ಚೆಕ್",
+    "pay_mode_dd_en": "D.D.",
+    "pay_mode_dd_kn": "ಡಿ.ಡಿ",
+    "pay_mode_upi_en": "U.P.I.",
+    "pay_mode_upi_kn": "ಯು.ಪಿ.ಐ",
+    "notify_email_enabled": True,
+    "notify_sms_enabled": True,
+    "notify_whatsapp_enabled": True,
+}
 
 # ── roles ────────────────────────────────────────────────────
 # (code, name, rank_level, is_all_access, description)
@@ -155,6 +191,20 @@ def seed_permissions(db) -> int:
     if created:
         db.commit()
     return created
+
+
+def seed_organisation_settings(db) -> bool:
+    """Create the singleton organisation-settings row (id = 1) if missing.
+    Returns True when the row was created. Existing rows are never touched —
+    the office may have edited them on the Settings screen."""
+    from models.system import OrganisationSettings
+
+    row = db.query(OrganisationSettings).filter(OrganisationSettings.id == 1).first()
+    if row is not None:
+        return False
+    db.add(OrganisationSettings(**ORGANISATION_SETTINGS_DEFAULTS))
+    db.commit()
+    return True
 
 
 def seed_roles(db) -> int:

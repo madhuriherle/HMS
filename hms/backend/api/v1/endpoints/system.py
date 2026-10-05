@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Union
 import os
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -7,6 +7,12 @@ from api import deps
 from core.config import settings
 from models.users import User
 from models.system import FileAttachment, SystemErrorLog
+from models.system import OrganisationSettings as OrganisationSettingsModel
+from schemas.system import OrganisationSettings as OrganisationSettingsSchema
+from schemas.system import OrganisationSettingsUpdate
+from schemas.common import PendingApproval
+from services import approval_gate
+from db.seed_defaults import seed_organisation_settings
 from core.pagination import paginate
 
 router = APIRouter()
@@ -59,3 +65,36 @@ def read_error_logs(
         db.query(SystemErrorLog).order_by(SystemErrorLog.created_at.desc()),
         page, limit
     )
+
+# ── Organisation settings (singleton row) ───────────────────
+
+@router.get("/settings", response_model=OrganisationSettingsSchema)
+def read_organisation_settings(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Organisation profile, contact, print-header and notification settings.
+
+    The singleton row is created with the receipt-book defaults on first
+    read, so the screen is populated out of the box."""
+    seed_organisation_settings(db)
+    return db.query(OrganisationSettingsModel).filter(OrganisationSettingsModel.id == 1).first()
+
+@router.put("/settings", response_model=Union[OrganisationSettingsSchema, PendingApproval])
+@approval_gate.gated("system", "UPDATE", "OrganisationSettings", "system.write")
+def update_organisation_settings(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("system.write")),
+    settings_in: OrganisationSettingsUpdate,
+) -> Any:
+    """Patch the organisation settings (partial update — only the fields
+    sent in the body change)."""
+    seed_organisation_settings(db)
+    row = db.query(OrganisationSettingsModel).filter(OrganisationSettingsModel.id == 1).first()
+    for k, v in settings_in.model_dump(exclude_unset=True).items():
+        setattr(row, k, v)
+    row.updated_by = current_user.id
+    db.commit(); db.refresh(row)
+    return row
