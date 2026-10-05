@@ -1,6 +1,6 @@
 from typing import Any, Union
 import os
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from api import deps
@@ -12,6 +12,7 @@ from schemas.system import OrganisationSettings as OrganisationSettingsSchema
 from schemas.system import OrganisationSettingsUpdate
 from schemas.common import PendingApproval
 from services import approval_gate
+from services.file_upload import save_upload
 from db.seed_defaults import seed_organisation_settings
 from core.pagination import paginate
 
@@ -97,4 +98,34 @@ def update_organisation_settings(
         setattr(row, k, v)
     row.updated_by = current_user.id
     db.commit(); db.refresh(row)
+    return row
+
+@router.post("/settings/logo", response_model=OrganisationSettingsSchema)
+# Not @approval_gate.gated: an UploadFile's bytes can't be captured into a
+# JSON payload and replayed later.
+async def upload_organisation_logo(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("system.write")),
+    file: UploadFile = File(...),
+) -> Any:
+    """Upload the organisation logo shown in the receipt print header.
+
+    Stores the file under ``uploads/org_logo/`` and points
+    ``logo_path`` at it (retrievable via GET /system/files?path=...).
+    Any previously uploaded logo file is deleted from disk."""
+    if not (file.content_type or "").startswith("image/"):
+        raise HTTPException(400, "Logo must be an image (jpeg, png or webp)")
+    seed_organisation_settings(db)
+    row = db.query(OrganisationSettingsModel).filter(OrganisationSettingsModel.id == 1).first()
+    meta = await save_upload(file, subfolder="org_logo")
+    replaced = row.logo_path
+    row.logo_path = meta["file_path"]
+    row.updated_by = current_user.id
+    db.commit(); db.refresh(row)
+    if replaced and replaced != row.logo_path:
+        try:
+            os.remove(replaced)
+        except OSError:
+            pass  # best-effort cleanup of the superseded file
     return row

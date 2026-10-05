@@ -6,6 +6,8 @@
   (PUT /notifications/templates/{id}/approval-status + list filter).
 """
 
+import os
+
 import pytest
 
 
@@ -309,3 +311,49 @@ def test_toggle_print_header_and_notification_settings(client, admin_headers):
     assert body["print_header_enabled"] is False
     assert body["notify_sms_enabled"] is False
     assert body["notify_email_enabled"] is True  # untouched toggle stays
+
+
+def test_upload_organisation_logo(client, admin_headers):
+    """Logo upload stores the file, points logo_path at it, and a re-upload
+    replaces (and deletes) the previous file."""
+    response = client.post(
+        "/api/v1/system/settings/logo",
+        headers=admin_headers,
+        files={"file": ("logo.png", b"\x89PNG\r\n\x1a\nfakepngbytes", "image/png")},
+    )
+    assert response.status_code == 200, response.text
+    first = response.json()["logo_path"]
+    assert first and first.endswith(".png")
+    assert os.path.isfile(first)
+
+    # Re-upload replaces the logo and cleans up the old file.
+    response = client.post(
+        "/api/v1/system/settings/logo",
+        headers=admin_headers,
+        files={"file": ("logo2.jpg", b"\xff\xd8\xff\xfakejpeg", "image/jpeg")},
+    )
+    assert response.status_code == 200, response.text
+    second = response.json()["logo_path"]
+    assert second != first
+    assert os.path.isfile(second)
+    assert not os.path.isfile(first), "superseded logo file must be deleted"
+
+    # And GET reflects the current logo.
+    assert client.get("/api/v1/system/settings", headers=admin_headers).json()["logo_path"] == second
+
+
+def test_upload_organisation_logo_rejects_non_image(client, admin_headers):
+    response = client.post(
+        "/api/v1/system/settings/logo",
+        headers=admin_headers,
+        files={"file": ("notes.txt", b"just text", "text/plain")},
+    )
+    assert response.status_code == 400, response.text
+
+
+def test_upload_organisation_logo_requires_login(client):
+    response = client.post(
+        "/api/v1/system/settings/logo",
+        files={"file": ("logo.png", b"x", "image/png")},
+    )
+    assert response.status_code == 401, response.text
