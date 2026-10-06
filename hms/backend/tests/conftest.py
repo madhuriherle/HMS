@@ -58,11 +58,12 @@ def app_engine():
     # Modules / privileges / roles live in tables now; load the defaults the
     # migration would (db/seed_defaults.py). Idempotent, so a migrated
     # PostgreSQL test database is fine too.
-    from db.seed_defaults import seed_modules, seed_permissions, seed_roles
+    from db.seed_defaults import seed_banks, seed_modules, seed_permissions, seed_roles
     from db.session import SessionLocal
     with SessionLocal() as seed_db:
         seed_modules(seed_db)
         seed_permissions(seed_db)
+        seed_banks(seed_db)
         seed_roles(seed_db)
     return engine
 

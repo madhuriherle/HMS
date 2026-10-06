@@ -224,6 +224,38 @@ class ServiceType(ServiceTypeBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class BankBase(BaseModel):
+    code: str
+    name_en: str
+    name_kn: Optional[str] = None
+    account_number: Optional[str] = None
+    branch_name: Optional[str] = None
+    ifsc_code: Optional[str] = None
+    description: Optional[str] = None
+    status: bool = True
+
+
+class BankCreate(BankBase):
+    pass
+
+
+class BankUpdate(BaseModel):
+    code: Optional[str] = None
+    name_en: Optional[str] = None
+    name_kn: Optional[str] = None
+    account_number: Optional[str] = None
+    branch_name: Optional[str] = None
+    ifsc_code: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[bool] = None
+
+
+class Bank(BankBase):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
 class HmsSettingBase(BaseModel):
     setting_key: str
     setting_value: dict

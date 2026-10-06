@@ -86,6 +86,19 @@ class ServiceType(AuditMixin, Base):
     status: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class Bank(AuditMixin, Base):
+    __tablename__ = "banks"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    name_en: Mapped[str] = mapped_column(String(100), nullable=False)
+    name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
+    account_number: Mapped[str] = mapped_column(String(50), nullable=True)
+    branch_name: Mapped[str] = mapped_column(String(100), nullable=True)
+    ifsc_code: Mapped[str] = mapped_column(String(20), nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=True)
+    status: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
 # ─── Personal masters ───
 # Generic id+name(+Kannada)+status shape. Gotra is part of the Sabha's own
 # member register (kept); the other horoscope masters (nakshatra, rashi, masa,

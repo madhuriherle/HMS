@@ -118,6 +118,14 @@ ORGANISATION_SETTINGS_DEFAULTS = {
     "notify_whatsapp_enabled": True,
 }
 
+# Receipt-entry bank dropdown defaults from the printed receipt-entry field list.
+BANK_CATALOG = [
+    ("KBL_1075", "KBL 1075"),
+    ("KBL_1541", "KBL1541"),
+    ("SBI", "SBI"),
+    ("CANARA_BANK", "CANARA BANK"),
+]
+
 # ── roles ────────────────────────────────────────────────────
 # (code, name, rank_level, is_all_access, description)
 ROLE_CATALOG = [
@@ -205,6 +213,25 @@ def seed_organisation_settings(db) -> bool:
     db.add(OrganisationSettings(**ORGANISATION_SETTINGS_DEFAULTS))
     db.commit()
     return True
+
+
+def seed_banks(db) -> int:
+    """Create missing bank master rows used by receipt-entry payment mode."""
+    from models.masters import Bank
+
+    existing = {
+        b.code
+        for b in db.query(Bank).filter(Bank.is_deleted == False).all()  # noqa: E712
+    }
+    created = 0
+    for code, name in BANK_CATALOG:
+        if code in existing:
+            continue
+        db.add(Bank(code=code, name_en=name, status=True))
+        created += 1
+    if created:
+        db.commit()
+    return created
 
 
 def seed_roles(db) -> int:

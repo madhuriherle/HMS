@@ -27,6 +27,7 @@ from models.magazines import (
     MagazineSubscription,
 )
 from models.masters import (
+    Bank,
     District,
     DocumentType,
     HmsSetting,

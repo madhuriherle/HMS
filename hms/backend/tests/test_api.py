@@ -3105,6 +3105,7 @@ def test_receipt_allocation_mapping_and_label_list(client, admin_headers):
     "/api/v1/masters/postal-codes",
     "/api/v1/masters/membership-types",
     "/api/v1/masters/document-types",
+    "/api/v1/masters/banks",
     "/api/v1/masters/service-types",
     "/api/v1/receipts/",
     "/api/v1/magazines/subscriptions",
@@ -3152,6 +3153,46 @@ def test_service_type_delete(client, admin_headers):
 
     r = client.get(f"/api/v1/masters/service-types/{service_type_id}", headers=admin_headers)
     assert r.status_code == 404
+
+
+def test_bank_master_receipt_dropdown_defaults_and_crud(client, admin_headers):
+    listing = client.get("/api/v1/masters/banks", headers=admin_headers)
+    assert listing.status_code == 200, listing.text
+    names = {row["name_en"] for row in listing.json()["data"]}
+    assert {"KBL 1075", "KBL1541", "SBI", "CANARA BANK"} <= names
+
+    created = client.post(
+        "/api/v1/masters/banks",
+        headers=admin_headers,
+        json={
+            "code": "TEST_BANK",
+            "name_en": "Test Bank",
+            "account_number": "123456",
+            "branch_name": "Main",
+            "ifsc_code": "TEST0001234",
+        },
+    )
+    assert created.status_code == 201, created.text
+    bank_id = created.json()["id"]
+
+    duplicate = client.post(
+        "/api/v1/masters/banks",
+        headers=admin_headers,
+        json={"code": "TEST_BANK", "name_en": "Duplicate Test Bank"},
+    )
+    assert duplicate.status_code == 409
+
+    updated = client.put(
+        f"/api/v1/masters/banks/{bank_id}",
+        headers=admin_headers,
+        json={"name_en": "Updated Test Bank", "status": False},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["name_en"] == "Updated Test Bank"
+    assert updated.json()["status"] is False
+
+    assert client.delete(f"/api/v1/masters/banks/{bank_id}", headers=admin_headers).status_code == 200
+    assert client.get(f"/api/v1/masters/banks/{bank_id}", headers=admin_headers).status_code == 404
 
 
 def test_profile_change_allows_new_mangalya_parity_fields(client, admin_headers):
