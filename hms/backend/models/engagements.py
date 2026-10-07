@@ -30,10 +30,12 @@ class AffiliationMagazineSetting(AuditMixin, Base):
 class Associate(AuditMixin, Base):
     __tablename__ = "associates"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    associate_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     organization: Mapped[str] = mapped_column(String(255), nullable=True)
     mobile: Mapped[str] = mapped_column(String(20), nullable=True)
     email: Mapped[str] = mapped_column(String(191), nullable=True)
+    pan_number: Mapped[str] = mapped_column(String(20), nullable=True)
     address: Mapped[str] = mapped_column(Text, nullable=True)
     magazine_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 

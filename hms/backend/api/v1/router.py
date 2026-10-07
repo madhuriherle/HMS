@@ -25,7 +25,7 @@ api_router.include_router(magazines.router, prefix="/magazines", tags=["magazine
 api_router.include_router(events.router, prefix="/events", tags=["events"], dependencies=[Depends(read_guard("events"))])
 api_router.include_router(engagements.router, prefix="/engagements", tags=["engagements"], dependencies=[Depends(read_guard("engagements"))])
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"], dependencies=[Depends(read_guard("notifications", exempt_prefixes=("/inbox", "/devices")))])
-api_router.include_router(approvals.router, prefix="/approvals", tags=["approvals"], dependencies=[Depends(read_guard("approvals"))])
+api_router.include_router(approvals.router, prefix="/approvals", tags=["approvals"], dependencies=[Depends(read_guard("members.approvals"))])
 api_router.include_router(imports.router, prefix="/imports", tags=["imports"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 

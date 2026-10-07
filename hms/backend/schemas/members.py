@@ -13,7 +13,10 @@ EDITABLE_MEMBER_FIELDS: Set[str] = {
     "father_husband_name", "blood_group", "native_place_id",
     "native_place_text", "qualification_id", "qualification_text", "occupation",
     "gotra_id", "gotra_text",
+    "father_name", "father_membership_number", "mother_name", "mother_membership_number",
+    "is_married", "spouse_name", "spouse_membership_number", "has_children", "children_details",
     "area", "place", "grama", "village", "label_point", "address_remarks",
+    "country", "city", "post", "category", "company", "website", "remarks",
 
     "aadhaar_number", "referred_by_member_id",
     "state_id", "district_id", "taluk_id", "pincode_id",
@@ -42,9 +45,23 @@ class MemberBase(BaseModel):
     gotra_id: Optional[int] = None
     gotra_text: Optional[str] = None
     occupation: Optional[str] = None
+    category: Optional[str] = None
+    company: Optional[str] = None
+    website: Optional[str] = None
+    remarks: Optional[str] = None
     aadhaar_number: Optional[str] = None
     whatsapp_number: Optional[str] = None
     referred_by_member_id: Optional[int] = None
+
+    father_name: Optional[str] = None
+    father_membership_number: Optional[str] = None
+    mother_name: Optional[str] = None
+    mother_membership_number: Optional[str] = None
+    is_married: Optional[bool] = None
+    spouse_name: Optional[str] = None
+    spouse_membership_number: Optional[str] = None
+    has_children: Optional[bool] = None
+    children_details: Optional[list] = None
 
     mobile: Optional[str] = None
     mobile_country_code: str = "+91"
@@ -54,6 +71,9 @@ class MemberBase(BaseModel):
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None
     locality: Optional[str] = None
+    country: Optional[str] = "India"
+    city: Optional[str] = None
+    post: Optional[str] = None
     area: Optional[str] = None
     place: Optional[str] = None
     grama: Optional[str] = None
@@ -93,8 +113,11 @@ class MemberBase(BaseModel):
     @field_validator("date_of_birth")
     @classmethod
     def _validate_dob(cls, v: Optional[date]) -> Optional[date]:
-        if v and v > date.today():
-            raise ValueError("date_of_birth cannot be in the future")
+        if v:
+            today = date.today()
+            age = today.year - v.year - ((today.month, today.day) < (v.month, v.day))
+            if age < 18:
+                raise ValueError("Member must be at least 18 years old")
         return v
 
     @field_validator("mobile", "alternate_mobile")
@@ -132,9 +155,23 @@ class MemberUpdate(BaseModel):
     gotra_id: Optional[int] = None
     gotra_text: Optional[str] = None
     occupation: Optional[str] = None
+    category: Optional[str] = None
+    company: Optional[str] = None
+    website: Optional[str] = None
+    remarks: Optional[str] = None
     aadhaar_number: Optional[str] = None
     whatsapp_number: Optional[str] = None
     referred_by_member_id: Optional[int] = None
+
+    father_name: Optional[str] = None
+    father_membership_number: Optional[str] = None
+    mother_name: Optional[str] = None
+    mother_membership_number: Optional[str] = None
+    is_married: Optional[bool] = None
+    spouse_name: Optional[str] = None
+    spouse_membership_number: Optional[str] = None
+    has_children: Optional[bool] = None
+    children_details: Optional[list] = None
 
     mobile: Optional[str] = None
     mobile_country_code: Optional[str] = None
@@ -143,6 +180,9 @@ class MemberUpdate(BaseModel):
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None
     locality: Optional[str] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    post: Optional[str] = None
     area: Optional[str] = None
     place: Optional[str] = None
     grama: Optional[str] = None
@@ -170,8 +210,11 @@ class MemberUpdate(BaseModel):
     @field_validator("date_of_birth")
     @classmethod
     def _validate_dob(cls, v: Optional[date]) -> Optional[date]:
-        if v and v > date.today():
-            raise ValueError("date_of_birth cannot be in the future")
+        if v:
+            today = date.today()
+            age = today.year - v.year - ((today.month, today.day) < (v.month, v.day))
+            if age < 18:
+                raise ValueError("Member must be at least 18 years old")
         return v
 
     @field_validator("mobile", "alternate_mobile")
@@ -195,6 +238,23 @@ class MemberInDBBase(MemberBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class MemberFamilyLink(BaseModel):
+    id: int
+    member_code: Optional[str] = None
+    name: str
+    relationship: str
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class MemberDonation(BaseModel):
+    receipt_id: int
+    receipt_number: str
+    receipt_date: date
+    amount: float
+    purpose: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 class Member(MemberInDBBase):
     pass

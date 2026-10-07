@@ -173,7 +173,7 @@ async def forgot_password(
         # Don't reveal if user exists or not
         return {"message": "If the number is registered, a reset link has been sent."}
 
-    token = secrets.token_urlsafe(32)
+    token = str(secrets.randbelow(1000000)).zfill(6)
     now = datetime.now(timezone.utc)
     reset = PasswordResetToken(
         user_id=user.id,
@@ -184,7 +184,7 @@ async def forgot_password(
     db.add(reset)
     db.commit()
 
-    msg = f"HMS MMA Password Reset: Your reset token is {token}. Valid for 30 minutes."
+    msg = f"HMS MMA Password Reset: Your OTP is {token}. Valid for 30 minutes."
 
     async def send():
         await whatsapp_service.send_message(

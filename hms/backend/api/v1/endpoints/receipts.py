@@ -207,7 +207,7 @@ def create_receipt(
             f"receipt net_amount {receipt_in.net_amount}",
         )
 
-    receipt_no = generate_next_number(db, "RECEIPT", "REC")
+    receipt_no = receipt_in.receipt_number or generate_next_number(db, "RECEIPT", "REC")
     created = crud_receipts.receipt.create_with_items(
         db=db, obj_in=receipt_in, created_by=current_user.id, receipt_number=receipt_no
     )

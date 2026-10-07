@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from api import deps
 from core.pagination import paginate
 from crud import masters as crud_masters
+import models.masters
 from models.masters import Bank, ServiceType
 from models.users import User
 from schemas import masters as schemas_masters
@@ -186,3 +187,77 @@ def delete_service_type(
             f"(opt-in id={in_use.id})",
         )
     return crud_masters.service_type.remove(db, id=id, deleted_by=current_user.id)
+
+# ─── PAYMENT MODES ───
+@router.get("/payment-modes")
+def read_payment_modes(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    skip: int = 0, limit: int = 100,
+    status: Optional[bool] = None
+) -> Any:
+    q = db.query(models.masters.PaymentMode)
+    if status is not None:
+        q = q.filter(models.masters.PaymentMode.status == status)
+    return q.offset(skip).limit(limit).all()
+
+@router.get("/payment-modes/{id}", response_model=schemas_masters.PaymentMode)
+def read_payment_mode(
+    id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user)
+) -> Any:
+    item = db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Payment mode not found")
+    return item
+
+@router.post("/payment-modes", response_model=Union[schemas_masters.PaymentMode, PendingApproval], status_code=201)
+@approval_gate.gated("masters", "CREATE", "PaymentMode", "masters.finance.write")
+def create_payment_mode(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("masters.finance.write")),
+    item_in: schemas_masters.PaymentModeCreate,
+) -> Any:
+    item = models.masters.PaymentMode(**item_in.model_dump())
+    item.created_by = current_user.id
+    item.updated_by = current_user.id
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.put("/payment-modes/{id}", response_model=Union[schemas_masters.PaymentMode, PendingApproval])
+@approval_gate.gated("masters", "UPDATE", "PaymentMode", "masters.finance.write")
+def update_payment_mode(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    item_in: schemas_masters.PaymentModeUpdate,
+    current_user: User = Depends(deps.require_permission("masters.finance.write")),
+) -> Any:
+    item = db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Payment mode not found")
+    for k, v in item_in.model_dump(exclude_unset=True).items():
+        setattr(item, k, v)
+    item.updated_by = current_user.id
+    db.commit()
+    db.refresh(item)
+    return item
+
+@router.delete("/payment-modes/{id}", response_model=Union[schemas_masters.PaymentMode, PendingApproval])
+@approval_gate.gated("masters", "DELETE", "PaymentMode", "masters.finance.write")
+def delete_payment_mode(
+    *,
+    db: Session = Depends(deps.get_db),
+    id: int,
+    current_user: User = Depends(deps.require_permission("masters.finance.write")),
+) -> Any:
+    item = db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.id == id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Payment mode not found")
+    db.delete(item)
+    db.commit()
+    return item

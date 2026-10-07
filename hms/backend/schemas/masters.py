@@ -256,6 +256,28 @@ class Bank(BankBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PaymentModeBase(BaseModel):
+    payment_mode: str
+    payment_type: str
+    bank_id: Optional[int] = None
+    status: bool = True
+
+class PaymentModeCreate(PaymentModeBase):
+    pass
+
+class PaymentModeUpdate(BaseModel):
+    payment_mode: Optional[str] = None
+    payment_type: Optional[str] = None
+    bank_id: Optional[int] = None
+    status: Optional[bool] = None
+
+class PaymentMode(PaymentModeBase):
+    id: int
+    created_at: datetime
+    bank: Optional[Bank] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
 class HmsSettingBase(BaseModel):
     setting_key: str
     setting_value: dict

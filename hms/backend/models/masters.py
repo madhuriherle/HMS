@@ -1,5 +1,5 @@
 from sqlalchemy import String, BigInteger, Boolean, DateTime, Date, Numeric, Text, ForeignKey, CHAR, JSON, Enum
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from models.base import Base, AuditMixin
 import enum
 
@@ -97,6 +97,17 @@ class Bank(AuditMixin, Base):
     ifsc_code: Mapped[str] = mapped_column(String(20), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+class PaymentMode(AuditMixin, Base):
+    __tablename__ = "payment_modes"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    payment_mode: Mapped[str] = mapped_column(String(50), nullable=False)
+    payment_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    bank_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("banks.id"), nullable=True)
+    status: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    bank = relationship("Bank")
 
 
 # ─── Personal masters ───

@@ -25,10 +25,12 @@ class Affiliation(AffiliationBase):
     model_config = ConfigDict(from_attributes=True)
 
 class AssociateBase(BaseModel):
+    associate_number: Optional[str] = None
     name: str
     organization: Optional[str] = None
     mobile: Optional[str] = None
     email: Optional[str] = None
+    pan_number: Optional[str] = None
     address: Optional[str] = None
     magazine_enabled: bool = True
 
@@ -40,6 +42,7 @@ class AssociateUpdate(BaseModel):
     organization: Optional[str] = None
     mobile: Optional[str] = None
     email: Optional[str] = None
+    pan_number: Optional[str] = None
     address: Optional[str] = None
     magazine_enabled: Optional[bool] = None
 

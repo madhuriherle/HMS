@@ -368,6 +368,90 @@ def public_register_member(
     }
 
 
+
+from fastapi.responses import Response
+from io import BytesIO
+
+@router.get("/export-labels")
+def export_labels(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    state_id: Optional[int] = None,
+    district_id: Optional[int] = None,
+    taluk_id: Optional[int] = None,
+    pincode_id: Optional[int] = None,
+    membership_type_id: Optional[int] = None,
+) -> Response:
+    """Generate a printable PDF of member address labels."""
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+    
+    query = db.query(Member).filter(Member.is_deleted == False, Member.member_status == "ACTIVE")
+
+    if state_id:
+        query = query.filter(Member.state_id == state_id)
+    if district_id:
+        query = query.filter(Member.district_id == district_id)
+    if taluk_id:
+        query = query.filter(Member.taluk_id == taluk_id)
+    if pincode_id:
+        query = query.filter(Member.pincode_id == pincode_id)
+    if membership_type_id:
+        query = query.filter(Member.membership_type_id == membership_type_id)
+
+    members = query.all()
+
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    
+    labels_per_row = 3
+    labels_per_col = 8
+    
+    label_width = width / labels_per_row
+    label_height = height / labels_per_col
+    
+    col = 0
+    row = 0
+    
+    for member in members:
+        x = col * label_width + 15
+        y = height - ((row + 1) * label_height) + 15
+        
+        textobject = c.beginText()
+        textobject.setTextOrigin(x, y + label_height - 25)
+        textobject.setFont("Helvetica-Bold", 10)
+        name = f"{member.first_name_en or ''} {member.last_name_en or ''}".strip()
+        textobject.textLine(name or "Unknown Member")
+        
+        textobject.setFont("Helvetica", 9)
+        if member.address_line1: textobject.textLine(member.address_line1)
+        if member.address_line2: textobject.textLine(member.address_line2)
+        
+        locality_str = [x for x in [member.locality, member.city, member.post] if x]
+        if locality_str:
+            textobject.textLine(", ".join(locality_str))
+            
+        c.drawText(textobject)
+        
+        col += 1
+        if col >= labels_per_row:
+            col = 0
+            row += 1
+            if row >= labels_per_col:
+                row = 0
+                c.showPage()
+                
+    c.save()
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    return Response(
+        content=pdf, 
+        media_type="application/pdf", 
+        headers={"Content-Disposition": "attachment; filename=labels.pdf"}
+    )
+
 @router.get("/{id}", response_model=schemas_members.Member)
 def read_member(
     *,
@@ -379,6 +463,145 @@ def read_member(
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
     return member
+
+@router.get("/{id}/family", response_model=List[schemas_members.MemberFamilyLink])
+def read_member_family(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    id: int,
+) -> Any:
+    member = crud_members.member.get(db=db, id=id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+        
+    family_chain = []
+    
+    def _format_name(m):
+        return m.full_name_kn or f"{m.first_name_en} {m.last_name_en or ''}".strip()
+        
+    if member.member_code:
+        linked = db.query(Member).filter(
+            or_(
+                Member.father_membership_number == member.member_code,
+                Member.mother_membership_number == member.member_code,
+                Member.spouse_membership_number == member.member_code
+            ),
+            Member.is_deleted == False
+        ).all()
+        for lnk in linked:
+            rel = "DEPENDENT"
+            if lnk.father_membership_number == member.member_code or lnk.mother_membership_number == member.member_code:
+                rel = "CHILD"
+            elif lnk.spouse_membership_number == member.member_code:
+                rel = "SPOUSE"
+            family_chain.append({
+                "id": lnk.id,
+                "member_code": lnk.member_code,
+                "name": _format_name(lnk),
+                "relationship": rel
+            })
+            
+    parents_spouses = []
+    if getattr(member, "father_membership_number", None):
+        parents_spouses.append((member.father_membership_number, "FATHER"))
+    if getattr(member, "mother_membership_number", None):
+        parents_spouses.append((member.mother_membership_number, "MOTHER"))
+    if getattr(member, "spouse_membership_number", None):
+        parents_spouses.append((member.spouse_membership_number, "SPOUSE"))
+        
+    for code, rel in parents_spouses:
+        rel_m = db.query(Member).filter(Member.member_code == code, Member.is_deleted == False).first()
+        if rel_m:
+            family_chain.append({
+                "id": rel_m.id,
+                "member_code": rel_m.member_code,
+                "name": _format_name(rel_m),
+                "relationship": rel
+            })
+            
+    my_memberships = db.query(MemberMembership).filter(MemberMembership.member_id == id).all()
+    my_mem_numbers = [m.membership_number for m in my_memberships if m.membership_number]
+    if my_mem_numbers:
+        deps = db.query(Member).join(MemberMembership).filter(
+            MemberMembership.family_membership_number.in_(my_mem_numbers),
+            Member.is_deleted == False
+        ).all()
+        for d in deps:
+            if not any(f["id"] == d.id for f in family_chain):
+                family_chain.append({
+                    "id": d.id,
+                    "member_code": d.member_code,
+                    "name": _format_name(d),
+                    "relationship": "DEPENDENT"
+                })
+                
+    return family_chain
+
+@router.get("/{id}/services", response_model=List[schemas_members.MemberServiceOptin])
+def read_member_services(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    id: int,
+) -> Any:
+    member = crud_members.member.get(db=db, id=id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+        
+    services_list = []
+    optins = db.query(MemberServiceOptin, ServiceType).join(
+        ServiceType, MemberServiceOptin.service_type_id == ServiceType.id
+    ).filter(
+        MemberServiceOptin.member_id == id,
+        MemberServiceOptin.is_deleted == False
+    ).all()
+    for optin, stype in optins:
+        services_list.append({
+            "id": optin.id,
+            "member_id": optin.member_id,
+            "service_type_id": optin.service_type_id,
+            "status": optin.status,
+            "opted_at": optin.opted_at,
+            "opted_via": optin.opted_via,
+            "linked_type": optin.linked_type,
+            "linked_id": optin.linked_id,
+            "notes": optin.notes,
+            "service_code": stype.code,
+            "service_name_en": stype.name_en,
+            "service_name_kn": stype.name_kn,
+        })
+    return services_list
+
+@router.get("/{id}/donations", response_model=List[schemas_members.MemberDonation])
+def read_member_donations(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    id: int,
+) -> Any:
+    member = crud_members.member.get(db=db, id=id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+        
+    from models.receipts import ReceiptAllocation, Receipt
+    donations_list = []
+    allocs = db.query(ReceiptAllocation, Receipt).join(
+        Receipt, ReceiptAllocation.receipt_id == Receipt.id
+    ).filter(
+        ReceiptAllocation.member_id == id,
+        ReceiptAllocation.is_deleted == False,
+        Receipt.is_deleted == False
+    ).all()
+    for alloc, rec in allocs:
+        donations_list.append({
+            "receipt_id": rec.id,
+            "receipt_number": rec.receipt_number,
+            "receipt_date": rec.receipt_date,
+            "amount": alloc.allocated_amount,
+            "purpose": rec.receipt_type
+        })
+    return donations_list
 
 @router.put("/{id}", response_model=Union[schemas_members.Member, PendingApproval])
 @approval_gate.gated("members", "UPDATE", "Member", "members.write")

@@ -45,8 +45,8 @@ class ReceiptAllocationIn(BaseModel):
 
     @model_validator(mode="after")
     def _exactly_one_payee(self):
-        if (self.member_id is None) == (self.associate_id is None):
-            raise ValueError("exactly one of member_id or associate_id is required")
+        if self.member_id is not None and self.associate_id is not None:
+            raise ValueError("Cannot link both member_id and associate_id")
         if self.associate_id is not None and self.membership_id is not None:
             raise ValueError("membership_id can only be set for member allocations")
         return self
@@ -58,13 +58,12 @@ class ReceiptBase(BaseModel):
     payer_name: Optional[str] = None
     payment_mode: str
     transaction_reference: Optional[str] = None
+    transaction_date: Optional[date] = None
     gross_amount: float
     discount_amount: float = 0.0
     net_amount: float
     source: ReceiptSource = "ONLINE"
-    # First registration vs renewal (Mangalya parity).
     is_renewal: bool = False
-    # Cheque capture when payment_mode=CHEQUE.
     cheque_number: Optional[str] = None
     cheque_date: Optional[date] = None
     notes: Optional[str] = None
@@ -82,6 +81,7 @@ class ReceiptBase(BaseModel):
 
 
 class ReceiptCreate(ReceiptBase):
+    receipt_number: Optional[str] = None
     items: List[ReceiptItemBase] = []
     # Map the receipt to members in the same call as the entry (optional).
     allocations: List[ReceiptAllocationIn] = []
@@ -142,8 +142,8 @@ class ReceiptAllocationCreate(BaseModel):
 
     @model_validator(mode="after")
     def _exactly_one_payee(self):
-        if (self.member_id is None) == (self.associate_id is None):
-            raise ValueError("exactly one of member_id or associate_id is required")
+        if self.member_id is not None and self.associate_id is not None:
+            raise ValueError("Cannot link both member_id and associate_id")
         if self.associate_id is not None and self.membership_id is not None:
             raise ValueError("membership_id can only be set for member allocations")
         return self
