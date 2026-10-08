@@ -10,8 +10,13 @@ venv/
 
 # Local uploads and databases
 hms/uploads/
-hms/backend/uploads/
+backend/uploads/
+uploads/
 *.db
+
+# Node
+frontend/node_modules/
+frontend/dist/
 
 # Editors / OS
 .vscode/

@@ -1,0 +1,177 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Brand Core Palette */
+    --brand-primary: #510601;
+    --brand-primary-dark: #3D0400;
+    --brand-primary-light: #6D0B04;
+    --brand-secondary: #8C1801;
+    --brand-sidebar: #200200;
+    --brand-dark: #180200;
+    --brand-brown: #863221;
+    --brand-cream: #FAF7F2;
+    --brand-surface: #FFFFFF;
+    --brand-border: #E8DFD8;
+
+    /* Brand Accent Colors */
+    --brand-gold: #FFC107;
+    --brand-gold-warm: #F4AA26;
+    --brand-gold-subtle: #FFF8E1;
+    --brand-accent-red: #ED4636;
+    --brand-accent-green: #3D705C;
+    --brand-accent-orange: #EE6A00;
+
+    /* Semantic Aliases */
+    --color-primary: var(--brand-primary);
+    --color-secondary: var(--brand-secondary);
+    --color-gold: var(--brand-gold);
+    --color-gold-warm: var(--brand-gold-warm);
+    --color-accent-red: var(--brand-accent-red);
+    --color-accent-green: var(--brand-accent-green);
+    --color-accent-orange: var(--brand-accent-orange);
+    --color-deep-bg: var(--brand-dark);
+    --color-warm-brown: var(--brand-brown);
+  }
+
+  /* Keep warm background for login input even with browser autofill */
+  .login-input-field:-webkit-autofill,
+  .login-input-field:-webkit-autofill:hover,
+  .login-input-field:-webkit-autofill:focus,
+  .login-input-field:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #F5ECE1 inset !important;
+    -webkit-text-fill-color: #280E07 !important;
+    box-shadow: 0 0 0 1000px #F5ECE1 inset !important;
+    color: #280E07 !important;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
+  html,
+  body,
+  #root,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  span,
+  a,
+  label,
+  table,
+  th,
+  td,
+  input,
+  button,
+  select,
+  textarea,
+  optgroup {
+    font-family: Inter, system-ui, "Segoe UI", Roboto, sans-serif;
+  }
+
+  *,
+  *::before,
+  *::after {
+    font-family: inherit;
+  }
+}
+
+/* Subtle traditional geometric cultural motif pattern for decorative background */
+.cultural-pattern {
+  background-color: #510601;
+  background-image: radial-gradient(rgba(255, 193, 7, 0.08) 1px, transparent 1px), radial-gradient(rgba(244, 170, 38, 0.05) 1px, #510601 1px);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+}
+
+/* Print Specific Rules for Clean Printing Across All Modules */
+@media print {
+  @page {
+    size: auto;
+    margin: 8mm;
+  }
+
+  /* 1. Hide the entire application tree under #root so background pages, sidebars, and tables never print */
+  #root {
+    display: none !important;
+  }
+
+  /* 2. Global clean white canvas */
+  html, body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* 3. Modal Backdrop Container (rendered via Portal into document.body) - remove fixed dark backdrops, blur, and centering wrappers */
+  body > div[class*="fixed"],
+  body > div[style*="fixed"],
+  .fixed.inset-0 {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    inset: auto !important;
+    transform: none !important;
+  }
+
+  /* 4. Modal Window Box - strip popup window styling, borders, and shadows */
+  body > div[class*="fixed"] > div,
+  body > div[style*="fixed"] > div {
+    position: static !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    width: 100% !important;
+    height: auto !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    transform: none !important;
+  }
+
+  /* 5. Hide non-printable elements */
+  nav,
+  aside,
+  header,
+  footer,
+  .no-print,
+  .print\:hidden,
+  button,
+  .modal-backdrop {
+    display: none !important;
+  }
+
+  /* 6. Printable label cards formatting */
+  .printable-label-card {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    border: 1px dashed #777 !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+}

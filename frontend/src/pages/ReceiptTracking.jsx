@@ -1,0 +1,921 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import SearchFilterBar from '../components/SearchFilterBar';
+import FilterSelect from '../components/FilterSelect';
+import {
+  ChevronRight,
+  Search,
+  Eye,
+  Edit3,
+  Trash2,
+  Link as LinkIcon,
+  CheckCircle2,
+  AlertCircle,
+  AlertTriangle,
+  X,
+  FileSpreadsheet,
+  User,
+  Phone,
+  Calendar,
+  Award,
+  Check,
+  RotateCcw,
+  Printer,
+  FileText,
+  Building,
+  CreditCard
+} from 'lucide-react';
+import Modal from '../components/Modal';
+import {
+  getStoredReceipts,
+  getStoredMembers,
+  getStoredUnapprovedMembers,
+  isReceiptUnmapped,
+  PARTICULARS_OPTIONS
+} from '../utils/receiptStore';
+import PermissionGate from '../components/PermissionGate';
+import useAuth from '../hooks/useAuth';
+import api from '../api';
+import { fetchReceipts, normalizeReceipt, receiptToApiPayload } from '../utils/apiAdapters';
+
+// Helper to format currency in Indian Rupees
+const formatINR = (amount) => {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amount || 0);
+};
+
+// Helper to format date string (YYYY-MM-DD to DD-MM-YYYY)
+const formatDate = (dateStr) => {
+  if (!dateStr) return '—';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateStr;
+};
+
+// Helper for number to words (Indian Numbering System)
+const numberToWords = (num) => {
+  if (!num || isNaN(num) || num <= 0) return '';
+  const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+  const n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+  if (!n) return '';
+  let str = '';
+  str += (Number(n[1]) !== 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';
+  str += (Number(n[2]) !== 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : '';
+  str += (Number(n[3]) !== 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : '';
+  str += (Number(n[4]) !== 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : '';
+  str += (Number(n[5]) !== 0) ? ((str !== '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
+  return str.trim() + ' Rupees Only';
+};
+
+export default function ReceiptTracking() {
+  const { hasPermission } = useAuth();
+  // Master Synchronized Stores
+  const [receipts, setReceipts] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [unapprovedMembers, setUnapprovedMembers] = useState([]);
+
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [particularsFilter, setParticularsFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, Assigned, Unassigned
+
+  // Modals State
+  const [viewingReceipt, setViewingReceipt] = useState(null);
+  const [editingReceipt, setEditingReceipt] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
+  const [editFormErrors, setEditFormErrors] = useState({});
+  const [deletingReceipt, setDeletingReceipt] = useState(null);
+
+  // Toast State
+  const [toastMessage, setToastMessage] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToastMessage({ message, type });
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+  };
+
+  const reloadData = async () => {
+    try {
+      setReceipts(await fetchReceipts());
+    } catch (error) {
+      console.warn('Failed to load receipts from API, using local fallback.', error);
+      setReceipts(getStoredReceipts());
+    }
+    try {
+      const membersRes = await api.get('/members/', { params: { limit: 500 } });
+      setMembers((membersRes.data?.data || []).map((m) => ({ ...m, name: [m.first_name_en, m.last_name_en].filter(Boolean).join(' ') })));
+    } catch (error) {
+      setMembers(getStoredMembers());
+    }
+    setUnapprovedMembers(getStoredUnapprovedMembers());
+  };
+
+  // Synchronize on mount
+  useEffect(() => {
+    reloadData();
+  }, []);
+
+  // ----------------------------------------------------
+  // FILTERING LOGIC
+  // ----------------------------------------------------
+  const filteredReceipts = useMemo(() => {
+    return receipts.filter((r) => {
+      const isUnmapped = isReceiptUnmapped(r);
+
+      // 1. Search Query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const numMatch = (r.receiptNumber || '').toLowerCase().includes(q);
+        const nameMatch = (r.name || '').toLowerCase().includes(q);
+        const mobileMatch = (r.mobile || '').includes(q);
+        const memberNoMatch = (r.membershipNo || '').toLowerCase().includes(q);
+        const particularsMatch = (r.particulars || '').toLowerCase().includes(q);
+        const txnMatch = (r.transactionId || '').toLowerCase().includes(q);
+
+        if (
+          !numMatch &&
+          !nameMatch &&
+          !mobileMatch &&
+          !memberNoMatch &&
+          !particularsMatch &&
+          !txnMatch
+        ) {
+          return false;
+        }
+      }
+
+      // 2. Particulars / Receipt Type Filter
+      if (particularsFilter !== 'ALL') {
+        const rPart = (r.particulars || '').toLowerCase();
+        if (rPart !== particularsFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // 3. Status Filter (Assigned vs Unassigned)
+      if (statusFilter === 'Assigned' && isUnmapped) {
+        return false;
+      }
+      if (statusFilter === 'Unassigned' && !isUnmapped) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [receipts, searchQuery, particularsFilter, statusFilter]);
+
+  // ----------------------------------------------------
+  // ACTION HANDLERS
+  // ----------------------------------------------------
+
+  // 1. Open Edit Modal
+  const handleOpenEdit = (receipt) => {
+    setEditingReceipt(receipt);
+    setEditFormData({
+      receiptNumber: receipt.receiptNumber || '',
+      receiptDate: receipt.receiptDate || '',
+      name: receipt.name || '',
+      panNo: receipt.panNo || '',
+      membershipNo: receipt.membershipNo || '',
+      mobile: receipt.mobile || '',
+      particulars: receipt.particulars || 'Membership',
+      donationDetails: receipt.donationDetails || '',
+      othersDescription: receipt.othersDescription || '',
+      amount: String(receipt.amount || ''),
+      paymentMode: receipt.paymentMode || 'Online',
+      bankName: receipt.bankName || receipt.bankAccount || '',
+      transactionId: receipt.transactionId || '',
+      transactionDate: receipt.transactionDate || '',
+      description: receipt.description || ''
+    });
+    setEditFormErrors({});
+  };
+
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'amount') {
+      const cleaned = value.replace(/\D/g, '');
+      setEditFormData((prev) => ({ ...prev, amount: cleaned }));
+    } else if (name === 'panNo') {
+      setEditFormData((prev) => ({ ...prev, panNo: value.toUpperCase() }));
+    } else if (name === 'mobile') {
+      const cleaned = value.replace(/\D/g, '').slice(0, 10);
+      setEditFormData((prev) => ({ ...prev, mobile: cleaned }));
+    } else {
+      setEditFormData((prev) => ({ ...prev, [name]: value }));
+    }
+
+    if (editFormErrors[name]) {
+      setEditFormErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    const errors = {};
+
+    if (!editFormData.receiptNumber?.trim()) {
+      errors.receiptNumber = 'Receipt No. is required';
+    }
+    if (!editFormData.receiptDate) {
+      errors.receiptDate = 'Receipt Date is required';
+    }
+    if (!editFormData.particulars) {
+      errors.particulars = 'Please select Receipt Type';
+    }
+    const amt = Number(editFormData.amount);
+    if (!editFormData.amount || isNaN(amt) || amt <= 0) {
+      errors.amount = 'Valid Amount > 0 is required';
+    }
+    if (!editFormData.paymentMode) {
+      errors.paymentMode = 'Payment Mode is required';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setEditFormErrors(errors);
+      showToast('Please fix highlighted required fields.', 'error');
+      return;
+    }
+
+    const uiPayload = {
+      receiptNumber: editFormData.receiptNumber.trim(),
+      receiptDate: editFormData.receiptDate,
+      name: editFormData.name ? editFormData.name.trim() : '',
+      panNo: editFormData.panNo ? editFormData.panNo.trim() : '',
+      membershipNo: editFormData.membershipNo ? editFormData.membershipNo.trim() : '',
+      mobile: editFormData.mobile ? editFormData.mobile.trim() : '',
+      particulars: editFormData.particulars,
+      donationDetails: editFormData.donationDetails ? editFormData.donationDetails.trim() : '',
+      othersDescription: editFormData.othersDescription ? editFormData.othersDescription.trim() : '',
+      amount: Number(editFormData.amount),
+      paymentMode: editFormData.paymentMode,
+      bankName: editFormData.bankName ? editFormData.bankName.trim() : '',
+      bankAccount: editFormData.bankName ? editFormData.bankName.trim() : '',
+      transactionId: editFormData.transactionId ? editFormData.transactionId.trim() : '',
+      transactionDate: editFormData.transactionDate,
+      description: editFormData.description ? editFormData.description.trim() : ''
+    };
+
+    try {
+      const apiPayload = receiptToApiPayload(uiPayload);
+      delete apiPayload.receipt_number;
+      delete apiPayload.items;
+      delete apiPayload.allocations;
+      const { data } = await api.put(`/receipts/${editingReceipt.id}`, apiPayload);
+      const updated = normalizeReceipt(data);
+      setReceipts((prev) => prev.map((r) => (r.id === editingReceipt.id ? updated : r)));
+      showToast(`Receipt #${updated.receiptNumber} updated successfully.`);
+      setEditingReceipt(null);
+    } catch (error) {
+      console.error('Failed to update receipt.', error);
+      showToast(error.response?.data?.detail || 'Failed to update receipt through API.', 'error');
+    }
+  };
+
+  // 2. Delete Receipt
+  const handleConfirmDelete = async () => {
+    if (!deletingReceipt) return;
+
+    const num = deletingReceipt.receiptNumber;
+    try {
+      await api.delete(`/receipts/${deletingReceipt.id}`);
+      setReceipts((prev) => prev.filter((r) => r.id !== deletingReceipt.id));
+      showToast(`Receipt #${num} deleted successfully.`);
+    } catch (error) {
+      console.error('Failed to delete receipt.', error);
+      showToast(error.response?.data?.detail || 'Failed to delete receipt through API.', 'error');
+    }
+
+    setDeletingReceipt(null);
+  };
+
+  return (
+    <PermissionGate required="receipts.read">
+    <div className="space-y-6 pb-16 font-sans">
+      {/* Toast Alert Notification */}
+      {toastMessage && (
+        <div
+          className={`fixed bottom-6 right-6 z-[10000] flex items-center gap-3 rounded-2xl px-5 py-3.5 shadow-2xl border transition-all animate-in slide-in-from-bottom-4 duration-200 ${
+            toastMessage.type === 'error'
+              ? 'bg-[#180200] text-white border-red-500/50'
+              : 'bg-[#180200] text-white border-emerald-500/50'
+          }`}
+        >
+          {toastMessage.type === 'error' ? (
+            <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          )}
+          <span className="text-xs sm:text-sm font-medium">{toastMessage.message}</span>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="ml-2 rounded-lg p-1 hover:bg-white/10 text-stone-400 hover:text-white cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Header, Filter & Search Toolbar */}
+      <SearchFilterBar
+        breadcrumb={
+          <nav className="flex items-center gap-1.5 text-xs text-[#863221] font-medium mb-1">
+            <Link to="/dashboard" className="hover:text-[#510601] transition-colors">Dashboard</Link>
+            <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
+            <span className="text-[#863221]">Receipts</span>
+            <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
+            <span className="text-[#510601] font-semibold">Receipt Tracking</span>
+          </nav>
+        }
+        title={<h1 className="text-2xl font-bold text-[#180200] tracking-tight">Receipt Tracking</h1>}
+        searchQuery={searchQuery}
+        onSearchChange={(val) => setSearchQuery(val)}
+        searchPlaceholder="Search..."
+        activeFiltersCount={
+          (particularsFilter !== 'ALL' ? 1 : 0) +
+          (statusFilter !== 'ALL' ? 1 : 0)
+        }
+        onResetFilters={() => {
+          setSearchQuery('');
+          setParticularsFilter('ALL');
+          setStatusFilter('ALL');
+        }}
+      >
+        {/* Receipt Type Filter */}
+        <FilterSelect
+          value={particularsFilter}
+          onChange={(val) => setParticularsFilter(val)}
+          options={[
+            { value: 'ALL', label: 'All Receipt Types' },
+            ...PARTICULARS_OPTIONS.map((opt) => ({ value: opt, label: opt }))
+          ]}
+          widthClass="w-full sm:w-56"
+        />
+
+        {/* Status Filter */}
+        <FilterSelect
+          value={statusFilter}
+          onChange={(val) => setStatusFilter(val)}
+          options={[
+            { value: 'ALL', label: 'All Statuses' },
+            { value: 'Assigned', label: 'Assigned' },
+            { value: 'Unassigned', label: 'Unassigned' }
+          ]}
+          widthClass="w-full sm:w-48"
+        />
+      </SearchFilterBar>
+
+      {/* Main Table Card (EXACTLY 6 Columns) */}
+      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[800px]">
+            <thead>
+              <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
+                <th className="py-3.5 px-4 whitespace-nowrap">Receipt Number</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Receipt Date</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Member Name</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Mobile</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Receipt Type</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap min-w-[170px]">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
+              {filteredReceipts.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-14 text-center text-[#863221]">
+                    <div className="flex flex-col items-center justify-center space-y-2">
+                      <FileSpreadsheet className="w-10 h-10 text-[#863221]/40" />
+                      <p className="text-base font-bold text-[#180200]">No receipts found</p>
+                      <p className="text-xs text-[#863221] max-w-sm mx-auto">
+                        Every receipt in the system (assigned and unassigned) will appear here.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                filteredReceipts.map((receipt) => {
+                  const isUnmapped = isReceiptUnmapped(receipt);
+
+                  return (
+                    <tr
+                      key={receipt.id}
+                      className={`transition-colors ${
+                        isUnmapped
+                          ? 'bg-amber-50/70 hover:bg-amber-100/60 text-[#180200]'
+                          : 'bg-white hover:bg-[#FAF7F2]/60 text-[#180200]'
+                      }`}
+                    >
+                      {/* Column 1: Receipt Number */}
+                      <td className="py-3.5 px-4 font-mono font-bold text-xs">
+                        <span className={`px-2 py-0.5 rounded tracking-wider border ${
+                          isUnmapped
+                            ? 'bg-amber-100/80 text-amber-900 border-amber-300'
+                            : 'bg-[#510601]/5 text-[#510601] border-[#510601]/20'
+                        }`}>
+                          #{receipt.receiptNumber}
+                        </span>
+                      </td>
+
+                      {/* Column 2: Receipt Date */}
+                      <td className="py-3.5 px-4 font-mono text-xs whitespace-nowrap">
+                        {formatDate(receipt.receiptDate)}
+                      </td>
+
+                      {/* Column 3: Member Name */}
+                      <td className="py-3.5 px-4">
+                        {isUnmapped ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-200/60 text-amber-900 border border-amber-300/80 shadow-2xs">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                            <span>Unassigned</span>
+                          </div>
+                        ) : (
+                          <div>
+                            <span className="font-bold text-[#180200]">
+                              {receipt.name || '—'}
+                            </span>
+                            {receipt.membershipNo && (
+                              <div className="text-[10px] font-mono text-[#863221] mt-0.5">
+                                #{receipt.membershipNo}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Column 4: Mobile */}
+                      <td className="py-3.5 px-4 font-mono text-xs">
+                        {isUnmapped || !receipt.mobile ? (
+                          <span className="text-gray-400">—</span>
+                        ) : (
+                          receipt.mobile
+                        )}
+                      </td>
+
+                      {/* Column 5: Receipt Type */}
+                      <td className="py-3.5 px-4 font-semibold text-[#510601] text-xs">
+                        {receipt.particulars || 'Membership'}
+                      </td>
+
+                      {/* Column 6: Action */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {/* View Action */}
+                          <button
+                            type="button"
+                            onClick={() => setViewingReceipt(receipt)}
+                            className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg border border-[#E8DFD8] hover:border-[#510601] transition-colors cursor-pointer shrink-0"
+                            title="View Receipt Details"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Edit Action */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(receipt)}
+                            disabled={!hasPermission('receipts.write')}
+                            className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg border border-[#E8DFD8] hover:border-[#510601] transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={!hasPermission('receipts.write') ? 'Requires receipts.write permission' : 'Edit Receipt'}
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Delete Action */}
+                          <button
+                            type="button"
+                            onClick={() => setDeletingReceipt(receipt)}
+                            disabled={!hasPermission('receipts.delete')}
+                            className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg border border-red-200 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={!hasPermission('receipts.delete') ? 'Requires receipts.delete permission' : 'Delete Receipt'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer Summary bar */}
+        <div className="px-5 py-3.5 bg-[#FAF7F2]/60 border-t border-[#E8DFD8] flex flex-col sm:flex-row items-center justify-between text-xs text-[#863221] gap-2">
+          <div>
+            Showing <strong className="text-[#180200]">{filteredReceipts.length}</strong> of{' '}
+            <strong className="text-[#180200]">{receipts.length}</strong> total receipts
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1 font-semibold text-emerald-800">
+              <span className="w-2 h-2 rounded-full bg-emerald-600" />
+              <span>{receipts.filter((r) => !isReceiptUnmapped(r)).length} Assigned</span>
+            </span>
+            <span className="inline-flex items-center gap-1 font-semibold text-amber-800">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <span>{receipts.filter((r) => isReceiptUnmapped(r)).length} Unassigned</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ============================================================ */}
+      {/* MODAL 1: VIEW RECEIPT DETAILS                                */}
+      {/* ============================================================ */}
+      <Modal isOpen={Boolean(viewingReceipt)} onClose={() => setViewingReceipt(null)}>
+        {viewingReceipt && (
+          <div className="bg-white rounded-2xl max-w-xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[#180200]">
+                    Receipt #{viewingReceipt.receiptNumber}
+                  </h2>
+                  <p className="text-xs text-[#863221]">
+                    Issued on {formatDate(viewingReceipt.receiptDate)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setViewingReceipt(null)}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-[#510601] hover:bg-stone-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+              {/* Status Header Chip */}
+              <div className="p-3 bg-[#FAF7F2]/60 rounded-xl border border-[#E8DFD8] flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-[#863221] block">Status</span>
+                  {isReceiptUnmapped(viewingReceipt) ? (
+                    <span className="inline-flex items-center gap-1 mt-0.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Unassigned</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 mt-0.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Assigned to Member #{viewingReceipt.membershipNo || viewingReceipt.memberId}</span>
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-right">
+                  <span className="text-[10px] uppercase font-bold text-[#863221] block">Amount Paid</span>
+                  <span className="text-base font-extrabold text-[#510601]">
+                    {formatINR(viewingReceipt.amount)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Member Details */}
+              <div className="bg-white rounded-xl p-4 border border-[#E8DFD8] space-y-2.5">
+                <span className="text-[11px] font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5" />
+                  <span>Member / Payee Information</span>
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-[#863221]">Name</span>
+                    <p className="font-bold text-[#180200] mt-0.5">
+                      {viewingReceipt.name || <span className="text-gray-400 italic">Unassigned</span>}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-[#863221]">Membership No.</span>
+                    <p className="font-mono mt-0.5">{viewingReceipt.membershipNo || '—'}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-[#863221]">Mobile</span>
+                    <p className="font-mono mt-0.5">{viewingReceipt.mobile || '—'}</p>
+                  </div>
+                  {viewingReceipt.panNo && (
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#863221]">PAN</span>
+                      <p className="font-mono mt-0.5">{viewingReceipt.panNo}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Payment Details */}
+              <div className="bg-white rounded-xl p-4 border border-[#E8DFD8] space-y-2.5">
+                <span className="text-[11px] font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Payment & Transaction</span>
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-[#863221]">Receipt Type</span>
+                    <p className="font-bold text-[#510601] mt-0.5">{viewingReceipt.particulars || 'Membership'}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-[#863221]">Payment Mode</span>
+                    <p className="font-medium mt-0.5">{viewingReceipt.paymentMode || 'Online'}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-[#863221]">Amount in Words</span>
+                    <p className="italic text-[#863221] mt-0.5">{numberToWords(viewingReceipt.amount)}</p>
+                  </div>
+                  {viewingReceipt.bankName && (
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#863221]">Bank / Account</span>
+                      <p className="font-medium mt-0.5">{viewingReceipt.bankName}</p>
+                    </div>
+                  )}
+                  {viewingReceipt.transactionId && (
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#863221]">Txn ID / Cheque No.</span>
+                      <p className="font-mono mt-0.5">{viewingReceipt.transactionId}</p>
+                    </div>
+                  )}
+                </div>
+
+                {viewingReceipt.description && (
+                  <div className="pt-2 border-t border-[#E8DFD8]">
+                    <span className="text-[10px] uppercase font-bold text-[#863221]">Remarks / Description</span>
+                    <p className="mt-0.5 text-[#180200]">{viewingReceipt.description}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+              <button
+                type="button"
+                onClick={() => setViewingReceipt(null)}
+                className="px-5 py-2 bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#863221] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ============================================================ */}
+      {/* MODAL 2: EDIT RECEIPT RECORD                                 */}
+      {/* ============================================================ */}
+      <Modal isOpen={Boolean(editingReceipt)} onClose={() => setEditingReceipt(null)}>
+        {editingReceipt && (
+          <div className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <form onSubmit={handleSaveEdit}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold">
+                    <Edit3 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-[#180200]">
+                      Edit Receipt #{editingReceipt.receiptNumber}
+                    </h2>
+                    <p className="text-xs text-[#863221]">
+                      Update existing receipt details
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingReceipt(null)}
+                  className="p-1.5 rounded-lg text-stone-400 hover:text-[#510601] hover:bg-stone-100 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Receipt Number */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
+                      Receipt Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="receiptNumber"
+                      value={editFormData.receiptNumber || ''}
+                      onChange={handleEditChange}
+                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl font-mono text-xs focus:outline-none focus:border-[#510601]"
+                    />
+                    {editFormErrors.receiptNumber && (
+                      <p className="text-[10px] text-red-500 mt-1">{editFormErrors.receiptNumber}</p>
+                    )}
+                  </div>
+
+                  {/* Receipt Date */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
+                      Receipt Date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      name="receiptDate"
+                      value={editFormData.receiptDate || ''}
+                      onChange={handleEditChange}
+                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl font-mono text-xs focus:outline-none focus:border-[#510601]"
+                    />
+                  </div>
+
+                  {/* Payee / Member Name */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
+                      Payee / Member Name
+                    </label>
+                    <input
+                      type="text"
+                      name="name"
+                      value={editFormData.name || ''}
+                      onChange={handleEditChange}
+                      placeholder="Leave blank for unassigned"
+                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]"
+                    />
+                  </div>
+
+                  {/* Mobile */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
+                      Mobile Number
+                    </label>
+                    <input
+                      type="text"
+                      name="mobile"
+                      value={editFormData.mobile || ''}
+                      onChange={handleEditChange}
+                      maxLength={10}
+                      placeholder="10-digit mobile"
+                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl font-mono text-xs focus:outline-none focus:border-[#510601]"
+                    />
+                  </div>
+
+                  {/* Particulars / Receipt Type */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
+                      Receipt Type / Particulars <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="particulars"
+                      value={editFormData.particulars || 'Membership'}
+                      onChange={handleEditChange}
+                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601] cursor-pointer"
+                    >
+                      {PARTICULARS_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Amount */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
+                      Amount (₹) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="amount"
+                      value={editFormData.amount || ''}
+                      onChange={handleEditChange}
+                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl font-mono font-bold text-xs focus:outline-none focus:border-[#510601]"
+                    />
+                    {editFormErrors.amount && (
+                      <p className="text-[10px] text-red-500 mt-1">{editFormErrors.amount}</p>
+                    )}
+                  </div>
+
+                  {/* Payment Mode */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
+                      Payment Mode <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      name="paymentMode"
+                      value={editFormData.paymentMode || 'Online'}
+                      onChange={handleEditChange}
+                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601] cursor-pointer"
+                    >
+                      <option value="Online">Online</option>
+                      <option value="Offline">Offline</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Cheque">Cheque</option>
+                      <option value="NEFT/RTGS">NEFT/RTGS</option>
+                      <option value="KBL 1075">KBL 1075</option>
+                      <option value="SBI">SBI</option>
+                      <option value="Canara Bank">Canara Bank</option>
+                    </select>
+                  </div>
+
+                  {/* Transaction ID */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
+                      Txn ID / Cheque No.
+                    </label>
+                    <input
+                      type="text"
+                      name="transactionId"
+                      value={editFormData.transactionId || ''}
+                      onChange={handleEditChange}
+                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl font-mono text-xs focus:outline-none focus:border-[#510601]"
+                    />
+                  </div>
+
+                  {/* Description / Remarks */}
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
+                      Description / Remarks
+                    </label>
+                    <textarea
+                      name="description"
+                      value={editFormData.description || ''}
+                      onChange={handleEditChange}
+                      rows={2}
+                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+                <button
+                  type="button"
+                  onClick={() => setEditingReceipt(null)}
+                  className="px-4 py-2 bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#863221] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!hasPermission('receipts.write')}
+                  title={!hasPermission('receipts.write') ? 'Requires receipts.write permission' : undefined}
+                  className="px-5 py-2 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </Modal>
+
+      {/* ============================================================ */}
+      {/* MODAL 4: DELETE CONFIRMATION MODAL                           */}
+      {/* ============================================================ */}
+      <Modal isOpen={Boolean(deletingReceipt)} onClose={() => setDeletingReceipt(null)}>
+        {deletingReceipt && (
+          <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-lg font-bold text-[#180200]">Delete Receipt</h3>
+            <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
+              Are you sure you want to delete receipt <strong>#{deletingReceipt.receiptNumber}</strong>? This will permanently remove the record.
+            </p>
+
+            <div className="mt-5 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setDeletingReceipt(null)}
+                className="w-full py-2.5 px-4 bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#863221] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={!hasPermission('receipts.delete')}
+                title={!hasPermission('receipts.delete') ? 'Requires receipts.delete permission' : undefined}
+                className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+    </PermissionGate>
+  );
+}
