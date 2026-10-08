@@ -1,7 +1,7 @@
 from crud.base import CRUDBase
 from models.masters import (
     State, District, Taluk, PostalCode, MembershipType, MembershipTypePrice,
-    DocumentType, ServiceType, HmsSetting, Bank,
+    DocumentType, ServiceType, Particular, HmsSetting, Bank,
     Qualification, NativePlace, Gotra,
     DeletionReason,
 )
@@ -11,7 +11,7 @@ from schemas.masters import (
     MembershipTypeCreate, MembershipTypeUpdate, MembershipTypePriceCreate, MembershipTypePriceUpdate,
     DocumentTypeCreate, DocumentTypeUpdate,
     BankCreate, BankUpdate,
-    ServiceTypeCreate, ServiceTypeUpdate, HmsSettingCreate, HmsSettingUpdate,
+    ServiceTypeCreate, ServiceTypeUpdate, ParticularCreate, ParticularUpdate, HmsSettingCreate, HmsSettingUpdate,
     PersonalMasterCreate, PersonalMasterUpdate,
     NativePlaceCreate, NativePlaceUpdate,
     DeletionReasonCreate, DeletionReasonUpdate,
@@ -41,7 +41,7 @@ class CRUDDocumentType(CRUDBase[DocumentType, DocumentTypeCreate, DocumentTypeUp
 class CRUDBank(CRUDBase[Bank, BankCreate, BankUpdate]):
     pass
 
-class CRUDServiceType(CRUDBase[ServiceType, ServiceTypeCreate, ServiceTypeUpdate]):
+class CRUDServiceType(CRUDBase[ServiceType, Particular, ServiceTypeCreate, ServiceTypeUpdate, ParticularCreate, ParticularUpdate]):
     pass
 
 class CRUDHmsSetting(CRUDBase[HmsSetting, HmsSettingCreate, HmsSettingUpdate]):
@@ -74,3 +74,8 @@ class CRUDDeletionReason(CRUDBase[DeletionReason, DeletionReasonCreate, Deletion
     pass
 
 deletion_reason = CRUDDeletionReason(DeletionReason)
+
+class CRUDParticular(CRUDBase[Particular, ParticularCreate, ParticularUpdate]):
+    pass
+
+particular = CRUDParticular(Particular)

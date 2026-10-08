@@ -1,5 +1,6 @@
 from sqlalchemy import String, BigInteger, Boolean, DateTime, Date, Numeric, Text, ForeignKey, CHAR, JSON, Enum
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import Optional
+from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
 from models.base import Base, AuditMixin
 import enum
 
@@ -76,6 +77,18 @@ class DocumentType(AuditMixin, Base):
     is_required: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
 
+
+class Particular(AuditMixin, Base):
+    __tablename__ = "particulars"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    name_en: Mapped[str] = mapped_column(String(100), nullable=False)
+    name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("particulars.id"), nullable=True)
+    status: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    children = relationship("Particular", backref=backref("parent", remote_side=[id]))
+
 class ServiceType(AuditMixin, Base):
     __tablename__ = "service_types"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
@@ -83,7 +96,10 @@ class ServiceType(AuditMixin, Base):
     name_en: Mapped[str] = mapped_column(String(100), nullable=False)
     name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
+    parent_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("service_types.id"), nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    children = relationship("ServiceType", backref=backref("parent", remote_side=[id]))
 
 
 class Bank(AuditMixin, Base):

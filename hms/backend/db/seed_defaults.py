@@ -34,7 +34,7 @@ MODULE_CATALOG = [
     ("roles", "Role Management", "users", "/users/roles", "shield", 2, None),
     ("users.privileges", "Privileges", "users", "/users/privileges", "key", 3, None),
     ("members", "Membership", None, "/members", "id-card", 30, None),
-    ("approvals", "Approvals", None, "/approvals", "check-circle", 35, None),
+    ("members.approvals", "Approvals & Receipt Mapping", "members", "/members/approvals", "check-circle", 35, None),
     ("magazines", "Magazine", None, "/magazines", "book-open", 40, None),
     ("receipts", "Receipts", None, "/receipts", "receipt", 50, None),
     ("reports", "Reports", None, "/reports", "bar-chart", 60, None),
@@ -56,7 +56,7 @@ _DESC = {
     "roles": "roles",
     "users.privileges": "role privilege assignment",
     "members": "members — profile, memberships, documents",
-    "approvals": "approval requests",
+    "members.approvals": "approval requests and receipt mapping",
     "magazines": "magazine subscriptions, pauses, returns and delivery labels",
     "receipts": "receipts and allocations",
     "reports": "reports and saved reports",
@@ -73,7 +73,7 @@ PERMISSION_CATALOG = []
 for _m in _READ_WRITE_DELETE:
     for _a in ("read", "write", "delete"):
         PERMISSION_CATALOG.append((f"{_m}.{_a}", _m, f"{_a.title()} {_m}", f"{_a.title()} {_DESC[_m]}"))
-for _m in ("users.privileges", "approvals"):
+for _m in ("users.privileges", "members.approvals"):
     for _a in ("read", "write"):
         PERMISSION_CATALOG.append((f"{_m}.{_a}", _m, f"{_a.title()} {_m}", f"{_a.title()} {_DESC[_m]}"))
 PERMISSION_CATALOG += [

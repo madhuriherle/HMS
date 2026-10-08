@@ -57,7 +57,7 @@ def test_permission_catalog_seeded(client, admin_headers):
     body = response.json()
     assert {"total", "page", "limit", "pages", "data"} <= set(body)
     codes = {p["code"] for p in body["data"]}
-    assert {"members.write", "users.management.write", "approvals.write"} <= codes
+    assert {"members.write", "users.management.write", "members.approvals.write"} <= codes
     assert body["total"] >= 11
     assert all(p["module_id"] is not None for p in body["data"]), "every seeded permission must resolve a module_id"
 
@@ -68,7 +68,7 @@ def test_module_catalog_seeded(client, admin_headers):
     body = response.json()
     assert {"total", "page", "limit", "pages", "data"} <= set(body)
     codes = {m["code"] for m in body["data"]}
-    assert {"masters", "users", "members", "approvals"} <= codes
+    assert {"masters", "users", "members", "members.approvals"} <= codes
     assert body["total"] >= 11
     members_module = next(m for m in body["data"] if m["code"] == "members")
     assert members_module["permission_count"] >= 1
@@ -2045,7 +2045,7 @@ def test_menu_and_privilege_tree_come_from_module_table(client, admin_headers):
     assert [m["code"] for m in menu.json()] == ["members"]  # only the module they can read
 
     full_menu = client.get("/api/v1/users/modules/menu", headers=admin_headers).json()
-    assert {"masters", "users", "members", "approvals"} <= {m["code"] for m in full_menu}
+    assert {"masters", "users", "members", "members.approvals"} <= {m["code"] for m in full_menu}
     users_node = next(m for m in full_menu if m["code"] == "users")
     assert {c["code"] for c in users_node["submodules"]} == {"users.management", "roles", "users.privileges"}
 

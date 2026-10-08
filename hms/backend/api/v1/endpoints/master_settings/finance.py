@@ -9,7 +9,7 @@ from api import deps
 from core.pagination import paginate
 from crud import masters as crud_masters
 import models.masters
-from models.masters import Bank, ServiceType
+from models.masters import Bank, ServiceType, Particular
 from models.users import User
 from schemas import masters as schemas_masters
 from schemas.common import PendingApproval
@@ -261,3 +261,52 @@ def delete_payment_mode(
     db.delete(item)
     db.commit()
     return item
+
+
+# ─────────────── PARTICULARS ────────────────
+@router.get("/particulars")
+def read_particulars(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    page: int = 1,
+    limit: int = 1000,
+) -> Any:
+    q = db.query(Particular).filter(Particular.is_deleted == False)
+    return paginate(q, page, limit)
+
+@router.post("/particulars", response_model=Union[schemas_masters.Particular, PendingApproval])
+@approval_gate.gated("masters", "CREATE", "Particular", "masters.write")
+def create_particular(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("masters.write")),
+    obj_in: schemas_masters.ParticularCreate,
+) -> Any:
+    return crud_masters.particular.create(db=db, obj_in=obj_in, created_by=current_user.id)
+
+@router.put("/particulars/{id}", response_model=Union[schemas_masters.Particular, PendingApproval])
+@approval_gate.gated("masters", "UPDATE", "Particular", "masters.write")
+def update_particular(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("masters.write")),
+    id: int,
+    obj_in: schemas_masters.ParticularUpdate,
+) -> Any:
+    obj = crud_masters.particular.get(db, id)
+    if not obj:
+        raise HTTPException(404, "Particular not found")
+    return crud_masters.particular.update(db, db_obj=obj, obj_in=obj_in, updated_by=current_user.id)
+
+@router.delete("/particulars/{id}", response_model=Union[schemas_masters.Particular, PendingApproval])
+@approval_gate.gated("masters", "DELETE", "Particular", "masters.delete")
+def delete_particular(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("masters.delete")),
+    id: int,
+) -> Any:
+    obj = crud_masters.particular.get(db, id)
+    if not obj:
+        raise HTTPException(404, "Particular not found")
+    return crud_masters.particular.remove(db, id=id, deleted_by=current_user.id)

@@ -198,11 +198,35 @@ class DocumentType(DocumentTypeBase):
     model_config = ConfigDict(from_attributes=True)
 
 
+
+class ParticularBase(BaseModel):
+    code: str
+    name_en: str
+    name_kn: Optional[str] = None
+    parent_id: Optional[int] = None
+    status: bool = True
+
+class ParticularCreate(ParticularBase):
+    pass
+
+class ParticularUpdate(BaseModel):
+    code: Optional[str] = None
+    name_en: Optional[str] = None
+    name_kn: Optional[str] = None
+    parent_id: Optional[int] = None
+    status: Optional[bool] = None
+
+class Particular(ParticularBase):
+    id: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
 class ServiceTypeBase(BaseModel):
     code: str
     name_en: str
     name_kn: Optional[str] = None
     description: Optional[str] = None
+    parent_id: Optional[int] = None
     status: bool = True
 
 
@@ -215,6 +239,7 @@ class ServiceTypeUpdate(BaseModel):
     name_en: Optional[str] = None
     name_kn: Optional[str] = None
     description: Optional[str] = None
+    parent_id: Optional[int] = None
     status: Optional[bool] = None
 
 
