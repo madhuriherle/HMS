@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle2, XCircle, RefreshCw, Inbox } from 'lucide-react';
+import { CheckCircle2, XCircle, Inbox } from 'lucide-react';
 import api from '../api';
 import { formatDateTime } from '../utils/dateUtils';
 import PermissionGate from '../components/PermissionGate';
@@ -38,7 +38,6 @@ const KINDS = [
   }
 ];
 
-const STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'ALL'];
 
 const badge = (status) =>
   status === 'APPROVED'
@@ -50,7 +49,7 @@ const badge = (status) =>
 export default function Approvals() {
   const { hasPermission } = useAuth();
   const [kindKey, setKindKey] = useState('requests');
-  const [status, setStatus] = useState('PENDING');
+  const status = 'PENDING'; // the queue only lists requests still waiting for a reviewer
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -117,16 +116,7 @@ export default function Approvals() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Approvals</h1>
-            <p className="text-sm text-[#863221] mt-1">Requests waiting for a reviewer. Approving runs the original action.</p>
           </div>
-          <button
-            type="button"
-            onClick={load}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs font-semibold text-[#510601] hover:bg-[#FAF7F2] cursor-pointer"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-            <span>Refresh</span>
-          </button>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -146,17 +136,6 @@ export default function Approvals() {
               </button>
             ))}
           </div>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs font-semibold text-[#180200] cursor-pointer"
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s === 'ALL' ? 'All statuses' : s.charAt(0) + s.slice(1).toLowerCase()}
-              </option>
-            ))}
-          </select>
         </div>
 
         {error && <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>}
