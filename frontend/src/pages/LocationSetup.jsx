@@ -50,47 +50,130 @@ export default function LocationSetup() {
   const [taluks, setTaluks] = useState([]);
   const [postalCodes, setPostalCodes] = useState([]);
 
+  const [statesSummary, setStatesSummary] = useState({});
+
   const fetchMasters = async () => {
     try {
-      const [stRes, dtRes, tkRes, pcRes] = await Promise.all([
-        api.get('/masters/states?limit=2000'),
-        api.get('/masters/districts?limit=2000'),
-        api.get('/masters/taluks?limit=20000'),
-        api.get('/masters/postal-codes?limit=20000')
+      const [stRes, summaryRes] = await Promise.all([
+        api.get('/masters/states?limit=200'),
+        api.get('/masters/states-summary')
       ]);
-      
-      const sName = (arr, id) => { const f = arr?.find(x => x.id === id); return f ? f.name_en : ''; };
-      const dState = (arr, id) => { const f = arr?.find(x => x.id === id); return f ? f.state_id : ''; };
 
       const mapState = s => ({ id: s.id, name: s.name_en, code: s.code || '', status: s.status ? 'Active' : 'Inactive' });
-      const mapDist = d => ({ id: d.id, name: d.name_en, stateId: d.state_id, status: d.status ? 'Active' : 'Inactive', stateName: sName(stRes.data?.data, d.state_id) });
-      const mapTk = t => ({ id: t.id, name: t.name_en, districtId: t.district_id, stateId: dState(dtRes.data?.data, t.district_id), status: t.status ? 'Active' : 'Inactive', districtName: sName(dtRes.data?.data, t.district_id) });
-      const mapPc = p => ({ 
-        id: p.id, 
-        postalCode: p.pincode, 
-        area: p.post_office_name, 
-        stateId: p.state_id, 
-        districtId: p.district_id, 
-        talukId: p.taluk_id, 
-        status: p.status ? 'Active' : 'Inactive',
-        stateName: sName(stRes.data?.data, p.state_id),
-        districtName: sName(dtRes.data?.data, p.district_id),
-        talukName: sName(tkRes.data?.data, p.taluk_id)
-      });
-
       setStates((stRes.data?.data || []).map(mapState));
-      setDistricts((dtRes.data?.data || []).map(mapDist));
-      setTaluks((tkRes.data?.data || []).map(mapTk));
-      setPostalCodes((pcRes.data?.data || []).map(mapPc));
+
+      const sMap = {};
+      (summaryRes.data?.data || summaryRes.data || []).forEach(s => {
+        const sid = s.id || s.state_id;
+        sMap[sid] = {
+           districts: s.districts || 0,
+           taluks: s.taluks || 0,
+           pins: s.pins || 0
+        };
+      });
+      setStatesSummary(sMap);
     } catch (err) {
       console.error(err);
-      // alert('Failed to fetch geography data');
     }
   };
 
   useEffect(() => {
     fetchMasters();
   }, []);
+
+  // Fetch districts on state select
+  useEffect(() => {
+    if (selectedStateId) {
+      api.get(`/masters/districts?state_id=${selectedStateId}&limit=2000`)
+        .then(res => {
+          const mapDist = d => ({ id: d.id, name: d.name_en, stateId: d.state_id, status: d.status ? 'Active' : 'Inactive' });
+          setDistricts((res.data?.data || []).map(mapDist));
+        })
+        .catch(console.error);
+    } else {
+      setDistricts([]);
+    }
+  }, [selectedStateId]);
+
+  // Fetch taluks on district select
+  useEffect(() => {
+    if (selectedDistrictIdForTaluk) {
+      api.get(`/masters/taluks?district_id=${selectedDistrictIdForTaluk}&limit=2000`)
+        .then(res => {
+          const mapTk = t => ({ id: t.id, name: t.name_en, districtId: t.district_id, stateId: t.state_id, status: t.status ? 'Active' : 'Inactive' });
+          setTaluks((res.data?.data || []).map(mapTk));
+        })
+        .catch(console.error);
+    } else {
+      setTaluks([]);
+    }
+  }, [selectedDistrictIdForTaluk]);
+
+  // Fetch paginated postal codes
+  const [totalPostalPages, setTotalPostalPages] = useState(1);
+  const [postalTotalRecords, setPostalTotalRecords] = useState(0);
+
+  useEffect(() => {
+    if (activeTab === 'postal') {
+      const fetchPostalCodes = async () => {
+        try {
+          const params = new URLSearchParams();
+          params.append('page', postalCurrentPage);
+          params.append('limit', postalPageSize);
+          if (postalSearchQuery) params.append('search', postalSearchQuery);
+          if (postalStateFilter !== 'ALL') params.append('state_id', postalStateFilter);
+          if (postalDistrictFilter !== 'ALL') params.append('district_id', postalDistrictFilter);
+          if (postalPrefixFilter !== 'ALL') params.append('prefix', postalPrefixFilter);
+          if (postalStatusFilter !== 'ALL') {
+            params.append('status', postalStatusFilter === 'Active' ? 'true' : 'false');
+          }
+
+          const { data } = await api.get(`/masters/postal-codes?${params.toString()}`);
+          
+          const mapPc = p => ({
+            id: p.id,
+            postalCode: p.pincode,
+            area: p.post_office_name,
+            stateId: p.state_id,
+            districtId: p.district_id,
+            talukId: p.taluk_id,
+            status: p.status ? 'Active' : 'Inactive',
+            stateName: p.state_name || p.state?.name_en || (states.find(s => s.id === p.state_id)?.name || ''),
+            districtName: p.district_name || p.district?.name_en || '',
+            talukName: p.taluk_name || p.taluk?.name_en || ''
+          });
+          
+          setPostalCodes((data?.data || []).map(mapPc));
+          setTotalPostalPages(Math.max(1, Math.ceil((data?.total || 0) / postalPageSize)));
+          setPostalTotalRecords(data?.total || 0);
+        } catch (err) {
+          console.error(err);
+        }
+      };
+      fetchPostalCodes();
+    }
+  }, [activeTab, postalCurrentPage, postalPageSize, postalSearchQuery, postalStateFilter, postalDistrictFilter, postalPrefixFilter, postalStatusFilter, states]);
+
+  // Modals Data Fetching
+  const [modalDistricts, setModalDistricts] = useState([]);
+  const [modalTaluks, setModalTaluks] = useState([]);
+
+  useEffect(() => {
+    if (isPostalModalOpen && postalFormData.stateId) {
+      api.get(`/masters/districts?state_id=${postalFormData.stateId}&limit=2000`).then(res => {
+         setModalDistricts(res.data?.data || []);
+      });
+    }
+  }, [isPostalModalOpen, postalFormData.stateId]);
+
+  useEffect(() => {
+    if (isPostalModalOpen && postalFormData.districtId) {
+      api.get(`/masters/taluks?district_id=${postalFormData.districtId}&limit=2000`).then(res => {
+         setModalTaluks(res.data?.data || []);
+      });
+    }
+  }, [isPostalModalOpen, postalFormData.districtId]);
+
 
   const persistStates = () => { fetchMasters(); };
   const persistDistricts = () => { fetchMasters(); };
@@ -361,64 +444,29 @@ export default function LocationSetup() {
 
   // Filtered districts for Add/Edit PIN modal based on selected state
   const activeDistrictsForModal = useMemo(() => {
-    return districts.filter((d) => d.stateId === postalFormData.stateId && (postalModalMode === 'edit' || d.status === 'Active'));
-  }, [districts, postalFormData.stateId, postalModalMode]);
+    return modalDistricts.filter((d) => postalModalMode === 'edit' || d.status);
+  }, [modalDistricts, postalModalMode]);
 
   // Filtered taluks for Add/Edit PIN modal based on selected district
   const activeTaluksForModal = useMemo(() => {
-    return taluks.filter((t) => t.districtId === postalFormData.districtId && (postalModalMode === 'edit' || t.status === 'Active'));
-  }, [taluks, postalFormData.districtId, postalModalMode]);
+    return modalTaluks.filter((t) => postalModalMode === 'edit' || t.status);
+  }, [modalTaluks, postalModalMode]);
 
   // Available districts for Postal Directory filter dropdown
-  const filterDistrictsList = useMemo(() => {
-    if (postalStateFilter === 'ALL') return districts;
-    const s = states.find((st) => st.name.toLowerCase() === postalStateFilter.toLowerCase());
-    return s ? districts.filter((d) => d.stateId === s.id) : districts;
-  }, [districts, states, postalStateFilter]);
+  const [filterDistrictsList, setFilterDistrictsList] = useState([]);
+  useEffect(() => {
+    if (postalStateFilter !== 'ALL') {
+      api.get(`/masters/districts?state_id=${postalStateFilter}&limit=2000`).then(res => {
+        const mapDist = d => ({ id: d.id, name: d.name_en });
+        setFilterDistrictsList((res.data?.data || []).map(mapDist));
+      });
+    } else {
+      setFilterDistrictsList([]);
+    }
+  }, [postalStateFilter]);
 
-  // Filtering Postal Codes
-  const filteredPostalCodes = useMemo(() => {
-    return postalCodes.filter((item) => {
-      // Search by PIN or Area
-      if (postalSearchQuery.trim()) {
-        const q = postalSearchQuery.trim().toLowerCase();
-        const matchesPin = item.postalCode.toLowerCase().includes(q);
-        const matchesArea = (item.area || '').toLowerCase().includes(q);
-        const matchesTaluk = (item.talukName || '').toLowerCase().includes(q);
-        if (!matchesPin && !matchesArea && !matchesTaluk) return false;
-      }
-
-      // Filter by State
-      if (postalStateFilter !== 'ALL') {
-        if ((item.stateName || '').toLowerCase() !== postalStateFilter.toLowerCase()) return false;
-      }
-
-      // Filter by District
-      if (postalDistrictFilter !== 'ALL') {
-        if ((item.districtName || '').toLowerCase() !== postalDistrictFilter.toLowerCase()) return false;
-      }
-
-      // Filter by Prefix
-      if (postalPrefixFilter !== 'ALL') {
-        if (!item.postalCode.startsWith(postalPrefixFilter)) return false;
-      }
-
-      // Filter by Status
-      if (postalStatusFilter !== 'ALL') {
-        const normalizedItemStatus = item.status === 'Mapped' ? 'Active' : item.status;
-        if (normalizedItemStatus !== postalStatusFilter) return false;
-      }
-
-      return true;
-    });
-  }, [postalCodes, postalSearchQuery, postalStateFilter, postalDistrictFilter, postalPrefixFilter, postalStatusFilter]);
-
-  // Pagination calculation
-  const totalPostalPages = Math.max(1, Math.ceil(filteredPostalCodes.length / postalPageSize));
-  const paginatedPostalCodes = useMemo(() => {
-    const startIndex = (postalCurrentPage - 1) * postalPageSize;
-    return filteredPostalCodes.slice(startIndex, startIndex + postalPageSize);
-  }, [filteredPostalCodes, postalCurrentPage, postalPageSize]);
+  // Pagination calculation handled by server
+  const paginatedPostalCodes = postalCodes;
 
   // Clear filters
   const handleClearPostalFilters = () => {
@@ -435,16 +483,13 @@ export default function LocationSetup() {
     setPostalModalMode('add');
     setEditingPostal(null);
     const activeState = states.find((s) => s.status === 'Active') || states[0];
-    const matchingDists = districts.filter((d) => d.stateId === activeState?.id && d.status === 'Active');
-    const firstDist = matchingDists[0];
-    const matchingTaluks = taluks.filter((t) => t.districtId === firstDist?.id && t.status === 'Active');
 
     setPostalFormData({
       postalCode: '',
       area: '',
       stateId: activeState ? activeState.id : '',
-      districtId: firstDist ? firstDist.id : '',
-      talukId: matchingTaluks[0] ? matchingTaluks[0].id : '',
+      districtId: '',
+      talukId: '',
       status: 'Active'
     });
     setPostalFormErrors({});
@@ -542,32 +587,14 @@ export default function LocationSetup() {
   };
 
   const handleExportPostalCodes = () => {
-    if (filteredPostalCodes.length === 0) {
-      showToast('No records available to export.', 'error');
-      return;
-    }
-
-    const headers = ['pin_code', 'post_office_name', 'taluk_name', 'district_name', 'state_name', 'status'];
-    const rows = filteredPostalCodes.map((p) => [
-      `"${p.postalCode}"`,
-      `"${(p.area || '').replace(/"/g, '""')}"`,
-      `"${(p.talukName || '').replace(/"/g, '""')}"`,
-      `"${(p.districtName || '').replace(/"/g, '""')}"`,
-      `"${(p.stateName || '').replace(/"/g, '""')}"`,
-      `"${p.status}"`
-    ]);
-
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `hms_postal_directory_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast(`Exported ${filteredPostalCodes.length} PIN code records.`);
-  };
+        const params = new URLSearchParams();
+        if (postalStateFilter !== 'ALL') params.append('state_id', postalStateFilter);
+        if (postalDistrictFilter !== 'ALL') params.append('district_id', postalDistrictFilter);
+        if (postalSearchQuery) params.append('search', postalSearchQuery);
+        if (postalPrefixFilter !== 'ALL') params.append('prefix', postalPrefixFilter);
+        if (postalStatusFilter !== 'ALL') params.append('status', postalStatusFilter === 'Active' ? 'true' : 'false');
+        window.location.href = `${api.defaults.baseURL}/masters/postal-codes/export?${params.toString()}`;
+     };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -811,12 +838,9 @@ export default function LocationSetup() {
   };
 
   const handleDeleteState = async (st) => {
-    const dCount = districts.filter((d) => d.stateId === st.id).length;
-    const tCount = taluks.filter((x) => x.stateId === st.id).length;
-    const pCount = postalCodes.filter((x) => x.stateId === st.id).length;
     const ok = await confirmYesNo({
       title: `Delete ${st.name}?`,
-      text: `This also deletes its ${dCount} districts, ${tCount} taluks and ${pCount} PIN codes. Members linked to them lose their location names.`,
+      text: `This also deletes its districts, taluks and PIN codes. Members linked to them lose their location names.`,
       confirmText: 'Yes, delete everything',
       danger: true
     });
@@ -922,9 +946,10 @@ export default function LocationSetup() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {states.map((st) => {
                 const isSelected = st.id === selectedStateId;
-                const stateDistCount = districts.filter((d) => d.stateId === st.id).length;
-                const stateTalukCount = taluks.filter((t) => t.stateId === st.id).length;
-                const statePinCount = postalCodes.filter((p) => p.stateId === st.id).length;
+                const summary = statesSummary[st.id] || { districts: 0, taluks: 0, pins: 0 };
+                const stateDistCount = summary.districts;
+                const stateTalukCount = summary.taluks;
+                const statePinCount = summary.pins;
 
                 return (
                   <div
@@ -1401,7 +1426,7 @@ export default function LocationSetup() {
                 >
                   <option value="ALL">All States</option>
                   {states.map((s) => (
-                    <option key={s.id} value={s.name}>
+                    <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
                   ))}
@@ -1421,7 +1446,7 @@ export default function LocationSetup() {
                 >
                   <option value="ALL">All Districts</option>
                   {filterDistrictsList.map((d) => (
-                    <option key={d.id} value={d.name}>
+                    <option key={d.id} value={d.id}>
                       {d.name}
                     </option>
                   ))}
