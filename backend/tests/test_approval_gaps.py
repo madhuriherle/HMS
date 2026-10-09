@@ -15,7 +15,7 @@ def test_nobody_approves_their_own_request(client, admin_headers):
     # a clerk whose masters.write needs approval, and who may also approve (approvals.write)
     _, _, clerk = _staff_with_role(
         client, admin_headers, "selfappr_clerk", "SelfApprClerk", "SELFAPPR_CLERK",
-        permission_grants=[("masters.write", True), ("approvals.write", False), ("masters.write.approve", False)],
+        permission_grants=[("masters.write", True), ("approvals.write", False)],
     )
     filed = _pending_state(client, clerk, "Gate Nadu")
     assert filed["status"] == "PENDING"
@@ -57,3 +57,17 @@ def test_member_document_actions_are_registered_for_approval():
     import main  # noqa: F401  (registers every gated endpoint)
     assert approval_registry.get("members", "UPDATE", "MemberDocument")
     assert approval_registry.get("members", "DELETE", "MemberDocument")
+
+
+def test_one_approve_permission_finalizes_everything(client, admin_headers):
+    """approvals.write alone is enough: it approves requests from any module."""
+    _, _, maker = _staff_with_role(
+        client, admin_headers, "one_maker", "OneMaker", "ONE_MAKER",
+        permission_grants=[("masters.write", True), ("members.delete", True)],
+    )
+    _, _, approver = _staff_with_role(
+        client, admin_headers, "one_approver", "OneApprover", "ONE_APPROVER",
+        permission_grants=[("approvals.write", False)],
+    )
+    rid = _pending_state(client, maker, "One Permission Nadu")["approval_request_id"]
+    assert client.put(f"{API}/approvals/requests/{rid}/approve", headers=approver).status_code == 200

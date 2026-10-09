@@ -1184,7 +1184,7 @@ export default function RolesAndPrivileges() {
                                     }`}>
                                       {priv.name}
                                     </p>
-                                    {!isReadOnly && isChecked && !String(priv.id).endsWith('.approve') && priv.id !== 'approvals.write' && (
+                                    {!isReadOnly && isChecked && priv.id !== 'approvals.write' && (
                                       <button
                                         type="button"
                                         onClick={(e) => {

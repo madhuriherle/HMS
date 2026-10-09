@@ -49,8 +49,6 @@ const badge = (status) =>
 export default function Approvals() {
   const { hasPermission, profile, isAllAccess } = useAuth();
   // Nobody approves their own request (an all-access owner may)
-  // Finalizing needs the approve privilege that matches the request's CRUD action (e.g. members.delete.approve)
-  const lacksAuthority = (row) => !!row.permission_code && !hasPermission(`${row.permission_code}.approve`);
   const isOwnRequest = (row) => !isAllAccess && row.requested_by != null && profile?.id === row.requested_by;
   const [kindKey, setKindKey] = useState('requests');
   const status = 'PENDING'; // the queue only lists requests still waiting for a reviewer
@@ -190,8 +188,8 @@ export default function Approvals() {
                             <button
                               type="button"
                               onClick={() => approve(r)}
-                              disabled={!hasPermission('approvals.write') || lacksAuthority(r) || isOwnRequest(r)}
-                              title={!hasPermission('approvals.write') ? 'Requires approvals.write permission' : lacksAuthority(r) ? `You need the ${r.permission_code}.approve privilege to finalize this request` : isOwnRequest(r) ? 'You cannot approve your own request. Another approver must review it.' : 'Approve'}
+                              disabled={!hasPermission('approvals.write') || isOwnRequest(r)}
+                              title={!hasPermission('approvals.write') ? 'Requires approvals.write permission' : isOwnRequest(r) ? 'You cannot approve your own request. Another approver must review it.' : 'Approve'}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -200,8 +198,8 @@ export default function Approvals() {
                             <button
                               type="button"
                               onClick={() => reject(r)}
-                              disabled={!hasPermission('approvals.write') || lacksAuthority(r)}
-                              title={!hasPermission('approvals.write') ? 'Requires approvals.write permission' : lacksAuthority(r) ? `You need the ${r.permission_code}.approve privilege to finalize this request` : 'Reject'}
+                              disabled={!hasPermission('approvals.write')}
+                              title={!hasPermission('approvals.write') ? 'Requires approvals.write permission' : 'Reject'}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <XCircle className="w-3.5 h-3.5" />

@@ -88,31 +88,6 @@ PERMISSION_CATALOG += [
     ("imports.write", "imports", "Bulk imports", "CSV imports such as postal codes"),
 ]
 
-# Authority to FINALIZE a gated request. Every CRUD privilege that can be put behind
-# approval (the "Approval" chip) has a matching `<code>.approve` privilege: a request made
-# under members.delete can only be approved or rejected by someone holding
-# members.delete.approve (all-access roles always can). Keep this list equal to the codes
-# used in @approval_gate.gated(...) — tests/test_approval_authority.py checks it.
-GATED_APPROVAL_CODES = (
-    "engagements.write", "engagements.delete", "events.write", "events.delete",
-    "magazines.write", "magazines.delete", "masters.write", "masters.delete",
-    "members.write", "members.delete", "notifications.write", "notifications.delete",
-    "receipts.write", "receipts.delete", "reports.write", "reports.delete",
-    "roles.write", "roles.delete", "system.write",
-    "users.management.delete", "users.privileges.write",
-)
-_base_by_code = {p[0]: p for p in PERMISSION_CATALOG}
-for _code in GATED_APPROVAL_CODES:
-    _base = _base_by_code.get(_code)
-    if not _base:
-        continue
-    _mod = _base[1]
-    _what = "deletions" if _code.endswith(".delete") else "changes (create / update)"
-    PERMISSION_CATALOG.append((
-        f"{_code}.approve", _mod, f"Approve {_mod} {_what}",
-        f"Finalize (approve or reject) pending {_what} requests for {_DESC.get(_mod, _mod)}",
-    ))
-
 # ── organisation settings (singleton row, id = 1) ────────────
 # Defaults mirror the Sabha's printed receipt book so the receipt/label
 # print-header works out of the box; the office edits everything on the
