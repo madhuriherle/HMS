@@ -4,7 +4,7 @@ import Modal from '../components/Modal';
 import {
   Plus,
   Search,
-  Edit3,
+  Pencil,
   Eye,
   Trash2,
   ChevronRight,
@@ -680,7 +680,7 @@ export default function BankDetailsManagement() {
                           <button
                             type="button"
                             onClick={() => setViewingItem(config)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] hover:bg-[#FAF7F2] hover:text-[#3D0400] border border-[#E8DFD8] rounded-lg transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer"
                             title="View Configuration Details"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -692,10 +692,10 @@ export default function BankDetailsManagement() {
                             type="button"
                             onClick={() => openEditModal(config)}
                             disabled={!hasPermission('masters.write')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-white bg-[#510601] hover:bg-[#3D0400] rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit Payment Mode'}
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
                           </button>
 
@@ -704,7 +704,7 @@ export default function BankDetailsManagement() {
                             type="button"
                             onClick={() => handleDeleteClick(config)}
                             disabled={!hasPermission('masters.delete')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#ED4636] hover:bg-red-50 border border-red-200 rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete Payment Mode'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1168,21 +1168,8 @@ export default function BankDetailsManagement() {
               </div>
             </div>
 
-            {/* Footer */}
+            {/* Read-only footer */}
             <div className="px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-end gap-2.5">
-              <button
-                onClick={() => {
-                  const target = viewingItem;
-                  setViewingItem(null);
-                  openEditModal(target);
-                }}
-                disabled={!hasPermission('masters.write')}
-                title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
-                className="px-4 py-2 bg-[#510601] text-white text-xs font-bold rounded-xl hover:bg-[#3D0400] transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Edit Configuration</span>
-              </button>
               <button
                 onClick={() => setViewingItem(null)}
                 className="px-4 py-2 border border-[#E8DFD8] text-xs font-semibold text-[#863221] hover:bg-white rounded-xl transition-colors cursor-pointer"

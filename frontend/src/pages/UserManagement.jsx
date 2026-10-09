@@ -7,7 +7,7 @@ import {
   Users,
   UserPlus,
   Search,
-  Edit3,
+  Pencil,
   Trash2,
   Eye,
   Power,
@@ -670,31 +670,34 @@ export default function UserManagement() {
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setViewingUser(user)}
-                            className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg border border-transparent hover:border-[#E8DFD8] transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-all cursor-pointer"
                             title="View User Details"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View</span>
                           </button>
                           <button
                             disabled={isRankLocked || !hasPermission('users.management.write')}
                             onClick={() => !isRankLocked && openEditModal(user)}
-                            className={`p-1.5 rounded-lg border transition-all ${
+                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
                               isRankLocked
                                 ? 'text-gray-300 border-transparent cursor-not-allowed opacity-40'
-                                : 'text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] border-transparent hover:border-[#E8DFD8] cursor-pointer'
+                                : 'text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200 cursor-pointer'
                             }`}
                             title={!hasPermission('users.management.write') ? 'You need the users.management.write permission' : isRankLocked ? 'User is at or above your rank' : 'Edit User'}
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Edit</span>
                           </button>
                           {!isRankLocked && !(user.isCurrentAdmin || user.username === 'admin' || user.id === 1) && (
                             <button
                               disabled={isRankLocked || !hasPermission('users.management.delete')}
                               onClick={() => setDeleteTargetUser(user)}
-                              className="p-1.5 text-[#863221] hover:text-[#ED4636] hover:bg-red-50 rounded-lg border border-transparent hover:border-red-100 transition-all cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                               title={!hasPermission('users.management.delete') ? 'You need the users.management.delete permission' : 'Delete User'}
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
                             </button>
                           )}
                         </div>
@@ -1292,7 +1295,7 @@ export default function UserManagement() {
                 );
               })()}
 
-              {/* Action Buttons */}
+              {/* Read-only footer */}
               <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[#E8DFD8]">
                 <button
                   type="button"
@@ -1300,18 +1303,6 @@ export default function UserManagement() {
                   className="px-4 py-2 border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                 >
                   Close
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const u = viewingUser;
-                    setViewingUser(null);
-                    openEditModal(u);
-                  }}
-                  className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Edit User</span>
                 </button>
               </div>
 

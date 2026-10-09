@@ -5,7 +5,7 @@ import {
   Tag,
   Plus,
   Search,
-  Edit3,
+  Pencil,
   Trash2,
   Eye,
   History,
@@ -336,9 +336,7 @@ export default function MembershipTypeManagement() {
   };
 
   // ---- delete ----
-  const handleConfirmDelete = async () => {
-    if (!deletingItem) return;
-    const item = deletingItem;
+  const handleConfirmDelete = async (item) => {
     try {
       const { data } = await api.delete(`/masters/membership-types/${item.id}`);
       showToast(
@@ -348,10 +346,9 @@ export default function MembershipTypeManagement() {
       );
       await fetchMembershipTypes();
     } catch (err) {
-      showToast(err.response?.data?.detail || 'Error deleting membership type', 'error');
+      if (!err.isCancelled) showToast(err.response?.data?.detail || 'Error deleting record', 'error');
     }
-    setDeletingItem(null);
-  };
+  };;
 
   const handleSavePriceUpdate = async (e) => {
     e.preventDefault();
@@ -593,18 +590,18 @@ export default function MembershipTypeManagement() {
                           <button
                             onClick={() => openEditModal(item)}
                             disabled={!hasPermission('masters.write')}
-                            className="px-2.5 py-1 text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit Membership Type'}
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
                           </button>
 
                           {/* Delete Button */}
                           <button
-                            onClick={() => setDeletingItem(item)}
+                            onClick={() => handleConfirmDelete(item)}
                             disabled={!hasPermission('masters.delete')}
-                            className="px-2.5 py-1 text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete Membership Type'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -887,51 +884,7 @@ export default function MembershipTypeManagement() {
         </div>
       </Modal>
 
-      {/* ============================================================ */}
-      {/* DELETE CONFIRMATION MODAL                                    */}
-      {/* ============================================================ */}
-      <Modal
-        isOpen={Boolean(deletingItem)}
-        onClose={() => setDeletingItem(null)}
-      >
-        {deletingItem && (
-          <div
-            className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-14 h-14 rounded-full bg-red-100 text-[#ED4636] flex items-center justify-center mx-auto mb-3.5">
-              <Trash2 className="w-7 h-7" />
-            </div>
-
-            <h3 className="text-lg font-bold text-[#180200]">
-              Delete Membership Type?
-            </h3>
-            <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
-              Are you sure you want to delete <strong className="text-[#180200]">{deletingItem.name}</strong> ({formatINR(deletingItem.currentPrice)})? This action cannot be undone.
-            </p>
-
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setDeletingItem(null)}
-                className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!hasPermission('masters.delete')}
-                title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : undefined}
-                onClick={handleConfirmDelete}
-                className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Confirm Delete</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      
 
       {/* ============================================================ */}
       {/* UPDATE MEMBERSHIP PRICE MODAL                                */}
@@ -1283,21 +1236,14 @@ export default function MembershipTypeManagement() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
+              {/* Read-only footer */}
               <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[#E8DFD8]">
                 <button
                   type="button"
-                  disabled={!hasPermission('masters.write')}
-                  title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
-                  onClick={() => {
-                    const item = viewingItem;
-                    setViewingItem(null);
-                    openEditModal(item);
-                  }}
-                  className="px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                  onClick={() => setViewingItem(null)}
+                  className="px-4 py-2 border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                 >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Edit</span>
+                  Close
                 </button>
               </div>
 

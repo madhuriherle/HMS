@@ -6,7 +6,7 @@ import {
   ChevronRight,
   Search,
   Eye,
-  Edit3,
+  Pencil,
   Trash2,
   Link as LinkIcon,
   CheckCircle2,
@@ -589,10 +589,11 @@ export default function ReceiptTracking() {
                           <button
                             type="button"
                             onClick={() => setViewingReceipt(receipt)}
-                            className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg border border-[#E8DFD8] hover:border-[#510601] transition-colors cursor-pointer shrink-0"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer shrink-0"
                             title="View Receipt Details"
                           >
                             <Eye className="w-3.5 h-3.5" />
+                            <span>View</span>
                           </button>
 
                           {/* Edit Action */}
@@ -600,10 +601,11 @@ export default function ReceiptTracking() {
                             type="button"
                             onClick={() => handleOpenEdit(receipt)}
                             disabled={!hasPermission('receipts.write')}
-                            className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg border border-[#E8DFD8] hover:border-[#510601] transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('receipts.write') ? 'Requires receipts.write permission' : 'Edit Receipt'}
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Edit</span>
                           </button>
 
                           {/* Delete Action */}
@@ -611,10 +613,11 @@ export default function ReceiptTracking() {
                             type="button"
                             onClick={() => setDeletingReceipt(receipt)}
                             disabled={!hasPermission('receipts.delete')}
-                            className="p-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg border border-red-200 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('receipts.delete') ? 'Requires receipts.delete permission' : 'Delete Receipt'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
                           </button>
                         </div>
                       </td>
@@ -773,49 +776,9 @@ export default function ReceiptTracking() {
               </div>
             </div>
 
-            {/* Modal Footer */}
+            {/* Read-only footer */}
             <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
-              <div className="flex flex-wrap items-center gap-2">
-                {String(viewingReceipt.status).toUpperCase() !== 'CANCELLED' && (
-                  <>
-                    {isReceiptUnmapped(viewingReceipt) ? (
-                      <button
-                        type="button"
-                        onClick={() => handleMapReceipt(viewingReceipt)}
-                        disabled={!hasPermission('receipts.write')}
-                        className="px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
-                      >
-                        Map to member
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveMapping(viewingReceipt)}
-                        disabled={!hasPermission('receipts.write')}
-                        className="px-3.5 py-2 bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#510601] text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
-                      >
-                        Remove mapping
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleRefundReceipt(viewingReceipt)}
-                      disabled={!hasPermission('receipts.write')}
-                      className="px-3.5 py-2 bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#510601] text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
-                    >
-                      Refund
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleCancelReceipt(viewingReceipt)}
-                      disabled={!hasPermission('receipts.write')}
-                      className="px-3.5 py-2 bg-white hover:bg-red-50 border border-red-200 text-[#ED4636] text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
-                    >
-                      Cancel receipt
-                    </button>
-                  </>
-                )}
-              </div>
+              <div />
               <button
                 type="button"
                 onClick={() => setViewingReceipt(null)}
@@ -839,7 +802,7 @@ export default function ReceiptTracking() {
               <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold">
-                    <Edit3 className="w-4 h-4" />
+                    <Pencil className="w-4 h-4" />
                   </div>
                   <div>
                     <h2 className="text-base font-bold text-[#180200]">

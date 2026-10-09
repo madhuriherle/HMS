@@ -521,10 +521,10 @@ export default function UnapprovedMembership() {
                           <button
                             type="button"
                             onClick={() => navigate('/dashboard/receipts/entry', { state: { selectedMember: m } })}
-                            className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 h-8 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer shrink-0 ${
+                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer shrink-0 ${
                               isAssigned
-                                ? 'bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300'
-                                : 'bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white hover:shadow'
+                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                                : 'bg-[#FAF7F2] hover:bg-[#F1E7DE] text-[#510601] border-[#E8DFD8]'
                             }`}
                             title={isAssigned ? `Receipt #${m.assignedReceiptNumber} assigned. Click to view or create another receipt.` : 'Open Receipt Entry and assign receipt to this applicant'}
                           >
@@ -536,10 +536,10 @@ export default function UnapprovedMembership() {
                           <button
                             type="button"
                             onClick={() => setViewingMember(m)}
-                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 h-8 bg-white hover:bg-[#FAF7F2] text-[#510601] hover:text-[#180200] text-xs font-bold rounded-xl border border-[#E8DFD8] hover:border-[#510601] shadow-sm transition-all cursor-pointer shrink-0"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer shrink-0"
                             title="View Full Application"
                           >
-                            <Eye className="w-3.5 h-3.5 shrink-0 text-[#863221]" />
+                            <Eye className="w-3.5 h-3.5 shrink-0" />
                             <span>View</span>
                           </button>
 
@@ -548,9 +548,9 @@ export default function UnapprovedMembership() {
                             type="button"
                             onClick={() => handleInitiateApprove(m)}
                             disabled={!hasPermission('approvals.write')}
-                            className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 h-8 text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${isAssigned
-                              ? 'bg-[#3D705C] hover:bg-[#2e5646] text-white hover:shadow-md'
-                              : 'bg-stone-100 hover:bg-stone-200 text-stone-500 border border-stone-200'
+                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${isAssigned
+                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                              : 'bg-stone-100 text-stone-500 border-stone-200'
                               }`}
                             title={
                               !hasPermission('approvals.write')
@@ -569,7 +569,7 @@ export default function UnapprovedMembership() {
                             type="button"
                             onClick={() => handleReject(m)}
                             disabled={!hasPermission('members.delete')}
-                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 h-8 text-xs font-bold rounded-xl border border-red-200 text-[#ED4636] bg-white hover:bg-red-50 shadow-sm transition-all cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('members.delete') ? 'Requires members.delete permission' : 'Reject this application'}
                           >
                             <XCircle className="w-3.5 h-3.5 shrink-0" />
@@ -838,20 +838,9 @@ export default function UnapprovedMembership() {
               </div>
             </div>
 
-            {/* Footer */}
+            {/* Read-only footer */}
             <div className="flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
-              <button
-                type="button"
-                onClick={() => goToReceiptEntry(viewingMember)}
-                className="text-xs font-semibold text-[#510601] hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>
-                  {viewingMember.receiptStatus === 'Assigned'
-                    ? 'View in Receipt Entry'
-                    : 'Assign a Receipt'}
-                </span>
-              </button>
+              <div />
 
               <div className="flex items-center gap-3">
                 <button
@@ -860,20 +849,6 @@ export default function UnapprovedMembership() {
                   className="py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                 >
                   Close
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const m = viewingMember;
-                    setViewingMember(null);
-                    handleInitiateApprove(m);
-                  }}
-                  disabled={!hasPermission('approvals.write')}
-                  title={!hasPermission('approvals.write') ? 'Requires approvals.write permission' : undefined}
-                  className="py-2.5 px-5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Approve Membership</span>
                 </button>
               </div>
             </div>

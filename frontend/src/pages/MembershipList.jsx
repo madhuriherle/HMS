@@ -8,7 +8,7 @@ import {
   User,
   Plus,
   Search,
-  Edit3,
+  Pencil,
   Trash2,
   Eye,
   Printer,
@@ -937,28 +937,31 @@ export default function MembershipList() {
                           <button
                             type="button"
                             onClick={() => setViewingMember(m)}
-                            className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer"
                             title="View Full Profile"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(m)}
                             disabled={!hasPermission('members.write')}
-                            className="p-1.5 text-amber-700 hover:text-amber-900 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('members.write') ? 'Requires members.write permission' : 'Edit Member'}
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Edit</span>
                           </button>
                           <button
                             type="button"
                             onClick={() => { setDeleteReason(''); setDeleteDialog(m); }}
                             disabled={!hasPermission('members.delete')}
-                            className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('members.delete') ? 'Requires members.delete permission' : 'Delete Member'}
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
                           </button>
                         </div>
                       </td>
@@ -1076,27 +1079,7 @@ export default function MembershipList() {
               </button>
             </div>
 
-            {/* Profile actions */}
-            <div className="flex flex-wrap items-center gap-2 px-6 py-3 border-b border-[#E8DFD8] bg-white">
-              <button
-                type="button"
-                onClick={() => handleAssignMembership(viewingMember)}
-                disabled={!hasPermission('members.write')}
-                title={!hasPermission('members.write') ? 'Requires members.write permission' : undefined}
-                className="px-3 py-1.5 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-40"
-              >
-                Add / change membership
-              </button>
-              <button
-                type="button"
-                onClick={() => handleUploadPhoto(viewingMember)}
-                disabled={!hasPermission('members.write')}
-                title={!hasPermission('members.write') ? 'Requires members.write permission' : undefined}
-                className="px-3 py-1.5 bg-white hover:bg-[#FAF7F2] border border-[#E8DFD8] text-[#510601] text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-40"
-              >
-                Upload photo
-              </button>
-            </div>
+            {/* Read-only: no actions in view popup */}
 
             {/* Tabs */}
             <div className="flex items-center gap-6 px-6 border-b border-[#E8DFD8] bg-[#FAF7F2]/50">
@@ -1430,16 +1413,10 @@ export default function MembershipList() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    const m = viewingMember;
-                    setViewingMember(null);
-                    handleOpenEditModal(m);
-                  }}
-                  disabled={!hasPermission('members.write')}
-                  title={!hasPermission('members.write') ? 'Requires members.write permission' : undefined}
-                  className="py-2 px-4 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => setViewingMember(null)}
+                  className="py-2 px-4 border border-[#E8DFD8] text-[#863221] hover:bg-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                 >
-                  Edit Profile
+                  Close
                 </button>
               </div>
             </div>

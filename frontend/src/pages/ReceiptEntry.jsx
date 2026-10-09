@@ -1050,14 +1050,14 @@ export default function ReceiptEntry() {
                 </div>
               </div>
 
-              {/* Footer */}
+              {/* Read-only footer */}
               <div className="p-4 border-t border-stone-200 bg-white flex items-center justify-end">
                 <button
                   type="button"
                   onClick={() => setViewingMember(null)}
-                  className="px-5 py-2 bg-[#00B074] hover:bg-[#009663] text-white text-xs sm:text-sm font-bold rounded-lg shadow-sm transition-all cursor-pointer"
+                  className="px-5 py-2 bg-white hover:bg-stone-50 border border-stone-300 text-stone-700 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer"
                 >
-                  Activate this profile
+                  Close
                 </button>
               </div>
             </div>
@@ -2011,7 +2011,7 @@ export default function ReceiptEntry() {
                               <button
                                 type="button"
                                 onClick={() => handleAssignFromMembership(member)}
-                                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 h-8 text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer bg-[#FAF7F2] hover:bg-[#F1E7DE] text-[#510601] border-[#E8DFD8]"
                                 title="Assign this member's details into the receipt form"
                               >
                                 <FileText className="w-3.5 h-3.5 shrink-0" />
@@ -2225,7 +2225,7 @@ export default function ReceiptEntry() {
                             <button
                               type="button"
                               onClick={() => handleAssignFromUnapproved(member)}
-                              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 h-8 text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer bg-[#FAF7F2] hover:bg-[#F1E7DE] text-[#510601] border-[#E8DFD8]"
                               title="Assign to Receipt"
                             >
                               <FileText className="w-3.5 h-3.5 shrink-0" />
@@ -2235,7 +2235,7 @@ export default function ReceiptEntry() {
                             <button
                               type="button"
                               onClick={() => setViewingMember(member)}
-                              className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 h-8 bg-white hover:bg-[#FAF7F2] text-[#510601] hover:text-[#180200] text-xs font-bold rounded-xl border border-[#E8DFD8] hover:border-[#510601] shadow-2xs transition-all cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer"
                               title="View full applicant registration profile"
                             >
                               <Eye className="w-3.5 h-3.5 shrink-0 text-[#863221]" />
@@ -2366,7 +2366,7 @@ export default function ReceiptEntry() {
                       <button
                         type="button"
                         onClick={() => handleAssignRenewal(r)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 h-8 text-xs font-bold rounded-xl shadow-sm bg-[#510601] hover:bg-[#8C1801] text-white cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer bg-[#FAF7F2] hover:bg-[#F1E7DE] text-[#510601] border-[#E8DFD8]"
                       >
                         <FileText className="w-3.5 h-3.5" />
                         <span>Assign to Receipt</span>

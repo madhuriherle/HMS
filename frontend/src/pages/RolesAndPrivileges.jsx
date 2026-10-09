@@ -6,7 +6,7 @@ import {
   ShieldCheck,
   Plus,
   Search,
-  Edit3,
+  Pencil,
   Trash2,
   Eye,
   Power,
@@ -700,37 +700,40 @@ export default function RolesAndPrivileges() {
                           <button
                             disabled={isSys}
                             onClick={() => !isSys && openPrivilegeModal(role)}
-                            className={`p-1.5 rounded-lg border transition-all ${
+                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
                               isSys
                                 ? 'text-gray-300 border-transparent cursor-not-allowed opacity-40'
-                                : 'text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] border-transparent hover:border-[#E8DFD8] cursor-pointer'
+                                : 'text-[#510601] bg-[#FAF7F2] hover:bg-[#F1E7DE] border-[#E8DFD8] cursor-pointer'
                             }`}
                             title={isSys ? "System role privileges are permanent and cannot be modified" : "Configure Privileges"}
                           >
-                            <ShieldCheck className="w-4 h-4" />
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>Privileges</span>
                           </button>
 
                           {/* View Details */}
                           <button
                             onClick={() => setViewingRole(role)}
-                            className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg border border-transparent hover:border-[#E8DFD8] transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-all cursor-pointer"
                             title="View Details"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View</span>
                           </button>
 
                           {/* Edit Role */}
                           <button
                             disabled={isLocked || !hasPermission('roles.write')}
                             onClick={() => !isLocked && openEditModal(role)}
-                            className={`p-1.5 rounded-lg border transition-all ${
+                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
                               isLocked
                                 ? 'text-gray-300 border-transparent cursor-not-allowed opacity-40'
-                                : 'text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] border-transparent hover:border-[#E8DFD8] cursor-pointer'
+                                : 'text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200 cursor-pointer'
                             }`}
                             title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? "System role cannot be edited" : isLocked ? "Role is at or above your rank" : "Edit Role"}
                           >
-                            <Edit3 className="w-4 h-4" />
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Edit</span>
                           </button>
 
                           {/* Delete Role (Only included if role is deletable) */}
@@ -738,10 +741,11 @@ export default function RolesAndPrivileges() {
                             <button
                               disabled={isLocked || !hasPermission('roles.delete')}
                               onClick={() => setDeleteTargetRole(role)}
-                              className="p-1.5 text-[#863221] hover:text-[#ED4636] hover:bg-red-50 rounded-lg border border-transparent hover:border-red-100 transition-all cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                               title={!hasPermission('roles.delete') ? 'You need the roles.delete permission' : 'Delete Role'}
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
                             </button>
                           )}
                         </div>
@@ -1347,7 +1351,7 @@ export default function RolesAndPrivileges() {
                 </div>
               </div>
 
-              {/* Actions */}
+              {/* Read-only footer */}
               <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[#E8DFD8]">
                 <button
                   type="button"
@@ -1355,18 +1359,6 @@ export default function RolesAndPrivileges() {
                   className="px-4 py-2 border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                 >
                   Close
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const r = viewingRole;
-                    setViewingRole(null);
-                    openPrivilegeModal(r);
-                  }}
-                  className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Key className="w-3.5 h-3.5" />
-                  <span>Configure Privileges</span>
                 </button>
               </div>
 
