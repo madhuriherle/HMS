@@ -855,7 +855,7 @@ export default function ReceiptEntry() {
 
 
   return (
-    <PermissionGate required="receipts.read">
+    <PermissionGate required="receipts.entry.read">
     <div className="space-y-6 pb-16 font-sans">
 
       {/* View Member Profile Details Modal */}
@@ -1630,8 +1630,8 @@ export default function ReceiptEntry() {
 
                 <button
                   type="submit"
-                  disabled={saving || !hasPermission('receipts.write')}
-                  title={!hasPermission('receipts.write') ? 'Requires receipts.write permission' : undefined}
+                  disabled={saving || !hasPermission('receipts.entry.write')}
+                  title={!hasPermission('receipts.entry.write') ? 'Requires receipts.entry.write permission' : undefined}
                   className="disabled:opacity-50 px-5 py-2 rounded-xl bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <Save className="w-3.5 h-3.5" />

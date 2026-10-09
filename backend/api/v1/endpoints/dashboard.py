@@ -43,8 +43,14 @@ def get_dashboard(
     held = deps.user_permission_codes(db, current_user)
     all_access = deps.is_all_access(db, current_user)
 
-    def allowed(code: str) -> bool:
-        return all_access or code in held
+    def allowed(*codes: str) -> bool:
+        return all_access or any(c in held for c in codes)
+
+    from models.users import Module
+
+    def module_on(code: str) -> bool:
+        row = db.query(Module).filter(Module.code == code, Module.is_deleted == False).first()  # noqa: E712
+        return bool(row and row.status)
 
     return {
         "members": {
@@ -52,20 +58,20 @@ def get_dashboard(
             "approved": approved_members,
             "unapproved": unapproved_members,
             "inactive": inactive_members,
-        } if allowed("members.read") else None,
+        } if allowed("members.read", "members.list.read", "members.unapproved.read") else None,
         "receipts": {
             "total_count": total_receipts,
             "total_amount": float(total_receipt_amount),
-        } if allowed("receipts.read") else None,
+        } if allowed("receipts.read", "receipts.entry.read", "receipts.tracking.read") else None,
         "magazines": {
             "active_subscriptions": active_subscriptions,
             "paused_subscriptions": paused_subscriptions,
             "returns_this_month": returns_this_month,
-        } if allowed("magazines.read") else None,
+        } if allowed("magazines.read") and module_on("magazines") else None,
         "pending_approvals": {
             "profile_changes": pending_profile_changes,
             "type_changes": pending_type_changes,
             "deletion_requests": pending_deletions,
             "total": pending_profile_changes + pending_type_changes + pending_deletions,
-        } if allowed("members.approvals.read") else None,
+        } if allowed("approvals.read") else None,
     }

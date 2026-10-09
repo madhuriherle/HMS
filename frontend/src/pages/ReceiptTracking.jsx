@@ -421,7 +421,7 @@ export default function ReceiptTracking() {
   };
 
   return (
-    <PermissionGate required="receipts.read">
+    <PermissionGate required="receipts.tracking.read">
     <div className="space-y-6 pb-16 font-sans">
       {/* Toast Alert Notification */}
       {toastMessage && (
@@ -600,9 +600,9 @@ export default function ReceiptTracking() {
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(receipt)}
-                            disabled={!hasPermission('receipts.write')}
+                            disabled={!hasPermission('receipts.tracking.write')}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={!hasPermission('receipts.write') ? 'Requires receipts.write permission' : 'Edit Receipt'}
+                            title={!hasPermission('receipts.tracking.write') ? 'Requires receipts.tracking.write permission' : 'Edit Receipt'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -612,9 +612,9 @@ export default function ReceiptTracking() {
                           <button
                             type="button"
                             onClick={() => setDeletingReceipt(receipt)}
-                            disabled={!hasPermission('receipts.delete')}
+                            disabled={!hasPermission('receipts.tracking.delete')}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={!hasPermission('receipts.delete') ? 'Requires receipts.delete permission' : 'Delete Receipt'}
+                            title={!hasPermission('receipts.tracking.delete') ? 'Requires receipts.tracking.delete permission' : 'Delete Receipt'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                             <span>Delete</span>
@@ -985,8 +985,8 @@ export default function ReceiptTracking() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!hasPermission('receipts.write')}
-                  title={!hasPermission('receipts.write') ? 'Requires receipts.write permission' : undefined}
+                  disabled={!hasPermission('receipts.tracking.write')}
+                  title={!hasPermission('receipts.tracking.write') ? 'Requires receipts.tracking.write permission' : undefined}
                   className="px-5 py-2 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Check className="w-3.5 h-3.5" />
@@ -1024,8 +1024,8 @@ export default function ReceiptTracking() {
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                disabled={!hasPermission('receipts.delete')}
-                title={!hasPermission('receipts.delete') ? 'Requires receipts.delete permission' : undefined}
+                disabled={!hasPermission('receipts.tracking.delete')}
+                title={!hasPermission('receipts.tracking.delete') ? 'Requires receipts.tracking.delete permission' : undefined}
                 className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Yes, Delete

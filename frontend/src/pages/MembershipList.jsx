@@ -649,7 +649,7 @@ export default function MembershipList() {
   };
 
   return (
-    <PermissionGate required="members.read">
+    <PermissionGate required="members.list.read">
     <div className="space-y-6">
       {/* ---------------------------------------------------- */}
       {/* HEADER, SEARCH & FILTERS SECTION                     */}
@@ -695,8 +695,8 @@ export default function MembershipList() {
             <button
               type="button"
               onClick={handleOpenAddModal}
-              disabled={!hasPermission('members.write')}
-              title={!hasPermission('members.write') ? 'Requires members.write permission' : undefined}
+              disabled={!hasPermission('members.list.write')}
+              title={!hasPermission('members.list.write') ? 'Requires members.list.write permission' : undefined}
               className="flex items-center gap-1.5 px-4 py-2 bg-[#510601] hover:bg-[#863221] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-sm cursor-pointer hover:shadow-md shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
@@ -946,9 +946,9 @@ export default function MembershipList() {
                           <button
                             type="button"
                             onClick={() => handleOpenEditModal(m)}
-                            disabled={!hasPermission('members.write')}
+                            disabled={!hasPermission('members.list.write')}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={!hasPermission('members.write') ? 'Requires members.write permission' : 'Edit Member'}
+                            title={!hasPermission('members.list.write') ? 'Requires members.list.write permission' : 'Edit Member'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -956,9 +956,9 @@ export default function MembershipList() {
                           <button
                             type="button"
                             onClick={() => { setDeleteReason(''); setDeleteDialog(m); }}
-                            disabled={!hasPermission('members.delete')}
+                            disabled={!hasPermission('members.list.delete')}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={!hasPermission('members.delete') ? 'Requires members.delete permission' : 'Delete Member'}
+                            title={!hasPermission('members.list.delete') ? 'Requires members.list.delete permission' : 'Delete Member'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                             <span>Delete</span>
@@ -1643,8 +1643,8 @@ export default function MembershipList() {
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                disabled={!hasPermission('members.delete')}
-                title={!hasPermission('members.delete') ? 'Requires members.delete permission' : undefined}
+                disabled={!hasPermission('members.list.delete')}
+                title={!hasPermission('members.list.delete') ? 'Requires members.list.delete permission' : undefined}
                 className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Trash2 className="w-3.5 h-3.5" />

@@ -291,7 +291,7 @@ export default function UnapprovedMembership() {
   const countAssigned = unapprovedMembers.filter((m) => m.receiptStatus === 'Assigned').length;
 
   return (
-    <PermissionGate required="members.approvals.read">
+    <PermissionGate required="members.unapproved.read">
     <div className="space-y-6">
       {/* ---------------------------------------------------- */}
       {/* HEADER, SEARCH & FILTERS SECTION                     */}
@@ -547,14 +547,14 @@ export default function UnapprovedMembership() {
                           <button
                             type="button"
                             onClick={() => handleInitiateApprove(m)}
-                            disabled={!hasPermission('approvals.write')}
+                            disabled={!hasPermission('members.unapproved.write')}
                             className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${isAssigned
                               ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
                               : 'bg-stone-100 text-stone-500 border-stone-200'
                               }`}
                             title={
-                              !hasPermission('approvals.write')
-                                ? 'Requires approvals.write permission'
+                              !hasPermission('members.unapproved.write')
+                                ? 'Requires members.unapproved.write permission'
                                 : isAssigned
                                   ? 'Approve membership and transfer to Membership List'
                                   : 'Requires Receipt to be Assigned first'
@@ -568,9 +568,9 @@ export default function UnapprovedMembership() {
                           <button
                             type="button"
                             onClick={() => handleReject(m)}
-                            disabled={!hasPermission('members.delete')}
+                            disabled={!hasPermission('members.list.delete')}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={!hasPermission('members.delete') ? 'Requires members.delete permission' : 'Reject this application'}
+                            title={!hasPermission('members.list.delete') ? 'Requires members.list.delete permission' : 'Reject this application'}
                           >
                             <XCircle className="w-3.5 h-3.5 shrink-0" />
                             <span>Reject</span>
@@ -962,8 +962,8 @@ export default function UnapprovedMembership() {
               <button
                 type="button"
                 onClick={handleConfirmApproval}
-                disabled={!hasPermission('approvals.write')}
-                title={!hasPermission('approvals.write') ? 'Requires approvals.write permission' : undefined}
+                disabled={!hasPermission('members.unapproved.write')}
+                title={!hasPermission('members.unapproved.write') ? 'Requires members.unapproved.write permission' : undefined}
                 className="w-full py-2.5 px-4 bg-[#3D705C] hover:bg-[#2F5747] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Check className="w-3.5 h-3.5" />

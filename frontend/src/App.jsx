@@ -111,9 +111,9 @@ function App() {
           <Route path="receipts/add" element={<ReceiptEntry />} />
           <Route path="receipts/tracking" element={<ReceiptTracking />} />
           <Route path="receipt/tracking" element={<ReceiptTracking />} />
-          <Route path="receipts/labels" element={<PermissionGate required="members.read" title="Access Restricted"><LabelList /></PermissionGate>} />
-          <Route path="receipts/label-list" element={<PermissionGate required="members.read" title="Access Restricted"><LabelList /></PermissionGate>} />
-          <Route path="magazine/labels" element={<PermissionGate required="members.read" title="Access Restricted"><LabelList /></PermissionGate>} />
+          <Route path="receipts/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
+          <Route path="receipts/label-list" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
+          <Route path="magazine/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
 
         </Route>
 

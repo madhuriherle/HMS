@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { applyBulk, stateOf, toggleOne } from '../utils/privilegeSelection';
 import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import {
@@ -43,6 +44,7 @@ export default function RolesAndPrivileges() {
   const [allPrivileges, setAllPrivileges] = useState([]);
   const [allPrivilegeIds, setAllPrivilegeIds] = useState([]);
   const [privilegeRows, setPrivilegeRows] = useState([]); // module / sub-module rows for the privilege table
+  const [disabledPrivilegeIds, setDisabledPrivilegeIds] = useState([]); // privileges of modules that are switched off (not built yet)
 
   const [loading, setLoading] = useState(true);
 
@@ -84,9 +86,11 @@ export default function RolesAndPrivileges() {
         let formattedGroups = [];
         let allIds = [];
         const matrixRows = [];
+        const offIds = [];
 
-        const traverse = (modList, path = "", depth = 0) => {
+        const traverse = (modList, path = "", depth = 0, parentOff = false) => {
            for (const mod of modList) {
+              const off = parentOff || mod.status === false;
               const currentPath = path ? `${path} > ${mod.name}` : mod.name;
               // one table row per module: Read / Write / Delete cells, anything else goes to "Other"
               const cells = { read: null, write: null, delete: null };
@@ -98,11 +102,13 @@ export default function RolesAndPrivileges() {
               }
               if ((mod.privileges && mod.privileges.length > 0) || (mod.submodules && mod.submodules.length > 0)) {
                 matrixRows.push({
-                  code: mod.code, name: mod.name, depth, min_rank_level: mod.min_rank_level ?? null,
+                  code: mod.code, name: mod.name, depth, min_rank_level: mod.min_rank_level ?? null, disabled: off,
                   cells, other, hasChildren: Boolean(mod.submodules && mod.submodules.length > 0)
                 });
               }
-              if (mod.privileges && mod.privileges.length > 0) {
+              if (off) {
+                 offIds.push(...(mod.privileges || []).map(p => p.code));
+              } else if (mod.privileges && mod.privileges.length > 0) {
                  const formattedPrivs = mod.privileges.map(p => ({
                     id: p.code, // using code as id for frontend
                     name: p.name,
@@ -116,7 +122,7 @@ export default function RolesAndPrivileges() {
                  allIds.push(...formattedPrivs.map(p => p.id));
               }
               if (mod.submodules && mod.submodules.length > 0) {
-                 traverse(mod.submodules, currentPath, depth + 1);
+                 traverse(mod.submodules, currentPath, depth + 1, off);
               }
            }
         };
@@ -125,6 +131,7 @@ export default function RolesAndPrivileges() {
         setAllPrivileges(formattedGroups);
         setAllPrivilegeIds(allIds);
         setPrivilegeRows(matrixRows);
+        setDisabledPrivilegeIds(offIds);
 
       } catch (err) {
         console.error("Error fetching data", err);
@@ -442,40 +449,11 @@ export default function RolesAndPrivileges() {
     }
   };
 
-  // Write and Delete need Read: a screen cannot be used without being able to open it.
-  // Ticking Write/Delete also ticks Read; unticking Read also unticks Write/Delete.
-  const readCodeFor = (code) => {
-    if (code === 'approvals.write' || !/\.(write|delete)$/.test(code)) return null;
-    const read = code.replace(/\.(write|delete)$/, '.read');
-    return allPrivilegeIds.includes(read) ? read : null;
-  };
-  const writeCodesFor = (readCode) =>
-    allPrivilegeIds.filter((c) => c !== 'approvals.write' && /\.(write|delete)$/.test(c) && c.replace(/\.(write|delete)$/, '.read') === readCode);
+  // Selection rules (Write/Delete tick Read; clearing Read clears them) live in utils/privilegeSelection.js
+  const handleTogglePrivilege = (id) => setSelectedPrivileges(prev => toggleOne(prev, id, allPrivilegeIds));
 
-  const handleTogglePrivilege = (id) => {
-    setSelectedPrivileges(prev => {
-      if (prev.includes(id)) {
-        const drop = new Set([id]);
-        if (id.endsWith('.read')) writeCodesFor(id).forEach((c) => drop.add(c));
-        return prev.filter(x => !drop.has(x));
-      }
-      const read = readCodeFor(id);
-      return Array.from(new Set([...prev, id, ...(read ? [read] : [])]));
-    });
-  };
-
-  // Tick or clear several privileges at once (a column or a row of the table)
-  const applyPrivilegeBulk = (codes, on) => {
-    setSelectedPrivileges(prev => {
-      const set = new Set(prev);
-      if (on) {
-        codes.forEach((c) => { set.add(c); const r = readCodeFor(c); if (r) set.add(r); });
-      } else {
-        codes.forEach((c) => { set.delete(c); if (c.endsWith('.read')) writeCodesFor(c).forEach((w) => set.delete(w)); });
-      }
-      return Array.from(set);
-    });
-  };
+  // Tick or clear several privileges at once (a column, a row, a module, or everything)
+  const applyPrivilegeBulk = (codes, on) => setSelectedPrivileges(prev => applyBulk(prev, codes, on, allPrivilegeIds));
 
   const handleToggleApprovalGate = (id) => {
     setApprovalRequiredCodes(prev =>
@@ -520,7 +498,8 @@ export default function RolesAndPrivileges() {
     const target = privilegeTargetRole;
     setSavingPrivileges(true);
     try {
-      const codes = selectedPrivileges.filter(id => allPrivilegeIds.includes(id));
+      const keptInOffModules = (target.permission_codes || []).filter(id => disabledPrivilegeIds.includes(id));
+      const codes = [...selectedPrivileges.filter(id => allPrivilegeIds.includes(id)), ...keptInOffModules];
       const approval = approvalRequiredCodes.filter(c => codes.includes(c));
       const res = await api.put(`/users/roles/${target.id}/permissions`, {
         permission_codes: codes,
@@ -1099,7 +1078,7 @@ export default function RolesAndPrivileges() {
                   <div className="flex items-center gap-3">
                     <div className="text-xs font-semibold text-[#863221]">
                       <span className="text-[#510601] font-bold">
-                        {isReadOnly ? allPrivilegeIds.length : selectedPrivileges.length}
+                        {isReadOnly ? allPrivilegeIds.length : selectedPrivileges.filter(id => allPrivilegeIds.includes(id)).length}
                       </span> of {allPrivilegeIds.length} Assigned
                     </div>
 
@@ -1119,10 +1098,10 @@ export default function RolesAndPrivileges() {
               {/* Scrollable Privilege Categories Grid */}
               <div className="p-6 flex-1 min-h-0 overflow-y-auto space-y-6">
                 <div className="flex items-start gap-2 p-3 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-[11px] text-[#863221]">
-                  <Clock className="w-4 h-4 shrink-0 mt-0.5" />
+                  <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
-                    Tick <span className="font-bold text-[#180200]">Read</span>, <span className="font-bold text-[#180200]">Write</span> (add and edit) and <span className="font-bold text-[#180200]">Delete</span> for each module and page; a header row ticks everything below it. Write or Delete also ticks Read.
-                    {' '}The <span className="font-bold text-[#180200]">clock</span> next to a ticked Write or Delete makes this role’s own actions wait for approval. <span className="font-bold text-[#180200]">Approve requests</span> (under Other) lets the person finalize other people’s requests.
+                    Tick <span className="font-bold text-[#180200]">Read</span>, <span className="font-bold text-[#180200]">Write</span> (add and edit) and <span className="font-bold text-[#180200]">Delete</span> for each module and page. A header row, the <span className="font-bold text-[#180200]">All</span> column and the box under each column title tick everything they cover; Write or Delete also ticks Read.
+                    {' '}Next to a ticked Write or Delete, <span className="font-bold text-[#180200]">Direct</span> means the role&apos;s actions apply at once and <span className="font-bold text-[#180200]">Needs approval</span> means they wait in the Approvals queue until someone with <span className="font-bold text-[#180200]">Approve requests</span> accepts them. Modules marked <span className="font-bold text-[#180200]">Coming soon</span> are not built yet.
                   </p>
                 </div>
                 {(() => {
@@ -1155,21 +1134,17 @@ export default function RolesAndPrivileges() {
                     );
                   }
 
-                  // the rows a header row covers: itself and every row indented below it
+                  // the rows a header row covers: itself and every working row indented below it
                   const subtreeOf = (idx) => {
                     const list = [rows[idx]];
                     for (let j = idx + 1; j < rows.length && rows[j].depth > rows[idx].depth; j += 1) list.push(rows[j]);
-                    return list;
+                    return list.filter((r) => !r.disabled);
                   };
                   const isOn = (id) => isReadOnly || selectedPrivileges.includes(id);
                   const colCodes = (list, col) => list.map((r) => r.cells[col]?.id).filter(Boolean);
                   const allCodes = (list) => list.flatMap((r) => [r.cells.read, r.cells.write, r.cells.delete, ...r.other]).filter(Boolean).map((c) => c.id);
-                  // state of a group of privileges: 'all' | 'some' | 'none' | 'na' (nothing to tick)
-                  const stateOf = (codes) => {
-                    if (codes.length === 0) return 'na';
-                    const on = codes.filter(isOn).length;
-                    return on === codes.length ? 'all' : on > 0 ? 'some' : 'none';
-                  };
+                  const liveRows = rows.filter((r) => !r.disabled);
+
                   const Box = ({ state, onClick, label }) => (
                     <button
                       type="button"
@@ -1188,15 +1163,50 @@ export default function RolesAndPrivileges() {
                     </button>
                   );
 
+                  // Direct / Needs approval: shown beside a ticked Write or Delete
+                  const ApprovalChoice = ({ id }) => {
+                    const needs = approvalRequiredCodes.includes(id);
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleApprovalGate(id)}
+                        title={needs
+                          ? 'Needs approval: this role\u2019s actions here wait in the Approvals queue. Click to let them apply directly.'
+                          : 'Direct: this role\u2019s actions here apply at once. Click to make them need approval.'}
+                        className={`px-2 py-0.5 rounded-full border text-[10px] font-bold whitespace-nowrap transition-colors ${
+                          needs
+                            ? 'bg-[#FFF1C9] border-[#F2B600] text-[#7A4A00]'
+                            : 'bg-white border-[#E8DFD8] text-[#863221]/70 hover:border-[#863221]'
+                        }`}
+                      >
+                        {needs ? 'Needs approval' : 'Direct'}
+                      </button>
+                    );
+                  };
+
                   return (
                     <div className="bg-white rounded-xl border border-[#E8DFD8] overflow-x-auto">
-                      <table className="w-full min-w-[720px] text-sm border-collapse">
-                        <thead className="sticky top-0 z-10">
+                      <table className="w-full min-w-[820px] text-sm border-collapse">
+                        <thead>
                           <tr className="bg-[#FAF7F2] text-[11px] font-bold uppercase tracking-wider text-[#863221] border-b border-[#E8DFD8]">
-                            <th className="text-left px-4 py-3 w-[34%]">Module</th>
-                            <th className="px-3 py-3 w-[9%] text-center">Read</th>
-                            <th className="px-3 py-3 w-[13%] text-center">Write</th>
-                            <th className="px-3 py-3 w-[13%] text-center">Delete</th>
+                            <th className="text-left px-4 py-3 w-[30%]">Module</th>
+                            {['read', 'write', 'delete'].map((col) => {
+                              const codes = colCodes(liveRows, col);
+                              return (
+                                <th key={col} className={`px-3 py-3 text-center ${col === 'read' ? 'w-[9%]' : 'w-[17%]'}`}>
+                                  <div className="flex flex-col items-center gap-1.5">
+                                    <span>{col}</span>
+                                    {codes.length > 0 && (
+                                      <Box
+                                        state={stateOf(codes, isOn)}
+                                        label={`Select all ${col} for every module`}
+                                        onClick={() => applyPrivilegeBulk(codes, stateOf(codes, isOn) !== 'all')}
+                                      />
+                                    )}
+                                  </div>
+                                </th>
+                              );
+                            })}
                             <th className="px-3 py-3 text-left">Other</th>
                             <th className="px-3 py-3 w-[7%] text-center">All</th>
                           </tr>
@@ -1205,37 +1215,46 @@ export default function RolesAndPrivileges() {
                           {rows.map((r, idx) => {
                             const sub = subtreeOf(idx);
                             const rowAll = allCodes(sub);
+                            const nameCell = (
+                              <td className="px-4 py-2.5" style={{ paddingLeft: `${16 + r.depth * 22}px` }}>
+                                <div className="flex items-center gap-2">
+                                  {r.hasChildren ? <Layers className="w-4 h-4 text-[#863221] shrink-0" /> : <span className="w-1.5 h-1.5 rounded-full bg-[#C9BCB0] shrink-0" />}
+                                  <span className={r.hasChildren ? 'text-xs font-bold uppercase tracking-wide text-[#180200]' : 'text-sm font-medium text-[#180200]'}>
+                                    {r.name}
+                                  </span>
+                                  {r.min_rank_level != null && (
+                                    <span className="px-1.5 py-0.5 bg-[#FFC107]/20 text-[#863221] text-[9px] font-bold rounded">Rank {r.min_rank_level}+</span>
+                                  )}
+                                  {r.disabled && (
+                                    <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold rounded-full">Coming soon</span>
+                                  )}
+                                </div>
+                              </td>
+                            );
+                            if (r.disabled) {
+                              return (
+                                <tr key={r.code} className="border-b border-[#F0E8E0] bg-gray-50/60 opacity-70">
+                                  {nameCell}
+                                  <td colSpan={5} className="px-3 py-2.5 text-xs text-gray-400">Not available yet. This module is switched off until its screens are built.</td>
+                                </tr>
+                              );
+                            }
                             const cellFor = (col) => {
                               // a header row's cell covers its whole subtree; a leaf row's cell is its own privilege
                               const codes = r.hasChildren ? colCodes(sub, col) : colCodes([r], col);
                               if (codes.length === 0) return <span className="text-[#D9CEC4]">–</span>;
                               const own = r.cells[col];
                               return (
-                                <div className="inline-flex items-center gap-1.5">
+                                <div className="inline-flex items-center gap-2">
                                   <Box
-                                    state={stateOf(codes)}
-                                    label={`${col} — ${r.name}${r.hasChildren ? ' (all below)' : ''}`}
+                                    state={stateOf(codes, isOn)}
+                                    label={`${col} for ${r.name}${r.hasChildren ? ' and everything below it' : ''}`}
                                     onClick={() => {
                                       if (!r.hasChildren && own) handleTogglePrivilege(own.id);
-                                      else applyPrivilegeBulk(codes, stateOf(codes) !== 'all');
+                                      else applyPrivilegeBulk(codes, stateOf(codes, isOn) !== 'all');
                                     }}
                                   />
-                                  {!isReadOnly && own && col !== 'read' && isOn(own.id) && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleApprovalGate(own.id)}
-                                      title={approvalRequiredCodes.includes(own.id)
-                                        ? 'Needs approval: this role\u2019s actions here wait in the Approvals queue. Click to allow them to apply directly.'
-                                        : 'Click to make this role\u2019s actions here wait for approval (maker-checker).'}
-                                      className={`p-1 rounded-md transition-colors ${
-                                        approvalRequiredCodes.includes(own.id)
-                                          ? 'bg-[#FFC107]/25 text-[#863221]'
-                                          : 'text-[#C9BCB0] hover:text-[#863221] hover:bg-[#FAF7F2]'
-                                      }`}
-                                    >
-                                      <Clock className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
+                                  {!isReadOnly && own && col !== 'read' && isOn(own.id) && <ApprovalChoice id={own.id} />}
                                 </div>
                               );
                             };
@@ -1244,17 +1263,7 @@ export default function RolesAndPrivileges() {
                                 key={r.code}
                                 className={`border-b border-[#F0E8E0] transition-colors ${r.hasChildren ? 'bg-[#FAF7F2]/70' : 'hover:bg-[#FAF7F2]/50'}`}
                               >
-                                <td className="px-4 py-2.5" style={{ paddingLeft: `${16 + r.depth * 22}px` }}>
-                                  <div className="flex items-center gap-2">
-                                    {r.hasChildren ? <Layers className="w-4 h-4 text-[#863221] shrink-0" /> : <span className="w-1.5 h-1.5 rounded-full bg-[#C9BCB0] shrink-0" />}
-                                    <span className={r.hasChildren ? 'text-xs font-bold uppercase tracking-wide text-[#180200]' : 'text-sm font-medium text-[#180200]'}>
-                                      {r.name}
-                                    </span>
-                                    {r.min_rank_level != null && (
-                                      <span className="px-1.5 py-0.5 bg-[#FFC107]/20 text-[#863221] text-[9px] font-bold rounded">Rank {r.min_rank_level}+</span>
-                                    )}
-                                  </div>
-                                </td>
+                                {nameCell}
                                 <td className="px-3 py-2.5 text-center">{cellFor('read')}</td>
                                 <td className="px-3 py-2.5 text-center">{cellFor('write')}</td>
                                 <td className="px-3 py-2.5 text-center">{cellFor('delete')}</td>
@@ -1263,7 +1272,7 @@ export default function RolesAndPrivileges() {
                                     <div className="flex flex-col gap-1">
                                       {r.other.map((o) => (
                                         <label key={o.id} className="inline-flex items-center gap-2 text-xs text-[#180200] cursor-pointer" title={o.description || o.id}>
-                                          <Box state={stateOf([o.id])} label={o.name} onClick={() => handleTogglePrivilege(o.id)} />
+                                          <Box state={stateOf([o.id], isOn)} label={o.name} onClick={() => handleTogglePrivilege(o.id)} />
                                           <span>{o.name}</span>
                                         </label>
                                       ))}
@@ -1273,9 +1282,9 @@ export default function RolesAndPrivileges() {
                                 <td className="px-3 py-2.5 text-center">
                                   {rowAll.length === 0 ? <span className="text-[#D9CEC4]">–</span> : (
                                     <Box
-                                      state={stateOf(rowAll)}
+                                      state={stateOf(rowAll, isOn)}
                                       label={`Everything for ${r.name}${r.hasChildren ? ' and the pages below it' : ''}`}
-                                      onClick={() => applyPrivilegeBulk(rowAll, stateOf(rowAll) !== 'all')}
+                                      onClick={() => applyPrivilegeBulk(rowAll, stateOf(rowAll, isOn) !== 'all')}
                                     />
                                   )}
                                 </td>

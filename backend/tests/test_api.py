@@ -57,7 +57,7 @@ def test_permission_catalog_seeded(client, admin_headers):
     body = response.json()
     assert {"total", "page", "limit", "pages", "data"} <= set(body)
     codes = {p["code"] for p in body["data"]}
-    assert {"members.write", "users.management.write", "members.approvals.write", "approvals.write"} <= codes
+    assert {"members.write", "users.management.write", "members.unapproved.write", "approvals.read", "approvals.write"} <= codes
     assert body["total"] >= 11
     assert all(p["module_id"] is not None for p in body["data"]), "every seeded permission must resolve a module_id"
 
@@ -68,7 +68,7 @@ def test_module_catalog_seeded(client, admin_headers):
     body = response.json()
     assert {"total", "page", "limit", "pages", "data"} <= set(body)
     codes = {m["code"] for m in body["data"]}
-    assert {"masters", "users", "members", "members.approvals"} <= codes
+    assert {"masters", "users", "members", "approvals"} <= codes
     assert body["total"] >= 11
     members_module = next(m for m in body["data"] if m["code"] == "members")
     assert members_module["permission_count"] >= 1
@@ -615,10 +615,10 @@ def test_rbac_blocks_then_grants_writes(client, admin_headers):
 
     # reads need <module>.read; writes need <module>.write
     read_denied = client.get("/api/v1/members/", headers=staff_headers)
-    assert read_denied.status_code == 403 and "members.read" in read_denied.json()["detail"]
+    assert read_denied.status_code == 403 and "members.list.read" in read_denied.json()["detail"]
     denied = client.post("/api/v1/members/", headers=staff_headers, json={"first_name_en": "Nope"})
     assert denied.status_code == 403, denied.text
-    assert "members.write" in denied.json()["detail"]
+    assert "members.register.write" in denied.json()["detail"]
 
     # an all-access role bypasses the privilege check (this call succeeds)
     assert _create_member(client, admin_headers, "9000000005", "Super")["id"]
@@ -626,7 +626,7 @@ def test_rbac_blocks_then_grants_writes(client, admin_headers):
     # grant the privileges to the role and retry with the same login
     grant = client.put(
         f"/api/v1/users/roles/{role_id}/permissions", headers=admin_headers,
-        json={"permission_codes": ["members.read", "members.write"]},
+        json={"permission_codes": ["members.list.read", "members.register.write"]},
     )
     assert grant.status_code == 200, grant.text
     assert client.get("/api/v1/members/", headers=staff_headers).status_code == 200
@@ -637,7 +637,7 @@ def test_rbac_blocks_then_grants_writes(client, admin_headers):
     assert allowed.status_code == 201, allowed.text
 
     # revoking one privilege takes effect immediately
-    assert client.delete(f"/api/v1/users/roles/{role_id}/permissions/{[p['id'] for p in client.get(f'/api/v1/users/roles/{role_id}/permissions', headers=admin_headers).json() if p['code'] == 'members.write'][0]}", headers=admin_headers).status_code == 200
+    assert client.delete(f"/api/v1/users/roles/{role_id}/permissions/{[p['id'] for p in client.get(f'/api/v1/users/roles/{role_id}/permissions', headers=admin_headers).json() if p['code'] == 'members.register.write'][0]}", headers=admin_headers).status_code == 200
     assert client.post("/api/v1/members/", headers=staff_headers, json={"first_name_en": "Again", "mobile": "9000000007"}).status_code == 403
 
 
@@ -663,14 +663,17 @@ def _staff_with_role(client, admin_headers, username, role_name, role_code, perm
     from db.seed_defaults import MODULE_CATALOG, SUB_MODULE_AREAS
     # a module-level grant (masters.write) also carries every sub-module of that module, as the
     # migration does for existing roles; tests that want ONE area pass its own code instead
+    from db.seed_defaults import PERMISSION_CATALOG
+    existing_codes = {p[0] for p in PERMISSION_CATALOG}
     for code, flag in list(grants.items()):
         module, _, action = code.rpartition(".")
         for sub, _label, _paths in SUB_MODULE_AREAS.get(module, []):
-            grants.setdefault(f"{sub}.{action}", flag)
+            if f"{sub}.{action}" in existing_codes:  # not every screen has all three actions
+                grants.setdefault(f"{sub}.{action}", flag)
     known_modules = {m[0] for m in MODULE_CATALOG} | {s for areas in SUB_MODULE_AREAS.values() for s, _l, _p in areas}
     for code in list(grants):
         module = code.rsplit(".", 1)[0]
-        if module in known_modules:  # meta-codes like approvals.write have no own module
+        if module in known_modules and f"{module}.read" in existing_codes:  # meta-codes like approvals.write have no own module; some screens have no Read
             grants.setdefault(module + ".read", False)
     resp = client.put(
         f"/api/v1/users/roles/{role['id']}/permissions", headers=admin_headers,
@@ -769,7 +772,7 @@ def test_member_delete_without_permission_denied(client, admin_headers):
         params={"reason": "no permission", "mode": "SOFT"},
     )
     assert denied.status_code == 403
-    assert "members.delete" in denied.json()["detail"]
+    assert "members.list.delete" in denied.json()["detail"]
 
 
 def test_member_delete_ungating_the_grant_executes_directly(client, admin_headers):
@@ -783,7 +786,7 @@ def test_member_delete_ungating_the_grant_executes_directly(client, admin_header
     )
     resync = client.put(
         f"/api/v1/users/roles/{role_id}/permissions", headers=admin_headers,
-        json={"permission_codes": ["members.delete", "members.read"], "approval_required_codes": []},
+        json={"permission_codes": ["members.list.delete", "members.list.read"], "approval_required_codes": []},
     )
     assert resync.status_code == 200, resync.text
 
@@ -2062,8 +2065,8 @@ def test_menu_and_privilege_tree_come_from_module_table(client, admin_headers):
             codes |= _menu_codes(m.get("submodules", []))
         return codes
 
-    # the menu is a tree; members.approvals nests under members
-    assert {"masters", "users", "members", "members.approvals"} <= _menu_codes(full_menu)
+    # the menu is a tree; Approvals is its own top-level module
+    assert {"masters", "users", "members", "approvals"} <= _menu_codes(full_menu)
     users_node = next(m for m in full_menu if m["code"] == "users")
     # Privileges has no page of its own (edited inside Role Management), so it has no route and no menu entry
     assert {"users.management", "roles", "users.modules"} == {c["code"] for c in users_node["submodules"]}

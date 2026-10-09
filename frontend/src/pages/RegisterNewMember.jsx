@@ -796,7 +796,7 @@ export default function RegisterNewMember() {
   };
 
   return (
-    <PermissionGate required={isViewMode ? 'members.read' : 'members.write'}>
+    <PermissionGate required={isViewMode ? 'members.list.read' : isEditMode ? 'members.list.write' : 'members.register.write'}>
     <div className="max-w-[1240px] mx-auto space-y-6">
       {/* ---------------------------------------------------- */}
       {/* BREADCRUMB & HEADER                                  */}
@@ -1746,8 +1746,8 @@ export default function RegisterNewMember() {
                     ) : (
                       <button
                         type="submit"
-                        disabled={saving || !hasPermission('members.write')}
-                        title={!hasPermission('members.write') ? 'Requires members.write permission' : undefined}
+                        disabled={saving || !hasPermission(isEditMode ? 'members.list.write' : 'members.register.write')}
+                        title={!hasPermission(isEditMode ? 'members.list.write' : 'members.register.write') ? `Requires ${isEditMode ? 'members.list.write' : 'members.register.write'} permission` : undefined}
                         className="disabled:opacity-50 px-6 py-2.5 bg-[#510601] hover:bg-[#8C1801] text-white font-bold text-xs sm:text-sm rounded-lg shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5"
                       >
                         <Save className="w-4 h-4" />

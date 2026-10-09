@@ -111,7 +111,7 @@ export default function Approvals() {
   };
 
   return (
-    <PermissionGate required="members.approvals.read">
+    <PermissionGate required="approvals.read">
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>

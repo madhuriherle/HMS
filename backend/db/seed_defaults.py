@@ -39,6 +39,42 @@ SUB_MODULE_AREAS = {
         ("masters.payment_modes", "Payment Mode Setup", ["/masters/payment-modes"]),
         ("masters.banks", "Bank Master", ["/masters/banks"]),
     ],
+    # A rule is a path prefix, or (methods, path-regex[, query]) where query is "unapproved" / "not-unapproved"
+    # (the approval_status filter of the member list). Paths are relative to /api/v1.
+    "members": [
+        ("members.list", "Membership List", [
+            ("GET", r"^/members/?$", "not-unapproved"),
+            ("GET", r"^/members/export-labels/?$"),
+            ("GET", r"^/members/documents/\d+/file/?$"),
+            ("GET", r"^/members/\d+(/(family|services|donations|profile|membership-credit|documents|service-optins))?/?$"),
+            ("PUT|DELETE", r"^/members/\d+/?$"),
+        ]),
+        ("members.unapproved", "Unapproved Members", [
+            ("GET", r"^/members/?$", "unapproved"),
+            ("GET", r"^/members/documents/\d+/file/?$"),
+            ("GET", r"^/members/\d+(/(family|services|donations|profile|membership-credit|documents|service-optins))?/?$"),
+            ("PUT|POST", r"^/members/\d+/(approve|request-activation)/?$"),
+        ]),
+        ("members.register", "Register New Member", [
+            ("POST", r"^/members/?$"),
+            ("POST", r"^/members/\d+/(memberships|photo)/?$"),
+        ]),
+    ],
+    "receipts": [
+        ("receipts.entry", "Receipt Entry", [
+            ("POST", r"^/receipts/?$"),
+            ("GET", r"^/receipts/renewals-due/?$"),
+            ("GET", r"^/receipts/tracking/?$"),  # the entry screen checks existing receipt numbers
+        ]),
+        ("receipts.tracking", "Receipt Tracking", [
+            ("GET", r"^/receipts/?$"),
+            ("GET", r"^/receipts/(tracking|allocations)/?$"),
+            ("GET", r"^/receipts/\d+(/allocations)?/?$"),
+            ("PUT|DELETE", r"^/receipts/\d+/?$"),
+            ("POST", r"^/receipts/\d+/(allocate|cancel|refund|payment-transactions)/?$"),
+            ("DELETE", r"^/receipts/\d+/allocations/\d+/?$"),
+        ]),
+    ],
     "engagements": [
         ("engagements.affiliations", "Affiliations", ["/engagements/affiliations"]),
         ("engagements.associates", "Associates", ["/engagements/associates"]),
@@ -46,6 +82,16 @@ SUB_MODULE_AREAS = {
         ("engagements.committee", "Committee", ["/engagements/committee"]),
     ],
 }
+# Areas that do not have all three actions (default: read, write, delete)
+AREA_ACTIONS = {
+    "members.unapproved": ("read", "write"),
+    "members.register": ("write",),
+    "receipts.entry": ("read", "write"),
+}
+
+# Modules whose screens are not built yet: switched off (status = false) by migration 0032
+NOT_BUILT_YET = ("magazines", "reports", "notifications", "activity", "events", "engagements", "imports")
+
 # sub-modules that are not menu pages need a module row of their own (menu pages already have one)
 _ENGAGEMENT_SUBS = [
     (code, label, "engagements", None, None, i + 1, None)
@@ -61,7 +107,7 @@ MODULE_CATALOG = [
     ("roles", "Role Management", "users", "/users/roles", "shield", 2, None),
     ("users.privileges", "Privileges", "users", "/users/privileges", "key", 3, None),
     ("members", "Membership", None, "/members", "id-card", 30, None),
-    ("members.approvals", "Approvals & Receipt Mapping", "members", "/members/approvals", "check-circle", 35, None),
+    ("approvals", "Approvals", None, "/approvals", "check-circle", 35, None),
     ("magazines", "Magazine", None, "/magazines", "book-open", 40, None),
     ("receipts", "Receipts", None, "/receipts", "receipt", 50, None),
     ("reports", "Reports", None, "/reports", "bar-chart", 60, None),
@@ -87,7 +133,7 @@ _DESC = {
     "roles": "roles",
     "users.privileges": "role privilege assignment",
     "members": "members — profile, memberships, documents",
-    "members.approvals": "approval requests and receipt mapping",
+    "approvals": "the approval queue",
     "magazines": "magazine subscriptions, pauses, returns and delivery labels",
     "receipts": "receipts and allocations",
     "reports": "reports and saved reports",
@@ -104,15 +150,16 @@ PERMISSION_CATALOG = []
 for _m in _READ_WRITE_DELETE:
     for _a in ("read", "write", "delete"):
         PERMISSION_CATALOG.append((f"{_m}.{_a}", _m, f"{_a.title()} {_m}", f"{_a.title()} {_DESC[_m]}"))
-for _m in ("users.privileges", "members.approvals"):
+for _m in ("users.privileges",):
     for _a in ("read", "write"):
         PERMISSION_CATALOG.append((f"{_m}.{_a}", _m, f"{_a.title()} {_m}", f"{_a.title()} {_DESC[_m]}"))
+PERMISSION_CATALOG.append(("approvals.read", "approvals", "Open the Approvals queue", "See the approval requests waiting for a reviewer"))
 PERMISSION_CATALOG += [
     # Meta-permission for reviewing approval requests (maker-checker queue).
     # The backend hardcodes this code (deps.require_permission("approvals.write"),
     # services/approval_notify.py), so it is minted as a single unsplittable
-    # code under the members.approvals module rather than read/write/delete.
-    ("approvals.write", "members.approvals", "Approve requests", "Review and approve/reject pending approval requests"),
+    # code under the approvals module rather than read/write/delete.
+    ("approvals.write", "approvals", "Approve requests", "Review and approve/reject pending approval requests"),
     ("activity.read", "activity", "Read activity", f"Read {_DESC['activity']}"),
     ("system.read", "system", "Read system", f"Read {_DESC['system']}"),
     ("system.write", "system", "Write system", f"Edit {_DESC['system']}"),
@@ -122,7 +169,7 @@ PERMISSION_CATALOG += [
 # Read / Write / Delete for every sub-module area
 for _module, _areas in SUB_MODULE_AREAS.items():
     for _sub, _label, _paths in _areas:
-        for _a in ("read", "write", "delete"):
+        for _a in AREA_ACTIONS.get(_sub, ("read", "write", "delete")):
             PERMISSION_CATALOG.append((f"{_sub}.{_a}", _sub, f"{_a.title()} {_label}", f"{_a.title()} {_label.lower()}"))
 
 # ── organisation settings (singleton row, id = 1) ────────────
@@ -217,11 +264,11 @@ def seed_modules(db) -> int:
 # (code, name, parent_code, route, icon, display_order, permission_code, min_rank_level)
 MENU_PAGE_CATALOG = [
     ("dashboard", "Dashboard", None, "/dashboard", "layout-dashboard", 5, None, None),
-    ("members.list", "Membership List", "members", "/dashboard/membership/list", "list", 1, "members.read", None),
-    ("members.unapproved", "Unapproved Members", "members", "/dashboard/membership/unapproved", "user-check", 2, "members.approvals.read", None),
-    ("members.register", "Register New Member", "members", "/dashboard/membership/register", "user-plus", 3, "members.write", None),
-    ("receipts.entry", "Receipt Entry", "receipts", "/dashboard/receipts/entry", "file-plus", 1, "receipts.read", None),
-    ("receipts.tracking", "Receipt Tracking", "receipts", "/dashboard/receipts/tracking", "search", 2, "receipts.read", None),
+    ("members.list", "Membership List", "members", "/dashboard/membership/list", "list", 1, "members.list.read", None),
+    ("members.unapproved", "Unapproved Members", "members", "/dashboard/membership/unapproved", "user-check", 2, "members.unapproved.read", None),
+    ("members.register", "Register New Member", "members", "/dashboard/membership/register", "user-plus", 3, "members.register.write", None),
+    ("receipts.entry", "Receipt Entry", "receipts", "/dashboard/receipts/entry", "file-plus", 1, "receipts.entry.read", None),
+    ("receipts.tracking", "Receipt Tracking", "receipts", "/dashboard/receipts/tracking", "search", 2, "receipts.tracking.read", None),
     ("users.modules", "Modules", "users", "/dashboard/users/modules", "layout-grid", 4, None, 1),
     ("masters.location", "Location Setup", "masters", "/dashboard/master/location-setup", "map-pin", 1, "masters.location.read", None),
     ("masters.membership_types", "Membership Types", "masters", "/dashboard/master/membership-type", "badge", 2, "masters.membership_types.read", None),
@@ -232,7 +279,7 @@ MENU_PAGE_CATALOG = [
     # Personal Masters screen is switched off for now (also switched off in migration 0025):
     # ("masters.personal", "Personal Masters", "masters", "/dashboard/master/personal-masters", "list-checks", 7, "masters.read", None),
     # parent may list alternatives ("a|b"): the first module code that exists is used
-    ("approvals.requests", "Approval Requests", "approvals|members.approvals", "/dashboard/approvals", "check-circle", 1, "members.approvals.read", None),
+    ("approvals.requests", "Approval Requests", "approvals", "/dashboard/approvals", "check-circle", 1, "approvals.read", None),
 ]
 
 # Older rows were seeded with API-style routes; point them at the real pages,
