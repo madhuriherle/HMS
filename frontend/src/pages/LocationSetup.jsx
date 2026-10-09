@@ -77,6 +77,36 @@ export default function LocationSetup() {
     }
   };
 
+  const [selectedStateId, setSelectedStateId] = useState(''); // first state from the server unless one is picked
+  const [selectedDistrictIdForTaluk, setSelectedDistrictIdForTaluk] = useState(''); // first district of the state unless one is picked
+
+  // ====================================================
+  // TAB 2: POSTAL / PIN CODE DIRECTORY STATE & LOGIC
+  // ====================================================
+  const [postalSearchQuery, setPostalSearchQuery] = useState('');
+  const [postalStateFilter, setPostalStateFilter] = useState('ALL');
+  const [postalDistrictFilter, setPostalDistrictFilter] = useState('ALL');
+  const [postalPrefixFilter, setPostalPrefixFilter] = useState('ALL');
+  const [postalStatusFilter, setPostalStatusFilter] = useState('ALL');
+
+  // Pagination for PIN Directory Table
+  const [postalCurrentPage, setPostalCurrentPage] = useState(1);
+  const [postalPageSize, setPostalPageSize] = useState(10);
+
+  // Add / Edit PIN Modal State
+  const [isPostalModalOpen, setIsPostalModalOpen] = useState(false);
+  const [postalModalMode, setPostalModalMode] = useState('add'); // 'add' | 'edit'
+  const [editingPostal, setEditingPostal] = useState(null);
+  const [postalFormData, setPostalFormData] = useState({
+    postalCode: '',
+    area: '',
+    stateId: '',
+    districtId: '',
+    talukId: '',
+    status: 'Active'
+  });
+  const [postalFormErrors, setPostalFormErrors] = useState({});
+
   useEffect(() => {
     fetchMasters();
   }, []);
@@ -189,8 +219,6 @@ export default function LocationSetup() {
   // ====================================================
   // TAB 1: GEOGRAPHIC HIERARCHY STATE & LOGIC
   // ====================================================
-  const [selectedStateId, setSelectedStateId] = useState(''); // first state from the server unless one is picked
-  const [selectedDistrictIdForTaluk, setSelectedDistrictIdForTaluk] = useState(''); // first district of the state unless one is picked
 
   // Sub-searches
   const [districtSearchQuery, setDistrictSearchQuery] = useState('');
@@ -407,32 +435,6 @@ export default function LocationSetup() {
     }
   };
 
-  // ====================================================
-  // TAB 2: POSTAL / PIN CODE DIRECTORY STATE & LOGIC
-  // ====================================================
-  const [postalSearchQuery, setPostalSearchQuery] = useState('');
-  const [postalStateFilter, setPostalStateFilter] = useState('ALL');
-  const [postalDistrictFilter, setPostalDistrictFilter] = useState('ALL');
-  const [postalPrefixFilter, setPostalPrefixFilter] = useState('ALL');
-  const [postalStatusFilter, setPostalStatusFilter] = useState('ALL');
-
-  // Pagination for PIN Directory Table
-  const [postalCurrentPage, setPostalCurrentPage] = useState(1);
-  const [postalPageSize, setPostalPageSize] = useState(10);
-
-  // Add / Edit PIN Modal State
-  const [isPostalModalOpen, setIsPostalModalOpen] = useState(false);
-  const [postalModalMode, setPostalModalMode] = useState('add'); // 'add' | 'edit'
-  const [editingPostal, setEditingPostal] = useState(null);
-  const [postalFormData, setPostalFormData] = useState({
-    postalCode: '',
-    area: '',
-    stateId: '',
-    districtId: '',
-    talukId: '',
-    status: 'Active'
-  });
-  const [postalFormErrors, setPostalFormErrors] = useState({});
 
   // Bulk Import Modal State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
