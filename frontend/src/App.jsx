@@ -1,4 +1,5 @@
 import React from 'react';
+import PermissionGate from './components/PermissionGate';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
 import MainLayout from './layouts/MainLayout';
@@ -23,6 +24,17 @@ import { BankMaster } from './pages/MasterLists';
 // Personal Masters (gotra / qualification / native place) screen is switched off for now:
 // import PersonalMasters, { BankMaster } from './pages/MasterLists';
 
+// Anyone without a login is sent to the sign-in page before any panel screen renders
+const RequireLogin = ({ children }) => {
+  let signedIn = false;
+  try {
+    signedIn = Boolean(localStorage.getItem('access_token'));
+  } catch (_) {
+    signedIn = false;
+  }
+  return signedIn ? children : <Navigate to="/" replace />;
+};
+
 function App() {
   return (
     <Router basename={import.meta.env.BASE_URL}>
@@ -37,7 +49,7 @@ function App() {
         <Route path="/membership/unapproved" element={<Navigate to="/dashboard/membership/unapproved" replace />} />
         <Route path="/membership" element={<Navigate to="/dashboard/membership/list" replace />} />
 
-        <Route path="/dashboard" element={<MainLayout />}>
+        <Route path="/dashboard" element={<RequireLogin><MainLayout /></RequireLogin>}>
           <Route index element={<Dashboard />} />
           
           {/* Membership Module Routes */}
@@ -87,10 +99,10 @@ function App() {
           <Route path="users" element={<UserManagement />} />
           <Route path="users/management" element={<UserManagement />} />
           <Route path="users/user-management" element={<UserManagement />} />
-          <Route path="users/modules" element={<ModulesManagement />} />
-          <Route path="master/modules" element={<ModulesManagement />} />
-          <Route path="masters/modules" element={<ModulesManagement />} />
-          <Route path="settings/modules" element={<ModulesManagement />} />
+          <Route path="users/modules" element={<PermissionGate minRank={1} title="Super Admin only" message="Module management is reserved for the Super Admin."><ModulesManagement /></PermissionGate>} />
+          <Route path="master/modules" element={<PermissionGate minRank={1} title="Super Admin only" message="Module management is reserved for the Super Admin."><ModulesManagement /></PermissionGate>} />
+          <Route path="masters/modules" element={<PermissionGate minRank={1} title="Super Admin only" message="Module management is reserved for the Super Admin."><ModulesManagement /></PermissionGate>} />
+          <Route path="settings/modules" element={<PermissionGate minRank={1} title="Super Admin only" message="Module management is reserved for the Super Admin."><ModulesManagement /></PermissionGate>} />
 
           {/* Receipts Module Routes */}
           <Route path="receipts" element={<Navigate to="/dashboard/receipts/entry" replace />} />
@@ -98,9 +110,9 @@ function App() {
           <Route path="receipts/add" element={<ReceiptEntry />} />
           <Route path="receipts/tracking" element={<ReceiptTracking />} />
           <Route path="receipt/tracking" element={<ReceiptTracking />} />
-          <Route path="receipts/labels" element={<LabelList />} />
-          <Route path="receipts/label-list" element={<LabelList />} />
-          <Route path="magazine/labels" element={<LabelList />} />
+          <Route path="receipts/labels" element={<PermissionGate required="members.read" title="Access Restricted"><LabelList /></PermissionGate>} />
+          <Route path="receipts/label-list" element={<PermissionGate required="members.read" title="Access Restricted"><LabelList /></PermissionGate>} />
+          <Route path="magazine/labels" element={<PermissionGate required="members.read" title="Access Restricted"><LabelList /></PermissionGate>} />
 
           {/* Placeholder routes for other menu items to prevent 404s during navigation */}
           <Route path="*" element={
