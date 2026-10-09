@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { applyBulk, stateOf, toggleOne } from '../utils/privilegeSelection';
 import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
@@ -566,6 +565,7 @@ export default function RolesAndPrivileges() {
         )}
       </Modal>
 
+      <div className={privilegeTargetRole ? 'hidden' : 'space-y-6'}>
       {/* Breadcrumb & Header */}
       <div>
 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -843,6 +843,7 @@ export default function RolesAndPrivileges() {
         </div>
 
       </div>
+      </div>
 
       {/* ============================================================ */}
       {/* ADD / EDIT ROLE MODAL                                        */}
@@ -985,15 +986,15 @@ export default function RolesAndPrivileges() {
       {/* ============================================================ */}
       {/* CONFIGURE PRIVILEGES MODAL                                   */}
       {/* ============================================================ */}
-      {privilegeTargetRole && createPortal(
-      <div className="fixed top-0 right-0 bottom-0 left-0 lg:left-64 z-40 bg-[#FAF7F2] flex flex-col overflow-hidden">
+      {privilegeTargetRole && (
+      <div>
         {privilegeTargetRole && (() => {
           const isSysTarget = isSystemRole(privilegeTargetRole);
           const isProtectedTarget = !isSysTarget && (privilegeTargetRole.rank_level ?? 99) <= myRankLevel;
           const isReadOnly = isSysTarget || isProtectedTarget;
           return (
             <div
-              className="bg-white w-full flex-1 min-h-0 flex flex-col overflow-hidden"
+              className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] w-full flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -1096,7 +1097,7 @@ export default function RolesAndPrivileges() {
               </div>
 
               {/* Scrollable Privilege Categories Grid */}
-              <div className="p-6 flex-1 min-h-0 overflow-y-auto space-y-6">
+              <div className="p-6 space-y-6">
                 <div className="flex items-start gap-2 p-3 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-[11px] text-[#863221]">
                   <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
@@ -1305,7 +1306,7 @@ export default function RolesAndPrivileges() {
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] shrink-0">
+              <div className="sticky bottom-0 z-10 flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] rounded-b-2xl shadow-[0_-4px_10px_-6px_rgba(24,2,0,0.12)]">
                 <button
                   type="button"
                   onClick={() => setPrivilegeTargetRole(null)}
@@ -1330,8 +1331,8 @@ export default function RolesAndPrivileges() {
             </div>
           );
         })()}
-      </div>,
-      document.body)}
+      </div>
+      )}
 
       {/* ============================================================ */}
       {/* VIEW DETAILS MODAL                                           */}
