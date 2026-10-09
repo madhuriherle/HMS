@@ -3,7 +3,7 @@ import { ChevronDown, ChevronUp, GripVertical, RotateCcw, Save } from 'lucide-re
 import api from '../api';
 import { notify } from '../utils/notify';
 import { apiErrorMessage } from '../utils/apiError';
-import { canDrop, changedItems, moveNode, moveStep, siblingsOf, sidebarPreview } from '../utils/menuArrange';
+import { canDrop, changedItems, moveNode, siblingsOf, sidebarPreview } from '../utils/menuArrange';
 
 const toNodes = (modules) =>
   modules.map((m) => ({
@@ -30,12 +30,15 @@ export default function MenuArranger({ modules, onSaved }) {
   const [dragId, setDragId] = useState(null);
   const [over, setOver] = useState(null); // { id, zone } while dragging over a row
   const [saving, setSaving] = useState(false);
+  const [showOff, setShowOff] = useState(false); // show the switched-off (not built yet) modules too
 
   useEffect(() => setNodes(original), [original]);
 
   const changes = useMemo(() => changedItems(original, nodes), [original, nodes]);
   const preview = useMemo(() => sidebarPreview(nodes), [nodes]);
-  const roots = useMemo(() => siblingsOf(nodes, null), [nodes]);
+  const visibleSiblings = (parentId) => siblingsOf(nodes, parentId).filter((n) => showOff || n.status);
+  const roots = visibleSiblings(null);
+  const offCount = nodes.filter((n) => !n.status).length;
 
   const endDrag = () => {
     setDragId(null);
@@ -59,7 +62,7 @@ export default function MenuArranger({ modules, onSaved }) {
   // a plain function, not a component: a component defined here would be replaced on every re-render
   // and the browser would cancel the drag that is in progress
   const renderRow = (node, depth) => {
-    const line = siblingsOf(nodes, node.parent_id);
+    const line = visibleSiblings(node.parent_id);
     const index = line.findIndex((n) => n.id === node.id);
     const isOver = over && over.id === node.id;
     const dropStyle = !isOver ? '' : over.zone === 'before'
@@ -108,7 +111,7 @@ export default function MenuArranger({ modules, onSaved }) {
           <button
             type="button"
             disabled={index <= 0}
-            onClick={() => setNodes((prev) => moveStep(prev, node.id, -1))}
+            onClick={() => setNodes((prev) => moveNode(prev, node.id, line[index - 1].id, 'before'))}
             title="Move up"
             className="p-1.5 rounded-lg text-[#510601] hover:bg-[#F1E7DE] disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer"
           >
@@ -117,7 +120,7 @@ export default function MenuArranger({ modules, onSaved }) {
           <button
             type="button"
             disabled={index === line.length - 1}
-            onClick={() => setNodes((prev) => moveStep(prev, node.id, +1))}
+            onClick={() => setNodes((prev) => moveNode(prev, node.id, line[index + 1].id, 'after'))}
             title="Move down"
             className="p-1.5 rounded-lg text-[#510601] hover:bg-[#F1E7DE] disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer"
           >
@@ -137,6 +140,12 @@ export default function MenuArranger({ modules, onSaved }) {
             or in the <b>middle</b> of a top-level module to put it inside. Nothing changes for anyone until you press Save.
           </p>
           <div className="flex items-center gap-2">
+            {offCount > 0 && (
+              <label className="inline-flex items-center gap-1.5 text-xs text-[#863221] cursor-pointer">
+                <input type="checkbox" checked={showOff} onChange={(e) => setShowOff(e.target.checked)} />
+                <span>Show {offCount} switched-off</span>
+              </label>
+            )}
             <button
               type="button"
               disabled={changes.length === 0 || saving}
@@ -161,7 +170,7 @@ export default function MenuArranger({ modules, onSaved }) {
           {roots.map((root) => (
             <div key={root.id}>
               {renderRow(root, 0)}
-              {siblingsOf(nodes, root.id).map((child) => (
+              {visibleSiblings(root.id).map((child) => (
                 <React.Fragment key={child.id}>{renderRow(child, 1)}</React.Fragment>
               ))}
             </div>

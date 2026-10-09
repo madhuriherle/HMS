@@ -1,6 +1,6 @@
 // Run: node src/utils/menuArrange.test.mjs
 import assert from 'node:assert/strict';
-import { canDrop, changedItems, isInside, moveNode, moveStep, siblingsOf, sidebarPreview } from './menuArrange.js';
+import { canDrop, changedItems, isInside, moduleTreeRows, moveNode, moveStep, siblingsOf, sidebarPreview } from './menuArrange.js';
 
 // Dashboard, Masters (Location, Types, Banks), Users (Roles), Reports (switched off, no route)
 const BASE = [
@@ -62,5 +62,20 @@ assert.deepEqual(changedItems(BASE, moveNode(BASE, 4, 6, 'into')).map((i) => i.i
 const side = sidebarPreview(BASE);
 assert.deepEqual(side.map((x) => x.name), ['Dashboard', 'Masters', 'Users'], 'switched-off Reports is not in the sidebar');
 assert.deepEqual(side[1].children.map((x) => x.name), ['Location', 'Types', 'Banks']);
+
+// ── Module Master table: tree order, built-only by default, folding, search ──
+const label = (rows) => rows.map((r) => ' '.repeat(r.depth * 2) + r.m.name);
+const builtOnly = BASE.filter((m) => m.status);
+let rows = moduleTreeRows(BASE, builtOnly, () => true);
+assert.deepEqual(label(rows), ['Dashboard', 'Masters', '  Location', '  Types', '  Banks', 'Users', '  Roles'],
+  'each module followed by its own pages, in order; the switched-off Reports tree is not listed');
+assert.equal(rows.find((r) => r.m.name === 'Masters').kids, 3);
+rows = moduleTreeRows(BASE, builtOnly, (m) => m.name !== 'Masters'); // Masters folded
+assert.deepEqual(label(rows), ['Dashboard', 'Masters', 'Users', '  Roles']);
+rows = moduleTreeRows(BASE, BASE.filter((m) => m.name === 'Banks'), () => true); // search for one page
+assert.deepEqual(label(rows), ['Masters', '  Banks'], 'a match keeps the module above it');
+rows = moduleTreeRows(BASE, BASE, () => true); // "All status": the switched-off ones come back, in their place
+assert.deepEqual(label(rows).slice(-2), ['Reports', '  Member Reports']);
+assert.equal(rows.length, BASE.length);
 
 console.log('menu arrange: all checks passed');

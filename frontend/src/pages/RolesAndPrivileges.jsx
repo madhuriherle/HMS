@@ -1107,7 +1107,8 @@ export default function RolesAndPrivileges() {
                 {(() => {
                   const targetRank = privilegeTargetRole.rank_level ?? 99;
                   const q = privilegeSearch.toLowerCase().trim();
-                  const reachable = privilegeRows.filter((r) => r.min_rank_level == null || targetRank <= r.min_rank_level);
+                  const switchedOff = privilegeRows.filter((r) => r.disabled && r.depth === 0).length; // modules not built yet
+                  const reachable = privilegeRows.filter((r) => !r.disabled && (r.min_rank_level == null || targetRank <= r.min_rank_level));
                   // a row matches the search by its own name or privilege names; a header row stays if a row below it matches
                   const rowMatches = (r) =>
                     !q || r.name.toLowerCase().includes(q)
@@ -1293,6 +1294,11 @@ export default function RolesAndPrivileges() {
                           })}
                         </tbody>
                       </table>
+                      {switchedOff > 0 && (
+                        <p className="px-4 py-3 text-[11px] text-[#863221]/80 border-t border-[#F0E8E0] bg-[#FAF7F2]/60">
+                          {switchedOff} more modules (Magazine, Reports, Notifications and others) are switched off until they are built, so they are not listed here.
+                        </p>
+                      )}
                     </div>
                   );
                 })()}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
 import MenuArranger from '../components/MenuArranger';
+import { moduleTreeRows } from '../utils/menuArrange';
 import FilterSelect from '../components/FilterSelect';
 import {
   Layers,
@@ -14,6 +15,7 @@ import {
   AlertCircle,
   CheckCircle2,
   RefreshCw,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   X
@@ -45,7 +47,8 @@ export default function ModulesManagement() {
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('Active'); // by default only the modules that are built and switched on
+  const [openGroups, setOpenGroups] = useState({}); // module id -> true/false (open by default)
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
   const [view, setView] = useState('table'); // 'table' | 'arrange' (drag and drop the sidebar order)
@@ -90,7 +93,7 @@ export default function ModulesManagement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRank1]);
 
-  const hasActiveFilters = searchQuery.trim() !== '' || statusFilter !== 'ALL';
+  const hasActiveFilters = searchQuery.trim() !== '' || statusFilter !== 'Active';
 
   const filteredModules = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -109,11 +112,14 @@ export default function ModulesManagement() {
     });
   }, [modules, searchQuery, statusFilter]);
 
-  const totalPages = Math.ceil(filteredModules.length / pageSize) || 1;
-  const paginatedModules = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredModules.slice(start, start + pageSize);
-  }, [filteredModules, currentPage, pageSize]);
+  // Tree order: each module, then its pages indented below it. A match keeps the modules above it so the
+  // tree stays readable; a group can be folded away.
+  const treeRows = useMemo(
+    () => moduleTreeRows(modules, filteredModules, (m) => (searchQuery.trim() !== '' ? true : (openGroups[m.id] ?? true))),
+    [modules, filteredModules, openGroups, searchQuery]
+  );
+
+  const hiddenOffCount = statusFilter === 'Active' ? modules.filter((m) => !m.status).length : 0;
 
   const parentName = (id) => {
     if (id == null) return null;
@@ -123,7 +129,7 @@ export default function ModulesManagement() {
 
   const handleClearFilters = () => {
     setSearchQuery('');
-    setStatusFilter('ALL');
+    setStatusFilter('Active');
     setCurrentPage(1);
   };
 
@@ -433,7 +439,6 @@ export default function ModulesManagement() {
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-semibold text-[#863221] uppercase tracking-wider">
                 <th className="px-6 py-3.5">Module</th>
-                <th className="px-6 py-3.5">Parent</th>
                 <th className="px-6 py-3.5">Route</th>
                 <th className="px-6 py-3.5 text-center">Order</th>
                 <th className="px-6 py-3.5 text-center">Rank Gate</th>
@@ -443,11 +448,23 @@ export default function ModulesManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DFD8] text-sm">
-              {!loading && paginatedModules.length > 0 ? (
-                paginatedModules.map((m) => (
+              {!loading && treeRows.length > 0 ? (
+                treeRows.map(({ m, depth, kids }) => (
                   <tr key={m.id} className="hover:bg-[#FAF7F2]/50 transition-colors">
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4" style={{ paddingLeft: `${24 + depth * 28}px` }}>
                       <div className="flex items-center gap-2.5">
+                        {kids > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => setOpenGroups((g) => ({ ...g, [m.id]: !(g[m.id] ?? true) }))}
+                            title={(openGroups[m.id] ?? true) ? 'Fold' : 'Unfold'}
+                            className="p-1 -ml-1 rounded text-[#863221] hover:bg-[#F1E7DE] cursor-pointer"
+                          >
+                            {(openGroups[m.id] ?? true) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </button>
+                        ) : (
+                          <span className="w-4 -ml-1" />
+                        )}
                         <div className="w-8 h-8 rounded-lg bg-[#510601]/10 text-[#510601] border border-[#510601]/20 flex items-center justify-center shrink-0">
                           <Layers className="w-4 h-4" />
                         </div>
@@ -456,9 +473,6 @@ export default function ModulesManagement() {
                           <span className="text-[11px] text-[#863221]/70 font-mono">{m.code}</span>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs text-[#180200]/80">
-                      {parentName(m.parent_id) || <span className="text-stone-400">— Root —</span>}
                     </td>
                     <td className="px-6 py-4 text-xs font-mono text-[#863221]">
                       {m.route || '—'}
@@ -531,13 +545,13 @@ export default function ModulesManagement() {
                 ))
               ) : loading ? (
                 <tr>
-                  <td colSpan="8" className="px-6 py-12 text-center text-[#863221] text-sm font-medium">
+                  <td colSpan="7" className="px-6 py-12 text-center text-[#863221] text-sm font-medium">
                     Loading modules...
                   </td>
                 </tr>
               ) : (
                 <tr>
-                  <td colSpan="8" className="px-6 py-12 text-center text-[#863221]">
+                  <td colSpan="7" className="px-6 py-12 text-center text-[#863221]">
                     <div className="w-12 h-12 rounded-full bg-[#FAF7F2] text-[#863221]/60 flex items-center justify-center mx-auto mb-3">
                       <Layers className="w-6 h-6" />
                     </div>
@@ -573,34 +587,15 @@ export default function ModulesManagement() {
           </table>
         </div>
 
-        {/* Pagination */}
-        {filteredModules.length > 0 && (
-          <div className="flex items-center justify-between px-6 py-3.5 border-t border-[#E8DFD8] bg-[#FAF7F2]/50">
-            <span className="text-xs text-[#863221] font-medium">
-              Showing {Math.min((currentPage - 1) * pageSize + 1, filteredModules.length)}–
-              {Math.min(currentPage * pageSize, filteredModules.length)} of {filteredModules.length} modules
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={currentPage <= 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="px-3 py-1.5 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:border-[#510601] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" /> Prev
-              </button>
-              <span className="px-2.5 text-xs font-semibold text-[#180200]">
-                Page {currentPage} of {totalPages}
+        {/* Count */}
+        {treeRows.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-3.5 border-t border-[#E8DFD8] bg-[#FAF7F2]/50">
+            <span className="text-xs text-[#863221] font-medium">{treeRows.length} modules shown</span>
+            {hiddenOffCount > 0 && (
+              <span className="text-xs text-[#863221]/80">
+                {hiddenOffCount} switched-off modules (not built yet) are hidden. Choose &quot;All Status&quot; to see them.
               </span>
-              <button
-                type="button"
-                disabled={currentPage >= totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="px-3 py-1.5 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:border-[#510601] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
-              >
-                Next <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            )}
           </div>
         )}
       </div>

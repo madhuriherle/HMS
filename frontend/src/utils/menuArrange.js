@@ -99,3 +99,37 @@ export const sidebarPreview = (nodes) => {
     siblingsOf(live, parentId).filter(show).map((n) => ({ ...n, children: build(n.id) }));
   return build(null);
 };
+
+// Module Master table: the modules in tree order (each module, then its pages indented below it).
+// `matches` are the modules that pass the search / status filter; a match keeps the modules above it.
+// `isOpen(module)` says whether a group is unfolded.
+export const moduleTreeRows = (modules, matches, isOpen) => {
+  const ids = new Set(modules.map((m) => m.id));
+  const byParent = new Map();
+  modules.forEach((m) => {
+    const key = m.parent_id != null && ids.has(m.parent_id) ? m.parent_id : null;
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key).push(m);
+  });
+  byParent.forEach((list) => list.sort((a, b) => (a.display_order - b.display_order) || (a.id - b.id)));
+  const keep = new Set(matches.map((m) => m.id));
+  const parentOf = new Map(modules.map((m) => [m.id, m.parent_id]));
+  [...keep].forEach((id) => {
+    let cur = parentOf.get(id);
+    while (cur != null && !keep.has(cur)) {
+      keep.add(cur);
+      cur = parentOf.get(cur);
+    }
+  });
+  const rows = [];
+  const walk = (parentId, depth) => {
+    (byParent.get(parentId) || []).forEach((m) => {
+      if (!keep.has(m.id)) return;
+      const kids = (byParent.get(m.id) || []).filter((k) => keep.has(k.id)).length;
+      rows.push({ m, depth, kids });
+      if (isOpen(m)) walk(m.id, depth + 1);
+    });
+  };
+  walk(null, 0);
+  return rows;
+};
