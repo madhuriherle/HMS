@@ -9,6 +9,8 @@ const ResultPopup = Swal.mixin({
   position: 'center',
   confirmButtonText: 'OK',
   confirmButtonColor: BRAND,
+  timer: 2000,
+  timerProgressBar: true,
   customClass: { popup: 'hms-mini-swal hms-result-swal' },
 });
 
