@@ -4449,9 +4449,11 @@ def test_campaign_send_records_delivery_status(client, admin_headers, monkeypatc
 
 
 def test_page_size_clamped(client, admin_headers):
+    from core.pagination import MAX_PAGE_SIZE
+
     response = client.get("/api/v1/members/", headers=admin_headers, params={"limit": 100000})
     assert response.status_code == 200, response.text
-    assert response.json()["limit"] == 500
+    assert response.json()["limit"] == MAX_PAGE_SIZE
 
 
 def test_production_requires_strong_secret():

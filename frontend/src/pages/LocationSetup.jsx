@@ -51,6 +51,9 @@ export default function LocationSetup() {
   const [postalCodes, setPostalCodes] = useState([]);
 
   const [statesSummary, setStatesSummary] = useState({});
+  const [districtSummary, setDistrictSummary] = useState({}); // districtId -> { taluks, pins } for the selected state
+  const [talukSummary, setTalukSummary] = useState({}); // talukId -> pins for the selected district
+  const [summaryTick, setSummaryTick] = useState(0); // bumped after every change so lists and counts reload
 
   const fetchMasters = async () => {
     try {
@@ -60,7 +63,11 @@ export default function LocationSetup() {
       ]);
 
       const mapState = s => ({ id: s.id, name: s.name_en, code: s.code || '', status: s.status ? 'Active' : 'Inactive' });
-      setStates((stRes.data?.data || []).map(mapState));
+      const loadedStates = (stRes.data?.data || []).map(mapState);
+      setStates(loadedStates);
+      const defaultState = loadedStates.find((s) => /karnataka/i.test(s.name)) || loadedStates[0];
+      if (defaultState) setSelectedStateId((prev) => prev || defaultState.id);
+      setSummaryTick((n) => n + 1);
 
       const sMap = {};
       (summaryRes.data?.data || summaryRes.data || []).forEach(s => {
@@ -111,33 +118,47 @@ export default function LocationSetup() {
     fetchMasters();
   }, []);
 
-  // Fetch districts on state select
+  // Districts of the selected state, with the real taluk and PIN count of each
   useEffect(() => {
-    if (selectedStateId) {
-      api.get(`/masters/districts?state_id=${selectedStateId}&limit=2000`)
-        .then(res => {
-          const mapDist = d => ({ id: d.id, name: d.name_en, stateId: d.state_id, status: d.status ? 'Active' : 'Inactive' });
-          setDistricts((res.data?.data || []).map(mapDist));
-        })
-        .catch(console.error);
-    } else {
+    if (!selectedStateId) {
       setDistricts([]);
+      setDistrictSummary({});
+      return;
     }
-  }, [selectedStateId]);
+    Promise.all([
+      api.get(`/masters/districts?state_id=${selectedStateId}&limit=2000`),
+      api.get(`/masters/districts-summary?state_id=${selectedStateId}`)
+    ])
+      .then(([res, sum]) => {
+        const mapDist = d => ({ id: d.id, name: d.name_en, stateId: d.state_id, status: d.status ? 'Active' : 'Inactive' });
+        setDistricts((res.data?.data || []).map(mapDist));
+        const map = {};
+        (sum.data?.data || []).forEach((row) => { map[row.id] = { taluks: row.taluks || 0, pins: row.pins || 0 }; });
+        setDistrictSummary(map);
+      })
+      .catch(console.error);
+  }, [selectedStateId, summaryTick]);
 
-  // Fetch taluks on district select
+  // Taluks of the selected district, with the real PIN count of each
   useEffect(() => {
-    if (selectedDistrictIdForTaluk) {
-      api.get(`/masters/taluks?district_id=${selectedDistrictIdForTaluk}&limit=2000`)
-        .then(res => {
-          const mapTk = t => ({ id: t.id, name: t.name_en, districtId: t.district_id, stateId: t.state_id, status: t.status ? 'Active' : 'Inactive' });
-          setTaluks((res.data?.data || []).map(mapTk));
-        })
-        .catch(console.error);
-    } else {
+    if (!selectedDistrictIdForTaluk) {
       setTaluks([]);
+      setTalukSummary({});
+      return;
     }
-  }, [selectedDistrictIdForTaluk]);
+    Promise.all([
+      api.get(`/masters/taluks?district_id=${selectedDistrictIdForTaluk}&limit=2000`),
+      api.get(`/masters/taluks-summary?district_id=${selectedDistrictIdForTaluk}`)
+    ])
+      .then(([res, sum]) => {
+        const mapTk = t => ({ id: t.id, name: t.name_en, districtId: t.district_id, stateId: t.state_id, status: t.status ? 'Active' : 'Inactive' });
+        setTaluks((res.data?.data || []).map(mapTk));
+        const map = {};
+        (sum.data?.data || []).forEach((row) => { map[row.id] = row.pins || 0; });
+        setTalukSummary(map);
+      })
+      .catch(console.error);
+  }, [selectedDistrictIdForTaluk, summaryTick]);
 
   // Fetch paginated postal codes
   const [totalPostalPages, setTotalPostalPages] = useState(1);
@@ -295,12 +316,13 @@ export default function LocationSetup() {
   }, [districtTaluks, talukSearchQuery]);
 
   // Count helpers for hierarchy badges
+  // counts come from the server, so every row shows its real number (not only the selected one)
   const getTaluksCountForDistrict = (districtId) => {
-    return taluks.filter((t) => t.districtId === districtId).length;
+    return districtSummary[districtId]?.taluks ?? taluks.filter((t) => t.districtId === districtId).length;
   };
 
   const getPostalCountForTaluk = (talukId) => {
-    return postalCodes.filter((p) => p.talukId === talukId).length;
+    return talukSummary[talukId] ?? postalCodes.filter((p) => p.talukId === talukId).length;
   };
 
   // --- District CRUD Operations ---

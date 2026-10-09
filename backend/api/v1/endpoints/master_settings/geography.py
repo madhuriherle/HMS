@@ -44,6 +44,51 @@ def get_states_summary(
     return {"data": res}
 
 
+@router.get("/districts-summary")
+def get_districts_summary(
+    state_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Taluk and PIN counts for every district of a state (real counts, not just the rows on screen)."""
+    from sqlalchemy import func
+
+    ids = [r[0] for r in db.query(District.id).filter(District.state_id == state_id, District.is_deleted == False).all()]  # noqa: E712
+    if not ids:
+        return {"data": []}
+    taluks = dict(
+        db.query(Taluk.district_id, func.count(Taluk.id))
+        .filter(Taluk.district_id.in_(ids), Taluk.is_deleted == False)  # noqa: E712
+        .group_by(Taluk.district_id).all()
+    )
+    pins = dict(
+        db.query(PostalCode.district_id, func.count(PostalCode.id))
+        .filter(PostalCode.district_id.in_(ids), PostalCode.is_deleted == False)  # noqa: E712
+        .group_by(PostalCode.district_id).all()
+    )
+    return {"data": [{"id": i, "taluks": taluks.get(i, 0), "pins": pins.get(i, 0)} for i in ids]}
+
+
+@router.get("/taluks-summary")
+def get_taluks_summary(
+    district_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """PIN count for every taluk of a district."""
+    from sqlalchemy import func
+
+    ids = [r[0] for r in db.query(Taluk.id).filter(Taluk.district_id == district_id, Taluk.is_deleted == False).all()]  # noqa: E712
+    if not ids:
+        return {"data": []}
+    pins = dict(
+        db.query(PostalCode.taluk_id, func.count(PostalCode.id))
+        .filter(PostalCode.taluk_id.in_(ids), PostalCode.is_deleted == False)  # noqa: E712
+        .group_by(PostalCode.taluk_id).all()
+    )
+    return {"data": [{"id": i, "pins": pins.get(i, 0)} for i in ids]}
+
+
 @router.get("/states")
 def read_states(
     db: Session = Depends(deps.get_db),
