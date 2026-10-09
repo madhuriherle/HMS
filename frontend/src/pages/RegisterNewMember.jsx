@@ -675,6 +675,20 @@ export default function RegisterNewMember() {
     return Object.keys(errors).length === 0;
   };
 
+  // Moving to the Payment tab (Next button or the tab header) needs step 1 to be complete
+  const goToPaymentStep = () => {
+    if (isViewMode || validateForm()) {
+      setActiveFormSection('paymentInfo');
+      return;
+    }
+    showToast('Please fill the required fields marked with * before moving to Payment Information.', 'error');
+    // bring the first missing field into view once its error message has rendered
+    window.setTimeout(() => {
+      const firstError = document.querySelector('p.text-red-600');
+      if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+  };
+
   // ----------------------------------------------------
   // SAVE (server calls)
   // ----------------------------------------------------
@@ -881,7 +895,7 @@ export default function RegisterNewMember() {
             </button>
             <button
               type="button"
-              onClick={() => setActiveFormSection('paymentInfo')}
+              onClick={goToPaymentStep}
               className={`px-6 py-2.5 text-xs sm:text-sm font-bold rounded-t-lg border-t border-x transition-all cursor-pointer ${activeFormSection === 'paymentInfo'
                 ? 'bg-[#510601] text-white border-[#510601] shadow-xs'
                 : 'bg-[#FAF7F2] text-[#510601] border-[#E8DFD8] hover:bg-white'
@@ -1558,7 +1572,7 @@ export default function RegisterNewMember() {
                     )}
                     <button
                       type="button"
-                      onClick={() => setActiveFormSection('paymentInfo')}
+                      onClick={goToPaymentStep}
                       className="px-6 py-2.5 bg-[#510601] hover:bg-[#8C1801] text-white font-bold text-sm rounded-lg shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5"
                     >
                       <span>Next: Payment Information</span>
