@@ -93,8 +93,14 @@ def delete_state(
     obj = crud_masters.state.get(db, id)
     if not obj:
         raise HTTPException(404, "State not found")
-    if db.query(District).filter(District.state_id == id, District.is_deleted == False).first():  # noqa: E712
-        raise HTTPException(409, "State has districts; remove or reassign them first")
+        
+    for pc in db.query(PostalCode).filter(PostalCode.state_id == id, PostalCode.is_deleted == False).all():  # noqa: E712
+        crud_masters.postal_code.remove(db, id=pc.id, deleted_by=current_user.id)
+    for t in db.query(Taluk).filter(Taluk.district_id.in_(db.query(District.id).filter(District.state_id == id)), Taluk.is_deleted == False).all():  # noqa: E712
+        crud_masters.taluk.remove(db, id=t.id, deleted_by=current_user.id)
+    for d in db.query(District).filter(District.state_id == id, District.is_deleted == False).all():  # noqa: E712
+        crud_masters.district.remove(db, id=d.id, deleted_by=current_user.id)
+        
     return crud_masters.state.remove(db, id=id, deleted_by=current_user.id)
 
 
@@ -187,10 +193,12 @@ def delete_district(
     obj = crud_masters.district.get(db, id)
     if not obj:
         raise HTTPException(404, "District not found")
-    if db.query(Taluk).filter(Taluk.district_id == id, Taluk.is_deleted == False).first():  # noqa: E712
-        raise HTTPException(409, "District has taluks; remove or reassign them first")
-    if db.query(PostalCode).filter(PostalCode.district_id == id, PostalCode.is_deleted == False).first():  # noqa: E712
-        raise HTTPException(409, "District is referenced by postal codes")
+        
+    for pc in db.query(PostalCode).filter(PostalCode.district_id == id, PostalCode.is_deleted == False).all():  # noqa: E712
+        crud_masters.postal_code.remove(db, id=pc.id, deleted_by=current_user.id)
+    for t in db.query(Taluk).filter(Taluk.district_id == id, Taluk.is_deleted == False).all():  # noqa: E712
+        crud_masters.taluk.remove(db, id=t.id, deleted_by=current_user.id)
+        
     return crud_masters.district.remove(db, id=id, deleted_by=current_user.id)
 
 
@@ -283,8 +291,10 @@ def delete_taluk(
     obj = crud_masters.taluk.get(db, id)
     if not obj:
         raise HTTPException(404, "Taluk not found")
-    if db.query(PostalCode).filter(PostalCode.taluk_id == id, PostalCode.is_deleted == False).first():  # noqa: E712
-        raise HTTPException(409, "Taluk is referenced by postal codes")
+        
+    for pc in db.query(PostalCode).filter(PostalCode.taluk_id == id, PostalCode.is_deleted == False).all():  # noqa: E712
+        crud_masters.postal_code.remove(db, id=pc.id, deleted_by=current_user.id)
+        
     return crud_masters.taluk.remove(db, id=id, deleted_by=current_user.id)
 
 

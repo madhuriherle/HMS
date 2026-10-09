@@ -397,7 +397,11 @@ def export_labels(
     if pincode_id:
         query = query.filter(Member.pincode_id == pincode_id)
     if membership_type_id:
-        query = query.filter(Member.membership_type_id == membership_type_id)
+        from models.members import MemberMembership
+        query = query.join(MemberMembership, Member.id == MemberMembership.member_id).filter(
+            MemberMembership.membership_type_id == membership_type_id,
+            MemberMembership.status == "ACTIVE"
+        )
 
     members = query.all()
 

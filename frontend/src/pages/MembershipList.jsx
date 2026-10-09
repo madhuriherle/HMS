@@ -597,11 +597,7 @@ export default function MembershipList() {
 
   const handleConfirmDelete = async () => {
     if (!deleteDialog) return;
-    const reason = deleteReason.trim();
-    if (!reason) {
-      showToast('Please enter a reason for deleting this member.', 'error');
-      return;
-    }
+    const reason = 'Deleted via UI';
     try {
       const { data } = await api.delete(`/members/${deleteDialog.id}`, { params: { reason } });
       if (data?.status === 'PENDING') {
@@ -2288,13 +2284,7 @@ export default function MembershipList() {
               </span>
             </p>
 
-            <textarea
-              value={deleteReason}
-              onChange={(e) => setDeleteReason(e.target.value)}
-              placeholder="Reason for deletion (required)"
-              rows={2}
-              className="mt-3 w-full rounded-xl border border-[#E8DFD8] p-2.5 text-xs text-[#180200] focus:outline-none focus:ring-2 focus:ring-[#ED4636]/30"
-            />
+            
 
             <div className="mt-6 flex items-center justify-center gap-3">
               <button
@@ -2307,7 +2297,7 @@ export default function MembershipList() {
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                disabled={!hasPermission('members.delete') || !deleteReason.trim()}
+                disabled={!hasPermission('members.delete')}
                 title={!hasPermission('members.delete') ? 'Requires members.delete permission' : undefined}
                 className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
               >

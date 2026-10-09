@@ -1678,7 +1678,7 @@ export default function LocationSetup() {
               </select>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E8DFD8]">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
               <button
                 type="button"
                 onClick={() => setIsDistrictModalOpen(false)}
@@ -1834,7 +1834,7 @@ export default function LocationSetup() {
               </select>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E8DFD8]">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
               <button
                 type="button"
                 onClick={() => setIsTalukModalOpen(false)}
@@ -2080,7 +2080,7 @@ export default function LocationSetup() {
               </select>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E8DFD8]">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
               <button
                 type="button"
                 onClick={() => setIsPostalModalOpen(false)}
@@ -2249,7 +2249,7 @@ export default function LocationSetup() {
             )}
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between pt-4 border-t border-[#E8DFD8]">
+            <div className="flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
               <p className="text-xs text-[#863221]">
                 Only valid rows without errors will be imported into the directory.
               </p>

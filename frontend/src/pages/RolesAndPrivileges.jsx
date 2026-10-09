@@ -553,11 +553,8 @@ export default function RolesAndPrivileges() {
         </div>
       </div>
 
-      {/* Main Content Card: Search/Filter + Table */}
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
-
-        {/* Search & Filters */}
-        <div className="p-4 sm:p-6 border-b border-[#E8DFD8] bg-[#FAF7F2]/30">
+      {/* Search & Filters Toolbar Card */}
+      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
 
             {/* Search Field */}
@@ -606,9 +603,10 @@ export default function RolesAndPrivileges() {
             </div>
 
           </div>
-        </div>
+      </div>
 
-        {/* Roles Table */}
+      {/* Roles Table Card */}
+      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[860px]">
             <thead>
@@ -978,7 +976,7 @@ export default function RolesAndPrivileges() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E8DFD8]">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
               <button
                 type="button"
                 onClick={() => setIsAddEditOpen(false)}

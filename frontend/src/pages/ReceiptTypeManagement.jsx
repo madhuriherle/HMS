@@ -491,11 +491,8 @@ export default function ReceiptTypeManagement() {
         </div>
       </div>
 
-      {/* Main Content Card: Search/Filter + Table */}
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
-
-        {/* Search and Filters Toolbar */}
-        <div className="p-4 sm:p-6 border-b border-[#E8DFD8] bg-[#FAF7F2]/30">
+      {/* Search and Filters Toolbar Card */}
+      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
 
             {/* Search Input */}
@@ -544,9 +541,10 @@ export default function ReceiptTypeManagement() {
             </div>
 
           </div>
-        </div>
+      </div>
 
-        {/* Particulars Master Table */}
+      {/* Particulars Master Table Card */}
+      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>

@@ -1151,7 +1151,7 @@ export default function UserManagement() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#E8DFD8]">
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
               <button
                 type="button"
                 onClick={() => setIsAddEditOpen(false)}
