@@ -101,3 +101,24 @@ def test_bank_account_and_notes_are_stored_and_listed(client, admin_headers):
     assert r.json()["bank_account"] == "SBI Main 1234"
     row = next(x for x in _tracking(client, h) if x["id"] == r.json()["id"])
     assert row["bank_account"] == "SBI Main 1234" and row["notes"] == "Bank: SBI Main 1234 - paid online"
+
+
+def test_receipt_server_validation(client, admin_headers):
+    """The server enforces the same limits as the Receipt Entry form."""
+    from datetime import date, timedelta
+    h = admin_headers
+    sfx = _sfx()
+
+    def post(**over):
+        body = _entry_payload(f"V-{sfx}-{over.pop('n', 'x')}", "Valid Payer")
+        body.update(over)
+        return client.post(f"{API}/receipts/", headers=h, json=body)
+
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    assert post(n="ok").status_code in (200, 201)
+    assert post(n="fut", receipt_date=tomorrow).status_code == 422, "future date"
+    assert post(n="big", gross_amount=1e12, net_amount=1e12).status_code == 422, "amount beyond NUMERIC(12,2)"
+    assert post(n="name", payer_name="x" * 201).status_code == 422, "payer name too long"
+    assert post(n="ref", transaction_reference="x" * 151).status_code == 422, "reference too long"
+    assert post(n="chq", cheque_number="x" * 51).status_code == 422, "cheque number too long"
+    assert post(n="x" * 60).status_code == 422, "receipt number too long"

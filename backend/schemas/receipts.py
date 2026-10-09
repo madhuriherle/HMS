@@ -74,7 +74,38 @@ class ReceiptBase(BaseModel):
     @field_validator("gross_amount", "discount_amount", "net_amount")
     @classmethod
     def amounts_non_negative(cls, v: float, info) -> float:
-        return _check_non_negative(info.field_name, v)
+        v = _check_non_negative(info.field_name, v)
+        if v > 9_999_999_999.99:  # the column is NUMERIC(12,2)
+            raise ValueError(f"{info.field_name} is too large")
+        return v
+
+    @field_validator("payer_name")
+    @classmethod
+    def payer_name_fits(cls, v):
+        if v is not None and len(v.strip()) > 200:
+            raise ValueError("payer_name can be at most 200 characters")
+        return v
+
+    @field_validator("transaction_reference")
+    @classmethod
+    def reference_fits(cls, v):
+        if v is not None and len(v.strip()) > 150:
+            raise ValueError("transaction_reference can be at most 150 characters")
+        return v
+
+    @field_validator("cheque_number")
+    @classmethod
+    def cheque_fits(cls, v):
+        if v is not None and len(v.strip()) > 50:
+            raise ValueError("cheque_number can be at most 50 characters")
+        return v
+
+    @field_validator("receipt_date")
+    @classmethod
+    def date_not_in_future(cls, v):
+        if v is not None and v > date.today():
+            raise ValueError("receipt_date cannot be in the future")
+        return v
 
     @model_validator(mode="after")
     def totals_consistent(self):
@@ -85,6 +116,14 @@ class ReceiptBase(BaseModel):
 
 class ReceiptCreate(ReceiptBase):
     receipt_number: Optional[str] = None
+
+    @field_validator("receipt_number")
+    @classmethod
+    def number_fits(cls, v):
+        if v is not None and len(v.strip()) > 50:
+            raise ValueError("receipt_number can be at most 50 characters")
+        return v
+
     items: List[ReceiptItemBase] = []
     # Map the receipt to members in the same call as the entry (optional).
     allocations: List[ReceiptAllocationIn] = []

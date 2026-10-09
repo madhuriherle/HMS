@@ -34,7 +34,7 @@ import useAuth from '../hooks/useAuth';
 import api from '../api';
 import { notify } from '../utils/notify';
 import { apiErrorMessage } from '../utils/apiError';
-import { formatDate, formatDateTime } from '../utils/dateUtils';
+import { formatDate, formatDateTime, getTodayISODate } from '../utils/dateUtils';
 import { receiptToApiPayload } from '../utils/apiAdapters';
 import { formatPaymentModeLabel } from '../utils/displayHelpers';
 import {
@@ -207,6 +207,7 @@ export default function ReceiptEntry() {
 
   // Selected Member State & Lookup State
   const [selectedMember, setSelectedMember] = useState(null);
+  const [memberProfile, setMemberProfile] = useState(null); // renewal date + payment history of the chosen approved member
   const [lookupMembershipNo, setLookupMembershipNo] = useState('');
   const [lookupError, setLookupError] = useState('');
   const [matchedExistingReceipt, setMatchedExistingReceipt] = useState(null);
@@ -335,6 +336,20 @@ export default function ReceiptEntry() {
   useEffect(() => {
     loadPhotoFor(selectedMember, (url) => setSelectedMember((prev) => (prev && prev.id === selectedMember.id ? { ...prev, photoUrl: url } : prev)));
   }, [selectedMember?.id, selectedMember?.photoPath]);
+
+  // For an approved member, load the renewal date and the last payment from the server
+  useEffect(() => {
+    setMemberProfile(null);
+    if (entrySource !== 'membership-assignment' || !selectedMember?.id) return undefined;
+    let cancelled = false;
+    api
+      .get(`/members/${selectedMember.id}/profile`)
+      .then(({ data }) => { if (!cancelled) setMemberProfile(data); })
+      .catch((error) => {
+        if (!cancelled) showToast(apiErrorMessage(error, 'Could not load the payment history.'), 'error');
+      });
+    return () => { cancelled = true; };
+  }, [entrySource, selectedMember?.id]);
   useEffect(() => {
     loadPhotoFor(viewingMember, (url) => setViewingMember((prev) => (prev && prev.id === viewingMember.id ? { ...prev, photoUrl: url } : prev)));
   }, [viewingMember?.id, viewingMember?.photoPath]);
@@ -580,6 +595,8 @@ export default function ReceiptEntry() {
     // 1. Receipt No. (Mandatory & Unique Manual Entry)
     if (!formData.receiptNumber.trim()) {
       errors.receiptNumber = 'Receipt No. is mandatory.';
+    } else if (formData.receiptNumber.trim().length > 50) {
+      errors.receiptNumber = 'Receipt No. can be at most 50 characters.';
     } else {
       const existingMatch = existingReceipts.find(
         (r) => r.receiptNumber && r.receiptNumber.toLowerCase().trim() === formData.receiptNumber.toLowerCase().trim()
@@ -591,12 +608,22 @@ export default function ReceiptEntry() {
 
     // 2. Receipt Date (Mandatory)
     if (!formData.receiptDate) {
-      errors.receiptDate = 'Receipt Date is mandatory.';
+      errors.receiptDate = 'Receipt Date is mandatory. Enter it as DD-MM-YYYY.';
+    } else if (formData.receiptDate > getTodayISODate()) {
+      errors.receiptDate = 'Receipt Date cannot be in the future.';
+    } else if (formData.receiptDate < '2000-01-01') {
+      errors.receiptDate = 'Receipt Date looks wrong. Please check the year.';
     }
 
     // 3. Name (Mandatory)
     if (!formData.name.trim()) {
       errors.name = 'Applicant / Payee Name is mandatory.';
+    } else if (formData.name.trim().length < 2) {
+      errors.name = 'Name must be at least 2 characters.';
+    } else if (formData.name.trim().length > 200) {
+      errors.name = 'Name can be at most 200 characters.';
+    } else if (!/[A-Za-z\u0C80-\u0CFF\u0D00-\u0D7F]/.test(formData.name)) {
+      errors.name = 'Name must contain letters.';
     }
 
     // 4. Particulars (Mandatory, must exist in the Particulars master)
@@ -620,6 +647,10 @@ export default function ReceiptEntry() {
     // 7. Amount (Mandatory, positive integer)
     if (!formData.amount || Number(formData.amount) <= 0) {
       errors.amount = 'Please enter a valid amount greater than 0.';
+    } else if (!/^\d+(\.\d{1,2})?$/.test(String(formData.amount).trim())) {
+      errors.amount = 'Amount can have at most 2 decimal places.';
+    } else if (Number(formData.amount) > 9999999999.99) {
+      errors.amount = 'Amount is too large.';
     }
 
     // 8. Payment Mode
@@ -629,12 +660,18 @@ export default function ReceiptEntry() {
       const isCash = formData.paymentMode.trim().toLowerCase() === 'cash';
       if (!isCash && !formData.transactionId.trim()) {
         errors.transactionId = `Transaction ID is mandatory for ${formData.paymentMode}.`;
+      } else if (!isCash && formData.transactionId.trim().length < 4) {
+        errors.transactionId = 'Transaction ID looks too short. Please check it.';
+      } else if (formData.transactionId.trim().length > 150) {
+        errors.transactionId = 'Transaction ID can be at most 150 characters.';
       }
     }
 
     // 9. Mobile (If entered, validate 10 digits)
-    if (formData.mobile && formData.mobile.length !== 10) {
+    if (formData.mobile && !/^\d{10}$/.test(formData.mobile)) {
       errors.mobile = 'Mobile number must be exactly 10 digits.';
+    } else if (formData.mobile && !/^[6-9]/.test(formData.mobile)) {
+      errors.mobile = 'Mobile number must start with 6, 7, 8 or 9.';
     }
 
     // 10. PAN (If entered, validate standard format)
@@ -1328,7 +1365,7 @@ export default function ReceiptEntry() {
                     </div>
                   </>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Membership No */}
                     <div>
                       <label className="block text-xs font-bold text-[#180200] mb-1">
@@ -1778,6 +1815,51 @@ export default function ReceiptEntry() {
                     </div>
                   </div>
                 </div>
+
+                {/* Approved member: renewal date and last payment */}
+                {entrySource === 'membership-assignment' && (() => {
+                  const ms = memberProfile?.memberships?.[0];
+                  const receipts = (memberProfile?.financial?.receipts || []).filter((r) => r.payment_status !== 'CANCELLED');
+                  const last = receipts[0];
+                  return (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold text-[#1D4ED8] tracking-wide uppercase flex items-center gap-1.5">
+                        <CreditCard className="w-3.5 h-3.5 text-[#1D4ED8]" />
+                        <span>Renewal &amp; Payments:</span>
+                      </h4>
+                      {!memberProfile ? (
+                        <div className="bg-white p-3.5 rounded-xl border border-[#E8DFD8] text-xs text-[#863221]">Loading...</div>
+                      ) : (
+                        <div className="bg-white p-3.5 rounded-xl border border-[#E8DFD8] grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                          <div>
+                            <span className="text-[#863221] font-semibold block">Valid Till / Renewal Due:</span>
+                            <strong className="text-[#180200] font-mono">{formatDate(ms?.expires_at, 'Lifetime / not set')}</strong>
+                          </div>
+                          <div>
+                            <span className="text-[#863221] font-semibold block">Membership Status:</span>
+                            <strong className="text-[#180200]">{ms?.status || '—'}</strong>
+                          </div>
+                          <div>
+                            <span className="text-[#863221] font-semibold block">Receipts So Far:</span>
+                            <strong className="text-[#180200]">{receipts.length}</strong>
+                          </div>
+                          <div className="sm:col-span-3 pt-2 border-t border-[#E8DFD8]">
+                            <span className="text-[#863221] font-semibold block">Last Payment:</span>
+                            {last ? (
+                              <span className="text-[#180200]">
+                                <strong className="font-mono">{last.receipt_number}</strong>
+                                {' · '}{formatDate(last.receipt_date)}
+                                {' · '}<strong className="font-mono text-[#3D705C]">₹{Number(last.net_amount || 0).toLocaleString('en-IN')}</strong>
+                              </span>
+                            ) : (
+                              <span className="text-[#863221]">No receipts recorded for this member yet.</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Section 4: Payment / Registration Remarks */}
                 {entrySource === 'unapproved-assignment' && (

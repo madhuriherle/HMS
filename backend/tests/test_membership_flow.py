@@ -49,6 +49,11 @@ def test_full_membership_flow(client, admin_headers):
     assert mid not in _ids(client, h, approval_status="UNAPPROVED")
     assert mid in _ids(client, h, approval_status="APPROVED")
 
+    # 5b. what Receipt Entry's member panel shows: renewal date + payment history from the profile
+    assert prof["memberships"][0]["status"], "membership status for the panel"
+    assert "expires_at" in prof["memberships"][0]
+    assert rec["id"] in [r["receipt_id"] for r in prof["financial"]["receipts"]], "last payment for the panel"
+
     # 6. TRACKING after approval: same receipt, now showing the approved member
     row = next(x for x in _tracking(client, h) if x["id"] == rec["id"])
     assert row["approval_status"] == "APPROVED" and row["member_code"]
