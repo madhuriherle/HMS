@@ -506,7 +506,8 @@ export default function Dashboard() {
             </div>
 
             {/* Modal Footer */}
-            </div>\n            <div className="shrink-0 flex items-center justify-between px-6 py-3.5 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+            </div>
+            <div className="shrink-0 flex items-center justify-between px-6 py-3.5 border-t border-[#E8DFD8] bg-[#FAF7F2]">
               <Link
                 to="/dashboard/membership/list"
                 onClick={() => setViewingMember(null)}

@@ -884,9 +884,7 @@ export default function ReceiptEntry() {
                   <h3 className="font-bold text-base text-white tracking-wide">
                     Profile Details
                   </h3>
-                  <span className="bg-[#FBC02D] text-[#180200] text-xs font-bold px-2 py-0.5 rounded shadow-xs">
-                    Delete
-                  </span>
+                  
                 </div>
                 <button
                   type="button"

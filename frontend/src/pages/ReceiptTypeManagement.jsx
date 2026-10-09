@@ -5,7 +5,7 @@ import {
   FileText,
   Plus,
   Search,
-  Edit3,
+  Pencil,
   Trash2,
   ChevronRight,
   ChevronDown,
@@ -626,7 +626,7 @@ export default function ReceiptTypeManagement() {
                               onClick={() => openAddSubTypeModal(type)}
                               disabled={!hasPermission('masters.write')}
                               title={!hasPermission('masters.write') ? 'Requires masters.write permission' : `Add Sub-Type under ${type.name}`}
-                              className="px-2.5 py-1 text-[#510601] hover:text-white bg-[#510601]/10 hover:bg-[#510601] border border-[#510601]/20 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <Plus className="w-3.5 h-3.5" />
                               <span>Sub-Type</span>
@@ -636,10 +636,10 @@ export default function ReceiptTypeManagement() {
                             <button
                               onClick={() => openEditTypeModal(type)}
                               disabled={!hasPermission('masters.write')}
-                              className="px-2.5 py-1 text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                               title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit Particular'}
                             >
-                              <Edit3 className="w-3.5 h-3.5" />
+                              <Pencil className="w-3.5 h-3.5" />
                               <span>Edit</span>
                             </button>
 
@@ -647,7 +647,7 @@ export default function ReceiptTypeManagement() {
                             <button
                               onClick={() => promptDeleteType(type)}
                               disabled={!hasPermission('masters.delete')}
-                              className="px-2.5 py-1 text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                               title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete Particular'}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -729,20 +729,20 @@ export default function ReceiptTypeManagement() {
                                                 type="button"
                                                 onClick={() => openEditSubTypeModal(type, sub)}
                                                 disabled={!hasPermission('masters.write')}
-                                                className="px-2 py-0.5 text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit Sub-Type'}
                                               >
-                                                <Edit3 className="w-3 h-3" />
+                                                <Pencil className="w-3.5 h-3.5" />
                                                 <span>Edit</span>
                                               </button>
                                               <button
                                                 type="button"
                                                 onClick={() => promptDeleteSubType(type, sub)}
                                                 disabled={!hasPermission('masters.delete')}
-                                                className="px-2 py-0.5 text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete Sub-Type'}
                                               >
-                                                <Trash2 className="w-3 h-3" />
+                                                <Trash2 className="w-3.5 h-3.5" />
                                                 <span>Delete</span>
                                               </button>
                                             </div>
@@ -866,7 +866,7 @@ export default function ReceiptTypeManagement() {
         onClose={() => setIsTypeModalOpen(false)}
       >
         <div
-          className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+          className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -879,9 +879,6 @@ export default function ReceiptTypeManagement() {
                 <h3 className="text-base font-bold text-[#180200]">
                   {typeModalMode === 'add' ? 'Add Particular' : 'Edit Particular'}
                 </h3>
-                <p className="text-xs text-[#863221]">
-                  {typeModalMode === 'add' ? 'Create a new particular category.' : `Editing "${editingType?.name}"`}
-                </p>
               </div>
             </div>
             <button
@@ -988,7 +985,7 @@ export default function ReceiptTypeManagement() {
         onClose={() => setIsSubTypeModalOpen(false)}
       >
         <div
-          className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+          className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -1001,9 +998,6 @@ export default function ReceiptTypeManagement() {
                 <h3 className="text-base font-bold text-[#180200]">
                   {subTypeModalMode === 'add' ? 'Add Sub-Type' : 'Edit Sub-Type'}
                 </h3>
-                <p className="text-xs text-[#863221]">
-                  Under Parent Category: <strong className="text-[#510601]">{parentTypeForSubType?.name}</strong>
-                </p>
               </div>
             </div>
             <button
@@ -1102,55 +1096,7 @@ export default function ReceiptTypeManagement() {
         </div>
       </Modal>
 
-      {/* ============================================================ */}
-      {/* DELETE CONFIRMATION MODAL                                    */}
-      {/* ============================================================ */}
-      <Modal
-        isOpen={Boolean(deletingItem)}
-        onClose={() => setDeletingItem(null)}
-      >
-        {deletingItem && (
-          <div
-            className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-14 h-14 rounded-full bg-red-100 text-[#ED4636] flex items-center justify-center mx-auto mb-3.5">
-              <Trash2 className="w-7 h-7" />
-            </div>
-
-            <h3 className="text-lg font-bold text-[#180200]">
-              Delete {deletingItem.targetType === 'receiptType' ? 'Particular' : 'Sub-Type'}?
-            </h3>
-            <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
-              Are you sure you want to delete <strong className="text-[#180200]">{deletingItem.item.name}</strong>
-              {deletingItem.targetType === 'subType' && deletingItem.parentType ? ` from ${deletingItem.parentType.name}` : ''}?
-              {deletingItem.targetType === 'receiptType' && deletingItem.item.subTypes?.length > 0
-                ? ' This will also remove all associated sub-types.'
-                : ' This action cannot be undone.'}
-            </p>
-
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setDeletingItem(null)}
-                className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!hasPermission('masters.delete')}
-                title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : undefined}
-                onClick={handleConfirmDelete}
-                className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Confirm Delete</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      
 
       {/* ============================================================ */}
       {/* STATUS TOGGLE CONFIRMATION DIALOG                            */}

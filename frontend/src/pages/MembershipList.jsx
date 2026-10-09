@@ -1040,7 +1040,7 @@ export default function MembershipList() {
       <Modal isOpen={Boolean(viewingMember)} onClose={() => setViewingMember(null)}>
         {viewingMember && (
           <div
-            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1100,7 +1100,8 @@ export default function MembershipList() {
             </div>
 
             {/* Modal Body Content */}
-            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto text-xs text-[#180200]">
+            <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs text-[#180200]">
               {activeViewTab === 'profile' && (
                 <div className="space-y-5">
               {/* Dynamic Membership Milestone & Cumulative Contribution Card */}
@@ -1397,7 +1398,8 @@ export default function MembershipList() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/60">
+            </div>
+            <div className="shrink-0 flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/60">
               <button
                 type="button"
                 onClick={() => {
@@ -1608,7 +1610,7 @@ export default function MembershipList() {
       <Modal isOpen={Boolean(deleteDialog)} onClose={() => setDeleteDialog(null)}>
         {deleteDialog && (
           <div
-            className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-14 h-14 rounded-full bg-red-100 text-[#ED4636] flex items-center justify-center mx-auto mb-3.5">

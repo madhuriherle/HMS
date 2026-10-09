@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Edit3, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
 import api from '../api';
 import PermissionGate from '../components/PermissionGate';
 import SearchFilterBar from '../components/SearchFilterBar';
@@ -139,14 +139,7 @@ function MasterTable({ title, subtitle, endpoint, fields, columns, withCode, pag
         }}
         rightSlot={
           <>
-            <button
-              type="button"
-              onClick={load}
-              className="p-2 bg-white border border-[#E8DFD8] rounded-xl text-[#510601] hover:bg-[#FAF7F2] cursor-pointer shrink-0"
-              title="Refresh"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+            
             <button
               type="button"
               onClick={add}
@@ -219,19 +212,21 @@ function MasterTable({ title, subtitle, endpoint, fields, columns, withCode, pag
                         type="button"
                         onClick={() => edit(row)}
                         disabled={!hasPermission('masters.write')}
-                        className="p-1.5 rounded-lg text-[#510601] border border-[#E8DFD8] hover:bg-[#FAF7F2] cursor-pointer disabled:opacity-40"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit'}
                       >
-                        <Edit3 className="w-3.5 h-3.5" />
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>Edit</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => remove(row)}
                         disabled={!hasPermission('masters.delete')}
-                        className="p-1.5 rounded-lg text-[#ED4636] border border-red-200 hover:bg-red-50 cursor-pointer disabled:opacity-40"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete'}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete</span>
                       </button>
                     </div>
                   </td>
@@ -317,7 +312,6 @@ export default function PersonalMasters() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Personal Masters</h1>
-          <p className="text-sm text-[#863221] mt-1">Dropdown values used in the member profile.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {Object.entries(tabs).map(([key, t]) => (

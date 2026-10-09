@@ -8,7 +8,7 @@ import {
   FileText,
   Plus,
   Search,
-  Edit3,
+  Pencil,
   Trash2,
   ChevronRight,
   ChevronLeft,
@@ -983,10 +983,11 @@ export default function LocationSetup() {
                             e.stopPropagation();
                             handleEditState(st);
                           }}
-                          className="p-1.5 rounded-lg text-[#510601] hover:bg-[#FAF7F2] border border-[#E8DFD8] cursor-pointer disabled:opacity-40"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                           title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit State'}
                         >
-                          <Edit3 className="w-3.5 h-3.5" />
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit</span>
                         </button>
                         <button
                           type="button"
@@ -995,10 +996,11 @@ export default function LocationSetup() {
                             e.stopPropagation();
                             handleDeleteState(st);
                           }}
-                          className="p-1.5 rounded-lg text-[#ED4636] hover:bg-red-50 border border-red-200 cursor-pointer disabled:opacity-40"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                           title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete State'}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
                         </button>
                       </div>
                     </div>
@@ -1130,19 +1132,21 @@ export default function LocationSetup() {
                                   type="button"
                                   onClick={() => handleOpenEditDistrict(dist)}
                                   disabled={!hasPermission('masters.write')}
-                                  className="p-1 text-[#863221] hover:text-[#510601] hover:bg-white rounded transition-colors"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                   title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit District'}
                                 >
-                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <Pencil className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setDeleteDialog({ type: 'district', item: dist })}
                                   disabled={!hasPermission('masters.delete')}
-                                  className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                   title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete District'}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Delete</span>
                                 </button>
                               </div>
                             </td>
@@ -1278,19 +1282,21 @@ export default function LocationSetup() {
                                   type="button"
                                   onClick={() => handleOpenEditTaluk(tk)}
                                   disabled={!hasPermission('masters.write')}
-                                  className="p-1 text-[#863221] hover:text-[#510601] hover:bg-white rounded transition-colors"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                   title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit Taluk'}
                                 >
-                                  <Edit3 className="w-3.5 h-3.5" />
+                                  <Pencil className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setDeleteDialog({ type: 'taluk', item: tk })}
                                   disabled={!hasPermission('masters.delete')}
-                                  className="p-1 text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                   title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete Taluk'}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Delete</span>
                                 </button>
                               </div>
                             </td>
@@ -1548,19 +1554,21 @@ export default function LocationSetup() {
                                 type="button"
                                 onClick={() => handleOpenEditPostal(item)}
                                 disabled={!hasPermission('masters.write')}
-                                className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg transition-colors"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                 title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit PIN Code Mapping'}
                               >
-                                <Edit3 className="w-4 h-4" />
+                                <Pencil className="w-3.5 h-3.5" />
+                                <span>Edit</span>
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setDeleteDialog({ type: 'postal', item })}
                                 disabled={!hasPermission('masters.delete')}
-                                className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                 title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete PIN Code'}
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
                               </button>
                             </div>
                           </td>
@@ -1643,7 +1651,7 @@ export default function LocationSetup() {
         onClose={() => setIsDistrictModalOpen(false)}
       >
         <div
-          className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+          className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -1656,9 +1664,6 @@ export default function LocationSetup() {
                 <h3 className="text-base font-bold text-[#180200]">
                   {districtModalMode === 'add' ? 'Add District' : 'Edit District'}
                 </h3>
-                <p className="text-xs text-[#863221]">
-                  {districtModalMode === 'add' ? `Add a new district under ${currentState.name}` : `Editing "${editingDistrict?.name}"`}
-                </p>
               </div>
             </div>
             <button
@@ -1755,7 +1760,7 @@ export default function LocationSetup() {
         onClose={() => setIsTalukModalOpen(false)}
       >
         <div
-          className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+          className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -1768,9 +1773,6 @@ export default function LocationSetup() {
                 <h3 className="text-base font-bold text-[#180200]">
                   {talukModalMode === 'add' ? 'Add Taluk' : 'Edit Taluk'}
                 </h3>
-                <p className="text-xs text-[#863221]">
-                  {talukModalMode === 'add' ? `Add a new taluk under ${currentDistrictForTaluk?.name || currentState.name}` : `Editing "${editingTaluk?.name}"`}
-                </p>
               </div>
             </div>
             <button
@@ -1910,7 +1912,7 @@ export default function LocationSetup() {
         onClose={() => setIsPostalModalOpen(false)}
       >
         <div
-          className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+          className="bg-white rounded-2xl max-w-3xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -1923,9 +1925,6 @@ export default function LocationSetup() {
                 <h3 className="text-base font-bold text-[#180200]">
                   {postalModalMode === 'add' ? 'Add PIN Code Entry' : 'Edit PIN Code Mapping'}
                 </h3>
-                <p className="text-xs text-[#863221]">
-                  {postalModalMode === 'add' ? 'Configure a new 6-digit postal code mapping.' : `Editing PIN "${editingPostal?.postalCode}"`}
-                </p>
               </div>
             </div>
             <button
@@ -2154,7 +2153,7 @@ export default function LocationSetup() {
         onClose={() => setIsImportModalOpen(false)}
       >
         <div
-          className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+          className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -2402,7 +2401,7 @@ export default function LocationSetup() {
       >
         {deleteDialog && (
           <div
-            className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-14 h-14 rounded-full bg-red-100 text-[#ED4636] flex items-center justify-center mx-auto mb-3.5">

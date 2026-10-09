@@ -508,8 +508,9 @@ export default function LabelList() {
                         <Link
                           to="/dashboard/receipts/tracking"
                           title="Receipts decide who is on the label list"
-                          className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-[#510601] hover:bg-stone-50 transition-colors"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors"
                         >
+                          <FileText className="w-3.5 h-3.5" />
                           <span>View receipts</span>
                         </Link>
                       </td>

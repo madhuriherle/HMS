@@ -726,7 +726,7 @@ export default function MembershipTypeManagement() {
         onClose={() => setIsAddEditOpen(false)}
       >
         <div
-          className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+          className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -739,9 +739,6 @@ export default function MembershipTypeManagement() {
                 <h3 className="text-base font-bold text-[#180200]">
                   {modalMode === 'add' ? 'Add Membership Type' : 'Edit Membership Type'}
                 </h3>
-                <p className="text-xs text-[#863221]">
-                  Configure membership category, amount and online visibility.
-                </p>
               </div>
             </div>
             <button
@@ -895,7 +892,7 @@ export default function MembershipTypeManagement() {
       >
         {priceTargetItem && (
           <div
-            className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1031,7 +1028,7 @@ export default function MembershipTypeManagement() {
       >
         {historyTargetItem && (
           <div
-            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
+            className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1044,9 +1041,6 @@ export default function MembershipTypeManagement() {
                   <h3 className="text-base font-bold text-[#180200]">
                     Price History – {historyTargetItem.name}
                   </h3>
-                  <p className="text-xs text-[#863221]">
-                    Complete chronological price revision audit log.
-                  </p>
                 </div>
               </div>
               <button
@@ -1169,7 +1163,7 @@ export default function MembershipTypeManagement() {
       >
         {viewingItem && (
           <div
-            className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

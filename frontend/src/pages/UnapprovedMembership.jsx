@@ -651,7 +651,7 @@ export default function UnapprovedMembership() {
       <Modal isOpen={Boolean(viewingMember)} onClose={() => setViewingMember(null)}>
         {viewingMember && (
           <div
-            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -684,7 +684,8 @@ export default function UnapprovedMembership() {
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto text-xs text-[#180200]">
+            <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs text-[#180200]">
               {/* Receipt Status Banner */}
               <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E8DFD8] flex items-center justify-between">
                 <div>
@@ -839,7 +840,8 @@ export default function UnapprovedMembership() {
             </div>
 
             {/* Read-only footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+            </div>
+            <div className="shrink-0 flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
               <div />
 
               <div className="flex items-center gap-3">
@@ -862,7 +864,7 @@ export default function UnapprovedMembership() {
       <Modal isOpen={Boolean(validationBlockDialog)} onClose={() => setValidationBlockDialog(null)}>
         {validationBlockDialog && (
           <div
-            className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-14 h-14 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto mb-3.5">
@@ -917,7 +919,7 @@ export default function UnapprovedMembership() {
       <Modal isOpen={Boolean(approveDialog)} onClose={() => setApproveDialog(null)}>
         {approveDialog && (
           <div
-            className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3.5">

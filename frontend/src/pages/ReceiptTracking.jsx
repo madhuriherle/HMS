@@ -653,7 +653,7 @@ export default function ReceiptTracking() {
       {/* ============================================================ */}
       <Modal isOpen={Boolean(viewingReceipt)} onClose={() => setViewingReceipt(null)}>
         {viewingReceipt && (
-          <div className="bg-white rounded-2xl max-w-xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl max-w-3xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
               <div className="flex items-center gap-2.5">
@@ -796,7 +796,7 @@ export default function ReceiptTracking() {
       {/* ============================================================ */}
       <Modal isOpen={Boolean(editingReceipt)} onClose={() => setEditingReceipt(null)}>
         {editingReceipt && (
-          <div className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
             <form onSubmit={handleSaveEdit}>
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
@@ -823,7 +823,8 @@ export default function ReceiptTracking() {
               </div>
 
               {/* Body */}
-              <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto text-xs">
+              <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Receipt Number */}
                   <div>
@@ -973,7 +974,8 @@ export default function ReceiptTracking() {
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+              </div>
+            <div className="shrink-0 flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
                 <button
                   type="button"
                   onClick={() => setEditingReceipt(null)}
@@ -1001,7 +1003,7 @@ export default function ReceiptTracking() {
       {/* ============================================================ */}
       <Modal isOpen={Boolean(deletingReceipt)} onClose={() => setDeletingReceipt(null)}>
         {deletingReceipt && (
-          <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
             <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
               <Trash2 className="w-6 h-6" />
             </div>

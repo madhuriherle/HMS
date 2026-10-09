@@ -532,11 +532,9 @@ export default function BankDetailsManagement() {
       {/* Breadcrumbs & Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#E8DFD8] pb-5">
         <div>
-<div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
               Payment Mode Configuration
             </h1>
-          </div>
         </div>
 
         {/* Action Button: Add Payment Mode */}
@@ -820,11 +818,6 @@ export default function BankDetailsManagement() {
               <h3 className="text-lg font-bold text-[#180200] font-serif">
                 {modalMode === 'add' ? 'Add Payment Mode' : 'Edit Payment Mode'}
               </h3>
-              <p className="text-xs text-[#863221]">
-                {modalMode === 'add'
-                  ? 'Configure a payment mode option for receipt collections.'
-                  : `Modify settings for "${formatPaymentModeLabel(editingItem)}".`}
-              </p>
             </div>
             <button
               onClick={() => setIsAddEditOpen(false)}
@@ -835,7 +828,8 @@ export default function BankDetailsManagement() {
           </div>
 
           {/* Modal Form */}
-          <form onSubmit={handleSaveForm} className="p-6 space-y-4 overflow-y-auto">
+          <form onSubmit={handleSaveForm} className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {/* Field: Payment Mode * */}
             <div>
               <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
@@ -1024,7 +1018,8 @@ export default function BankDetailsManagement() {
             </div>
 
             {/* Modal Buttons */}
-            <div className="px-6 py-4 border-t border-[#E8DFD8] flex items-center justify-end gap-2.5 shrink-0 bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
+            </div>
+            <div className="px-6 py-4 border-t border-[#E8DFD8] flex items-center justify-end gap-2.5 shrink-0 bg-[#FAF7F2]  rounded-b-2xl">
               <button
                 type="button"
                 onClick={() => setIsAddEditOpen(false)}
@@ -1059,9 +1054,6 @@ export default function BankDetailsManagement() {
                 <h3 className="text-lg font-bold text-[#180200] font-serif">
                   Payment Mode Details
                 </h3>
-                <p className="text-xs text-[#863221]">
-                  Read-only record overview
-                </p>
               </div>
               <button
                 onClick={() => setViewingItem(null)}
