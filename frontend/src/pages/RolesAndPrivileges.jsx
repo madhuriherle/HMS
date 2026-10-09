@@ -22,6 +22,7 @@ import {
   Key,
   CheckSquare,
   Check,
+  Save,
   Minus,
   Square,
   Lock,
@@ -641,7 +642,7 @@ export default function RolesAndPrivileges() {
       {/* Roles Table Card */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[520px]">
+          <table className="w-full text-left border-collapse min-w-[760px]">
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-semibold text-[#863221] uppercase tracking-wider">
                 <th className="px-6 py-3">Role Name</th>
@@ -692,34 +693,37 @@ export default function RolesAndPrivileges() {
                         </button>
                       </td>
                       <td className="px-6 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
                           {/* Privileges */}
                           <button
                             disabled={isSys}
                             onClick={() => !isSys && openPrivilegeModal(role)}
-                            className={`p-2 rounded-lg transition-colors ${isSys ? 'text-gray-300 cursor-not-allowed opacity-40' : 'text-[#510601] hover:bg-[#F1E7DE] cursor-pointer'}`}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${isSys ? 'text-gray-300 border-transparent cursor-not-allowed opacity-40' : 'text-[#510601] bg-[#FAF7F2] hover:bg-[#F1E7DE] border-[#E8DFD8] cursor-pointer'}`}
                             title={isSys ? 'System role privileges are permanent and cannot be modified' : 'Configure Privileges'}
                           >
-                            <ShieldCheck className="w-4 h-4" />
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            <span>Privileges</span>
                           </button>
 
                           {/* View details (rank, description, privileges, dates) */}
                           <button
                             onClick={() => setViewingRole(role)}
-                            className="p-2 rounded-lg text-[#510601] hover:bg-[#F1E7DE] transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-all cursor-pointer"
                             title="View Details"
                           >
-                            <Eye className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View</span>
                           </button>
 
                           {/* Edit */}
                           <button
                             disabled={isLocked || !hasPermission('roles.write')}
                             onClick={() => !isLocked && openEditModal(role)}
-                            className={`p-2 rounded-lg transition-colors ${isLocked ? 'text-gray-300 cursor-not-allowed opacity-40' : 'text-amber-700 hover:bg-amber-50 cursor-pointer'}`}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${isLocked ? 'text-gray-300 border-transparent cursor-not-allowed opacity-40' : 'text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200 cursor-pointer'}`}
                             title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? 'System role cannot be edited' : isLocked ? 'Role is at or above your rank' : 'Edit Role'}
                           >
-                            <Pencil className="w-4 h-4" />
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Edit</span>
                           </button>
 
                           {/* Delete (only for deletable roles) */}
@@ -727,10 +731,11 @@ export default function RolesAndPrivileges() {
                             <button
                               disabled={isLocked || !hasPermission('roles.delete')}
                               onClick={() => setDeleteTargetRole(role)}
-                              className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                               title={!hasPermission('roles.delete') ? 'You need the roles.delete permission' : 'Delete Role'}
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
                             </button>
                           )}
                         </div>
@@ -993,56 +998,47 @@ export default function RolesAndPrivileges() {
           const isProtectedTarget = !isSysTarget && (privilegeTargetRole.rank_level ?? 99) <= myRankLevel;
           const isReadOnly = isSysTarget || isProtectedTarget;
           return (
-            <div
-              className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] w-full flex flex-col"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="space-y-6">
               {/* Header */}
-              <div className="px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2] shrink-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
-                      <Key className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base sm:text-lg font-bold text-[#180200]">
-                          Configure Privileges – {privilegeTargetRole.name}
-                        </h3>
-                        {isSysTarget && (
-                          <span className="px-2 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[10px] font-bold rounded-md">
-                            System Role (Read-Only)
-                          </span>
-                        )}
-                        {isProtectedTarget && (
-                          <span className="px-2 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[10px] font-bold rounded-md">
-                            Rank-Protected (Read-Only)
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-[#863221]">
-                        {isReadOnly
-                          ? (isSysTarget
-                            ? 'Super Admin / System roles maintain permanent full-access across all modules.'
-                            : 'This role is at or above your rank, so its access levels can only be viewed.')
-                          : null}
-                      </p>
-                    </div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
+                    Configure Privileges – {privilegeTargetRole.name}
+                  </h1>
+                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                    {isSysTarget && (
+                      <span className="px-2 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[10px] font-bold rounded-md">
+                        System Role (Read-Only)
+                      </span>
+                    )}
+                    {isProtectedTarget && (
+                      <span className="px-2 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[10px] font-bold rounded-md">
+                        Rank-Protected (Read-Only)
+                      </span>
+                    )}
+                    <p className="text-xs text-[#863221]">
+                      {isReadOnly
+                        ? (isSysTarget
+                          ? 'Super Admin / System roles maintain permanent full-access across all modules.'
+                          : 'This role is at or above your rank, so its access levels can only be viewed.')
+                        : 'Choose what this role can read, write and delete.'}
+                    </p>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setPrivilegeTargetRole(null)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#E8DFD8] bg-white hover:bg-[#FAF7F2] text-[#510601] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    <span>Back to Roles</span>
-                  </button>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPrivilegeTargetRole(null)}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-[#E8DFD8] hover:bg-[#FAF7F2] text-[#510601] text-sm font-semibold rounded-xl transition-colors cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Back to Roles</span>
+                </button>
+              </div>
 
                 {/* System Role Notice Banner */}
                 {isSysTarget && (
-                  <div className="mt-3 px-3.5 py-2 bg-[#FFC107]/15 border border-[#FFC107]/40 rounded-xl text-xs text-[#863221] flex items-center gap-2">
+                  <div className="px-3.5 py-2 bg-[#FFC107]/15 border border-[#FFC107]/40 rounded-xl text-xs text-[#863221] flex items-center gap-2">
                     <Lock className="w-4 h-4 text-[#863221] shrink-0" />
                     <span className="font-semibold">System role privileges are permanent and cannot be modified.</span>
                   </div>
@@ -1050,14 +1046,15 @@ export default function RolesAndPrivileges() {
 
                 {/* Rank-Protected Role Notice Banner */}
                 {isProtectedTarget && (
-                  <div className="mt-3 px-3.5 py-2 bg-[#FFC107]/15 border border-[#FFC107]/40 rounded-xl text-xs text-[#863221] flex items-center gap-2">
+                  <div className="px-3.5 py-2 bg-[#FFC107]/15 border border-[#FFC107]/40 rounded-xl text-xs text-[#863221] flex items-center gap-2">
                     <Lock className="w-4 h-4 text-[#863221] shrink-0" />
                     <span className="font-semibold">System Protection: access levels for this role cannot be modified (rank {privilegeTargetRole.rank_level} ≤ your rank {myRankLevel}).</span>
                   </div>
                 )}
 
+              <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)]">
                 {/* Quick Filter & Master Toggle Toolbar */}
-                <div className="mt-4 pt-3 border-t border-[#E8DFD8] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <div className="px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#863221]/50" />
                     <input
@@ -1094,9 +1091,8 @@ export default function RolesAndPrivileges() {
                     )}
                   </div>
                 </div>
-              </div>
 
-              {/* Scrollable Privilege Categories Grid */}
+              {/* Privilege table */}
               <div className="p-6 space-y-6">
                 <div className="flex items-start gap-2 p-3 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-[11px] text-[#863221]">
                   <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
@@ -1305,14 +1301,17 @@ export default function RolesAndPrivileges() {
                 })()}
               </div>
 
-              {/* Footer */}
-              <div className="sticky bottom-0 z-10 flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] rounded-b-2xl shadow-[0_-4px_10px_-6px_rgba(24,2,0,0.12)]">
+              </div>
+
+              {/* Action bar (stays at the bottom of the screen while the page scrolls) */}
+              <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 px-5 py-3 bg-white border border-[#E8DFD8] rounded-2xl shadow-[0_-4px_14px_-6px_rgba(24,2,0,0.15)]">
                 <button
                   type="button"
                   onClick={() => setPrivilegeTargetRole(null)}
-                  className="px-4 py-2 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-sm font-semibold rounded-xl transition-colors cursor-pointer"
                 >
-                  {isReadOnly ? 'Close' : 'Cancel'}
+                  <X className="w-4 h-4" />
+                  <span>{isReadOnly ? 'Close' : 'Cancel'}</span>
                 </button>
 
                 {!isReadOnly && (
@@ -1321,9 +1320,10 @@ export default function RolesAndPrivileges() {
                     onClick={handleSavePrivileges}
                     disabled={savingPrivileges || !hasPermission('users.privileges.write')}
                     title={!hasPermission('users.privileges.write') ? 'You need the users.privileges.write permission' : 'Save Privileges'}
-                    className="px-5 py-2 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer disabled:opacity-60"
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer disabled:opacity-60"
                   >
-                    {savingPrivileges ? 'Saving...' : 'Save Privileges'}
+                    <Save className="w-4 h-4" />
+                    <span>{savingPrivileges ? 'Saving...' : 'Save Privileges'}</span>
                   </button>
                 )}
               </div>
