@@ -57,7 +57,30 @@ export const describeAction = (method, url) => {
 
 // Resolves with the reason text, or null if the user cancelled.
 export const confirmAction = async (method, url) => {
-  return 'Action performed via UI';
+  // Reuse a just-given confirmation (a single action often fires several calls).
+  if (Date.now() - lastApproved.at < REUSE_MS && lastApproved.reason) {
+    return lastApproved.reason;
+  }
+
+  const { verb, entity, title } = describeAction(method, url);
+  const result = await Swal.fire({
+    title,
+    text: `Are you sure you want to ${verb.toLowerCase()} this ${entity}?`,
+    icon: verb === 'Delete' ? 'warning' : 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, I am sure',
+    cancelButtonText: 'Cancel',
+    confirmButtonColor: verb === 'Delete' ? '#ED4636' : '#510601',
+    cancelButtonColor: '#863221',
+    reverseButtons: true,
+    allowOutsideClick: false,
+  });
+
+  if (!result.isConfirmed) return null;
+
+  const reason = 'Confirmed via UI';
+  lastApproved = { at: Date.now(), reason };
+  return reason;
 };
 
 // Shown by api.js when the user backs out; pages display response.data.detail.

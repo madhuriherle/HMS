@@ -28,9 +28,12 @@ import {
   ChevronLeft,
   ShieldAlert,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  XCircle
 } from 'lucide-react';
 import api from '../api';
+import { askReason } from '../utils/dialogs';
+import { notify } from '../utils/notify';
 import {
   loadUnapprovedMembers,
   loadMembershipTypes,
@@ -75,10 +78,7 @@ export default function UnapprovedMembership() {
   // Toast feedback
   const [toastMessage, setToastMessage] = useState(null);
   const showToast = (message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4000);
+    notify(message, type);
   };
 
   // ----------------------------------------------------
@@ -238,11 +238,34 @@ export default function UnapprovedMembership() {
     setApproveDialog(member);
   };
 
+  // Reject = remove the application (the server records the reason)
+  const handleReject = async (member) => {
+    const reason = await askReason({
+      title: `Reject ${member.fullName || member.name}?`,
+      text: 'The application is removed from the unapproved list.',
+      confirmText: 'Yes, reject',
+      danger: true
+    });
+    if (!reason) return;
+    try {
+      const { data } = await api.delete(`/members/${member.id}`, { params: { reason, mode: 'SOFT' } });
+      showToast(
+        data?.status === 'PENDING'
+          ? `Rejection of ${member.fullName || member.name} submitted for approval.`
+          : `Application of ${member.fullName || member.name} rejected.`
+      );
+      if (viewingMember) setViewingMember(null);
+      await reloadData();
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Error rejecting the application', 'error');
+    }
+  };
+
   const handleConfirmApproval = async () => {
     if (!approveDialog) return;
     const memberToApprove = approveDialog;
     try {
-      const { data } = await api.put(`/members/${memberToApprove.id}/approve`);
+      const { data } = await api.put(`/members/${memberToApprove.id}/approve`, null, { params: { reason: 'Approved via UI' } });
       if (selectedIds.has(memberToApprove.id)) {
         const next = new Set(selectedIds);
         next.delete(memberToApprove.id);
@@ -538,6 +561,18 @@ export default function UnapprovedMembership() {
                           >
                             <Check className="w-3.5 h-3.5 shrink-0" />
                             <span>Approve</span>
+                          </button>
+
+                          {/* 4. Reject Action */}
+                          <button
+                            type="button"
+                            onClick={() => handleReject(m)}
+                            disabled={!hasPermission('members.delete')}
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 h-8 text-xs font-bold rounded-xl border border-red-200 text-[#ED4636] bg-white hover:bg-red-50 shadow-sm transition-all cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={!hasPermission('members.delete') ? 'Requires members.delete permission' : 'Reject this application'}
+                          >
+                            <XCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>Reject</span>
                           </button>
                         </div>
                       </td>

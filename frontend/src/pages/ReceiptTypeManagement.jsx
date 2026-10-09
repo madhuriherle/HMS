@@ -18,6 +18,7 @@ import {
   Layers
 } from 'lucide-react';
 import api from '../api';
+import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
 
@@ -72,10 +73,7 @@ export default function ReceiptTypeManagement() {
   const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
+    notify(message, type);
   };
 
 
@@ -294,58 +292,43 @@ export default function ReceiptTypeManagement() {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSaveSubType = (e) => {
+  const handleSaveSubType = async (e) => {
     e.preventDefault();
     if (!validateSubTypeForm()) return;
 
     const trimmedName = subTypeFormData.name.trim();
-    const parentId = parentTypeForSubType.id;
+    const parent = parentTypeForSubType;
+    const isActive = subTypeFormData.status === 'Active';
 
-    const updated = receiptTypes.map(rt => {
-      if (rt.id === parentId) {
-        const subTypes = rt.subTypes ? [...rt.subTypes] : [];
-        if (subTypeModalMode === 'add') {
-          const maxSubTypeId = subTypes.length > 0 ? Math.max(...subTypes.map(s => Number(s.id) || 0)) : parentId * 100;
-          const nextSubId = maxSubTypeId + 1;
-          const newSubType = {
-            id: nextSubId,
-            name: trimmedName,
-            status: subTypeFormData.status
-          };
-          return {
-            ...rt,
-            subTypes: [...subTypes, newSubType]
-          };
-        } else {
-          const updatedSubTypes = subTypes.map(st => {
-            if (st.id === editingSubType.id) {
-              return {
-                ...st,
-                name: trimmedName,
-                status: subTypeFormData.status
-              };
-            }
-            return st;
-          });
-          return {
-            ...rt,
-            subTypes: updatedSubTypes
-          };
-        }
+    try {
+      let data;
+      if (subTypeModalMode === 'add') {
+        const code = trimmedName.substring(0, 3).toUpperCase() + Date.now().toString().slice(-4);
+        ({ data } = await api.post('/masters/particulars', {
+          code,
+          name_en: trimmedName,
+          parent_id: parent.id,
+          status: isActive
+        }));
+      } else {
+        ({ data } = await api.put(`/masters/particulars/${editingSubType.id}`, {
+          name_en: trimmedName,
+          status: isActive
+        }));
       }
-      return rt;
-    });
-
-    persistReceiptTypes(updated);
-    // Ensure parent row is expanded so user sees the newly added/edited sub-type
-    setExpandedRows(prev => ({ ...prev, [parentId]: true }));
-
-    showToast(
-      subTypeModalMode === 'add'
-        ? `Sub-Type "${trimmedName}" added under ${parentTypeForSubType.name}.`
-        : `Sub-Type "${trimmedName}" updated successfully.`
-    );
-    setIsSubTypeModalOpen(false);
+      setExpandedRows((prev) => ({ ...prev, [parent.id]: true }));
+      showToast(
+        isPendingApproval(data)
+          ? `Sub-Type "${trimmedName}" submitted for approval.`
+          : subTypeModalMode === 'add'
+            ? `Sub-Type "${trimmedName}" added under ${parent.name}.`
+            : `Sub-Type "${trimmedName}" updated successfully.`
+      );
+      setIsSubTypeModalOpen(false);
+      await fetchReceiptTypes();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error saving sub-type', 'error');
+    }
   };
 
   // ----------------------------------------------------
@@ -378,7 +361,7 @@ export default function ReceiptTypeManagement() {
     const { targetType, item, newStatus } = statusDialog;
     const kind = targetType === 'subType' ? 'Sub-Type' : 'Particular';
     try {
-      const { data } = await api.put(`/masters/particulars/${item.id}`, { status: newStatus === 'Active' });
+      const { data } = await api.put(`/masters/particulars/${item.id}`, { status: newStatus === 'Active' }, { params: { reason: 'Status changed via UI' } });
       showToast(
         isPendingApproval(data)
           ? `Status change for ${kind} "${item.name}" submitted for approval.`
@@ -415,7 +398,7 @@ export default function ReceiptTypeManagement() {
     const { targetType, item, parentType } = deletingItem;
     const kind = targetType === 'subType' ? 'Sub-Type' : 'Particular';
     try {
-      const { data } = await api.delete(`/masters/particulars/${item.id}`);
+      const { data } = await api.delete(`/masters/particulars/${item.id}`, { params: { reason: 'Deleted via UI' } });
       showToast(
         isPendingApproval(data)
           ? `Delete request for ${kind} "${item.name}" submitted for approval.`

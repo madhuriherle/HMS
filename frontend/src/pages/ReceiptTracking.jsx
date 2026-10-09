@@ -31,6 +31,8 @@ import { loadParticulars, loadMembers, loadPaymentModeConfigs } from '../utils/s
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
+import { askForm, askReason, confirmYesNo } from '../utils/dialogs';
+import { notify } from '../utils/notify';
 import { fetchReceipts, normalizeReceipt, receiptToApiPayload } from '../utils/apiAdapters';
 
 // Helper to format currency in Indian Rupees
@@ -93,10 +95,7 @@ export default function ReceiptTracking() {
   const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4000);
+    notify(message, type);
   };
 
   // Particular names for the filter / edit dropdowns come from the Particulars master
@@ -289,12 +288,132 @@ export default function ReceiptTracking() {
   };
 
   // 2. Delete Receipt
+  // ----------------------------------------------------
+  // RECEIPT ACTIONS (all server calls): map / unmap, refund, cancel
+  // ----------------------------------------------------
+  const isPendingApproval = (data) => Boolean(data && (data.approval_request_id || data.status === 'PENDING'));
+
+  const afterReceiptAction = async (data, doneMessage, pendingMessage) => {
+    showToast(isPendingApproval(data) ? pendingMessage : doneMessage);
+    setViewingReceipt(null);
+    await reloadData();
+  };
+
+  const handleMapReceipt = async (receipt) => {
+    const v = await askForm({
+      title: `Map receipt #${receipt.receiptNumber} to a member`,
+      confirmText: 'Map receipt',
+      fields: [
+        {
+          name: 'memberId',
+          label: 'Member',
+          type: 'select',
+          required: true,
+          options: members.map((m) => ({
+            value: m.id,
+            label: `${m.name || m.first_name_en || ''} (${m.member_code || `#${m.id}`})`
+          }))
+        },
+        { name: 'amount', label: 'Amount to allocate', type: 'number', required: true, value: receipt.amount }
+      ]
+    });
+    if (!v) return;
+    try {
+      const { data } = await api.post(`/receipts/${receipt.id}/allocate`, {
+        member_id: Number(v.memberId),
+        allocated_amount: v.amount
+      });
+      await afterReceiptAction(data, 'Receipt mapped to the member.', 'Mapping submitted for approval.');
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Error mapping the receipt', 'error');
+    }
+  };
+
+  const handleRemoveMapping = async (receipt) => {
+    try {
+      const { data: allocations } = await api.get(`/receipts/${receipt.id}/allocations`);
+      if (!allocations.length) {
+        showToast('This receipt is not mapped to anyone.', 'error');
+        return;
+      }
+      let target = allocations[0];
+      if (allocations.length > 1) {
+        const v = await askForm({
+          title: 'Remove which mapping?',
+          confirmText: 'Remove',
+          fields: [{
+            name: 'allocationId',
+            label: 'Mapping',
+            type: 'select',
+            required: true,
+            options: allocations.map((a) => ({
+              value: a.id,
+              label: `${a.member_name || a.associate_name || `#${a.id}`} - ${a.allocated_amount}`
+            }))
+          }]
+        });
+        if (!v) return;
+        target = allocations.find((a) => String(a.id) === String(v.allocationId));
+      } else {
+        const ok = await confirmYesNo({
+          title: 'Remove the mapping?',
+          text: `Receipt #${receipt.receiptNumber} will no longer be mapped to ${target.member_name || 'this member'}.`,
+          confirmText: 'Yes, remove',
+          danger: true
+        });
+        if (!ok) return;
+      }
+      const { data } = await api.delete(`/receipts/${receipt.id}/allocations/${target.id}`);
+      await afterReceiptAction(data, 'Mapping removed.', 'Removal submitted for approval.');
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Error removing the mapping', 'error');
+    }
+  };
+
+  const handleRefundReceipt = async (receipt) => {
+    const v = await askForm({
+      title: `Refund receipt #${receipt.receiptNumber}`,
+      confirmText: 'Record refund',
+      fields: [
+        { name: 'amount', label: 'Refund amount', type: 'number', required: true, value: receipt.amount },
+        { name: 'reference', label: 'Refund reference (optional)' }
+      ]
+    });
+    if (!v) return;
+    try {
+      const { data } = await api.post(`/receipts/${receipt.id}/refund`, {
+        amount: v.amount,
+        status: 'PENDING',
+        refund_reference: v.reference || null
+      });
+      await afterReceiptAction(data, 'Refund recorded.', 'Refund submitted for approval.');
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Error recording the refund', 'error');
+    }
+  };
+
+  const handleCancelReceipt = async (receipt) => {
+    const reason = await askReason({
+      title: `Cancel receipt #${receipt.receiptNumber}?`,
+      text: 'A cancelled receipt stays on record but no longer counts as paid.',
+      confirmText: 'Yes, cancel receipt',
+      danger: true
+    });
+    if (!reason) return;
+    try {
+      const { data } = await api.post(`/receipts/${receipt.id}/cancel`, { reason });
+      await afterReceiptAction(data, 'Receipt cancelled.', 'Cancellation submitted for approval.');
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Error cancelling the receipt', 'error');
+    }
+  };
+
   const handleConfirmDelete = async () => {
     if (!deletingReceipt) return;
 
     const num = deletingReceipt.receiptNumber;
     try {
-      await api.delete(`/receipts/${deletingReceipt.id}`);
+      await api.delete(`/receipts/${deletingReceipt.id}`, { params: { reason: 'Deleted via UI' } });
       setReceipts((prev) => prev.filter((r) => r.id !== deletingReceipt.id));
       showToast(`Receipt #${num} deleted successfully.`);
     } catch (error) {
@@ -656,7 +775,48 @@ export default function ReceiptTracking() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+              <div className="flex flex-wrap items-center gap-2">
+                {String(viewingReceipt.status).toUpperCase() !== 'CANCELLED' && (
+                  <>
+                    {isReceiptUnmapped(viewingReceipt) ? (
+                      <button
+                        type="button"
+                        onClick={() => handleMapReceipt(viewingReceipt)}
+                        disabled={!hasPermission('receipts.write')}
+                        className="px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
+                      >
+                        Map to member
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMapping(viewingReceipt)}
+                        disabled={!hasPermission('receipts.write')}
+                        className="px-3.5 py-2 bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#510601] text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
+                      >
+                        Remove mapping
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRefundReceipt(viewingReceipt)}
+                      disabled={!hasPermission('receipts.write')}
+                      className="px-3.5 py-2 bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#510601] text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
+                    >
+                      Refund
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleCancelReceipt(viewingReceipt)}
+                      disabled={!hasPermission('receipts.write')}
+                      className="px-3.5 py-2 bg-white hover:bg-red-50 border border-red-200 text-[#ED4636] text-xs font-semibold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
+                    >
+                      Cancel receipt
+                    </button>
+                  </>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setViewingReceipt(null)}

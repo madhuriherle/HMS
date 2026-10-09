@@ -45,6 +45,8 @@ import {
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
+import { askForm } from '../utils/dialogs';
+import { notify } from '../utils/notify';
 import {
   fetchMembers,
   memberToApiPayload,
@@ -110,10 +112,7 @@ export default function MembershipList() {
   // Toast feedback
   const [toastMessage, setToastMessage] = useState(null);
   const showToast = (message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
+    notify(message, type);
   };
 
   // ----------------------------------------------------
@@ -578,13 +577,67 @@ export default function MembershipList() {
   // ----------------------------------------------------
   // STATUS & DELETE HANDLERS
   // ----------------------------------------------------
+  // ----------------------------------------------------
+  // MEMBER PROFILE ACTIONS (server calls): membership type, photo
+  // ----------------------------------------------------
+  const handleAssignMembership = async (member) => {
+    const v = await askForm({
+      title: `Membership for ${member.fullName || member.name}`,
+      text: 'The membership starts at the type\'s current price.',
+      confirmText: 'Add membership',
+      fields: [
+        {
+          name: 'typeId',
+          label: 'Membership type',
+          type: 'select',
+          required: true,
+          options: membershipTypes
+            .filter((mt) => mt.status === 'Active')
+            .map((mt) => ({ value: mt.id, label: mt.name }))
+        }
+      ]
+    });
+    if (!v) return;
+    try {
+      const { data } = await api.post(`/members/${member.id}/memberships`, {
+        membership_type_id: Number(v.typeId)
+      });
+      showToast(
+        data?.approval_request_id || data?.status === 'PENDING'
+          ? 'Membership change submitted for approval.'
+          : 'Membership added.'
+      );
+      await loadMembers();
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Error adding the membership', 'error');
+    }
+  };
+
+  const handleUploadPhoto = async (member) => {
+    const v = await askForm({
+      title: `Photo for ${member.fullName || member.name}`,
+      confirmText: 'Upload',
+      fields: [{ name: 'file', label: 'Photo (JPG or PNG)', type: 'file', required: true }]
+    });
+    if (!v) return;
+    try {
+      const form = new FormData();
+      form.append('file', v.file);
+      await api.post(`/members/${member.id}/photo`, form);
+      showToast('Photo uploaded.');
+      await loadMembers();
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Error uploading the photo', 'error');
+    }
+  };
+
   const handleConfirmStatusToggle = async () => {
     if (!statusDialog) return;
     const { member, nextStatus } = statusDialog;
     try {
       const { data } = await api.put(`/members/${member.id}`, {
         member_status: nextStatus === 'Active' ? 'ACTIVE' : 'INACTIVE',
-      });
+      }, { params: { reason: 'Status changed via UI' } });
       const updatedMember = normalizeMember(data);
       setMembers((prev) => prev.map((m) => (m.id === member.id ? updatedMember : m)));
       showToast(`Member "${member.fullName || member.name}" set to ${nextStatus}.`);
@@ -1731,6 +1784,28 @@ export default function MembershipList() {
                 className="text-[#863221]/60 hover:text-[#180200] p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Profile actions */}
+            <div className="flex flex-wrap items-center gap-2 px-6 py-3 border-b border-[#E8DFD8] bg-white">
+              <button
+                type="button"
+                onClick={() => handleAssignMembership(viewingMember)}
+                disabled={!hasPermission('members.write')}
+                title={!hasPermission('members.write') ? 'Requires members.write permission' : undefined}
+                className="px-3 py-1.5 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-40"
+              >
+                Add / change membership
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUploadPhoto(viewingMember)}
+                disabled={!hasPermission('members.write')}
+                title={!hasPermission('members.write') ? 'Requires members.write permission' : undefined}
+                className="px-3 py-1.5 bg-white hover:bg-[#FAF7F2] border border-[#E8DFD8] text-[#510601] text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-40"
+              >
+                Upload photo
               </button>
             </div>
 

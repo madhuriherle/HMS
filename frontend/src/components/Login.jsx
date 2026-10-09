@@ -3,6 +3,7 @@ import { Eye, EyeOff, AlertCircle, ArrowRight, User, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import logoIcon from '../assets/logo-icon.png';
 import api from '../api';
+import { notifySuccess } from '../utils/notify';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -73,6 +74,7 @@ export default function Login() {
       }
 
       navigate('/dashboard');
+      notifySuccess('Login successful! Welcome back.');
     } catch (err) {
       const detail = err?.response?.data?.detail;
       setAuthError(

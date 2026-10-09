@@ -6,6 +6,7 @@ import {
   Search,
   Edit3,
   Eye,
+  Trash2,
   ChevronRight,
   ChevronLeft,
   CheckCircle2,
@@ -18,6 +19,7 @@ import {
   SlidersHorizontal
 } from 'lucide-react';
 import api from '../api';
+import { notify } from '../utils/notify';
 import { formatPaymentModeLabel } from '../utils/displayHelpers';
 import { loadReceipts } from '../utils/serverData';
 import useAuth from '../hooks/useAuth';
@@ -80,15 +82,13 @@ export default function BankDetailsManagement() {
 
   // Status Toggle Confirmation Dialog State
   const [statusDialog, setStatusDialog] = useState(null); // { item, newStatus }
+  const [deleteDialog, setDeleteDialog] = useState(null); // payment mode to delete
 
   // Toast / Feedback State
   const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
+    notify(message, type);
   };
 
 
@@ -437,12 +437,33 @@ export default function BankDetailsManagement() {
 
   const isPendingApproval = (data) => Boolean(data && (data.approval_request_id || data.status === 'PENDING'));
 
+  const handleToggleStatusClick = (config) => {
+    setStatusDialog({ item: config, newStatus: config.status === 'Active' ? 'Inactive' : 'Active' });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteDialog) return;
+    const label = formatPaymentModeLabel(deleteDialog);
+    try {
+      const { data } = await api.delete(`/masters/payment-modes/${deleteDialog.id}`);
+      showToast(
+        isPendingApproval(data)
+          ? `Delete request for "${label}" submitted for approval.`
+          : `"${label}" deleted. Existing receipts keep the mode they were recorded with.`
+      );
+      await fetchConfigs();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error deleting payment mode', 'error');
+    }
+    setDeleteDialog(null);
+  };
+
   const confirmStatusToggle = async () => {
     if (!statusDialog) return;
     const { item, newStatus } = statusDialog;
     const label = formatPaymentModeLabel(item);
     try {
-      const { data } = await api.put(`/masters/payment-modes/${item.id}`, { status: newStatus === 'Active' });
+      const { data } = await api.put(`/masters/payment-modes/${item.id}`, { status: newStatus === 'Active' }, { params: { reason: 'Status changed via UI' } });
       showToast(
         isPendingApproval(data)
           ? `Status change for "${label}" submitted for approval.`
@@ -628,7 +649,7 @@ export default function BankDetailsManagement() {
                         </button>
                       </td>
 
-                      {/* Column: Action (Only View and Edit - Strictly NO Delete) */}
+                      {/* Column: Actions */}
                       <td className="py-4 px-4 sm:px-6 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {/* View Button */}
@@ -652,6 +673,18 @@ export default function BankDetailsManagement() {
                           >
                             <Edit3 className="w-3.5 h-3.5" />
                             <span>Edit</span>
+                          </button>
+
+                          {/* Delete Button */}
+                          <button
+                            type="button"
+                            onClick={() => setDeleteDialog(config)}
+                            disabled={!hasPermission('masters.delete')}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#ED4636] hover:bg-red-50 border border-red-200 rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete Payment Mode'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
                           </button>
                         </div>
                       </td>
@@ -1193,6 +1226,40 @@ export default function BankDetailsManagement() {
                   }`}
               >
                 Confirm {statusDialog.newStatus}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Delete confirmation */}
+      <Modal isOpen={!!deleteDialog} onClose={() => setDeleteDialog(null)} className="p-4">
+        {deleteDialog && (
+          <div className="bg-white rounded-2xl shadow-xl border border-[#E8DFD8] w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-5 text-center">
+              <div className="w-12 h-12 rounded-full mx-auto flex items-center justify-center mb-3 bg-red-50 text-[#ED4636]">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <h4 className="text-base font-bold text-[#180200] font-serif mb-1">Delete Payment Mode?</h4>
+              <p className="text-xs text-[#863221] leading-relaxed">
+                {`"${formatPaymentModeLabel(deleteDialog)}" will be removed from the Payment Mode dropdown. Receipts already recorded with it are not changed.`}
+              </p>
+            </div>
+            <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setDeleteDialog(null)}
+                className="px-4 py-2 border border-[#E8DFD8] text-xs font-semibold text-[#863221] hover:bg-white rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!hasPermission('masters.delete')}
+                onClick={confirmDelete}
+                className="px-5 py-2 text-xs font-bold text-white rounded-xl shadow-sm transition-colors cursor-pointer bg-[#ED4636] hover:bg-[#C93324] disabled:opacity-40"
+              >
+                Confirm Delete
               </button>
             </div>
           </div>

@@ -190,6 +190,10 @@ MENU_PAGE_CATALOG = [
     ("masters.particulars", "Particulars Master", "masters", "/dashboard/master/receipt-type", "list-checks", 3, "masters.read", None),
     ("masters.organisation", "Organisation Settings", "masters", "/dashboard/master/organisation-settings", "building", 4, "system.read", None),
     ("masters.payment_modes", "Payment Mode Setup", "masters", "/dashboard/master/payment-modes", "credit-card", 5, "masters.read", None),
+    ("masters.banks", "Bank Master", "masters", "/dashboard/master/banks", "building", 6, "masters.read", None),
+    ("masters.personal", "Personal Masters", "masters", "/dashboard/master/personal-masters", "list-checks", 7, "masters.read", None),
+    # parent may list alternatives ("a|b"): the first module code that exists is used
+    ("approvals.requests", "Approval Requests", "approvals|members.approvals", "/dashboard/approvals", "check-circle", 1, "members.approvals.read", None),
 ]
 
 # Older rows were seeded with API-style routes; point them at the real pages,
@@ -212,7 +216,7 @@ def seed_menu_pages(db) -> int:
     for code, name, parent, route, icon, order, perm, min_rank in MENU_PAGE_CATALOG:
         if code in rows:
             continue
-        parent_row = rows.get(parent) if parent else None
+        parent_row = next((rows[c] for c in (parent or '').split('|') if c in rows), None) if parent else None
         if parent and not parent_row:
             logger.error("Menu page '%s' references unknown parent module '%s' - skipped.", code, parent)
             continue

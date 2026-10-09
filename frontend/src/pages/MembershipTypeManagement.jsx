@@ -25,6 +25,7 @@ import {
   FileText
 } from 'lucide-react';
 import api from '../api';
+import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
 
@@ -123,10 +124,7 @@ export default function MembershipTypeManagement() {
   const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
+    notify(message, type);
   };
 
 
@@ -284,6 +282,82 @@ export default function MembershipTypeManagement() {
 
   const isPendingApproval = (data) => Boolean(data && (data.approval_request_id || data.status === 'PENDING'));
 
+  // ---- price history (read from the server) ----
+  const handleOpenHistory = async (item) => {
+    try {
+      const res = await api.get(`/masters/membership-types/${item.id}/prices`, { params: { limit: 200 } });
+      const priceHistory = (res.data?.data || []).map((p) => ({
+        id: p.id,
+        price: Number(p.amount),
+        effectiveFrom: p.effective_from,
+        effectiveTo: p.effective_to || 'Present',
+        reason: p.change_reason || '',
+        changedAt: p.created_at ? String(p.created_at).slice(0, 10) : ''
+      }));
+      setHistoryTargetItem({
+        ...item,
+        effectiveFrom: priceHistory[0]?.effectiveFrom || item.effectiveFrom,
+        priceHistory
+      });
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Failed to load the price history.', 'error');
+    }
+  };
+
+  // ---- update price ----
+  const openUpdatePriceModal = (item) => {
+    setPriceTargetItem(item);
+    setPriceFormData({
+      newPrice: '',
+      effectiveFrom: new Date().toISOString().split('T')[0],
+      reason: ''
+    });
+    setPriceFormErrors({});
+    setIsUpdatePriceOpen(true);
+  };
+
+  const handlePriceFormChange = (e) => {
+    const { name, value } = e.target;
+    setPriceFormData((prev) => ({
+      ...prev,
+      [name]: name === 'newPrice' ? value.replace(/[^\d.]/g, '') : value
+    }));
+    if (priceFormErrors[name]) {
+      setPriceFormErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validatePriceForm = () => {
+    const errors = {};
+    const price = Number(priceFormData.newPrice);
+    if (!priceFormData.newPrice || Number.isNaN(price) || price <= 0) {
+      errors.newPrice = 'Enter a price greater than 0.';
+    }
+    if (!priceFormData.effectiveFrom) {
+      errors.effectiveFrom = 'Effective date is required.';
+    }
+    setPriceFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // ---- delete ----
+  const handleConfirmDelete = async () => {
+    if (!deletingItem) return;
+    const item = deletingItem;
+    try {
+      const { data } = await api.delete(`/masters/membership-types/${item.id}`);
+      showToast(
+        isPendingApproval(data)
+          ? `Delete request for "${item.name}" submitted for approval.`
+          : `Membership Type "${item.name}" deleted.`
+      );
+      await fetchMembershipTypes();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error deleting membership type', 'error');
+    }
+    setDeletingItem(null);
+  };
+
   const handleSavePriceUpdate = async (e) => {
     e.preventDefault();
     if (!validatePriceForm()) return;
@@ -321,7 +395,7 @@ export default function MembershipTypeManagement() {
     if (!statusDialog) return;
     const { item, newStatus } = statusDialog;
     try {
-      const { data } = await api.put(`/masters/membership-types/${item.id}`, { status: newStatus === 'Active' });
+      const { data } = await api.put(`/masters/membership-types/${item.id}`, { status: newStatus === 'Active' }, { params: { reason: 'Status changed via UI' } });
       showToast(
         isPendingApproval(data)
           ? `Status change for "${item.name}" submitted for approval.`

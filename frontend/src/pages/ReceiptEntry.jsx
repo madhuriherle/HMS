@@ -34,6 +34,7 @@ import {
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
+import { notify } from '../utils/notify';
 import {
   fetchMembers,
   fetchReceipts,
@@ -157,10 +158,7 @@ export default function ReceiptEntry() {
   const hasActiveSubTypes = activeSubTypes.length > 0;
 
   const showToast = (message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4000);
+    notify(message, type);
   };
 
   // ----------------------------------------------------

@@ -16,6 +16,8 @@ import MembershipList from './pages/MembershipList';
 import UnapprovedMembership from './pages/UnapprovedMembership';
 import OrganisationSettings from './pages/OrganisationSettings';
 import BankDetailsManagement from './pages/BankDetailsManagement';
+import Approvals from './pages/Approvals';
+import PersonalMasters, { BankMaster } from './pages/MasterLists';
 
 function App() {
   return (
@@ -54,6 +56,9 @@ function App() {
           <Route path="settings/organisation" element={<OrganisationSettings />} />
           <Route path="settings" element={<OrganisationSettings />} />
           <Route path="master/payment-modes" element={<BankDetailsManagement />} />
+          <Route path="master/banks" element={<BankMaster />} />
+          <Route path="master/personal-masters" element={<PersonalMasters />} />
+          <Route path="approvals" element={<Approvals />} />
           <Route path="masters/payment-modes" element={<BankDetailsManagement />} />
           <Route path="master/payment-mode" element={<BankDetailsManagement />} />
           <Route path="masters/payment-mode" element={<BankDetailsManagement />} />

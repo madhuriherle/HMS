@@ -32,6 +32,7 @@ import {
   FileText
 } from 'lucide-react';
 import api from '../api';
+import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
 
@@ -121,10 +122,7 @@ export default function UserManagement() {
   const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
+    notify(message, type);
   };
 
   // Helper to resolve role object from roleId
@@ -403,7 +401,7 @@ export default function UserManagement() {
     const { user, newStatus } = statusDialog;
 
     try {
-      const res = await api.put(`/users/${user.id}`, { status: newStatus });
+      const res = await api.put(`/users/${user.id}`, { status: newStatus }, { params: { reason: 'Status changed via UI' } });
       const updated = res.data?.id ? res.data : { ...user, status: newStatus };
       setUsers(prev => prev.map(u => (u.id === user.id || String(u.id) === String(user.id)) ? updated : u));
 
@@ -433,7 +431,7 @@ export default function UserManagement() {
     const target = deleteTargetUser;
 
     try {
-      const res = await api.delete(`/users/${target.id}`);
+      const res = await api.delete(`/users/${target.id}`, { params: { reason: 'Deleted via UI' } });
       if (res.data?.approval_request_id || res.data?.status === 'PENDING') {
         showToast('User deletion submitted for approval.');
       } else {

@@ -24,6 +24,8 @@ import {
   Info
 } from 'lucide-react';
 import api from '../api';
+import { askForm, confirmYesNo } from '../utils/dialogs';
+import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
 
@@ -60,7 +62,7 @@ export default function LocationSetup() {
       const sName = (arr, id) => { const f = arr?.find(x => x.id === id); return f ? f.name_en : ''; };
       const dState = (arr, id) => { const f = arr?.find(x => x.id === id); return f ? f.state_id : ''; };
 
-      const mapState = s => ({ id: s.id, name: s.name_en, status: s.status ? 'Active' : 'Inactive' });
+      const mapState = s => ({ id: s.id, name: s.name_en, code: s.code || '', status: s.status ? 'Active' : 'Inactive' });
       const mapDist = d => ({ id: d.id, name: d.name_en, stateId: d.state_id, status: d.status ? 'Active' : 'Inactive', stateName: sName(stRes.data?.data, d.state_id) });
       const mapTk = t => ({ id: t.id, name: t.name_en, districtId: t.district_id, stateId: dState(dtRes.data?.data, t.district_id), status: t.status ? 'Active' : 'Inactive', districtName: sName(dtRes.data?.data, t.district_id) });
       const mapPc = p => ({ 
@@ -98,10 +100,7 @@ export default function LocationSetup() {
   // Toast feedback
   const [toastMessage, setToastMessage] = useState(null);
   const showToast = (message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
+    notify(message, type);
   };
 
   // ====================================================
@@ -792,13 +791,53 @@ export default function LocationSetup() {
       ? `PIN Code "${item.postalCode}"`
       : `${type.charAt(0).toUpperCase() + type.slice(1)} "${item.name}"`;
 
+  const handleEditState = async (st) => {
+    const v = await askForm({
+      title: 'Edit State',
+      confirmText: 'Save',
+      fields: [
+        { name: 'name', label: 'State name', required: true, value: st.name },
+        { name: 'code', label: 'State code', value: st.code }
+      ]
+    });
+    if (!v) return;
+    try {
+      const { data } = await api.put(`/masters/states/${st.id}`, { name_en: v.name, code: v.code || null });
+      showToast(isPendingApproval(data) ? `Change to "${st.name}" submitted for approval.` : `State "${v.name}" updated.`);
+      await fetchMasters();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error updating state', 'error');
+    }
+  };
+
+  const handleDeleteState = async (st) => {
+    const dCount = districts.filter((d) => d.stateId === st.id).length;
+    const tCount = taluks.filter((x) => x.stateId === st.id).length;
+    const pCount = postalCodes.filter((x) => x.stateId === st.id).length;
+    const ok = await confirmYesNo({
+      title: `Delete ${st.name}?`,
+      text: `This also deletes its ${dCount} districts, ${tCount} taluks and ${pCount} PIN codes. Members linked to them lose their location names.`,
+      confirmText: 'Yes, delete everything',
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      const { data } = await api.delete(`/masters/states/${st.id}`);
+      showToast(isPendingApproval(data) ? `Delete request for "${st.name}" submitted for approval.` : `State "${st.name}" deleted.`);
+      if (selectedStateId === st.id) setSelectedStateId('');
+      await fetchMasters();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error deleting state', 'error');
+    }
+  };
+
   const handleConfirmStatusToggle = async () => {
     if (!statusDialog) return;
     const { type, item, nextStatus } = statusDialog;
     try {
       const { data } = await api.put(`/masters/${LOCATION_PATHS[type]}/${item.id}`, {
         status: nextStatus === 'Active'
-      });
+      }, { params: { reason: 'Status changed via UI' } });
       showToast(
         isPendingApproval(data)
           ? `Status change for ${locationLabel(type, item)} submitted for approval.`
@@ -815,7 +854,7 @@ export default function LocationSetup() {
     if (!deleteDialog) return;
     const { type, item } = deleteDialog;
     try {
-      const { data } = await api.delete(`/masters/${LOCATION_PATHS[type]}/${item.id}`);
+      const { data } = await api.delete(`/masters/${LOCATION_PATHS[type]}/${item.id}`, { params: { reason: 'Deleted via UI' } });
       showToast(
         isPendingApproval(data)
           ? `Delete request for ${locationLabel(type, item)} submitted for approval.`
@@ -945,6 +984,30 @@ export default function LocationSetup() {
                         >
                           <span className={`w-1.5 h-1.5 rounded-full ${st.status === 'Active' ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                           <span>{st.status}</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!hasPermission('masters.write')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditState(st);
+                          }}
+                          className="p-1.5 rounded-lg text-[#510601] hover:bg-[#FAF7F2] border border-[#E8DFD8] cursor-pointer disabled:opacity-40"
+                          title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit State'}
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!hasPermission('masters.delete')}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteState(st);
+                          }}
+                          className="p-1.5 rounded-lg text-[#ED4636] hover:bg-red-50 border border-red-200 cursor-pointer disabled:opacity-40"
+                          title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete State'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>

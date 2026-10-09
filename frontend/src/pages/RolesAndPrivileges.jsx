@@ -27,6 +27,7 @@ import {
   FileText
 } from 'lucide-react';
 import api from '../api';
+import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
 
@@ -152,10 +153,7 @@ export default function RolesAndPrivileges() {
   const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
+    notify(message, type);
   };
 
   // ----------------------------------------------------
@@ -366,7 +364,7 @@ export default function RolesAndPrivileges() {
     const { role, newStatus } = statusDialog;
 
     try {
-      const res = await api.put(`/users/roles/${role.id}`, { status: newStatus });
+      const res = await api.put(`/users/roles/${role.id}`, { status: newStatus }, { params: { reason: 'Status changed via UI' } });
       if (isPendingApproval(res.data)) {
         showToast('Status change submitted for approval.');
       } else {
@@ -391,7 +389,7 @@ export default function RolesAndPrivileges() {
     const target = deleteTargetRole;
 
     try {
-      const res = await api.delete(`/users/roles/${target.id}`);
+      const res = await api.delete(`/users/roles/${target.id}`, { params: { reason: 'Deleted via UI' } });
       if (isPendingApproval(res.data)) {
         showToast('Role deletion submitted for approval.');
       } else {

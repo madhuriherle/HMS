@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
+import { notify } from '../utils/notify';
 import {
   Printer,
   Search,
@@ -26,6 +27,9 @@ import {
   Download
 } from 'lucide-react';
 import { loadMembers, loadMembershipTypes, loadReceipts } from '../utils/serverData';
+import api from '../api';
+import { askForm } from '../utils/dialogs';
+import useAuth from '../hooks/useAuth';
 
 // Date formatter
 const formatDate = (dateStr) => {
@@ -38,6 +42,7 @@ const formatDate = (dateStr) => {
 };
 
 export default function LabelList() {
+  const { hasPermission } = useAuth();
   // Synchronized stores
   // Label list = members that have a receipt mapped to them (paid members), all read from the server
   const [labelList, setLabelList] = useState([]);
@@ -65,10 +70,7 @@ export default function LabelList() {
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   const showToast = (message, type = 'success') => {
-    setToast({ show: true, message, type });
-    setTimeout(() => {
-      setToast({ show: false, message: '', type: 'success' });
-    }, 4000);
+    notify(message, type);
   };
 
   const loadLabelData = async (typeId) => {
@@ -177,6 +179,53 @@ export default function LabelList() {
     return labelList.filter((item) => selectedIds.includes(item.id));
   }, [labelList, selectedIds]);
 
+  // Generate a label batch on the server (paid members only) and download its PDF
+  const handleGenerateBatch = async () => {
+    const now = new Date();
+    const v = await askForm({
+      title: 'Generate label batch',
+      text: 'Creates the labels for members who have paid, and downloads them as a PDF.',
+      confirmText: 'Generate',
+      fields: [
+        {
+          name: 'month',
+          label: 'Magazine issue (month)',
+          type: 'month',
+          required: true,
+          value: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        }
+      ]
+    });
+    if (!v) return;
+    try {
+      const { data } = await api.post('/magazines/generate-labels', null, {
+        params: { issue_month_year: v.month, only_paid: true }
+      });
+      if (data?.approval_request_id || data?.status === 'PENDING') {
+        showToast('Label batch submitted for approval.');
+        return;
+      }
+      const pdf = await api.get(`/magazines/label-batches/${data.batch_id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(pdf.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `labels-${v.month}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast(`Label batch generated (${data.total_labels ?? data.total ?? ''} labels).`);
+    } catch (error) {
+      let detail = error.response?.data?.detail;
+      if (!detail && error.response?.data instanceof Blob) {
+        try {
+          detail = JSON.parse(await error.response.data.text()).detail;
+        } catch (_) {}
+      }
+      showToast(detail || 'Error generating the label batch', 'error');
+    }
+  };
+
   // Direct print trigger
   const handleTriggerPrint = () => {
     window.print();
@@ -227,6 +276,17 @@ export default function LabelList() {
             <User className="h-4 w-4 text-[#8C1801]" />
             <span>Membership List</span>
           </Link>
+
+          <button
+            type="button"
+            onClick={handleGenerateBatch}
+            disabled={!hasPermission('magazines.write')}
+            title={!hasPermission('magazines.write') ? 'Requires magazines.write permission' : 'Generate a label batch (PDF) for paid members'}
+            className="inline-flex items-center gap-2 rounded-lg border border-[#E8DFD8] bg-white px-4 py-2 text-sm font-medium text-[#510601] shadow-sm hover:bg-[#FAF7F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <Printer className="h-4 w-4" />
+            <span>Generate Batch (PDF)</span>
+          </button>
 
           <button
             type="button"

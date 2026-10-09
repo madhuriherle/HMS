@@ -8,7 +8,7 @@ password = "D-apps@123456"
 
 local_base = r"D:\python_project\hms"
 remote_repo = "/opt/hms-mma/repo"
-docker_dir = "/opt/hms-mma"
+web_root = "/var/www/html/hms"
 
 def safe_print(value):
     encoding = sys.stdout.encoding or "utf-8"
@@ -32,14 +32,21 @@ if __name__ == "__main__":
     ssh.connect(hostname, username=username, password=password)
     sftp = ssh.open_sftp()
     
-    local_path = os.path.join(local_base, "backend", "api", "v1", "endpoints", "master_settings", "geography.py")
-    remote_path = f"{remote_repo}/hms/backend/api/v1/endpoints/master_settings/geography.py"
+    local_path = os.path.join(local_base, "frontend", "src", "pages", "Dashboard.jsx")
+    remote_path = f"{remote_repo}/frontend/src/pages/Dashboard.jsx"
     print(f"Uploading {local_path} -> {remote_path}")
     sftp.put(local_path, remote_path)
     
-    print("--- Restarting Backend (Docker) ---")
-    run_command(ssh, f"cd {docker_dir} && docker compose up -d --build")
+    print("--- Building Frontend ---")
+    run_command(ssh, f"cd {remote_repo}/frontend && npm run build")
+    
+    print(f"--- Deploying Frontend to Nginx ---")
+    run_command(ssh, f"mkdir -p {web_root}")
+    run_command(ssh, f"cp -r {remote_repo}/frontend/dist/* {web_root}/")
+    
+    print("--- Restarting Nginx ---")
+    run_command(ssh, "systemctl restart nginx")
 
     sftp.close()
     ssh.close()
-    print("Backend Deployment complete.")
+    print("Frontend Deployment complete.")

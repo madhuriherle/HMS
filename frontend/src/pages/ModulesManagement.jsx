@@ -17,6 +17,8 @@ import {
   X
 } from 'lucide-react';
 import api from '../api';
+import { notify } from '../utils/notify';
+import { askChecklist } from '../utils/dialogs';
 import useAuth from '../hooks/useAuth';
 
 const emptyForm = {
@@ -56,8 +58,7 @@ export default function ModulesManagement() {
   const [toastMessage, setToastMessage] = useState(null);
 
   const showToast = (message, type = 'success') => {
-    setToastMessage({ message, type });
-    setTimeout(() => setToastMessage(null), 3500);
+    notify(message, type);
   };
 
   const errDetail = (err, fallback) => {
@@ -253,6 +254,36 @@ export default function ModulesManagement() {
   // ----------------------------------------------------
   // STATUS TOGGLE
   // ----------------------------------------------------
+  // Attach privileges to a module (server call). Ticked privileges move to this module.
+  const handleLinkPrivileges = async (m) => {
+    try {
+      const res = await api.get('/users/permissions', { params: { limit: 500 } });
+      const perms = res.data?.data || [];
+      const names = Object.fromEntries(modules.map((x) => [x.id, x.name_en]));
+      const picked = await askChecklist({
+        title: `Privileges of "${m.name_en}"`,
+        text: 'Tick the privileges that belong to this module. A ticked privilege moves here from its current module.',
+        confirmText: 'Save',
+        items: perms.map((p) => ({
+          value: p.id,
+          label: `${p.code} - ${p.name}`,
+          hint: p.module_id && p.module_id !== m.id ? `Currently in: ${names[p.module_id] || p.module}` : '',
+          checked: p.module_id === m.id
+        }))
+      });
+      if (picked === null) return;
+      if (picked.length === 0) {
+        showToast('Select at least one privilege to link.', 'error');
+        return;
+      }
+      await api.post(`/users/modules/${m.id}/link-privileges`, picked);
+      showToast(`Privileges linked to "${m.name_en}".`);
+      await fetchModules();
+    } catch (err) {
+      showToast(errDetail(err, 'Error linking privileges'), 'error');
+    }
+  };
+
   const handleToggleStatus = async (m) => {
     try {
       const res = await api.put(`/users/modules/${m.id}`, { status: !m.status });
@@ -271,7 +302,7 @@ export default function ModulesManagement() {
     if (!deleteTarget) return;
     const target = deleteTarget;
     try {
-      await api.delete(`/users/modules/${target.id}`);
+      await api.delete(`/users/modules/${target.id}`, { params: { reason: 'Deleted via UI' } });
       setModules((prev) => prev.filter((m) => m.id !== target.id && String(m.id) !== String(target.id)));
       showToast(`Module "${target.name_en}" deleted successfully.`);
     } catch (err) {
@@ -455,6 +486,13 @@ export default function ModulesManagement() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => handleLinkPrivileges(m)}
+                          className="px-2 py-1 text-xs font-semibold text-[#510601] hover:bg-[#FAF7F2] rounded-lg border border-[#E8DFD8] transition-all cursor-pointer"
+                          title="Link privileges to this module"
+                        >
+                          Privileges
+                        </button>
                         <button
                           onClick={() => openEditModal(m)}
                           className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg border border-transparent hover:border-[#E8DFD8] transition-all cursor-pointer"

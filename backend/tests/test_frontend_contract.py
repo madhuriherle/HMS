@@ -458,17 +458,15 @@ def test_status_toggle_and_delete_persist(client, admin_headers):
         stored = next(x for x in _items(client.get(f"{API}/masters/{path}?limit=20000", headers=h).json()) if x["id"] == row["id"])
         assert stored["status"] is False, path
 
-    # parents with children are protected, with a readable reason
-    blocked = client.delete(f"{API}/masters/districts/{d['id']}", headers=h)
-    assert blocked.status_code == 409 and "taluks" in blocked.json()["detail"].lower(), blocked.text
-    blocked = client.delete(f"{API}/masters/taluks/{t['id']}", headers=h)
-    assert blocked.status_code == 409, blocked.text
-
-    # bottom-up delete removes the rows from the lists
-    for path, row in (("postal-codes", p), ("taluks", t), ("districts", d)):
-        r = client.delete(f"{API}/masters/{path}/{row['id']}", headers=h)
-        assert r.status_code in (200, 204), (path, r.text)
-        assert row["id"] not in _ids(client, h, path), f"{path} row still listed after delete"
+    # deleting a taluk removes its PIN codes; deleting a district removes its taluks and PIN codes
+    t2 = client.post(f"{API}/masters/taluks", headers=h, json={"name_en": f"DelT2{s}", "district_id": d["id"], "status": True}).json()
+    assert client.delete(f"{API}/masters/taluks/{t2['id']}", headers=h).status_code in (200, 204)
+    assert t2["id"] not in _ids(client, h, "taluks")
+    r = client.delete(f"{API}/masters/districts/{d['id']}", headers=h)
+    assert r.status_code in (200, 204), r.text
+    assert d["id"] not in _ids(client, h, "districts")
+    assert t["id"] not in _ids(client, h, "taluks"), "taluk survived its district"
+    assert p["id"] not in _ids(client, h, "postal-codes"), "PIN code survived its district"
 
     # particulars: status + delete
     pa = client.post(f"{API}/masters/particulars", headers=h, json={"code": f"DP{s}", "name_en": f"DelP{s}", "status": True}).json()
