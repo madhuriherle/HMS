@@ -571,6 +571,10 @@ def set_role_permissions(*, db: Session = Depends(deps.get_db), current_user: Us
     if unknown_gated:
         raise HTTPException(400, f"approval_required_codes must be a subset of permission_codes: {', '.join(sorted(unknown_gated))}")
 
+    on_approvals = sorted(c for c in approval_required if c.startswith("approvals."))
+    if on_approvals:
+        raise HTTPException(400, f"Approving is always direct and cannot itself need approval: {', '.join(on_approvals)}")
+
     codes_by_id = {p.id: p.code for p in perms}
     gated_ids = {p.id for p in perms if p.code in approval_required}
 

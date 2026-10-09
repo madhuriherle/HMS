@@ -1001,30 +1001,14 @@ export default function RolesAndPrivileges() {
             <div className="space-y-6">
               {/* Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
-                    Configure Privileges – {privilegeTargetRole.name}
-                  </h1>
-                  <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                    {isSysTarget && (
-                      <span className="px-2 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[10px] font-bold rounded-md">
-                        System Role (Read-Only)
-                      </span>
-                    )}
-                    {isProtectedTarget && (
-                      <span className="px-2 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[10px] font-bold rounded-md">
-                        Rank-Protected (Read-Only)
-                      </span>
-                    )}
-                    <p className="text-xs text-[#863221]">
-                      {isReadOnly
-                        ? (isSysTarget
-                          ? 'Super Admin / System roles maintain permanent full-access across all modules.'
-                          : 'This role is at or above your rank, so its access levels can only be viewed.')
-                        : 'Choose what this role can read, write and delete.'}
-                    </p>
-                  </div>
-                </div>
+                <h1 className="flex flex-wrap items-center gap-3 text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
+                  <span>Configure Privileges – {privilegeTargetRole.name}</span>
+                  {isReadOnly && (
+                    <span className="px-2 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[11px] font-bold rounded-md tracking-normal">
+                      {isSysTarget ? 'System Role (Read-Only)' : 'Rank-Protected (Read-Only)'}
+                    </span>
+                  )}
+                </h1>
 
                 <button
                   type="button"
@@ -1036,21 +1020,6 @@ export default function RolesAndPrivileges() {
                 </button>
               </div>
 
-                {/* System Role Notice Banner */}
-                {isSysTarget && (
-                  <div className="px-3.5 py-2 bg-[#FFC107]/15 border border-[#FFC107]/40 rounded-xl text-xs text-[#863221] flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-[#863221] shrink-0" />
-                    <span className="font-semibold">System role privileges are permanent and cannot be modified.</span>
-                  </div>
-                )}
-
-                {/* Rank-Protected Role Notice Banner */}
-                {isProtectedTarget && (
-                  <div className="px-3.5 py-2 bg-[#FFC107]/15 border border-[#FFC107]/40 rounded-xl text-xs text-[#863221] flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-[#863221] shrink-0" />
-                    <span className="font-semibold">System Protection: access levels for this role cannot be modified (rank {privilegeTargetRole.rank_level} ≤ your rank {myRankLevel}).</span>
-                  </div>
-                )}
 
               <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)]">
                 {/* Quick Filter & Master Toggle Toolbar */}
@@ -1094,17 +1063,9 @@ export default function RolesAndPrivileges() {
 
               {/* Privilege table */}
               <div className="p-6 space-y-6">
-                <div className="flex items-start gap-2 p-3 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-[11px] text-[#863221]">
-                  <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
-                  <p className="leading-relaxed">
-                    Tick <span className="font-bold text-[#180200]">Read</span>, <span className="font-bold text-[#180200]">Write</span> (add and edit) and <span className="font-bold text-[#180200]">Delete</span> for each module and page. A header row, the <span className="font-bold text-[#180200]">All</span> column and the box under each column title tick everything they cover; Write or Delete also ticks Read.
-                    {' '}Next to a ticked Write or Delete, <span className="font-bold text-[#180200]">Direct</span> means the role&apos;s actions apply at once and <span className="font-bold text-[#180200]">Needs approval</span> means they wait in the Approvals queue until someone with <span className="font-bold text-[#180200]">Approve requests</span> accepts them. Modules marked <span className="font-bold text-[#180200]">Coming soon</span> are not built yet.
-                  </p>
-                </div>
                 {(() => {
                   const targetRank = privilegeTargetRole.rank_level ?? 99;
                   const q = privilegeSearch.toLowerCase().trim();
-                  const switchedOff = privilegeRows.filter((r) => r.disabled && r.depth === 0).length; // modules not built yet
                   const reachable = privilegeRows.filter((r) => !r.disabled && (r.min_rank_level == null || targetRank <= r.min_rank_level));
                   // a row matches the search by its own name or privilege names; a header row stays if a row below it matches
                   const rowMatches = (r) =>
@@ -1252,7 +1213,7 @@ export default function RolesAndPrivileges() {
                                       else applyPrivilegeBulk(codes, stateOf(codes, isOn) !== 'all');
                                     }}
                                   />
-                                  {!isReadOnly && own && col !== 'read' && isOn(own.id) && <ApprovalChoice id={own.id} />}
+                                  {!isReadOnly && own && col !== 'read' && isOn(own.id) && !String(own.id).startsWith('approvals.') && <ApprovalChoice id={own.id} />}
                                 </div>
                               );
                             };
@@ -1291,11 +1252,6 @@ export default function RolesAndPrivileges() {
                           })}
                         </tbody>
                       </table>
-                      {switchedOff > 0 && (
-                        <p className="px-4 py-3 text-[11px] text-[#863221]/80 border-t border-[#F0E8E0] bg-[#FAF7F2]/60">
-                          {switchedOff} more modules (Magazine, Reports, Notifications and others) are switched off until they are built, so they are not listed here.
-                        </p>
-                      )}
                     </div>
                   );
                 })()}
