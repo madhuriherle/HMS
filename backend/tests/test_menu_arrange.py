@@ -128,3 +128,25 @@ def test_migration_0033_adds_planned_screens_switched_off(client, admin_headers)
             for m in db.query(Module).all():
                 m.status = True
             db.commit()
+
+
+def test_create_a_section_then_a_page_inside_it(client, admin_headers):
+    """What the Module form sends: a side-menu section (no route, top level), then a page inside it."""
+    h, s = admin_headers, _suffix()
+    sec = client.post(f"{API}/users/modules", headers=h, json={
+        "code": f"sec_{s}", "name_en": f"Section {s}", "route": None, "parent_id": None, "icon": "folder", "display_order": 90, "status": True})
+    assert sec.status_code == 200, sec.text
+    page = client.post(f"{API}/users/modules", headers=h, json={
+        "code": f"pg_{s}", "name_en": f"Page {s}", "route": f"/dashboard/x-{s}", "parent_id": sec.json()["id"], "icon": "file-text", "display_order": 1, "status": True})
+    assert page.status_code == 200, page.text
+    mods = _modules(client, h)
+    assert mods[f"pg_{s}"]["parent_id"] == mods[f"sec_{s}"]["id"] and mods[f"sec_{s}"]["route"] is None
+    assert mods[f"sec_{s}"]["icon"] == "folder"
+    # a section cannot be its own parent (the form never offers it; the server also refuses)
+    bad = client.put(f"{API}/users/modules/{mods[f'sec_{s}']['id']}", headers=h, json={"parent_id": mods[f"sec_{s}"]["id"]})
+    assert bad.status_code in (400, 422), bad.text
+
+
+def _suffix():
+    import random
+    return str(random.randint(100000, 999999))

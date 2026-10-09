@@ -133,3 +133,12 @@ export const moduleTreeRows = (modules, matches, isOpen) => {
   walk(null, 0);
   return rows;
 };
+
+// 'section' = a heading of the side menu that groups pages; 'page' = opens a screen.
+// A module with pages inside is a section; a module inside a section is a page; a top-level module is a
+// page when it has a route and a section when it has none.
+export const moduleKind = (modules, m) => {
+  if (modules.some((x) => x.parent_id === m.id)) return 'section';
+  if (m.parent_id != null) return 'page';
+  return m.route ? 'page' : 'section';
+};

@@ -5,7 +5,7 @@ import SearchFilterBar from '../components/SearchFilterBar';
 import MenuArranger from '../components/MenuArranger';
 import IconPicker from '../components/IconPicker';
 import { MENU_ICONS } from '../utils/menuIcons';
-import { moduleTreeRows } from '../utils/menuArrange';
+import { moduleKind, moduleTreeRows } from '../utils/menuArrange';
 import FilterSelect from '../components/FilterSelect';
 import {
   Layers,
@@ -28,6 +28,7 @@ import { askChecklist } from '../utils/dialogs';
 import useAuth from '../hooks/useAuth';
 
 const emptyForm = {
+  type: 'page', // 'page' (opens a screen) or 'section' (a side-menu heading that groups pages)
   code: '',
   name_en: '',
   name_kn: '',
@@ -150,6 +151,7 @@ export default function ModulesManagement() {
     setModalMode('edit');
     setEditingModule(m);
     setFormData({
+      type: moduleKind(modules, m),
       code: m.code || '',
       name_en: m.name_en || '',
       name_kn: m.name_kn || '',
@@ -173,6 +175,12 @@ export default function ModulesManagement() {
       setFormData((prev) => ({ ...prev, status: value === 'true' }));
       return;
     }
+    if (name === 'type') {
+      // a section is a top-level heading with no screen of its own
+      setFormData((prev) => ({ ...prev, type: value, ...(value === 'section' ? { route: '', parent_id: '', permission_code: '' } : {}) }));
+      setFormErrors((prev) => ({ ...prev, route: '' }));
+      return;
+    }
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (formErrors[name]) {
       setFormErrors((prev) => ({ ...prev, [name]: '' }));
@@ -194,6 +202,12 @@ export default function ModulesManagement() {
         const dup = modules.some((m) => (m.code || '').toLowerCase() === code.toLowerCase());
         if (dup) errors.code = 'A module with this code already exists';
       }
+    }
+
+    const route = (formData.route || '').trim();
+    if (formData.type === 'page') {
+      if (modalMode === 'add' && !route) errors.route = 'A page needs a route, for example /dashboard/reports';
+      else if (route && !route.startsWith('/')) errors.route = 'The route must start with /';
     }
 
     const order = Number(formData.display_order);
@@ -222,9 +236,9 @@ export default function ModulesManagement() {
       name_en: formData.name_en.trim(),
       name_kn: (formData.name_kn || '').trim() || null,
       description: (formData.description || '').trim() || null,
-      route: (formData.route || '').trim() || null,
+      route: formData.type === 'section' ? null : (formData.route || '').trim() || null,
       icon: (formData.icon || '').trim() || null,
-      parent_id: formData.parent_id === '' ? null : Number(formData.parent_id),
+      parent_id: formData.type === 'section' || formData.parent_id === '' ? null : Number(formData.parent_id),
       opens_module_id: formData.opens_module_id === '' ? null : Number(formData.opens_module_id),
       display_order: Number(formData.display_order),
       min_rank_level:
@@ -635,43 +649,14 @@ export default function ModulesManagement() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                  Module Code {modalMode === 'add' && <span className="text-[#ED4636]">*</span>}
-                </label>
-                <input
-                  type="text"
-                  name="code"
-                  value={formData.code}
-                  onChange={handleFormChange}
-                  disabled={modalMode === 'edit'}
-                  className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors disabled:bg-gray-50 disabled:text-[#863221]/60 ${formErrors.code
-                    ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
-                    : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                    }`}
-                />
-                {modalMode === 'edit' && (
-                  <p className="text-[10px] text-[#863221]/70 mt-1">Code is immutable — permissions reference it.</p>
-                )}
-                {formErrors.code && (
-                  <p className="text-xs text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    {formErrors.code}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                  Module Name (EN) <span className="text-[#ED4636]">*</span>
+                  Name <span className="text-[#ED4636]">*</span>
                 </label>
                 <input
                   type="text"
                   name="name_en"
                   value={formData.name_en}
                   onChange={handleFormChange}
-                  className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.name_en
-                    ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
-                    : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                    }`}
+                  className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none font-semibold ${formErrors.name_en ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20' : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'}`}
                 />
                 {formErrors.name_en && (
                   <p className="text-xs text-[#ED4636] mt-1 font-medium flex items-center gap-1">
@@ -683,140 +668,100 @@ export default function ModulesManagement() {
 
               <div>
                 <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                  Module Name (KN)
+                  Code {modalMode === 'add' && <span className="text-[#ED4636]">*</span>}
                 </label>
                 <input
                   type="text"
-                  name="name_kn"
-                  value={formData.name_kn}
+                  name="code"
+                  value={formData.code}
                   onChange={handleFormChange}
-                  className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
+                  disabled={modalMode === 'edit'}
+                  className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none font-mono ${formErrors.code ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20' : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'} disabled:bg-[#FAF7F2] disabled:text-[#863221]/70`}
                 />
+                {modalMode === 'edit' && (
+                  <p className="text-[10px] text-[#863221]/70 mt-1">Code is immutable. Privileges refer to it.</p>
+                )}
+                {formErrors.code && (
+                  <p className="text-xs text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    {formErrors.code}
+                  </p>
+                )}
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                  Route
-                </label>
-                <input
-                  type="text"
-                  name="route"
-                  value={formData.route}
-                  onChange={handleFormChange}
-                  className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-mono text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                  Parent Module
+                  Type
                 </label>
                 <select
-                  name="parent_id"
-                  value={formData.parent_id}
+                  name="type"
+                  value={formData.type}
                   onChange={handleFormChange}
-                  className={`w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer ${formErrors.parent_id ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30' : ''}`}
+                  disabled={modalMode === 'edit' && modules.some((x) => x.parent_id === editingModule?.id)}
+                  className="w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] disabled:bg-[#FAF7F2]"
                 >
-                  <option value="">— Root level —</option>
-                  {modules
-                    .filter((m) => !editingModule || (m.id !== editingModule.id && String(m.id) !== String(editingModule.id)))
-                    .map((m) => (
-                      <option key={m.id} value={m.id}>{m.name_en} ({m.code})</option>
-                    ))}
+                  <option value="page">Page (opens a screen)</option>
+                  <option value="section">Side menu section (groups pages)</option>
                 </select>
+                <p className="text-[10px] text-[#863221]/70 mt-1">
+                  {formData.type === 'section'
+                    ? 'A heading in the side menu. Pages are placed inside it.'
+                    : 'A screen. It can sit inside a section or stand alone.'}
+                </p>
+              </div>
+
+              {formData.type === 'page' ? (
+                <div>
+                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
+                    Inside section
+                  </label>
+                  <select
+                    name="parent_id"
+                    value={formData.parent_id}
+                    onChange={handleFormChange}
+                    className="w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
+                  >
+                    <option value="">None (top-level page)</option>
+                    {modules
+                      .filter((m) => m.parent_id == null && (!editingModule || String(m.id) !== String(editingModule.id)))
+                      .sort((a, b) => (a.display_order - b.display_order) || (a.id - b.id))
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>{m.name_en}</option>
+                      ))}
+                  </select>
                 {formErrors.parent_id && (
                   <p className="text-xs text-[#ED4636] mt-1 font-medium flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                     {formErrors.parent_id}
                   </p>
                 )}
-              </div>
+                </div>
+              ) : (
+                <div className="hidden sm:block" />
+              )}
 
-              <div>
-                <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                  Opens Module
-                </label>
-                <select
-                  name="opens_module_id"
-                  value={formData.opens_module_id}
-                  onChange={handleFormChange}
-                  className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
-                >
-                  <option value="">— None —</option>
-                  {modules
-                    .filter((m) => !editingModule || (m.id !== editingModule.id && String(m.id) !== String(editingModule.id)))
-                    .map((m) => (
-                      <option key={m.id} value={m.id}>{m.name_en} ({m.code})</option>
-                    ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                  Display Order
-                </label>
-                <input
-                  type="number"
-                  name="display_order"
-                  min="0"
-                  value={formData.display_order}
-                  onChange={handleFormChange}
-                  className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] focus:outline-none transition-colors ${formErrors.display_order
-                    ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
-                    : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                    }`}
-                />
-                {formErrors.display_order && (
+              {formData.type === 'page' && (
+                <div>
+                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
+                    Route {modalMode === 'add' && <span className="text-[#ED4636]">*</span>}
+                  </label>
+                  <input
+                    type="text"
+                    name="route"
+                    value={formData.route}
+                    onChange={handleFormChange}
+                    className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none font-mono ${formErrors.route ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20' : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'}`}
+                  />
+                {formErrors.route && (
                   <p className="text-xs text-[#ED4636] mt-1 font-medium flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    {formErrors.display_order}
+                    {formErrors.route}
                   </p>
                 )}
-              </div>
+                </div>
+              )}
 
-              <div>
-                <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                  Rank Gate (min_rank_level)
-                </label>
-                <input
-                  type="number"
-                  name="min_rank_level"
-                  min="1"
-                  value={formData.min_rank_level}
-                  onChange={handleFormChange}
-                  className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.min_rank_level
-                    ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
-                    : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                    }`}
-                />
-                <p className="text-[10px] text-[#863221]/70 mt-1">
-                  Roles ranked worse than this number will not see the module.
-                </p>
-                {formErrors.min_rank_level && (
-                  <p className="text-xs text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    {formErrors.min_rank_level}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                  Privilege that shows this page
-                </label>
-                <input
-                  type="text"
-                  name="permission_code"
-                  value={formData.permission_code}
-                  onChange={handleFormChange}
-                  className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
-                />
-                <p className="text-[10px] text-[#863221]/70 mt-1">
-                  Roles holding this privilege see the page in the sidebar. Must be an existing privilege code.
-                </p>
-              </div>
-
-              <div>
+              <div className={formData.type === 'page' ? '' : 'sm:col-span-2'}>
                 <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
                   Icon
                 </label>
@@ -825,35 +770,83 @@ export default function ModulesManagement() {
                   onChange={(name) => setFormData((prev) => ({ ...prev, icon: name }))}
                 />
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                  Status
-                </label>
-                <select
-                  name="status"
-                  value={formData.status ? 'true' : 'false'}
-                  onChange={handleFormChange}
-                  className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
-                >
-                  <option value="true">Active (visible in menu)</option>
-                  <option value="false">Inactive (hidden)</option>
-                </select>
+            <details className="rounded-xl border border-[#E8DFD8] bg-[#FAF7F2]/60 group">
+              <summary className="px-4 py-3 text-xs font-bold text-[#510601] uppercase tracking-wider cursor-pointer select-none">
+                More options
+              </summary>
+              <div className="p-4 pt-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">Name (Kannada)</label>
+                  <input type="text" name="name_kn" value={formData.name_kn} onChange={handleFormChange}
+                    className="w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">Display order</label>
+                  <input type="number" name="display_order" min="0" value={formData.display_order} onChange={handleFormChange}
+                    className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none font-semibold ${formErrors.display_order ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20' : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'}`} />
+                {formErrors.display_order && (
+                  <p className="text-xs text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    {formErrors.display_order}
+                  </p>
+                )}
+                  <p className="text-[10px] text-[#863221]/70 mt-1">Or drag it in Arrange menu.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">Rank gate</label>
+                  <input type="number" name="min_rank_level" min="1" value={formData.min_rank_level} onChange={handleFormChange}
+                    className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none font-semibold ${formErrors.min_rank_level ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20' : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'}`} />
+                  <p className="text-[10px] text-[#863221]/70 mt-1">Roles ranked worse than this number will not see it. Empty = everyone.</p>
+                {formErrors.min_rank_level && (
+                  <p className="text-xs text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    {formErrors.min_rank_level}
+                  </p>
+                )}
+                </div>
+
+                {formData.type === 'page' && (
+                  <div>
+                    <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">Privilege that shows this page</label>
+                    <input type="text" name="permission_code" value={formData.permission_code} onChange={handleFormChange}
+                      className="w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none font-mono border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
+                    <p className="text-[10px] text-[#863221]/70 mt-1">Roles holding this privilege see the page. Must be an existing privilege code.</p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">Opens module</label>
+                  <select name="opens_module_id" value={formData.opens_module_id} onChange={handleFormChange}
+                    className="w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]">
+                    <option value="">None</option>
+                    {modules
+                      .filter((m) => !editingModule || String(m.id) !== String(editingModule.id))
+                      .map((m) => (
+                        <option key={m.id} value={m.id}>{m.name_en} ({m.code})</option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">Status</label>
+                  <select name="status" value={formData.status ? 'true' : 'false'} onChange={handleFormChange}
+                    className="w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]">
+                    <option value="true">Active (visible in menu)</option>
+                    <option value="false">Inactive (hidden)</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">Description</label>
+                  <textarea name="description" rows={2} value={formData.description} onChange={handleFormChange}
+                    className="w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none text-xs border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
+                </div>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                Description
-              </label>
-              <textarea
-                name="description"
-                rows={2}
-                value={formData.description}
-                onChange={handleFormChange}
-                className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors resize-none"
-              />
-            </div>
+            </details>
 
             </div>
             <div className="shrink-0 flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] rounded-b-2xl">

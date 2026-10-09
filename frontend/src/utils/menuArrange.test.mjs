@@ -1,6 +1,6 @@
 // Run: node src/utils/menuArrange.test.mjs
 import assert from 'node:assert/strict';
-import { canDrop, changedItems, isInside, moduleTreeRows, moveNode, moveStep, siblingsOf, sidebarPreview } from './menuArrange.js';
+import { canDrop, changedItems, isInside, moduleKind, moduleTreeRows, moveNode, moveStep, siblingsOf, sidebarPreview } from './menuArrange.js';
 
 // Dashboard, Masters (Location, Types, Banks), Users (Roles), Reports (switched off, no route)
 const BASE = [
@@ -77,5 +77,12 @@ assert.deepEqual(label(rows), ['Masters', '  Banks'], 'a match keeps the module 
 rows = moduleTreeRows(BASE, BASE, () => true); // "All status": the switched-off ones come back, in their place
 assert.deepEqual(label(rows).slice(-2), ['Reports', '  Member Reports']);
 assert.equal(rows.length, BASE.length);
+
+// ── Module form: is it a side-menu section or a page? ──
+assert.equal(moduleKind(BASE, BASE[1]), 'section', 'Masters has pages inside it');
+assert.equal(moduleKind(BASE, BASE[2]), 'page', 'Location sits inside Masters');
+assert.equal(moduleKind(BASE, BASE[0]), 'page', 'Dashboard: top level with a route');
+assert.equal(moduleKind(BASE, { id: 99, parent_id: null, route: null }), 'section', 'top level, no route, nothing inside');
+assert.equal(moduleKind(BASE, { id: 98, parent_id: 2, route: null }), 'page', 'planned page inside a section, no route yet');
 
 console.log('menu arrange: all checks passed');
