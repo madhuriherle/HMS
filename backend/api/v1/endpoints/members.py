@@ -952,7 +952,8 @@ def download_member_document(
         raise HTTPException(status_code=404, detail="File missing on disk")
     return FileResponse(d.file_path, media_type=d.mime_type or "application/octet-stream", filename=d.original_filename)
 
-@router.put("/documents/{doc_id}", response_model=schemas_members.MemberDocument)
+@router.put("/documents/{doc_id}", response_model=Union[schemas_members.MemberDocument, PendingApproval])
+@approval_gate.gated("members", "UPDATE", "MemberDocument", "members.write", id_param="doc_id")
 def verify_member_document(
     *, db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("members.write")),
@@ -972,6 +973,7 @@ def verify_member_document(
     return d
 
 @router.delete("/documents/{doc_id}")
+@approval_gate.gated("members", "DELETE", "MemberDocument", "members.delete", id_param="doc_id")
 def delete_member_document(
     *, db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("members.delete")),

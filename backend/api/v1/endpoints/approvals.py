@@ -623,6 +623,12 @@ async def approve_generic_request(
         raise HTTPException(404, "Approval request not found")
     if req.status != "PENDING":
         raise HTTPException(400, f"Request is already {req.status}")
+    if req.requested_by == current_user.id:
+        # An all-access owner could do the action directly, so only they may approve their own request
+        from models.users import Role
+        own_role = db.query(Role).filter(Role.id == current_user.role_id).first()
+        if not (own_role and own_role.is_all_access):
+            raise HTTPException(403, "You cannot approve your own request. Another approver must review it.")
 
     action = approval_registry.get(req.module, req.action, req.entity_type)
     if not action:

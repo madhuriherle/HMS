@@ -24,7 +24,8 @@ import {
   Lock,
   Calendar,
   Layers,
-  FileText
+  FileText,
+  Clock
 } from 'lucide-react';
 import api from '../api';
 import { formatDate } from '../utils/dateUtils';
@@ -423,6 +424,12 @@ export default function RolesAndPrivileges() {
 
   const handleTogglePrivilege = (id) => {
     setSelectedPrivileges(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleApprovalGate = (id) => {
+    setApprovalRequiredCodes(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
@@ -948,17 +955,15 @@ export default function RolesAndPrivileges() {
       {/* ============================================================ */}
       {/* CONFIGURE PRIVILEGES MODAL                                   */}
       {/* ============================================================ */}
-      <Modal
-        isOpen={Boolean(privilegeTargetRole)}
-        onClose={() => setPrivilegeTargetRole(null)}
-      >
+      {privilegeTargetRole && (
+      <div className="fixed top-0 right-0 bottom-0 left-0 lg:left-64 z-40 bg-[#FAF7F2] flex flex-col overflow-hidden animate-in fade-in duration-150">
         {privilegeTargetRole && (() => {
           const isSysTarget = isSystemRole(privilegeTargetRole);
           const isProtectedTarget = !isSysTarget && (privilegeTargetRole.rank_level ?? 99) <= myRankLevel;
           const isReadOnly = isSysTarget || isProtectedTarget;
           return (
             <div
-              className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]"
+              className="bg-white w-full flex-1 min-h-0 flex flex-col overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -995,10 +1000,12 @@ export default function RolesAndPrivileges() {
                   </div>
 
                   <button
+                    type="button"
                     onClick={() => setPrivilegeTargetRole(null)}
-                    className="text-[#863221]/60 hover:text-[#180200] p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-[#E8DFD8] bg-white hover:bg-[#FAF7F2] text-[#510601] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                   >
-                    <X className="w-5 h-5" />
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Back to Roles</span>
                   </button>
                 </div>
 
@@ -1059,7 +1066,14 @@ export default function RolesAndPrivileges() {
               </div>
 
               {/* Scrollable Privilege Categories Grid */}
-              <div className="p-6 overflow-y-auto space-y-6">
+              <div className="p-6 flex-1 min-h-0 overflow-y-auto space-y-6">
+                <div className="flex items-start gap-2 p-3 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-[11px] text-[#863221]">
+                  <Clock className="w-4 h-4 shrink-0 mt-0.5" />
+                  <p className="leading-relaxed">
+                    Ticking the <span className="font-bold text-[#180200]">Approval</span> chip on a granted privilege makes every action under it go to the
+                    <span className="font-bold text-[#180200]"> Approvals</span> queue instead of applying immediately (maker-checker). Leave it off for instant access.
+                  </p>
+                </div>
                 {(() => {
                   const targetRank = privilegeTargetRole.rank_level ?? 99;
                   const groups = filteredPrivilegeGroups.filter(
@@ -1139,7 +1153,7 @@ export default function RolesAndPrivileges() {
                         </div>
 
                         {/* Privileges Checkboxes Grid */}
-                        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
                           {group.privileges.map((priv) => {
                             const isChecked = isReadOnly || selectedPrivileges.includes(priv.id);
 
@@ -1162,14 +1176,40 @@ export default function RolesAndPrivileges() {
                                     <Square className="w-4 h-4 text-[#863221]/40" />
                                   )}
                                 </div>
-                                <div>
-                                  <p className={`text-xs font-semibold leading-snug ${
-                                    isChecked
-                                      ? (isReadOnly ? 'text-[#863221]' : 'text-[#510601]')
-                                      : 'text-[#180200]'
-                                  }`}>
-                                    {priv.name}
-                                  </p>
+                                <div className="min-w-0">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className={`text-xs font-semibold leading-snug ${
+                                      isChecked
+                                        ? (isReadOnly ? 'text-[#863221]' : 'text-[#510601]')
+                                        : 'text-[#180200]'
+                                    }`}>
+                                      {priv.name}
+                                    </p>
+                                    {!isReadOnly && isChecked && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleToggleApprovalGate(priv.id);
+                                        }}
+                                        title={approvalRequiredCodes.includes(priv.id)
+                                          ? 'Actions under this privilege are filed for approval before they execute. Click to allow instant execution.'
+                                          : 'File actions under this privilege for approval before they execute (maker-checker).'}
+                                        className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-wide transition-all ${
+                                          approvalRequiredCodes.includes(priv.id)
+                                            ? 'bg-[#FFC107]/20 border-[#FFC107]/50 text-[#863221] hover:bg-[#FFC107]/35'
+                                            : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-[#FFC107]/40 hover:text-[#863221]'
+                                        }`}>
+                                        <Clock className="w-2.5 h-2.5" />
+                                        Approval
+                                      </button>
+                                    )}
+                                  </div>
+                                  {approvalRequiredCodes.includes(priv.id) && isChecked && (
+                                    <p className="text-[9px] font-semibold text-[#863221] mt-0.5">
+                                      Actions need admin approval
+                                    </p>
+                                  )}
                                   <p className="text-[11px] text-[#863221]/70 mt-0.5 leading-relaxed">
                                     {priv.description}
                                   </p>
@@ -1210,7 +1250,8 @@ export default function RolesAndPrivileges() {
             </div>
           );
         })()}
-      </Modal>
+      </div>
+      )}
 
       {/* ============================================================ */}
       {/* VIEW DETAILS MODAL                                           */}

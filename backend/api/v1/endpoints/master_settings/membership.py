@@ -303,6 +303,7 @@ def read_membership_credit_settings(db: Session = Depends(deps.get_db), current_
 
 
 @router.put("/membership-credit-settings")
+@approval_gate.gated("masters", "UPDATE", "MembershipCreditSettings", "masters.write", id_param=None)
 def update_membership_credit_settings(
     *, db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("masters.write")),
@@ -326,6 +327,7 @@ def update_membership_credit_settings(
 
 
 @router.post("/membership-credit-settings/reset")
+@approval_gate.gated("masters", "UPDATE", "MembershipCreditSettingsReset", "masters.write", id_param=None)
 def reset_membership_credit_settings(
     *, db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("masters.write")),
