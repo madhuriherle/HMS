@@ -77,6 +77,7 @@ class ModuleBase(BaseModel):
     route: Optional[str] = None
     display_order: int = 0
     min_rank_level: Optional[int] = None
+    permission_code: Optional[str] = None
 
 
 class ModuleCreate(ModuleBase):
@@ -94,6 +95,7 @@ class ModuleUpdate(BaseModel):
     route: Optional[str] = None
     display_order: Optional[int] = None
     min_rank_level: Optional[int] = None
+    permission_code: Optional[str] = None
     # code is immutable — permissions reference it as a stable string key.
 
 

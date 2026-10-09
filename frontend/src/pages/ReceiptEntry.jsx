@@ -24,16 +24,13 @@ import {
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import {
-  getStoredParticulars,
-  getActiveParticulars,
-  getStoredUnapprovedMembers,
-  getStoredUnapprovedRenewals,
-  getStoredMembershipTypes,
-  getStoredReceipts,
-  getActivePaymentModeConfigs,
-  initialPaymentModeConfigs,
-  getStoredMembers
-} from '../utils/receiptStore';
+  loadParticulars,
+  loadMembershipTypes,
+  loadPaymentModeConfigs,
+  loadRenewals,
+  loadMembers,
+  loadReceipts
+} from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
@@ -68,12 +65,13 @@ export default function ReceiptEntry() {
   const { hasPermission } = useAuth();
 
   // Master datasets
-  const [particularsMaster, setParticularsMaster] = useState(getStoredParticulars());
-  const [unapprovedMembers, setUnapprovedMembers] = useState(getStoredUnapprovedMembers());
-  const [unapprovedRenewals, setUnapprovedRenewals] = useState(getStoredUnapprovedRenewals());
-  const [membershipTypes] = useState(getStoredMembershipTypes());
-  const [existingReceipts, setExistingReceipts] = useState(getStoredReceipts());
-  const [paymentModeConfigs, setPaymentModeConfigs] = useState(getActivePaymentModeConfigs());
+  const [particularsMaster, setParticularsMaster] = useState([]);
+  const [unapprovedMembers, setUnapprovedMembers] = useState([]);
+  const [unapprovedRenewals, setUnapprovedRenewals] = useState([]);
+  const [approvedMembers, setApprovedMembers] = useState([]);
+  const [membershipTypes, setMembershipTypes] = useState([]);
+  const [existingReceipts, setExistingReceipts] = useState([]);
+  const [paymentModeConfigs, setPaymentModeConfigs] = useState([]);
 
   // Active Particulars loaded dynamically from Particulars Master
   const activeParticulars = useMemo(() => {
@@ -85,7 +83,7 @@ export default function ReceiptEntry() {
 
   // Active online bank account options fetched dynamically from Masters -> Payment Mode Setup
   const activeOnlineBanks = useMemo(() => {
-    const configs = getActivePaymentModeConfigs();
+    const configs = paymentModeConfigs;
     const online = configs.filter(
       (c) =>
         (c.paymentType === 'Online' ||
@@ -96,10 +94,7 @@ export default function ReceiptEntry() {
             c.bankAccount !== '—')) &&
         (c.status || 'Active') === 'Active'
     );
-    if (online.length > 0) return online;
-    return initialPaymentModeConfigs.filter(
-      (c) => (c.paymentType === 'Online' || c.paymentMode === 'Online') && (c.status || 'Active') === 'Active'
-    );
+    return online;
   }, [paymentModeConfigs]);
 
   // Selected Member / Renewal State
@@ -172,24 +167,12 @@ export default function ReceiptEntry() {
   // HELPER: Resolve Membership Type Active Price
   // ----------------------------------------------------
   const resolveMembershipFee = (typeNameOrId) => {
-    if (!typeNameOrId) return 0;
+    if (typeNameOrId === undefined || typeNameOrId === null || typeNameOrId === '') return 0;
     const clean = String(typeNameOrId).toLowerCase().trim();
     const found = membershipTypes.find(
-      (mt) =>
-        mt.id.toLowerCase() === clean ||
-        mt.name.toLowerCase() === clean ||
-        mt.name.toLowerCase().includes(clean)
+      (mt) => String(mt.id) === clean || String(mt.name || '').toLowerCase() === clean
     );
-    if (found) {
-      return found.currentPrice || found.fee || 0;
-    }
-    // Standard fallbacks if not yet initialized in custom master
-    if (clean.includes('poshaka') && !clean.includes('maha')) return 1000;
-    if (clean.includes('mahaposhaka')) return 2000;
-    if (clean.includes('mahapalaka')) return 10000;
-    if (clean.includes('sahasa') || clean.includes('sahasadasyatva')) return 5000;
-    if (clean.includes('ajeeva') || clean.includes('life')) return 10000;
-    return 1000;
+    return found ? Number(found.currentPrice) || 0 : 0;
   };
 
   // ----------------------------------------------------
@@ -197,9 +180,9 @@ export default function ReceiptEntry() {
   // ----------------------------------------------------
   const enrichedMember = useMemo(() => {
     if (!selectedMember) return null;
-    const allMembers = getStoredMembers();
-    const unapproved = getStoredUnapprovedMembers();
-    const renewals = getStoredUnapprovedRenewals();
+    const allMembers = approvedMembers;
+    const unapproved = unapprovedMembers;
+    const renewals = unapprovedRenewals;
 
     const memNum = selectedMember.membershipNumber;
     const regNum = selectedMember.registrationNumber || selectedMember.id;
@@ -251,8 +234,8 @@ export default function ReceiptEntry() {
     ].filter(Boolean).join(' / ') || '—';
 
     const districtState = [
-      selectedMember.districtName || foundApproved?.districtName || 'Bengaluru Urban',
-      selectedMember.stateName || foundApproved?.stateName || 'Karnataka'
+      selectedMember.districtName || foundApproved?.districtName,
+      selectedMember.stateName || foundApproved?.stateName
     ].filter(Boolean).join(', ');
 
     const pinCode = selectedMember.postalCode || selectedMember.pinCode || selectedMember.pincode || foundApproved?.postalCode || foundUnapproved?.pin || '—';
@@ -283,7 +266,7 @@ export default function ReceiptEntry() {
       nativeDetails,
       magazineRemarks
     };
-  }, [selectedMember]);
+  }, [selectedMember, approvedMembers, unapprovedMembers, unapprovedRenewals]);
 
   // ----------------------------------------------------
   // POPULATE FORM FROM SELECTED MEMBER
@@ -291,7 +274,7 @@ export default function ReceiptEntry() {
   const applyMemberToForm = (member) => {
     setSelectedMember(member);
     const memType = member.membershipType || '';
-    const defaultOnlineBank = activeOnlineBanks[0]?.bankAccount || 'KBL 1075';
+    const defaultOnlineBank = activeOnlineBanks[0]?.bankAccount || '';
 
     setFormData((prev) => ({
       ...prev,
@@ -324,7 +307,7 @@ export default function ReceiptEntry() {
   const handleAssignRenewalToReceipt = (renewal) => {
     setSelectedMember(renewal);
     const memType = renewal.membershipType || 'Poshaka';
-    const defaultOnlineBank = activeOnlineBanks[0]?.bankAccount || 'KBL 1075';
+    const defaultOnlineBank = activeOnlineBanks[0]?.bankAccount || '';
 
     setFormData((prev) => ({
       ...prev,
@@ -354,36 +337,19 @@ export default function ReceiptEntry() {
 
   // Sync on initial mount or when navigation state arrives
   useEffect(() => {
-    const updatedParticulars = getStoredParticulars();
-    setParticularsMaster(updatedParticulars);
-    fetchMembers({ approval_status: 'UNAPPROVED' })
-      .then(setUnapprovedMembers)
-      .catch((error) => {
-        console.warn('Failed to load unapproved members from API, using local fallback.', error);
-        setUnapprovedMembers(getStoredUnapprovedMembers());
-      });
-    api.get('/receipts/renewals-due', { params: { limit: 500 } })
-      .then((res) => setUnapprovedRenewals(unwrapList(res.data).map((row) => ({
-        ...row,
-        id: row.membership_id || row.member_id,
-        registrationNumber: row.member_code || row.member_id,
-        name: row.member_name,
-        membershipNumber: row.membership_number,
-        membershipName: row.member_name,
-        contactNumber: row.mobile,
-        membershipType: row.membership_type,
-      }))))
-      .catch((error) => {
-        console.warn('Failed to load renewals from API, using local fallback.', error);
-        setUnapprovedRenewals(getStoredUnapprovedRenewals());
-      });
-    fetchReceipts()
-      .then(setExistingReceipts)
-      .catch((error) => {
-        console.warn('Failed to load receipts from API, using local fallback.', error);
-        setExistingReceipts(getStoredReceipts());
-      });
-    setPaymentModeConfigs(getActivePaymentModeConfigs());
+    const fail = (what) => (error) => {
+      console.error(`Failed to load ${what}.`, error);
+      showToast(error.response?.data?.detail || `Failed to load ${what} from the server.`, 'error');
+    };
+    loadParticulars().then(setParticularsMaster).catch(fail('particulars'));
+    loadMembershipTypes().then(setMembershipTypes).catch(fail('membership types'));
+    loadMembers().then(setApprovedMembers).catch(fail('members'));
+    loadMembers({ approval_status: 'UNAPPROVED' }).then(setUnapprovedMembers).catch(fail('unapproved members'));
+    loadRenewals().then(setUnapprovedRenewals).catch(fail('renewals'));
+    loadReceipts().then(setExistingReceipts).catch(fail('receipts'));
+    loadPaymentModeConfigs()
+      .then((all) => setPaymentModeConfigs(all.filter((c) => c.status === 'Active')))
+      .catch(fail('payment modes'));
 
     if (location.state?.selectedMember) {
       applyMemberToForm(location.state.selectedMember);
@@ -409,7 +375,7 @@ export default function ReceiptEntry() {
   // Payment Mode Change (Cash / Online)
   const handlePaymentModeChange = (e) => {
     const selectedMode = e.target.value;
-    const defaultOnlineBank = activeOnlineBanks[0]?.bankAccount || 'KBL 1075';
+    const defaultOnlineBank = activeOnlineBanks[0]?.bankAccount || '';
 
     setFormData((prev) => ({
       ...prev,
@@ -985,15 +951,7 @@ export default function ReceiptEntry() {
 
       {/* Breadcrumb Navigation */}
       <div>
-        <nav className="flex items-center gap-1.5 text-xs text-[#863221] mb-2 font-medium">
-          <Link to="/dashboard" className="hover:text-[#510601] transition-colors">Dashboard</Link>
-          <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-          <span className="text-[#863221]">Receipts</span>
-          <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-          <span className="text-[#510601] font-semibold">Receipt Entry</span>
-        </nav>
-
-        {/* Page Top Header */}
+{/* Page Top Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">

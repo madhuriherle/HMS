@@ -18,28 +18,34 @@ import {
   SlidersHorizontal
 } from 'lucide-react';
 import api from '../api';
-import {
-  AVAILABLE_PAYMENT_MODES,
-  AVAILABLE_BANK_ACCOUNTS,
-  formatPaymentModeLabel,
-  getStoredReceipts
-} from '../utils/receiptStore';
+import { formatPaymentModeLabel } from '../utils/displayHelpers';
+import { loadReceipts } from '../utils/serverData';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
-
-const BANK_DETAILS_LOOKUP = {
-  'KBL 1075': { branch: 'Malleswaram', ifscCode: 'KARB0000107', accountNumber: '010750010001075' },
-  'KBL 1541': { branch: 'Jayanagar', ifscCode: 'KARB0000154', accountNumber: '015410010001541' },
-  'SBI': { branch: 'Kumbashi', ifscCode: 'SBIN0040123', accountNumber: '30891234567' },
-  'CANARA BANK': { branch: 'Bangalore Main', ifscCode: 'CNRB0000567', accountNumber: '0567101012345' }
-};
 
 export default function BankDetailsManagement() {
   const { hasPermission } = useAuth();
 
   // Master state
   const [paymentConfigs, setPaymentConfigs] = useState([]);
-  const [receipts, setReceipts] = useState(getStoredReceipts());
+  const [receipts, setReceipts] = useState([]);
+  const [banks, setBanks] = useState([]);
+
+  // Dropdown options and bank details come from the Bank master / existing payment modes
+  const AVAILABLE_BANK_ACCOUNTS = useMemo(() => [...new Set(banks.map((b) => b.name_en))], [banks]);
+  const BANK_DETAILS_LOOKUP = useMemo(() => {
+    const map = {};
+    banks.forEach((b) => {
+      if (!map[b.name_en]) {
+        map[b.name_en] = { branch: b.branch_name || '', ifscCode: b.ifsc_code || '', accountNumber: b.account_number || '' };
+      }
+    });
+    return map;
+  }, [banks]);
+  const AVAILABLE_PAYMENT_MODES = useMemo(
+    () => [...new Set(paymentConfigs.map((c) => c.paymentMode).filter(Boolean))],
+    [paymentConfigs]
+  );
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -57,14 +63,14 @@ export default function BankDetailsManagement() {
   const [modalMode, setModalMode] = useState('add'); // 'add' | 'edit'
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({
-    paymentMode: 'Online',
+    paymentMode: '',
     customPaymentMode: '',
     paymentType: 'Online',
-    bankAccount: 'KBL 1075',
+    bankAccount: '',
     customBankAccount: '',
-    branch: 'Malleswaram',
-    ifscCode: 'KARB0000107',
-    accountNumber: '010750010001075',
+    branch: '',
+    ifscCode: '',
+    accountNumber: '',
     status: 'Active'
   });
   const [formErrors, setFormErrors] = useState({});
@@ -93,6 +99,7 @@ export default function BankDetailsManagement() {
         api.get('/masters/payment-modes?limit=1000')
       ]);
       const banks = banksRes.data?.data || [];
+      setBanks(banks);
       const modes = Array.isArray(modesRes.data) ? modesRes.data : (modesRes.data?.data || []);
       const mapped = modes.map(m => {
         const bank = banks.find(b => b.id === m.bank_id);
@@ -115,7 +122,9 @@ export default function BankDetailsManagement() {
 
   useEffect(() => {
     fetchConfigs();
-    setReceipts(getStoredReceipts());
+    loadReceipts()
+      .then(setReceipts)
+      .catch((error) => showToast(error.response?.data?.detail || 'Failed to load receipts from the server.', 'error'));
   }, []);
 
 
@@ -192,10 +201,10 @@ export default function BankDetailsManagement() {
   const openAddModal = () => {
     setModalMode('add');
     setEditingItem(null);
-    const defaultBank = 'KBL 1075';
+    const defaultBank = AVAILABLE_BANK_ACCOUNTS[0] || '';
     const lookup = BANK_DETAILS_LOOKUP[defaultBank] || {};
     setFormData({
-      paymentMode: 'Online',
+      paymentMode: AVAILABLE_PAYMENT_MODES[0] || '__CUSTOM__',
       customPaymentMode: '',
       paymentType: 'Online',
       bankAccount: defaultBank,
@@ -220,7 +229,7 @@ export default function BankDetailsManagement() {
       paymentMode: isCustomMode ? '__CUSTOM__' : config.paymentMode,
       customPaymentMode: isCustomMode ? config.paymentMode : '',
       paymentType: config.paymentType || (config.paymentMode === 'Cash' ? 'Offline' : 'Online'),
-      bankAccount: isCustomBank ? '__CUSTOM__' : (config.bankAccount || (config.paymentMode === 'Cash' ? '' : 'KBL 1075')),
+      bankAccount: isCustomBank ? '__CUSTOM__' : (config.bankAccount || (config.paymentMode === 'Cash' ? '' : (AVAILABLE_BANK_ACCOUNTS[0] || ''))),
       customBankAccount: isCustomBank ? config.bankAccount : '',
       branch: config.branch || lookup.branch || '',
       ifscCode: config.ifscCode || lookup.ifscCode || '',
@@ -242,7 +251,7 @@ export default function BankDetailsManagement() {
     } else {
       autoType = 'Online';
       if (!autoBank) {
-        autoBank = 'KBL 1075';
+        autoBank = AVAILABLE_BANK_ACCOUNTS[0] || '';
       }
     }
 
@@ -426,29 +435,26 @@ export default function BankDetailsManagement() {
     }
   };
 
-  const confirmStatusToggle = () => {
+  const isPendingApproval = (data) => Boolean(data && (data.approval_request_id || data.status === 'PENDING'));
+
+  const confirmStatusToggle = async () => {
     if (!statusDialog) return;
     const { item, newStatus } = statusDialog;
-
-    const updated = paymentConfigs.map((cfg) => {
-      if (cfg.id === item.id) {
-        return {
-          ...cfg,
-          status: newStatus,
-          updatedAt: new Date().toISOString()
-        };
-      }
-      return cfg;
-    });
-
-    persistConfigs(updated);
     const label = formatPaymentModeLabel(item);
-    showToast(
-      `"${label}" status changed to ${newStatus}.${newStatus === 'Inactive'
-        ? ' It will no longer appear for new receipts, but existing historical receipts remain intact.'
-        : ' It is now available for selection in new receipts.'
-      }`
-    );
+    try {
+      const { data } = await api.put(`/masters/payment-modes/${item.id}`, { status: newStatus === 'Active' });
+      showToast(
+        isPendingApproval(data)
+          ? `Status change for "${label}" submitted for approval.`
+          : `"${label}" status changed to ${newStatus}.${newStatus === 'Inactive'
+            ? ' It will no longer appear for new receipts, but existing historical receipts remain intact.'
+            : ' It is now available for selection in new receipts.'
+          }`
+      );
+      await fetchConfigs();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error updating status', 'error');
+    }
     setStatusDialog(null);
   };
 
@@ -483,22 +489,10 @@ export default function BankDetailsManagement() {
       {/* Breadcrumbs & Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#E8DFD8] pb-5">
         <div>
-          <nav className="flex items-center gap-2 text-xs font-semibold text-[#863221] uppercase tracking-wider mb-1.5">
-            <Link to="/dashboard" className="hover:text-[#510601] transition-colors">
-              Dashboard
-            </Link>
-            <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-            <span>Masters</span>
-            <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-            <span className="text-[#180200]">Payment Mode Setup</span>
-          </nav>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-[#180200] tracking-tight font-serif">
+<div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
               Payment Mode Configuration
             </h1>
-            <p className="text-xs text-[#863221] mt-1">
-              Configure available payment modes (Cash, Online linked to bank accounts) for receipt generation.
-            </p>
           </div>
         </div>
 

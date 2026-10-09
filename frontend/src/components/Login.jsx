@@ -66,11 +66,10 @@ export default function Login() {
       try {
         const me = await api.get('/auth/me');
         localStorage.setItem('hms_user_profile', JSON.stringify(me.data));
-      } catch (_) {
-        localStorage.setItem('hms_user_profile', JSON.stringify({
-          name: formData.username.trim(),
-          username: formData.username.trim(),
-        }));
+      } catch (meErr) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        throw meErr;
       }
 
       navigate('/dashboard');

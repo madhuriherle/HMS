@@ -34,18 +34,14 @@ import {
   Coins,
   Receipt
 } from 'lucide-react';
+import { calculateMemberMembershipStatus } from '../utils/displayHelpers';
 import {
-  getStoredMembers,
-  getStoredMembershipTypes,
-  getStoredReceipts,
-  calculateMemberMembershipStatus,
-  getStoredStates,
-  getStoredDistricts,
-  getStoredTaluks,
-  getStoredPostalCodes,
-  lookupLocationByPin,
-  getStoredGothras
-} from '../utils/receiptStore';
+  loadLocations,
+  loadMembershipTypes,
+  loadReceipts,
+  loadGothras,
+  findLocationByPin
+} from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
@@ -54,6 +50,8 @@ import {
   memberToApiPayload,
   normalizeMember,
 } from '../utils/apiAdapters';
+
+const toId = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? v : Number(v));
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 const MEMBER_CATEGORIES = ['Individual', 'Family', 'Institutional', 'Senior Citizen', 'Corporate', 'General'];
@@ -64,33 +62,49 @@ export default function MembershipList() {
   // ----------------------------------------------------
   // MASTER STORES
   // ----------------------------------------------------
-  const [members, setMembers] = useState(getStoredMembers());
-  const [membershipTypes, setMembershipTypes] = useState(getStoredMembershipTypes());
-  const [receipts, setReceipts] = useState(getStoredReceipts());
-  const [states, setStates] = useState(getStoredStates());
-  const [districts, setDistricts] = useState(getStoredDistricts());
-  const [taluks, setTaluks] = useState(getStoredTaluks());
-  const [postalCodes, setPostalCodes] = useState(getStoredPostalCodes());
-  const [gothras] = useState(getStoredGothras());
+  const [members, setMembers] = useState([]);
+  const [membershipTypes, setMembershipTypes] = useState([]);
+  const [receipts, setReceipts] = useState([]);
+  const [states, setStates] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [taluks, setTaluks] = useState([]);
+  const [postalCodes, setPostalCodes] = useState([]);
+  const [gothras, setGothras] = useState([]);
 
   const loadMembers = async () => {
     try {
       setMembers(await fetchMembers());
     } catch (error) {
-      console.warn('Failed to load members from API, using local fallback.', error);
-      setMembers(getStoredMembers());
+      console.error('Failed to load members.', error);
+      showToast(error.response?.data?.detail || 'Failed to load members from the server.', 'error');
     }
   };
 
-  // Reload fresh data from API/stores on mount
+  const loadMasters = async () => {
+    try {
+      const [loc, types, recs, goth] = await Promise.all([
+        loadLocations(),
+        loadMembershipTypes(),
+        loadReceipts(),
+        loadGothras()
+      ]);
+      setStates(loc.states);
+      setDistricts(loc.districts);
+      setTaluks(loc.taluks);
+      setPostalCodes(loc.postalCodes);
+      setMembershipTypes(types);
+      setReceipts(recs);
+      setGothras(goth);
+    } catch (error) {
+      console.error('Failed to load master data.', error);
+      showToast(error.response?.data?.detail || 'Failed to load master data from the server.', 'error');
+    }
+  };
+
+  // Everything is read from the server on mount
   useEffect(() => {
     loadMembers();
-    setMembershipTypes(getStoredMembershipTypes());
-    setReceipts(getStoredReceipts());
-    setStates(getStoredStates());
-    setDistricts(getStoredDistricts());
-    setTaluks(getStoredTaluks());
-    setPostalCodes(getStoredPostalCodes());
+    loadMasters();
   }, []);
 
   // Toast feedback
@@ -139,8 +153,8 @@ export default function MembershipList() {
 
     // Location Details
     country: 'India',
-    stateId: 'ST-01',
-    stateName: 'Karnataka',
+    stateId: '',
+    stateName: '',
     districtId: '',
     districtName: '',
     postalCode: '',
@@ -161,7 +175,7 @@ export default function MembershipList() {
 
     // Additional Member Details
     website: '',
-    gothra: 'Vishwamitra',
+    gothra: '',
     bloodGroup: 'O+',
     birthDate: '',
     status: 'Active',
@@ -200,11 +214,9 @@ export default function MembershipList() {
           setIsTabLoading(false);
         })
         .catch(err => {
-          console.warn('API error, falling back to mock delay for ' + activeViewTab, err);
-          setTimeout(() => {
-            setTabData(prev => ({ ...prev, [activeViewTab]: [] }));
-            setIsTabLoading(false);
-          }, 800);
+          console.error('Failed to load member ' + activeViewTab, err);
+          setIsTabLoading(false);
+          showToast(err.response?.data?.detail || 'Failed to load ' + activeViewTab + ' from the server.', 'error');
         });
     }
   }, [activeViewTab, viewingMember]);
@@ -214,6 +226,7 @@ export default function MembershipList() {
 
   // 4. Delete Confirmation Modal
   const [deleteDialog, setDeleteDialog] = useState(null); // member
+  const [deleteReason, setDeleteReason] = useState('');
 
   // 5. Label Preview Modal
   const [isLabelPreviewOpen, setIsLabelPreviewOpen] = useState(false);
@@ -349,7 +362,7 @@ export default function MembershipList() {
   const handlePinCodeLookup = (pin) => {
     if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) return;
 
-    const lookup = lookupLocationByPin(pin);
+    const lookup = findLocationByPin(postalCodes, pin);
     if (lookup.found) {
       // Cascading match against master states & districts
       const matchState = states.find(
@@ -368,8 +381,8 @@ export default function MembershipList() {
         ...prev,
         postalCode: pin,
         country: 'India',
-        stateId: matchState ? matchState.id : (lookup.stateId || 'ST-01'),
-        stateName: matchState ? matchState.name : (lookup.stateName || 'Karnataka'),
+        stateId: matchState ? matchState.id : (lookup.stateId || ''),
+        stateName: matchState ? matchState.name : (lookup.stateName || ''),
         districtId: matchDistrict ? matchDistrict.id : (lookup.districtId || ''),
         districtName: matchDistrict ? matchDistrict.name : (lookup.districtName || ''),
         post: lookup.area || '',
@@ -422,8 +435,8 @@ export default function MembershipList() {
 
     setFormData({
       ...initialFormState,
-      stateId: firstActiveState ? firstActiveState.id : 'ST-01',
-      stateName: firstActiveState ? firstActiveState.name : 'Karnataka',
+      stateId: firstActiveState ? firstActiveState.id : '',
+      stateName: firstActiveState ? firstActiveState.name : '',
       districtId: firstDist ? firstDist.id : '',
       districtName: firstDist ? firstDist.name : '',
       membershipTypeId: firstActiveType ? firstActiveType.id : '',
@@ -460,8 +473,8 @@ export default function MembershipList() {
       email: member.email || '',
 
       country: member.country || 'India',
-      stateId: member.stateId || 'ST-01',
-      stateName: member.stateName || 'Karnataka',
+      stateId: member.stateId || '',
+      stateName: member.stateName || '',
       districtId: member.districtId || '',
       districtName: member.districtName || '',
       postalCode: member.postalCode || '',
@@ -480,7 +493,7 @@ export default function MembershipList() {
       company: member.company || '',
 
       website: member.website || '',
-      gothra: member.gothra || 'Vishwamitra',
+      gothra: member.gothra || '',
       bloodGroup: member.bloodGroup || 'O+',
       birthDate: member.birthDate || '',
       status: member.status === 'Approved' ? 'Active' : member.status || 'Active',
@@ -584,8 +597,19 @@ export default function MembershipList() {
 
   const handleConfirmDelete = async () => {
     if (!deleteDialog) return;
+    const reason = deleteReason.trim();
+    if (!reason) {
+      showToast('Please enter a reason for deleting this member.', 'error');
+      return;
+    }
     try {
-      await api.delete(`/members/${deleteDialog.id}`);
+      const { data } = await api.delete(`/members/${deleteDialog.id}`, { params: { reason } });
+      if (data?.status === 'PENDING') {
+        showToast(data.message || 'Delete request submitted for approval.');
+        setDeleteDialog(null);
+        setDeleteReason('');
+        return;
+      }
       setMembers((prev) => prev.filter((m) => m.id !== deleteDialog.id));
     } catch (error) {
       console.error('Failed to delete member.', error);
@@ -602,6 +626,7 @@ export default function MembershipList() {
 
     showToast('Delete request sent successfully.');
     setDeleteDialog(null);
+    setDeleteReason('');
   };
 
   // ----------------------------------------------------
@@ -622,18 +647,8 @@ export default function MembershipList() {
       {/* HEADER, SEARCH & FILTERS SECTION                     */}
       {/* ---------------------------------------------------- */}
       <SearchFilterBar
-        breadcrumb={
-          <nav className="flex items-center gap-2 text-sm text-[#863221] font-medium mb-1">
-            <Link to="/dashboard" className="hover:text-[#510601] transition-colors">
-              Dashboard
-            </Link>
-            <ChevronRight className="w-4 h-4 text-[#863221]/50" />
-            <span className="text-[#863221]">Membership</span>
-            <ChevronRight className="w-4 h-4 text-[#863221]/50" />
-            <span className="text-[#180200] font-semibold">Membership List</span>
-          </nav>
-        }
-        title={<h1 className="text-2xl font-bold text-[#180200] tracking-tight">Membership List</h1>}
+        
+        title={<h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Membership List</h1>}
         searchQuery={searchQuery}
         onSearchChange={(val) => {
           setSearchQuery(val);
@@ -908,7 +923,7 @@ export default function MembershipList() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setDeleteDialog(m)}
+                            onClick={() => { setDeleteReason(''); setDeleteDialog(m); }}
                             disabled={!hasPermission('members.delete')}
                             className="p-1.5 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('members.delete') ? 'Requires members.delete permission' : 'Delete Member'}
@@ -1281,7 +1296,7 @@ export default function MembershipList() {
                       <select
                         value={formData.stateId}
                         onChange={(e) => {
-                          const newStateId = e.target.value;
+                          const newStateId = toId(e.target.value);
                           const stObj = states.find((s) => s.id === newStateId);
                           const matchingDists = districts.filter(
                             (d) => d.stateId === newStateId && (formModalMode === 'edit' || d.status === 'Active')
@@ -1291,7 +1306,7 @@ export default function MembershipList() {
                           setFormData({
                             ...formData,
                             stateId: newStateId,
-                            stateName: stObj ? stObj.name : 'Karnataka',
+                            stateName: stObj ? stObj.name : '',
                             districtId: firstD ? firstD.id : '',
                             districtName: firstD ? firstD.name : ''
                           });
@@ -1316,7 +1331,7 @@ export default function MembershipList() {
                       <select
                         value={formData.districtId}
                         onChange={(e) => {
-                          const newDistId = e.target.value;
+                          const newDistId = toId(e.target.value);
                           const distObj = districts.find((d) => d.id === newDistId);
                           setFormData({
                             ...formData,
@@ -1420,7 +1435,7 @@ export default function MembershipList() {
                       <select
                         value={formData.membershipTypeId}
                         onChange={(e) => {
-                          const typeId = e.target.value;
+                          const typeId = toId(e.target.value);
                           const tObj = membershipTypes.find((mt) => mt.id === typeId);
                           setFormData({
                             ...formData,
@@ -1511,6 +1526,7 @@ export default function MembershipList() {
                         onChange={(e) => setFormData({ ...formData, gothra: e.target.value })}
                         className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
                       >
+                        <option value="">-- Select Gotra --</option>
                         {gothras.map((g) => (
                           <option key={g} value={g}>
                             {g}
@@ -1995,7 +2011,7 @@ export default function MembershipList() {
                   <div>
                     <span className="text-[10px] uppercase font-bold text-[#863221]">District & State</span>
                     <p className="font-medium mt-0.5">
-                      {viewingMember.districtName || '—'}, {viewingMember.stateName || 'Karnataka'}
+                      {[viewingMember.districtName, viewingMember.stateName].filter(Boolean).join(', ') || '—'}
                     </p>
                   </div>
                   <div>
@@ -2272,6 +2288,14 @@ export default function MembershipList() {
               </span>
             </p>
 
+            <textarea
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              placeholder="Reason for deletion (required)"
+              rows={2}
+              className="mt-3 w-full rounded-xl border border-[#E8DFD8] p-2.5 text-xs text-[#180200] focus:outline-none focus:ring-2 focus:ring-[#ED4636]/30"
+            />
+
             <div className="mt-6 flex items-center justify-center gap-3">
               <button
                 type="button"
@@ -2283,7 +2307,7 @@ export default function MembershipList() {
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                disabled={!hasPermission('members.delete')}
+                disabled={!hasPermission('members.delete') || !deleteReason.trim()}
                 title={!hasPermission('members.delete') ? 'Requires members.delete permission' : undefined}
                 className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
               >

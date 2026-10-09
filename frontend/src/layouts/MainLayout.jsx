@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Menu, User, LogOut } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
+import api from '../api';
 
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -15,8 +16,21 @@ export default function MainLayout() {
         if (parsed?.username || parsed?.name) return parsed;
       }
     } catch (_) {}
-    return { name: 'hmsuser', username: 'hmsuser', email: 'hmsuser@hms.org' };
+    return null;
   });
+
+  // Refresh the signed-in user (role, privileges) from the server on every panel load
+  useEffect(() => {
+    api.get('/auth/me')
+      .then(({ data }) => {
+        try {
+          localStorage.setItem('hms_user_profile', JSON.stringify(data));
+        } catch (_) {}
+        setCurrentUser(data);
+        window.dispatchEvent(new Event('hms-profile-change'));
+      })
+      .catch((err) => console.error('Failed to refresh the signed-in user.', err));
+  }, []);
 
   useEffect(() => {
     const syncUser = () => {
@@ -42,8 +56,7 @@ export default function MainLayout() {
     navigate('/');
   };
 
-  const displayName = currentUser?.username || currentUser?.name || currentUser?.fullName || 'hmsuser';
-  const displayEmail = currentUser?.email || `${displayName}@hms.org`;
+  const displayName = currentUser?.name || currentUser?.username || currentUser?.fullName || '';
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#FAF7F2] font-sans">
@@ -75,9 +88,9 @@ export default function MainLayout() {
           <div className="flex items-center gap-3 ml-auto">
             <div className="flex items-center gap-2.5 rounded-xl bg-white border border-[#E8DFD8] p-1.5 sm:px-3 sm:py-1.5 shadow-sm hover:border-[#510601]/30 transition-all">
               <div className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 rounded-full bg-[#510601] flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-xs">
-                A
+                {(displayName || '?').charAt(0).toUpperCase()}
               </div>
-              <span className="text-xs sm:text-sm font-bold text-[#180200]">Admin</span>
+              <span className="text-xs sm:text-sm font-bold text-[#180200]">{displayName}</span>
               <button
                 onClick={handleLogout}
                 title="Log Out"

@@ -26,7 +26,6 @@ import {
   Layers,
   FileText
 } from 'lucide-react';
-import { initialRoles } from '../data/rolesData';
 import api from '../api';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
@@ -162,17 +161,8 @@ export default function RolesAndPrivileges() {
   // ----------------------------------------------------
   // SYSTEM ROLE HELPER
   // ----------------------------------------------------
-  const isSystemRole = (role) => {
-    if (!role) return false;
-    return Boolean(
-      role.isSystem ||
-      role.is_all_access ||
-      role.code === 'super_admin' ||
-      role.rank_level === 1 ||
-      role.id === 1 ||
-      String(role.id) === '1'
-    );
-  };
+  // A system role is one the database flags as all-access (roles.is_all_access).
+  const isSystemRole = (role) => Boolean(role?.is_all_access);
 
   // A role at or above your own rank is protected: viewable, never modifiable.
   const canManageRole = (role) =>
@@ -544,15 +534,7 @@ export default function RolesAndPrivileges() {
 
       {/* Breadcrumb & Header */}
       <div>
-        <nav className="flex items-center gap-1.5 text-xs text-[#863221] mb-2 font-medium">
-          <Link to="/dashboard" className="hover:text-[#510601] transition-colors">Dashboard</Link>
-          <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-          <span>User Management</span>
-          <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-          <span className="text-[#510601] font-semibold">Roles & Privileges</span>
-        </nav>
-
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
               User Roles & Privileges
@@ -1413,7 +1395,7 @@ export default function RolesAndPrivileges() {
             className="bg-white rounded-2xl max-w-sm w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
-            {deleteTargetRole.usersCount > 0 || deleteTargetRole.isSystem || deleteTargetRole.is_all_access || deleteTargetRole.rank_level === 1 ? (
+            {deleteTargetRole.usersCount > 0 || isSystemRole(deleteTargetRole) ? (
               <>
                 <div className="w-14 h-14 rounded-full bg-amber-100 text-[#EE6A00] flex items-center justify-center mx-auto mb-3.5">
                   <Lock className="w-7 h-7" />

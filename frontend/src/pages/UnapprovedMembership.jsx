@@ -30,15 +30,12 @@ import {
   Sparkles,
   ArrowRight
 } from 'lucide-react';
+import api from '../api';
 import {
-  getStoredUnapprovedMembers,
-  saveStoredUnapprovedMembers,
-  getStoredMembers,
-  saveStoredMembers,
-  getStoredMembershipTypes,
-  getStoredStates,
-  getStoredDistricts
-} from '../utils/receiptStore';
+  loadUnapprovedMembers,
+  loadMembershipTypes,
+  loadLocations
+} from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 
@@ -49,19 +46,31 @@ export default function UnapprovedMembership() {
   // ----------------------------------------------------
   // DATA STORES
   // ----------------------------------------------------
-  const [unapprovedMembers, setUnapprovedMembers] = useState(getStoredUnapprovedMembers());
-  const [membershipTypes] = useState(getStoredMembershipTypes());
-  const [states] = useState(getStoredStates());
-  const [districts] = useState(getStoredDistricts());
+  const [unapprovedMembers, setUnapprovedMembers] = useState([]);
+  const [membershipTypes, setMembershipTypes] = useState([]);
+  const [states, setStates] = useState([]);
+  const [districts, setDistricts] = useState([]);
+
+  const reloadData = async () => {
+    const fail = (what) => (error) => {
+      console.error(`Failed to load ${what}.`, error);
+      showToast(error.response?.data?.detail || `Failed to load ${what} from the server.`, 'error');
+    };
+    await Promise.all([
+      loadUnapprovedMembers().then(setUnapprovedMembers).catch(fail('unapproved members')),
+      loadMembershipTypes().then(setMembershipTypes).catch(fail('membership types')),
+      loadLocations()
+        .then((loc) => {
+          setStates(loc.states);
+          setDistricts(loc.districts);
+        })
+        .catch(fail('locations'))
+    ]);
+  };
 
   useEffect(() => {
-    setUnapprovedMembers(getStoredUnapprovedMembers());
+    reloadData();
   }, []);
-
-  const persistUnapproved = (updated) => {
-    setUnapprovedMembers(updated);
-    saveStoredUnapprovedMembers(updated);
-  };
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState(null);
@@ -118,7 +127,7 @@ export default function UnapprovedMembership() {
         const mob = (m.mobile || m.mobileNumber || '').toLowerCase();
         const em = (m.email || '').toLowerCase();
         const dist = (m.districtName || '').toLowerCase();
-        const id = (m.id || '').toLowerCase();
+        const id = String(m.id ?? '').toLowerCase();
 
         if (
           !name.includes(q) &&
@@ -206,40 +215,10 @@ export default function UnapprovedMembership() {
   };
 
   // ----------------------------------------------------
-  // SIMULATION HANDLER: TOGGLE RECEIPT STATUS
-  // (Provides easy testing for receipt module connectivity)
+  // A receipt is mapped to the applicant on the Receipt Entry screen
   // ----------------------------------------------------
-  const handleToggleReceiptMappingSimulation = (memberId) => {
-    const updated = unapprovedMembers.map((m) => {
-      if (m.id === memberId) {
-        const isAssigned = m.receiptStatus === 'Assigned';
-        const nextReceiptStatus = isAssigned ? 'Pending' : 'Assigned';
-        const nextReceiptNo = isAssigned ? '' : `REC-${Math.floor(1000 + Math.random() * 9000)}`;
-
-        return {
-          ...m,
-          receiptStatus: nextReceiptStatus,
-          assignedReceiptNumber: nextReceiptNo
-        };
-      }
-      return m;
-    });
-
-    persistUnapproved(updated);
-
-    const target = updated.find((m) => m.id === memberId);
-    if (target?.receiptStatus === 'Assigned') {
-      showToast(
-        `Receipt assigned for ${target.fullName} (${target.assignedReceiptNumber}). Ready for approval!`,
-        'success'
-      );
-    } else {
-      showToast(`Receipt status reset to Pending for ${target?.fullName}.`, 'info');
-    }
-
-    if (viewingMember && viewingMember.id === memberId) {
-      setViewingMember(target);
-    }
+  const goToReceiptEntry = (member) => {
+    navigate('/dashboard/receipts/entry', { state: { selectedMember: member } });
   };
 
   // ----------------------------------------------------
@@ -259,53 +238,26 @@ export default function UnapprovedMembership() {
     setApproveDialog(member);
   };
 
-  const handleConfirmApproval = () => {
+  const handleConfirmApproval = async () => {
     if (!approveDialog) return;
     const memberToApprove = approveDialog;
-
-    // Load existing approved members
-    const existingMembers = getStoredMembers();
-
-    // Generate next sequential permanent membership number
-    const maxNum = existingMembers.reduce((max, m) => {
-      const num = parseInt(m.membershipNumber, 10);
-      return !isNaN(num) && num > max ? num : max;
-    }, 110);
-    const nextMembershipNumber = (maxNum + 1).toString();
-
-    // Construct approved member record preserving all existing data
-    const approvedMemberRecord = {
-      ...memberToApprove,
-      membershipNumber: nextMembershipNumber,
-      approvalStatus: 'Approved',
-      status: 'Active',
-      createdDate: memberToApprove.registrationDate || new Date().toISOString().split('T')[0],
-      approvedDate: new Date().toISOString().split('T')[0],
-      assignedReceiptNumber: memberToApprove.assignedReceiptNumber || 'REC-ONLINE'
-    };
-
-    // 1. Add to existing permanent Membership List
-    const updatedApprovedMembers = [approvedMemberRecord, ...existingMembers];
-    saveStoredMembers(updatedApprovedMembers);
-
-    // 2. Remove from Unapproved Membership List
-    const updatedUnapprovedList = unapprovedMembers.filter((m) => m.id !== memberToApprove.id);
-    persistUnapproved(updatedUnapprovedList);
-
-    // 3. Remove from selections
-    if (selectedIds.has(memberToApprove.id)) {
-      const next = new Set(selectedIds);
-      next.delete(memberToApprove.id);
-      setSelectedIds(next);
+    try {
+      const { data } = await api.put(`/members/${memberToApprove.id}/approve`);
+      if (selectedIds.has(memberToApprove.id)) {
+        const next = new Set(selectedIds);
+        next.delete(memberToApprove.id);
+        setSelectedIds(next);
+      }
+      showToast(
+        `Membership for ${memberToApprove.fullName} approved successfully! Moved to Membership List${data?.member_code ? ` (#${data.member_code})` : ''}.`,
+        'success'
+      );
+      if (viewingMember) setViewingMember(null);
+      await reloadData();
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Error approving membership', 'error');
     }
-
-    showToast(
-      `Membership for ${approvedMemberRecord.fullName} approved successfully! Moved to Membership List (#${approvedMemberRecord.membershipNumber}).`,
-      'success'
-    );
-
     setApproveDialog(null);
-    if (viewingMember) setViewingMember(null);
   };
 
   // Metric counts
@@ -320,18 +272,8 @@ export default function UnapprovedMembership() {
       {/* HEADER, SEARCH & FILTERS SECTION                     */}
       {/* ---------------------------------------------------- */}
       <SearchFilterBar
-        breadcrumb={
-          <nav className="flex items-center gap-2 text-sm text-[#863221] font-medium mb-1">
-            <Link to="/dashboard" className="hover:text-[#510601] transition-colors">
-              Dashboard
-            </Link>
-            <ChevronRight className="w-4 h-4 text-[#863221]/50" />
-            <span className="text-[#863221]">Membership</span>
-            <ChevronRight className="w-4 h-4 text-[#863221]/50" />
-            <span className="text-[#180200] font-semibold">Unapproved Membership</span>
-          </nav>
-        }
-        title={<h1 className="text-2xl font-bold text-[#180200] tracking-tight">Unapproved Membership</h1>}
+        
+        title={<h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Unapproved Membership</h1>}
         searchQuery={searchQuery}
         onSearchChange={(val) => {
           setSearchQuery(val);
@@ -518,7 +460,7 @@ export default function UnapprovedMembership() {
                           {m.districtName || '—'}
                         </div>
                         <div className="text-[11px] text-[#863221]/80 mt-0.5">
-                          {m.stateName || 'Karnataka'}
+                          {m.stateName || ''}
                         </div>
                       </td>
 
@@ -780,7 +722,7 @@ export default function UnapprovedMembership() {
                   <div>
                     <span className="text-[10px] uppercase font-bold text-[#863221]">District & State</span>
                     <p className="font-medium mt-0.5">
-                      {viewingMember.districtName || '—'}, {viewingMember.stateName || 'Karnataka'}
+                      {[viewingMember.districtName, viewingMember.stateName].filter(Boolean).join(', ') || '—'}
                     </p>
                   </div>
                   <div>
@@ -828,14 +770,14 @@ export default function UnapprovedMembership() {
             <div className="flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
               <button
                 type="button"
-                onClick={() => handleToggleReceiptMappingSimulation(viewingMember.id)}
+                onClick={() => goToReceiptEntry(viewingMember)}
                 className="text-xs font-semibold text-[#510601] hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>
                   {viewingMember.receiptStatus === 'Assigned'
-                    ? 'Reset to Pending (Demo)'
-                    : 'Simulate Receipt Assigned (Demo)'}
+                    ? 'View in Receipt Entry'
+                    : 'Assign a Receipt'}
                 </span>
               </button>
 
@@ -908,14 +850,14 @@ export default function UnapprovedMembership() {
               <button
                 type="button"
                 onClick={() => {
-                  const id = validationBlockDialog.id;
+                  const member = validationBlockDialog;
                   setValidationBlockDialog(null);
-                  handleToggleReceiptMappingSimulation(id);
+                  goToReceiptEntry(member);
                 }}
                 className="w-full py-2.5 px-4 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Simulate Receipt Assignment</span>
+                <span>Assign a Receipt</span>
               </button>
             </div>
           </div>

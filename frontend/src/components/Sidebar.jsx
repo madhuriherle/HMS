@@ -1,82 +1,102 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Map,
-  Users,
-  FileText,
+  Activity,
+  BadgeCheck,
+  Bell,
+  BarChart3,
+  BookOpen,
+  Building2,
+  Calendar,
+  CheckCircle,
   ChevronDown,
   ChevronRight,
+  Circle,
+  CreditCard,
+  Database,
+  FilePlus,
+  FileText,
+  IdCard,
+  Key,
+  LayoutDashboard,
+  LayoutGrid,
+  Link as LinkIcon,
+  List,
+  ListChecks,
+  Map,
+  MapPin,
+  Receipt,
+  Search,
+  Settings,
+  Shield,
+  Upload,
+  User,
   UserCheck,
+  Users,
   X
 } from 'lucide-react';
 import clsx from 'clsx';
-import useAuth from '../hooks/useAuth';
+import api from '../api';
 import fullLogo from '../assets/logo.png';
 
-const menuItems = [
-  {
-    name: 'Dashboard',
-    path: '/dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    name: 'Membership',
-    icon: UserCheck,
-    submenus: [
-      { name: 'Membership List', path: '/dashboard/membership/list', permission: 'members.read' },
-      { name: 'Unapproved Membership', path: '/dashboard/membership/unapproved', permission: 'members.approvals.read' },
-    ],
-  },
-  {
-    name: 'Receipts',
-    icon: FileText,
-    submenus: [
-      { name: 'Receipt Entry', path: '/dashboard/receipts/entry', permission: 'receipts.read' },
-      { name: 'Receipt Tracking', path: '/dashboard/receipts/tracking', permission: 'receipts.read' },
-    ],
-  },
-  {
-    name: 'User',
-    icon: Users,
-    submenus: [
-      { name: 'Roles & Privileges', path: '/dashboard/users/roles', permission: 'roles.read' },
-      { name: 'Users', path: '/dashboard/users/list', permission: 'users.management.read' },
-      { name: 'Modules', path: '/dashboard/users/modules', rank1Only: true },
-    ],
-  },
-  {
-    name: 'Masters',
-    icon: Map,
-    submenus: [
-      {
-        name: 'Location Setup',
-        path: '/dashboard/master/location-setup',
-        permission: 'masters.read',
-      },
-      {
-        name: 'Membership Types',
-        path: '/dashboard/master/membership-type',
-        permission: 'masters.read',
-      },
-      {
-        name: 'Particulars Master',
-        path: '/dashboard/master/receipt-type',
-        permission: 'masters.read',
-      },
-      {
-        name: 'Organisation Settings',
-        path: '/dashboard/master/organisation-settings',
-        permission: 'system.read',
-      },
-      {
-        name: 'Payment Mode Setup',
-        path: '/dashboard/master/payment-modes',
-        permission: 'masters.read',
-      },
-    ],
-  },
-];
+// The menu itself (names, order, links, which privilege shows each page) lives
+// in the database `modules` table and comes from GET /users/modules/menu.
+// This table only turns the icon *name* stored on a module into a component.
+const ICONS = {
+  'layout-dashboard': LayoutDashboard,
+  list: List,
+  'user-check': UserCheck,
+  'file-plus': FilePlus,
+  search: Search,
+  'layout-grid': LayoutGrid,
+  'map-pin': MapPin,
+  badge: BadgeCheck,
+  'list-checks': ListChecks,
+  building: Building2,
+  'credit-card': CreditCard,
+  database: Database,
+  users: Users,
+  user: User,
+  shield: Shield,
+  key: Key,
+  'id-card': IdCard,
+  'check-circle': CheckCircle,
+  'book-open': BookOpen,
+  receipt: Receipt,
+  'bar-chart': BarChart3,
+  bell: Bell,
+  activity: Activity,
+  calendar: Calendar,
+  link: LinkIcon,
+  upload: Upload,
+  settings: Settings,
+  map: Map,
+  'file-text': FileText,
+};
+
+// Only modules that open a page of this panel belong in the sidebar.
+const isPanelRoute = (route) => typeof route === 'string' && route.startsWith('/dashboard');
+
+const leaves = (node) => {
+  const kids = node.submodules || [];
+  return kids.length ? kids.flatMap(leaves) : isPanelRoute(node.route) ? [node] : [];
+};
+
+const toMenuItems = (nodes) =>
+  (nodes || [])
+    .map((node) => {
+      const Icon = ICONS[node.icon] || Circle;
+      const children = (node.submodules || []).flatMap(leaves);
+      if (children.length) {
+        return {
+          name: node.name,
+          icon: Icon,
+          submenus: children.map((c) => ({ name: c.name, path: c.route })),
+        };
+      }
+      return isPanelRoute(node.route) ? { name: node.name, icon: Icon, path: node.route } : null;
+    })
+    .filter(Boolean);
 
 // Checks exact and nested routes
 const isPathActive = (pathname, path) => {
@@ -88,23 +108,26 @@ const isPathActive = (pathname, path) => {
 
 export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
-  const { myRank, hasPermission } = useAuth();
-  const isRank1 = myRank === 1;
 
-  const visibleMenuItems = menuItems
-    .map((item) =>
-      item.submenus
-        ? {
-            ...item,
-            submenus: item.submenus.filter(
-              (sub) =>
-                (!sub.rank1Only || isRank1) &&
-                (!sub.permission || hasPermission(sub.permission))
-            ),
-          }
-        : item
-    )
-    .filter((item) => !item.submenus || item.submenus.length > 0);
+  const [visibleMenuItems, setVisibleMenuItems] = useState([]);
+  const [menuState, setMenuState] = useState('loading'); // 'loading' | 'ready' | 'error'
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get('/users/modules/menu')
+      .then((res) => {
+        if (cancelled) return;
+        setVisibleMenuItems(toMenuItems(res.data));
+        setMenuState('ready');
+      })
+      .catch(() => {
+        if (!cancelled) setMenuState('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Submenus expansion state (keyed by menu item name)
   const [expandedMenus, setExpandedMenus] = useState({});
@@ -123,7 +146,7 @@ export default function Sidebar({ isOpen, onClose }) {
         [activeParent.name]: true,
       }));
     }
-  }, [location.pathname]);
+  }, [location.pathname, visibleMenuItems]);
 
   const toggleSubmenu = (menuName) => {
     setExpandedMenus((prev) => ({
@@ -151,7 +174,7 @@ export default function Sidebar({ isOpen, onClose }) {
       )}
     >
       {/* Brand Header */}
-      <div className="flex h-20 shrink-0 items-center justify-between border-b border-[#8C1801] bg-[#200200] px-4 py-2">
+      <div className="flex h-16 shrink-0 items-center justify-between border-b border-[#8C1801] bg-[#200200] px-4 py-1.5">
         <NavLink
           to="/dashboard"
           onClick={handleNavClick}
@@ -161,7 +184,7 @@ export default function Sidebar({ isOpen, onClose }) {
           <img
             src={fullLogo}
             alt="Shri Akhila Havyaka Mahasabha (R.)"
-            className="w-full max-h-14 object-contain filter drop-shadow-sm"
+            className="w-full max-h-11 object-contain filter drop-shadow-sm"
           />
         </NavLink>
 
@@ -178,6 +201,12 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* Navigation List */}
       <nav className="flex-1 space-y-1.5 p-3 overflow-y-auto overflow-x-hidden">
+        {menuState === 'loading' && (
+          <p className="px-3.5 py-2 text-xs text-[#FAF7F2]/60">Loading menu…</p>
+        )}
+        {menuState === 'error' && (
+          <p className="px-3.5 py-2 text-xs text-[#FFC107]">Menu could not be loaded. Please refresh.</p>
+        )}
         {visibleMenuItems.map((item) => {
           const isParentActive =
             item.submenus?.some((sub) =>
@@ -206,11 +235,6 @@ export default function Sidebar({ isOpen, onClose }) {
                         : 'text-[#FAF7F2] hover:bg-[#8C1801]/60 hover:text-white'
                     )}
                   >
-                    {/* Active Left Indicator Bar */}
-                    {isParentActive && (
-                      <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-7 bg-[#FFC107] rounded-r-full shadow-md" />
-                    )}
-
                     <div className="flex items-center min-w-0">
                       <Icon
                         className={clsx(
@@ -245,15 +269,12 @@ export default function Sidebar({ isOpen, onClose }) {
                             to={sub.path}
                             onClick={handleNavClick}
                             className={clsx(
-                              'relative block rounded-lg px-3 py-2 text-xs transition-all truncate group',
+                              'relative block rounded-lg px-3 py-2 text-sm transition-all truncate group',
                               isSubActive
-                                ? 'bg-[#863221] text-white font-bold ring-1 ring-[#FFC107]/50 shadow-xs pl-3.5'
+                                ? 'bg-[#863221] text-white font-bold ring-1 ring-[#FFC107]/50 shadow-xs'
                                 : 'text-[#FAF7F2]/80 font-medium hover:bg-[#8C1801]/60 hover:text-white'
                             )}
                           >
-                            {isSubActive && (
-                              <span className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-3.5 bg-[#FFC107] rounded-r-full" />
-                            )}
                             <span className="truncate">{sub.name}</span>
                           </NavLink>
                         );
@@ -274,11 +295,6 @@ export default function Sidebar({ isOpen, onClose }) {
                       : 'text-[#FAF7F2] hover:bg-[#8C1801]/60 hover:text-white'
                   )}
                 >
-                  {/* Active Left Indicator Bar */}
-                  {isSingleActive && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-7 bg-[#FFC107] rounded-r-full shadow-md" />
-                  )}
-
                   <Icon
                     className={clsx(
                       'h-5 w-5 shrink-0 mr-3 transition-colors',

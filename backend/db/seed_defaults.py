@@ -173,6 +173,65 @@ def seed_modules(db) -> int:
     return created
 
 
+# ── sidebar pages ────────────────────────────────────────────
+# The web panel's left menu is read from the modules table (GET
+# /users/modules/menu). Each page is a child module whose route is the
+# front-end path; permission_code is the privilege that shows it.
+# (code, name, parent_code, route, icon, display_order, permission_code, min_rank_level)
+MENU_PAGE_CATALOG = [
+    ("dashboard", "Dashboard", None, "/dashboard", "layout-dashboard", 5, None, None),
+    ("members.list", "Membership List", "members", "/dashboard/membership/list", "list", 1, "members.read", None),
+    ("members.unapproved", "Unapproved Membership", "members", "/dashboard/membership/unapproved", "user-check", 2, "members.approvals.read", None),
+    ("receipts.entry", "Receipt Entry", "receipts", "/dashboard/receipts/entry", "file-plus", 1, "receipts.read", None),
+    ("receipts.tracking", "Receipt Tracking", "receipts", "/dashboard/receipts/tracking", "search", 2, "receipts.read", None),
+    ("users.modules", "Modules", "users", "/dashboard/users/modules", "layout-grid", 4, None, 1),
+    ("masters.location", "Location Setup", "masters", "/dashboard/master/location-setup", "map-pin", 1, "masters.read", None),
+    ("masters.membership_types", "Membership Types", "masters", "/dashboard/master/membership-type", "badge", 2, "masters.read", None),
+    ("masters.particulars", "Particulars Master", "masters", "/dashboard/master/receipt-type", "list-checks", 3, "masters.read", None),
+    ("masters.organisation", "Organisation Settings", "masters", "/dashboard/master/organisation-settings", "building", 4, "system.read", None),
+    ("masters.payment_modes", "Payment Mode Setup", "masters", "/dashboard/master/payment-modes", "credit-card", 5, "masters.read", None),
+]
+
+# Older rows were seeded with API-style routes; point them at the real pages,
+# but only while they still hold the old value (so admin edits are kept).
+# code -> (old route, new route)
+MENU_ROUTE_FIXES = {
+    "users.management": ("/users", "/dashboard/users/list"),
+    "roles": ("/users/roles", "/dashboard/users/roles"),
+    "users.privileges": ("/users/privileges", None),  # privileges are edited inside Role Management
+}
+
+
+def seed_menu_pages(db) -> int:
+    """Insert the sidebar page rows that are missing and repoint old routes.
+    Returns the number created. Never overwrites a value an admin has edited."""
+    from models.users import Module
+
+    rows = {m.code: m for m in db.query(Module).filter(Module.is_deleted == False).all()}  # noqa: E712
+    created = 0
+    for code, name, parent, route, icon, order, perm, min_rank in MENU_PAGE_CATALOG:
+        if code in rows:
+            continue
+        parent_row = rows.get(parent) if parent else None
+        if parent and not parent_row:
+            logger.error("Menu page '%s' references unknown parent module '%s' - skipped.", code, parent)
+            continue
+        row = Module(
+            code=code, name_en=name, route=route, icon=icon, display_order=order,
+            permission_code=perm, min_rank_level=min_rank,
+            parent_id=parent_row.id if parent_row else None,
+        )
+        db.add(row)
+        rows[code] = row
+        created += 1
+    for code, (old, new) in MENU_ROUTE_FIXES.items():
+        m = rows.get(code)
+        if m is not None and m.route == old:
+            m.route = new
+    db.commit()
+    return created
+
+
 def seed_permissions(db) -> int:
     """Insert any missing permission rows. Returns the number created.
 

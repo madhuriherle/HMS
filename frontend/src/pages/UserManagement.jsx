@@ -31,8 +31,6 @@ import {
   Layers,
   FileText
 } from 'lucide-react';
-import { initialRoles, allPrivileges } from '../data/rolesData';
-import { initialUsers } from '../data/userData';
 import api from '../api';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
@@ -55,6 +53,7 @@ export default function UserManagement() {
   // Master state
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [allPrivileges, setAllPrivileges] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // --- Fetch API Data on Mount ---
@@ -133,6 +132,9 @@ export default function UserManagement() {
     if (roleId === undefined || roleId === null || roleId === '') return null;
     return roles.find(r => r.id === roleId || r.id === Number(roleId) || String(r.id) === String(roleId)) || null;
   };
+
+  // Role currently picked in the Add / Edit form (drives the privileges preview box)
+  const selectedFormRole = getRoleById(formData.roleId);
 
   // Helper for active status check (supports boolean and string)
   const isUserActive = (user) => {
@@ -490,16 +492,8 @@ export default function UserManagement() {
 
       {/* Header, Search & Filters */}
       <SearchFilterBar
-        breadcrumb={
-          <nav className="flex items-center gap-1.5 text-xs text-[#863221] font-medium mb-1">
-            <Link to="/dashboard" className="hover:text-[#510601] transition-colors">Dashboard</Link>
-            <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-            <span>User Management</span>
-            <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-            <span className="text-[#510601] font-semibold">Users</span>
-          </nav>
-        }
-        title={<h1 className="text-2xl font-bold text-[#180200] tracking-tight">User Management</h1>}
+        
+        title={<h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">User Management</h1>}
         searchQuery={searchQuery}
         onSearchChange={(val) => {
           setSearchQuery(val);
@@ -1129,13 +1123,14 @@ export default function UserManagement() {
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       {allPrivileges.map(mod => {
+                        const rolePrivs = selectedFormRole.privileges || [];
                         const hasPrivs = mod.privileges.some(p =>
-                          selectedFormRole.privileges?.includes(p.id)
+                          rolePrivs.includes(p.id)
                         );
                         if (!hasPrivs) return null;
 
                         const countInMod = mod.privileges.filter(p =>
-                          selectedFormRole.privileges?.includes(p.id)
+                          rolePrivs.includes(p.id)
                         ).length;
 
                         return (

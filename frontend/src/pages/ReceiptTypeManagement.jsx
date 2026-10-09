@@ -371,37 +371,23 @@ export default function ReceiptTypeManagement() {
     });
   };
 
-  const handleConfirmStatusToggle = () => {
+  const isPendingApproval = (data) => Boolean(data && (data.approval_request_id || data.status === 'PENDING'));
+
+  const handleConfirmStatusToggle = async () => {
     if (!statusDialog) return;
-
-    const { targetType, item, parentType, newStatus } = statusDialog;
-
-    if (targetType === 'receiptType') {
-      const updated = receiptTypes.map(rt => {
-        if (rt.id === item.id) {
-          return { ...rt, status: newStatus };
-        }
-        return rt;
-      });
-      persistReceiptTypes(updated);
-      showToast(`Particular "${item.name}" set to ${newStatus}.`);
-    } else if (targetType === 'subType' && parentType) {
-      const updated = receiptTypes.map(rt => {
-        if (rt.id === parentType.id) {
-          const updatedSubTypes = (rt.subTypes || []).map(st => {
-            if (st.id === item.id) {
-              return { ...st, status: newStatus };
-            }
-            return st;
-          });
-          return { ...rt, subTypes: updatedSubTypes };
-        }
-        return rt;
-      });
-      persistReceiptTypes(updated);
-      showToast(`Sub-Type "${item.name}" set to ${newStatus}.`);
+    const { targetType, item, newStatus } = statusDialog;
+    const kind = targetType === 'subType' ? 'Sub-Type' : 'Particular';
+    try {
+      const { data } = await api.put(`/masters/particulars/${item.id}`, { status: newStatus === 'Active' });
+      showToast(
+        isPendingApproval(data)
+          ? `Status change for ${kind} "${item.name}" submitted for approval.`
+          : `${kind} "${item.name}" set to ${newStatus}.`
+      );
+      await fetchReceiptTypes();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error updating status', 'error');
     }
-
     setStatusDialog(null);
   };
 
@@ -424,29 +410,23 @@ export default function ReceiptTypeManagement() {
     });
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingItem) return;
-
     const { targetType, item, parentType } = deletingItem;
-
-    if (targetType === 'receiptType') {
-      const updated = receiptTypes.filter(rt => rt.id !== item.id);
-      persistReceiptTypes(updated);
-      showToast(`Particular "${item.name}" deleted.`);
-    } else if (targetType === 'subType' && parentType) {
-      const updated = receiptTypes.map(rt => {
-        if (rt.id === parentType.id) {
-          return {
-            ...rt,
-            subTypes: (rt.subTypes || []).filter(st => st.id !== item.id)
-          };
-        }
-        return rt;
-      });
-      persistReceiptTypes(updated);
-      showToast(`Sub-Type "${item.name}" removed from ${parentType.name}.`);
+    const kind = targetType === 'subType' ? 'Sub-Type' : 'Particular';
+    try {
+      const { data } = await api.delete(`/masters/particulars/${item.id}`);
+      showToast(
+        isPendingApproval(data)
+          ? `Delete request for ${kind} "${item.name}" submitted for approval.`
+          : targetType === 'subType' && parentType
+            ? `Sub-Type "${item.name}" removed from ${parentType.name}.`
+            : `Particular "${item.name}" deleted.`
+      );
+      await fetchReceiptTypes();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error deleting', 'error');
     }
-
     setDeletingItem(null);
   };
 
@@ -492,15 +472,7 @@ export default function ReceiptTypeManagement() {
 
       {/* Breadcrumb & Header */}
       <div>
-        <nav className="flex items-center gap-1.5 text-xs text-[#863221] mb-2 font-medium">
-          <Link to="/dashboard" className="hover:text-[#510601] transition-colors">Dashboard</Link>
-          <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-          <span>Masters</span>
-          <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-          <span className="text-[#510601] font-semibold">Particulars Master</span>
-        </nav>
-
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
               Particulars Master

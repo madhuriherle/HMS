@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
@@ -25,12 +25,7 @@ import {
   SlidersHorizontal,
   Download
 } from 'lucide-react';
-import {
-  getStoredLabelList,
-  saveStoredLabelList,
-  getStoredMembers,
-  getStoredMembershipTypes
-} from '../utils/receiptStore';
+import { loadMembers, loadMembershipTypes, loadReceipts } from '../utils/serverData';
 
 // Date formatter
 const formatDate = (dateStr) => {
@@ -44,9 +39,10 @@ const formatDate = (dateStr) => {
 
 export default function LabelList() {
   // Synchronized stores
-  const [labelList, setLabelList] = useState(getStoredLabelList());
-  const [members] = useState(getStoredMembers());
-  const [membershipTypes] = useState(getStoredMembershipTypes());
+  // Label list = members that have a receipt mapped to them (paid members), all read from the server
+  const [labelList, setLabelList] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [membershipTypes, setMembershipTypes] = useState([]);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -60,9 +56,6 @@ export default function LabelList() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-
-  // Remove confirmation modal
-  const [itemToRemove, setItemToRemove] = useState(null);
 
   // Print Preview Modal
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -78,6 +71,35 @@ export default function LabelList() {
     }, 4000);
   };
 
+  const loadLabelData = async (typeId) => {
+    try {
+      const [mems, recs, types] = await Promise.all([
+        loadMembers({ limit: 5000, ...(typeId && typeId !== 'ALL' ? { membership_type_id: typeId } : {}) }),
+        loadReceipts({ limit: 5000 }),
+        loadMembershipTypes()
+      ]);
+      const lastReceiptDate = new Map();
+      recs.forEach((r) => {
+        if (r.memberId == null) return;
+        const prev = lastReceiptDate.get(r.memberId);
+        if (!prev || String(r.receiptDate) > prev) lastReceiptDate.set(r.memberId, String(r.receiptDate || ''));
+      });
+      setMembers(mems);
+      setMembershipTypes(types);
+      setLabelList(
+        [...lastReceiptDate.entries()].map(([memberId, addedDate]) => ({ id: memberId, memberId, addedDate }))
+      );
+    } catch (error) {
+      console.error('Failed to load label list.', error);
+      showToast(error.response?.data?.detail || 'Failed to load the label list from the server.', 'error');
+    }
+  };
+
+  // the membership-type filter is applied by the server
+  useEffect(() => {
+    loadLabelData(membershipTypeFilter);
+  }, [membershipTypeFilter]);
+
   // Helper lookups
   const getMember = (memberId) => members.find((m) => m.id === memberId);
   const getMembershipType = (typeId) => membershipTypes.find((mt) => mt.id === typeId);
@@ -91,19 +113,14 @@ export default function LabelList() {
       // Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase().trim();
-        const matchesName = member.fullName.toLowerCase().includes(q);
-        const matchesNo = member.membershipNumber.toLowerCase().includes(q);
-        const matchesPhone = member.mobile.includes(q);
+        const matchesName = String(member.fullName ?? '').toLowerCase().includes(q);
+        const matchesNo = String(member.membershipNumber ?? '').toLowerCase().includes(q);
+        const matchesPhone = String(member.mobile ?? '').includes(q);
         const matchesCity = (member.talukName || '').toLowerCase().includes(q) || (member.districtName || '').toLowerCase().includes(q);
 
         if (!matchesName && !matchesNo && !matchesPhone && !matchesCity) {
           return false;
         }
-      }
-
-      // Membership Type
-      if (membershipTypeFilter !== 'ALL') {
-        if (member.membershipTypeId !== membershipTypeFilter) return false;
       }
 
       // Date added
@@ -154,20 +171,6 @@ export default function LabelList() {
     setSelectedIds([]);
   };
 
-  // Remove member from Label List
-  const handleConfirmRemove = () => {
-    if (!itemToRemove) return;
-
-    const updatedList = labelList.filter((item) => item.id !== itemToRemove.id);
-    setLabelList(updatedList);
-    saveStoredLabelList(updatedList);
-
-    // Also remove from selection if selected
-    setSelectedIds((prev) => prev.filter((id) => id !== itemToRemove.id));
-
-    setItemToRemove(null);
-    showToast('Member removed from label list.', 'success');
-  };
 
   // Get items for printing
   const itemsToPrint = useMemo(() => {
@@ -210,19 +213,9 @@ export default function LabelList() {
       {/* Header & Breadcrumb */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <nav className="flex items-center space-x-2 text-xs text-gray-500 mb-1">
-            <Link to="/dashboard" className="hover:text-[#8C1801]">Dashboard</Link>
-            <ChevronRight className="h-3 w-3 text-gray-400" />
-            <Link to="/dashboard/receipts" className="hover:text-[#8C1801]">Receipts</Link>
-            <ChevronRight className="h-3 w-3 text-gray-400" />
-            <span className="text-gray-800 font-semibold">Label List</span>
-          </nav>
-          <h1 className="text-2xl font-bold text-[#180200]">
+<h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
             Label List
           </h1>
-          <p className="text-sm text-gray-600 mt-0.5">
-            View members added for label printing. Select members to generate postal dispatch labels.
-          </p>
         </div>
 
         {/* Action Buttons */}
@@ -399,7 +392,7 @@ export default function LabelList() {
               ) : (
                 paginatedList.map((item) => {
                   const member = getMember(item.memberId);
-                  const memType = member ? getMembershipType(member.membershipTypeId) : null;
+                  const memType = membershipTypeFilter !== 'ALL' ? membershipTypes.find((mt) => String(mt.id) === String(membershipTypeFilter)) : null;
                   const isSelected = selectedIds.includes(item.id);
 
                   if (!member) return null;
@@ -435,7 +428,7 @@ export default function LabelList() {
                       {/* Membership Type */}
                       <td className="px-4 py-3.5 text-xs">
                         <span className="inline-flex items-center rounded-md bg-stone-100 px-2 py-1 text-xs font-medium text-stone-800">
-                          {memType?.name || 'Standard'}
+                          {memType?.name || '—'}
                         </span>
                       </td>
 
@@ -462,15 +455,13 @@ export default function LabelList() {
 
                       {/* Actions */}
                       <td className="px-4 py-3.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => setItemToRemove(item)}
-                          title="Remove from Label List"
-                          className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
+                        <Link
+                          to="/dashboard/receipts/tracking"
+                          title="Receipts decide who is on the label list"
+                          className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-medium text-[#510601] hover:bg-stone-50 transition-colors"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          <span>Remove</span>
-                        </button>
+                          <span>View receipts</span>
+                        </Link>
                       </td>
                     </tr>
                   );
@@ -567,7 +558,7 @@ export default function LabelList() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2 print:gap-4">
               {itemsToPrint.map((item) => {
                 const member = getMember(item.memberId);
-                const memType = member ? getMembershipType(member.membershipTypeId) : null;
+                const memType = membershipTypeFilter !== 'ALL' ? membershipTypes.find((mt) => String(mt.id) === String(membershipTypeFilter)) : null;
                 if (!member) return null;
 
                 return (
@@ -648,58 +639,7 @@ export default function LabelList() {
       {/* ========================================================= */}
       {/* 12. REMOVE CONFIRMATION DIALOG                            */}
       {/* ========================================================= */}
-      <Modal isOpen={Boolean(itemToRemove)} onClose={() => setItemToRemove(null)}>
-        {itemToRemove && (
-          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl border border-stone-200 p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center gap-3">
-              <div className="rounded-full bg-red-100 p-3 text-red-700">
-                <AlertTriangle className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-gray-900">
-                  Remove from Label List?
-                </h3>
-                <p className="text-xs text-gray-500">
-                  Confirmation required
-                </p>
-              </div>
-            </div>
 
-            <p className="text-xs text-gray-600 leading-relaxed">
-              Are you sure you want to remove{' '}
-              <strong className="text-gray-900">
-                {getMember(itemToRemove.memberId)?.fullName}
-              </strong>{' '}
-              ({getMember(itemToRemove.memberId)?.membershipNumber}) from the label printing queue?
-            </p>
-
-            <div className="rounded-lg bg-stone-100 p-3 text-[11px] text-stone-700 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 shrink-0 text-stone-500 mt-0.5" />
-              <span>
-                <strong>Note:</strong> Removing this member from the label list will{' '}
-                <strong>NOT</strong> delete, cancel, or unassign the associated receipt. It only removes the member from the current physical printing batch.
-              </span>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setItemToRemove(null)}
-                className="rounded-lg border border-stone-200 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-stone-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmRemove}
-                className="rounded-lg bg-red-600 px-4 py-2 text-xs font-medium text-white hover:bg-red-700 shadow-sm"
-              >
-                Remove Member
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
     </div>
   );
 }

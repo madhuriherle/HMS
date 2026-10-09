@@ -31,7 +31,7 @@ export default function SearchFilterBar({
         {(title || leftSlot) ? (
           <div className="flex items-center gap-3 min-w-0">
             {typeof title === 'string' ? (
-              <h1 className="text-2xl font-bold text-[#180200] tracking-tight">{title}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">{title}</h1>
             ) : (
               title
             )}

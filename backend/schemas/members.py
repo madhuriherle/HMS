@@ -196,6 +196,18 @@ class MemberUpdate(BaseModel):
     district_id: Optional[int] = None
     taluk_id: Optional[int] = None
     pincode_id: Optional[int] = None
+    # Active/Inactive toggle only; approval state has its own flow.
+    member_status: Optional[str] = None
+
+    @field_validator("member_status")
+    @classmethod
+    def _validate_member_status(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v = v.strip().upper()
+        if v not in ("ACTIVE", "INACTIVE"):
+            raise ValueError("member_status must be ACTIVE or INACTIVE")
+        return v
 
     @field_validator("gender")
     @classmethod

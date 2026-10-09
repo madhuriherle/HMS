@@ -41,7 +41,7 @@ def _to_plain(obj, exclude: Set[str]):
         if prop.key not in exclude
     }
 
-MAX_PAGE_SIZE = 500
+MAX_PAGE_SIZE = 25000
 
 def paginate(query, page: int = 1, limit: int = 20, exclude: Optional[Set[str]] = None) -> dict:
     """Helper to paginate a SQLAlchemy query (limit is clamped)."""

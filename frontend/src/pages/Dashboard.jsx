@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users, UserCheck, Clock, Activity, UserX, Tag,
   UserPlus, List, CheckCircle, FileText, ArrowRight, Eye, BookOpen, Printer,
@@ -8,10 +8,12 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
-import { statCards, registrationData, membershipTypeData, districtData, recentActivity } from '../data/dummyData';
 import Modal from '../components/Modal';
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
+import api from '../api';
+import Swal from 'sweetalert2';
+import { normalizeMember, unwrapList } from '../utils/apiAdapters';
 
 const iconMap = {
   'users': Users,
@@ -28,114 +30,6 @@ const MEMBERSHIP_COLORS = {
   'Mahaposhaka': '#F4AA26',
   'Mahapalaka': '#3D705C',
   'Sahasadasyatva': '#863221',
-};
-
-const RECENT_MEMBERS_DETAILS = {
-  'MEM-001': {
-    id: 'MEM-001',
-    name: 'Ramesh Bhat',
-    fullName: 'Ramesh Bhat',
-    mobile: '9845123456',
-    email: 'ramesh.bhat@gmail.com',
-    district: 'Dakshina Kannada',
-    districtName: 'Dakshina Kannada',
-    talukName: 'Mangaluru',
-    stateName: 'Karnataka',
-    postalCode: '575001',
-    address: 'Near Sharavu Temple, Mangaluru',
-    type: 'Mahaposhaka',
-    membershipType: 'Mahaposhaka',
-    category: 'Individual',
-    gothra: 'Vishwamitra',
-    bloodGroup: 'O+',
-    date: '2026-09-28',
-    status: 'Approved',
-    amount: '₹5,000'
-  },
-  'MEM-002': {
-    id: 'MEM-002',
-    name: 'Sujatha Hegde',
-    fullName: 'Sujatha Hegde',
-    mobile: '9480123456',
-    email: 'sujatha.hegde@yahoo.com',
-    district: 'Uttara Kannada',
-    districtName: 'Uttara Kannada',
-    talukName: 'Sirsi',
-    stateName: 'Karnataka',
-    postalCode: '581401',
-    address: 'Car Street, Sirsi',
-    type: 'Poshaka',
-    membershipType: 'Poshaka',
-    category: 'Individual',
-    gothra: 'Kashyapa',
-    bloodGroup: 'A+',
-    date: '2026-09-28',
-    status: 'Pending',
-    amount: '₹2,000'
-  },
-  'MEM-003': {
-    id: 'MEM-003',
-    name: 'Ganesh Sharma',
-    fullName: 'Ganesh Sharma',
-    mobile: '9741234567',
-    email: 'ganesh.sharma@outlook.com',
-    district: 'Udupi',
-    districtName: 'Udupi',
-    talukName: 'Kundapura',
-    stateName: 'Karnataka',
-    postalCode: '576201',
-    address: 'Main Road, Kundapura',
-    type: 'Mahapalaka',
-    membershipType: 'Mahapalaka',
-    category: 'Individual',
-    gothra: 'Bharadwaja',
-    bloodGroup: 'B+',
-    date: '2026-09-27',
-    status: 'Approved',
-    amount: '₹10,000'
-  },
-  'MEM-004': {
-    id: 'MEM-004',
-    name: 'Kavya Shastri',
-    fullName: 'Kavya Shastri',
-    mobile: '9900112233',
-    email: 'kavya.shastri@gmail.com',
-    district: 'Bengaluru',
-    districtName: 'Bengaluru Urban',
-    talukName: 'Bengaluru South',
-    stateName: 'Karnataka',
-    postalCode: '560004',
-    address: '8th Main, Basavanagudi, Bengaluru',
-    type: 'Sahasadasyatva',
-    membershipType: 'Sahasadasyatva',
-    category: 'Individual',
-    gothra: 'Vasishta',
-    bloodGroup: 'AB+',
-    date: '2026-09-26',
-    status: 'Inactive',
-    amount: '₹1,000'
-  },
-  'MEM-005': {
-    id: 'MEM-005',
-    name: 'Narayana Upadhyaya',
-    fullName: 'Narayana Upadhyaya',
-    mobile: '9632587410',
-    email: 'narayana.u@gmail.com',
-    district: 'Shivamogga',
-    districtName: 'Shivamogga',
-    talukName: 'Sagara',
-    stateName: 'Karnataka',
-    postalCode: '577401',
-    address: 'B.H. Road, Sagara',
-    type: 'Poshaka',
-    membershipType: 'Poshaka',
-    category: 'Individual',
-    gothra: 'Angirasa',
-    bloodGroup: 'O+',
-    date: '2026-09-25',
-    status: 'Approved',
-    amount: '₹2,000'
-  }
 };
 
 const StatCard = ({ title, value, icon, color, trend }) => {
@@ -163,28 +57,113 @@ const StatCard = ({ title, value, icon, color, trend }) => {
 
 export default function Dashboard() {
   const [viewingMember, setViewingMember] = useState(null);
+  
+  const [stats, setStats] = useState({
+    total: 0,
+    approved: 0,
+    pending: 0,
+    magazineCount: 0
+  });
+  
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [membershipTypeData, setMembershipTypeData] = useState([]);
+  const [registrationData, setRegistrationData] = useState([]);
+  const [districtData, setDistrictData] = useState([]);
+  
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [dashRes, reportRes, membersRes] = await Promise.all([
+          api.get('/dashboard'),
+          api.get('/reports/summary'),
+          api.get('/members?limit=5&sort_by=created_at&sort_desc=true')
+        ]);
+        
+        const dData = dashRes.data;
+        setStats({
+          total: dData.members?.total || 0,
+          approved: dData.members?.approved || 0,
+          pending: dData.members?.unapproved || 0,
+          magazineCount: dData.magazines?.active_subscriptions || 0
+        });
+        
+        const rData = reportRes.data;
+        if (rData.memberships?.by_type) {
+          setMembershipTypeData(rData.memberships.by_type.map(item => ({
+            name: item.membership_type,
+            value: item.member_count
+          })));
+        }
+        
+        const mData = membersRes.data;
+        if (mData.items) {
+          setRecentActivity(mData.items.map(m => ({
+            id: m.id,
+            name: m.full_name_en || m.name,
+            district: m.district,
+            type: m.membership_type,
+            date: m.created_at ? m.created_at.split('T')[0] : '-',
+            status: m.approval_status === 'APPROVED' ? 'Approved' : (m.approval_status === 'UNAPPROVED' ? 'Pending' : 'Inactive')
+          })));
+        }
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const statCards = [
+    { id: 1, title: 'Total Members', value: stats.total.toLocaleString(), icon: 'users', color: '#510601', trend: '' },
+    { id: 2, title: 'Approved Members', value: stats.approved.toLocaleString(), icon: 'user-check', color: '#3D705C', trend: '' },
+    { id: 3, title: 'Pending Approvals', value: stats.pending.toLocaleString(), icon: 'clock', color: '#EE6A00', trend: '' },
+    { id: 4, title: 'This Month Magazine Count', value: stats.magazineCount.toLocaleString(), icon: 'book-open', color: '#8C1801', trend: '' },
+  ];
+
 
   const currentDate = new Date().toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
 
-  const handleOpenMemberView = (item) => {
-    const memberDetails = RECENT_MEMBERS_DETAILS[item.id] || {
-      ...item,
-      fullName: item.name,
-      membershipType: item.type,
-      districtName: item.district,
-      mobile: '—',
-      email: '—',
-      gothra: '—',
-      bloodGroup: '—',
-      address: '—',
-      stateName: 'Karnataka',
-      talukName: item.district,
-      postalCode: '—',
-      amount: '—'
-    };
-    setViewingMember(memberDetails);
+  // Everything shown in the member popup is read from the server
+  const handleOpenMemberView = async (item) => {
+    try {
+      const { data } = await api.get(`/members/${item.id}`);
+      const m = normalizeMember(data);
+      const nameOf = (path, id) =>
+        id
+          ? api.get(`/masters/${path}/${id}`).then((r) => r.data?.name_en || '').catch(() => '')
+          : Promise.resolve('');
+      const [stateName, districtName, talukName, receipts] = await Promise.all([
+        nameOf('states', data.state_id),
+        nameOf('districts', data.district_id),
+        nameOf('taluks', data.taluk_id),
+        api
+          .get('/receipts/tracking', { params: { member_id: item.id, limit: 1 } })
+          .then((r) => unwrapList(r.data))
+          .catch(() => [])
+      ]);
+      const latest = receipts[0];
+      setViewingMember({
+        ...item,
+        ...m,
+        fullName: m.fullName || item.name,
+        districtName,
+        stateName,
+        talukName,
+        mobile: m.mobile,
+        address: m.address,
+        amount: latest ? `₹${Number(latest.amount).toLocaleString('en-IN')}` : ''
+      });
+    } catch (err) {
+      console.error('Failed to fetch member details', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Could not load member',
+        text: err.response?.data?.detail || 'The server could not return this member.',
+        confirmButtonColor: '#510601'
+      });
+    }
   };
 
   return (
@@ -195,7 +174,6 @@ export default function Dashboard() {
           <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
             Welcome to HMS
           </h1>
-          <p className="text-[#863221] mt-1">Membership Management Dashboard</p>
         </div>
         <div className="bg-white px-4 py-2 rounded-lg border border-[#E8DFD8] shadow-sm text-sm font-medium text-[#180200]">
           {currentDate}
@@ -341,7 +319,7 @@ export default function Dashboard() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-8 w-8 rounded-full bg-[#510601]/10 flex items-center justify-center text-[#510601] font-bold text-xs mr-3">
-                          {item.name.charAt(0)}
+                          {(item.name || 'M').charAt(0)}
                         </div>
                         <div className="text-sm font-medium text-[#180200]">{item.name}</div>
                       </div>
@@ -407,7 +385,7 @@ export default function Dashboard() {
                     )}
                   </div>
                   <p className="text-xs text-[#863221] font-medium">
-                    {viewingMember.membershipType || viewingMember.type || 'Standard'} Member
+                    {viewingMember.membershipType || viewingMember.type || ''} Member
                   </p>
                 </div>
               </div>
@@ -489,7 +467,7 @@ export default function Dashboard() {
                   <div>
                     <span className="text-[10px] uppercase font-bold text-[#863221]">District & State</span>
                     <p className="font-medium mt-0.5">
-                      {viewingMember.districtName || viewingMember.district || '—'}, {viewingMember.stateName || 'Karnataka'}
+                      {[viewingMember.districtName || viewingMember.district, viewingMember.stateName].filter(Boolean).join(', ') || '—'}
                     </p>
                   </div>
                   <div>
@@ -510,7 +488,7 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-bold text-[#863221]">Membership Fee</span>
-                  <p className="font-bold text-sm text-[#180200] mt-0.5">{viewingMember.amount || '₹2,000'}</p>
+                  <p className="font-bold text-sm text-[#180200] mt-0.5">{viewingMember.amount || '—'}</p>
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-bold text-[#863221]">Registration Date</span>

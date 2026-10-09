@@ -123,6 +123,7 @@ def _module_dict(m: Module, children: list, privileges: list) -> dict:
         "icon": m.icon, "route": m.route, "parent_id": m.parent_id,
         "opens_module_id": m.opens_module_id, "display_order": m.display_order,
         "min_rank_level": m.min_rank_level, "status": m.status,
+        "permission_code": m.permission_code,
         "submodules": children,
         "privileges": [
             {"id": p.id, "code": p.code, "name": p.name, "description": p.description, "status": p.status}
@@ -174,8 +175,14 @@ def my_menu(db: Session = Depends(deps.get_db), current_user: User = Depends(dep
         if not visible:
             if role.is_all_access:
                 visible = bool(m.route or m.parent_id is None)
-            else:
+            elif m.permission_code:
+                # page gated by one explicit privilege
+                visible = bool(m.route) and m.permission_code in held
+            elif mine:
                 visible = bool(m.route) and any(p.code in held for p in mine if p.code.endswith(".read"))
+            else:
+                # no privilege gate configured: the rank gate above is all that applies
+                visible = bool(m.route)
         if not visible:
             return None
         return _module_dict(m, kids, [p for p in mine if role.is_all_access or p.code in held])
@@ -239,6 +246,11 @@ def read_module(*, db: Session = Depends(deps.get_db), current_user: User = Depe
     return out
 
 
+def _check_permission_code(db: Session, code) -> None:
+    if code and not db.query(Permission).filter(Permission.code == code, Permission.is_deleted == False).first():  # noqa: E712
+        raise HTTPException(400, f"permission_code '{code}' is not a known privilege")
+
+
 def _check_module_refs(db: Session, parent_id, opens_id, own_id=None) -> None:
     for label, ref in (("parent_id", parent_id), ("opens_module_id", opens_id)):
         if ref is not None:
@@ -253,6 +265,7 @@ def create_module(*, db: Session = Depends(deps.get_db), current_user: User = De
     if db.query(Module).filter(Module.code == module_in.code, Module.is_deleted == False).first():  # noqa: E712
         raise HTTPException(409, f"Module code '{module_in.code}' already exists")
     _check_module_refs(db, module_in.parent_id, module_in.opens_module_id)
+    _check_permission_code(db, module_in.permission_code)
     return crud_users.module.create(db=db, obj_in=module_in, created_by=current_user.id)
 
 
@@ -263,6 +276,7 @@ def update_module(*, db: Session = Depends(deps.get_db), current_user: User = De
         raise HTTPException(404, "Module not found")
     data = module_in.model_dump(exclude_unset=True)
     _check_module_refs(db, data.get("parent_id"), data.get("opens_module_id"), own_id=module_id)
+    _check_permission_code(db, data.get("permission_code"))
     return crud_users.module.update(db, db_obj=module, obj_in=module_in, updated_by=current_user.id)
 
 

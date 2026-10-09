@@ -27,6 +27,10 @@ import api from '../api';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
 
+// <select> values are always strings; API ids are numbers, so convert back
+// before comparing with `===` or sending to the API.
+const toId = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? v : Number(v));
+
 export default function LocationSetup() {
   const { hasPermission } = useAuth();
 
@@ -49,8 +53,8 @@ export default function LocationSetup() {
       const [stRes, dtRes, tkRes, pcRes] = await Promise.all([
         api.get('/masters/states?limit=2000'),
         api.get('/masters/districts?limit=2000'),
-        api.get('/masters/taluks?limit=2000'),
-        api.get('/masters/postal-codes?limit=2000')
+        api.get('/masters/taluks?limit=20000'),
+        api.get('/masters/postal-codes?limit=20000')
       ]);
       
       const sName = (arr, id) => { const f = arr?.find(x => x.id === id); return f ? f.name_en : ''; };
@@ -103,8 +107,8 @@ export default function LocationSetup() {
   // ====================================================
   // TAB 1: GEOGRAPHIC HIERARCHY STATE & LOGIC
   // ====================================================
-  const [selectedStateId, setSelectedStateId] = useState('ST-01'); // Default Karnataka
-  const [selectedDistrictIdForTaluk, setSelectedDistrictIdForTaluk] = useState('DT-01'); // Default Dakshina Kannada
+  const [selectedStateId, setSelectedStateId] = useState(''); // first state from the server unless one is picked
+  const [selectedDistrictIdForTaluk, setSelectedDistrictIdForTaluk] = useState(''); // first district of the state unless one is picked
 
   // Sub-searches
   const [districtSearchQuery, setDistrictSearchQuery] = useState('');
@@ -116,7 +120,7 @@ export default function LocationSetup() {
   const [editingDistrict, setEditingDistrict] = useState(null);
   const [districtFormData, setDistrictFormData] = useState({
     name: '',
-    stateId: 'ST-01',
+    stateId: '',
     status: 'Active'
   });
   const [districtFormErrors, setDistrictFormErrors] = useState({});
@@ -127,8 +131,8 @@ export default function LocationSetup() {
   const [editingTaluk, setEditingTaluk] = useState(null);
   const [talukFormData, setTalukFormData] = useState({
     name: '',
-    stateId: 'ST-01',
-    districtId: 'DT-01',
+    stateId: '',
+    districtId: '',
     status: 'Active'
   });
   const [talukFormErrors, setTalukFormErrors] = useState({});
@@ -138,7 +142,7 @@ export default function LocationSetup() {
   const [statusDialog, setStatusDialog] = useState(null); // { type: 'state' | 'district' | 'taluk' | 'postal', item, nextStatus }
 
   // Current active selected state object
-  const currentState = states.find((s) => s.id === selectedStateId) || states[0] || { id: 'ST-01', name: 'Karnataka' };
+  const currentState = states.find((s) => s.id === selectedStateId) || states[0] || { id: '', name: '' };
 
   // Filtered districts for selected state
   const stateDistricts = useMemo(() => {
@@ -341,7 +345,7 @@ export default function LocationSetup() {
   const [postalFormData, setPostalFormData] = useState({
     postalCode: '',
     area: '',
-    stateId: 'ST-01',
+    stateId: '',
     districtId: '',
     talukId: '',
     status: 'Active'
@@ -439,7 +443,7 @@ export default function LocationSetup() {
     setPostalFormData({
       postalCode: '',
       area: '',
-      stateId: activeState ? activeState.id : 'ST-01',
+      stateId: activeState ? activeState.id : '',
       districtId: firstDist ? firstDist.id : '',
       talukId: matchingTaluks[0] ? matchingTaluks[0].id : '',
       status: 'Active'
@@ -667,7 +671,7 @@ export default function LocationSetup() {
         rowData.errorMsg = 'Post Office / Area name is required';
         invalidLocationCount++;
       }
-      // 3. Validate State (Karnataka or Kerala)
+      // 3. Validate State against the states on the server
       else {
         const stateMatch = states.find(
           (s) => s.name.toLowerCase() === rowData.stateName.toLowerCase()
@@ -675,7 +679,7 @@ export default function LocationSetup() {
         if (!stateMatch) {
           rowData.isValid = false;
           rowData.errorType = 'INVALID_LOCATION';
-          rowData.errorMsg = `State must be Karnataka or Kerala (found "${rowData.stateName || 'empty'}")`;
+          rowData.errorMsg = `State "${rowData.stateName || 'empty'}" does not exist in the State master`;
           invalidLocationCount++;
         } else {
           rowData.matchedState = stateMatch;
@@ -744,86 +748,83 @@ export default function LocationSetup() {
     });
   };
 
-  const handleCommitImport = () => {
+  const handleCommitImport = async () => {
     const validRows = importPreviewRows.filter((r) => r.isValid);
     if (validRows.length === 0) {
       showToast('No valid records to import.', 'error');
       return;
     }
 
-    const newRecords = validRows.map((r, idx) => ({
-      id: `PIN-${Date.now()}-${idx}`,
-      postalCode: r.pinCode,
-      area: r.area,
-      stateId: r.matchedState.id,
-      stateName: r.matchedState.name,
-      districtId: r.matchedDistrict.id,
-      districtName: r.matchedDistrict.name,
-      talukId: r.matchedTaluk.id,
-      talukName: r.matchedTaluk.name,
-      status: 'Active',
-      createdDate: new Date().toISOString().split('T')[0]
-    }));
+    // The server imports a CSV of ids it validates again
+    const quote = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = [
+      'pincode,post_office_name,state_id,district_id,taluk_id',
+      ...validRows.map((r) =>
+        [r.pinCode, quote(r.area), r.matchedState.id, r.matchedDistrict.id, r.matchedTaluk.id].join(',')
+      )
+    ].join('\n');
+    const form = new FormData();
+    form.append('file', new Blob([csv], { type: 'text/csv' }), 'postal_codes.csv');
 
-    persistPostalCodes([...newRecords, ...postalCodes]);
-    showToast(`Successfully imported ${newRecords.length} PIN Code records!`);
-    setIsImportModalOpen(false);
-    setImportFile(null);
-    setImportPreviewRows([]);
-    setImportSummary(null);
+    try {
+      const { data } = await api.post('/imports/postal-codes/import', form);
+      const added = data?.inserted ?? validRows.length;
+      const updated = data?.updated ?? 0;
+      showToast(`Imported PIN codes: ${added} added, ${updated} updated.`);
+      setIsImportModalOpen(false);
+      setImportFile(null);
+      setImportPreviewRows([]);
+      setImportSummary(null);
+      await fetchMasters();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'PIN code import failed.', 'error');
+    }
   };
 
   // ====================================================
   // STATUS TOGGLE & DELETE CONFIRMATION HANDLERS
   // ====================================================
-  const handleConfirmStatusToggle = () => {
+  const isPendingApproval = (data) => Boolean(data && (data.approval_request_id || data.status === 'PENDING'));
+
+  const LOCATION_PATHS = { state: 'states', district: 'districts', taluk: 'taluks', postal: 'postal-codes' };
+  const locationLabel = (type, item) =>
+    type === 'postal'
+      ? `PIN Code "${item.postalCode}"`
+      : `${type.charAt(0).toUpperCase() + type.slice(1)} "${item.name}"`;
+
+  const handleConfirmStatusToggle = async () => {
     if (!statusDialog) return;
     const { type, item, nextStatus } = statusDialog;
-
-    if (type === 'state') {
-      const updated = states.map((s) => (s.id === item.id ? { ...s, status: nextStatus } : s));
-      persistStates(updated);
-      showToast(`State "${item.name}" set to ${nextStatus}.`);
-    } else if (type === 'district') {
-      const updated = districts.map((d) => (d.id === item.id ? { ...d, status: nextStatus } : d));
-      persistDistricts(updated);
-      showToast(`District "${item.name}" set to ${nextStatus}.`);
-    } else if (type === 'taluk') {
-      const updated = taluks.map((t) => (t.id === item.id ? { ...t, status: nextStatus } : t));
-      persistTaluks(updated);
-      showToast(`Taluk "${item.name}" set to ${nextStatus}.`);
-    } else if (type === 'postal') {
-      const updated = postalCodes.map((p) => (p.id === item.id ? { ...p, status: nextStatus } : p));
-      persistPostalCodes(updated);
-      showToast(`PIN Code "${item.postalCode}" set to ${nextStatus}.`);
+    try {
+      const { data } = await api.put(`/masters/${LOCATION_PATHS[type]}/${item.id}`, {
+        status: nextStatus === 'Active'
+      });
+      showToast(
+        isPendingApproval(data)
+          ? `Status change for ${locationLabel(type, item)} submitted for approval.`
+          : `${locationLabel(type, item)} set to ${nextStatus}.`
+      );
+      await fetchMasters();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error updating status', 'error');
     }
     setStatusDialog(null);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteDialog) return;
     const { type, item } = deleteDialog;
-
-    if (type === 'district') {
-      // Remove district and associated taluks & postal codes
-      const updatedDistricts = districts.filter((d) => d.id !== item.id);
-      persistDistricts(updatedDistricts);
-      const updatedTaluks = taluks.filter((t) => t.districtId !== item.id);
-      persistTaluks(updatedTaluks);
-      const updatedPins = postalCodes.filter((p) => p.districtId !== item.id);
-      persistPostalCodes(updatedPins);
-      showToast(`District "${item.name}" deleted.`);
-    } else if (type === 'taluk') {
-      // Remove taluk and associated postal codes
-      const updatedTaluks = taluks.filter((t) => t.id !== item.id);
-      persistTaluks(updatedTaluks);
-      const updatedPins = postalCodes.filter((p) => p.talukId !== item.id);
-      persistPostalCodes(updatedPins);
-      showToast(`Taluk "${item.name}" deleted.`);
-    } else if (type === 'postal') {
-      const updatedPins = postalCodes.filter((p) => p.id !== item.id);
-      persistPostalCodes(updatedPins);
-      showToast(`PIN Code "${item.postalCode}" (${item.area}) removed.`);
+    try {
+      const { data } = await api.delete(`/masters/${LOCATION_PATHS[type]}/${item.id}`);
+      showToast(
+        isPendingApproval(data)
+          ? `Delete request for ${locationLabel(type, item)} submitted for approval.`
+          : `${locationLabel(type, item)} deleted.`
+      );
+      await fetchMasters();
+    } catch (err) {
+      // the server refuses to delete a parent that still has children and says why
+      showToast(err.response?.data?.detail || 'Error deleting record', 'error');
     }
     setDeleteDialog(null);
   };
@@ -835,18 +836,9 @@ export default function LocationSetup() {
       {/* BREADCRUMB & HEADER                                  */}
       {/* ---------------------------------------------------- */}
       <div>
-        <nav className="flex items-center gap-2 text-sm text-[#863221] mb-2 font-medium">
-          <Link to="/dashboard" className="hover:text-[#510601] transition-colors">
-            Dashboard
-          </Link>
-          <ChevronRight className="w-4 h-4 text-[#863221]/50" />
-          <span className="text-[#863221]">Masters</span>
-          <ChevronRight className="w-4 h-4 text-[#863221]/50" />
-          <span className="text-[#180200] font-semibold">Location Setup</span>
-        </nav>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-[#180200] tracking-tight">Location Setup</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Location Setup</h1>
 
           </div>
         </div>
@@ -1143,7 +1135,7 @@ export default function LocationSetup() {
                 <div>
                   <select
                     value={selectedDistrictIdForTaluk}
-                    onChange={(e) => setSelectedDistrictIdForTaluk(e.target.value)}
+                    onChange={(e) => setSelectedDistrictIdForTaluk(toId(e.target.value))}
                     className="w-full py-1.5 px-2.5 text-xs bg-white border border-[#E8DFD8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#510601] font-medium text-[#180200]"
                   >
                     {stateDistricts.map((d) => (
@@ -1351,8 +1343,11 @@ export default function LocationSetup() {
                   className="w-full py-1.5 px-2.5 text-xs bg-white border border-[#E8DFD8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#510601] text-[#180200]"
                 >
                   <option value="ALL">All States</option>
-                  <option value="Karnataka">Karnataka</option>
-                  <option value="Kerala">Kerala</option>
+                  {states.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1471,7 +1466,7 @@ export default function LocationSetup() {
                           <td className="py-3 px-4 text-[#863221]">{item.districtName || '—'}</td>
                           <td className="py-3 px-4">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-[#FAF7F2] text-[#510601] border border-[#E8DFD8]">
-                              {item.stateName || 'Karnataka'}
+                              {item.stateName || ''}
                             </span>
                           </td>
                           <td className="py-3 px-4 text-center">
@@ -1632,7 +1627,7 @@ export default function LocationSetup() {
               </label>
               <select
                 value={districtFormData.stateId}
-                onChange={(e) => setDistrictFormData({ ...districtFormData, stateId: e.target.value })}
+                onChange={(e) => setDistrictFormData({ ...districtFormData, stateId: toId(e.target.value) })}
                 className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
               >
                 {states.map((s) => (
@@ -1746,7 +1741,7 @@ export default function LocationSetup() {
               <select
                 value={talukFormData.stateId}
                 onChange={(e) => {
-                  const newStateId = e.target.value;
+                  const newStateId = toId(e.target.value);
                   const matchDists = districts.filter((d) => d.stateId === newStateId);
                   setTalukFormData({
                     ...talukFormData,
@@ -1771,7 +1766,7 @@ export default function LocationSetup() {
               <select
                 value={talukFormData.districtId}
                 onChange={(e) => {
-                  setTalukFormData({ ...talukFormData, districtId: e.target.value });
+                  setTalukFormData({ ...talukFormData, districtId: toId(e.target.value) });
                   if (talukFormErrors.districtId) {
                     setTalukFormErrors({ ...talukFormErrors, districtId: null });
                   }
@@ -1967,7 +1962,7 @@ export default function LocationSetup() {
                 <select
                   value={postalFormData.stateId}
                   onChange={(e) => {
-                    const newStateId = e.target.value;
+                    const newStateId = toId(e.target.value);
                     const newDists = districts.filter(
                       (d) => d.stateId === newStateId && (postalModalMode === 'edit' || d.status === 'Active')
                     );
@@ -2003,7 +1998,7 @@ export default function LocationSetup() {
                 <select
                   value={postalFormData.districtId}
                   onChange={(e) => {
-                    const newDistId = e.target.value;
+                    const newDistId = toId(e.target.value);
                     const newTaluks = taluks.filter(
                       (t) => t.districtId === newDistId && (postalModalMode === 'edit' || t.status === 'Active')
                     );
@@ -2046,7 +2041,7 @@ export default function LocationSetup() {
                 <select
                   value={postalFormData.talukId}
                   onChange={(e) => {
-                    setPostalFormData({ ...postalFormData, talukId: e.target.value });
+                    setPostalFormData({ ...postalFormData, talukId: toId(e.target.value) });
                     if (postalFormErrors.talukId) {
                       setPostalFormErrors({ ...postalFormErrors, talukId: null });
                     }

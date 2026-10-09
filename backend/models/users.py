@@ -53,6 +53,9 @@ class Module(AuditMixin, Base):
     route: Mapped[str] = mapped_column(String(255), nullable=True)
     display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     min_rank_level: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # A menu page (leaf) is shown to a role only when it holds this privilege.
+    # NULL = no privilege gate (rank gate still applies).
+    permission_code: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
 
 class Role(AuditMixin, Base):
     __tablename__ = "roles"

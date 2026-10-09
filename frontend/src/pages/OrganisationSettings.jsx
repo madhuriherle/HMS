@@ -32,11 +32,11 @@ import {
 } from 'lucide-react';
 import {
   ORGANISATION_TYPES,
-  DEFAULT_ORGANISATION_SETTINGS,
-  getStoredOrganisationSettings,
-  saveStoredOrganisationSettings
+  EMPTY_ORGANISATION_SETTINGS,
+  settingsFromApi,
+  settingsToApi
 } from '../utils/organisationStore';
-import { lookupLocationByPin } from '../utils/receiptStore';
+import { loadLocations, findLocationByPin } from '../utils/serverData';
 
 export default function OrganisationSettings() {
   const { hasPermission } = useAuth();
@@ -45,8 +45,8 @@ export default function OrganisationSettings() {
   const [activeTab, setActiveTab] = useState('profile');
 
   // Master Settings State
-  const [settings, setSettings] = useState(getStoredOrganisationSettings);
-  const [savedSettingsSnapshot, setSavedSettingsSnapshot] = useState(getStoredOrganisationSettings);
+  const [settings, setSettings] = useState(EMPTY_ORGANISATION_SETTINGS);
+  const [savedSettingsSnapshot, setSavedSettingsSnapshot] = useState(EMPTY_ORGANISATION_SETTINGS);
 
   // Errors & UI Feedback
   const [errors, setErrors] = useState({});
@@ -55,54 +55,31 @@ export default function OrganisationSettings() {
 
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    const fetchSettings = async () => {
+  // The logo is a protected server file: fetch it as an image blob for display
+  const loadLogoUrl = async (path) => {
+    if (!path) return null;
+    const res = await api.get('/system/files', { params: { path }, responseType: 'blob' });
+    return URL.createObjectURL(res.data);
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const { data } = await api.get('/system/settings');
+      const next = settingsFromApi(data);
       try {
-        const response = await api.get('/system/settings');
-        if (response.data && response.data.data) {
-          const apiData = response.data.data;
-          
-          setSettings(prev => {
-            const next = {
-              ...prev,
-              profile: {
-                ...prev.profile,
-                organisationName: apiData.name_en || prev.profile.organisationName,
-                registrationNumber: apiData.registration_no || prev.profile.registrationNumber,
-                website: apiData.website || prev.profile.website,
-                addressLine1: apiData.address_en || prev.profile.addressLine1
-              },
-              contact: {
-                ...prev.contact,
-                email: apiData.email || prev.contact.email,
-                contactNumber: apiData.mobile || prev.contact.contactNumber,
-                alternateContactNumber: apiData.phone || prev.contact.alternateContactNumber
-              },
-              printHeaders: {
-                ...prev.printHeaders,
-                showLogo: apiData.print_header_enabled !== null ? apiData.print_header_enabled : prev.printHeaders.showLogo,
-                footerText: apiData.receipt_footer_note_en || prev.printHeaders.footerText,
-                presidentTitleEn: apiData.president_title_en || prev.printHeaders.presidentTitleEn,
-                secretaryTitleEn: apiData.secretary_title_en || prev.printHeaders.secretaryTitleEn,
-                treasurerTitleEn: apiData.treasurer_title_en || prev.printHeaders.treasurerTitleEn,
-                payModeCashEn: apiData.pay_mode_cash_en || prev.printHeaders.payModeCashEn,
-                payModeChequeEn: apiData.pay_mode_cheque_en || prev.printHeaders.payModeChequeEn,
-                payModeDdEn: apiData.pay_mode_dd_en || prev.printHeaders.payModeDdEn,
-                payModeUpiEn: apiData.pay_mode_upi_en || prev.printHeaders.payModeUpiEn
-              },
-              notifications: {
-                ...prev.notifications,
-                enableNotifications: apiData.notify_email_enabled !== null ? apiData.notify_email_enabled : prev.notifications.enableNotifications
-              }
-            };
-            setSavedSettingsSnapshot(next);
-            return next;
-          });
-        }
-      } catch (err) {
-        console.error("Failed to load settings from API", err);
+        next.profile.logo = await loadLogoUrl(next.profile.logoPath);
+      } catch (logoErr) {
+        console.error('Failed to load the logo.', logoErr);
       }
-    };
+      setSettings(next);
+      setSavedSettingsSnapshot(next);
+    } catch (err) {
+      console.error('Failed to load settings from API', err);
+      showToast(err.response?.data?.detail || 'Failed to load settings from the server.', 'error');
+    }
+  };
+
+  useEffect(() => {
     fetchSettings();
   }, []);
 
@@ -143,20 +120,23 @@ export default function OrganisationSettings() {
 
     // Auto-fill state / district on 6-digit PIN code lookup
     if (name === 'postalCode' && value.length === 6 && /^\d{6}$/.test(value)) {
-      const match = lookupLocationByPin(value);
-      if (match.found) {
-        setSettings((prev) => ({
-          ...prev,
-          profile: {
-            ...prev.profile,
-            postalCode: value,
-            state: match.stateName || prev.profile.state,
-            district: match.districtName || prev.profile.district,
-            taluk: match.talukName || match.area || prev.profile.taluk
-          }
-        }));
-        showToast(`Resolved location for PIN ${value}: ${match.districtName}, ${match.stateName}`);
-      }
+      loadLocations()
+        .then((loc) => {
+          const match = findLocationByPin(loc.postalCodes, value);
+          if (!match.found) return;
+          setSettings((prev) => ({
+            ...prev,
+            profile: {
+              ...prev.profile,
+              postalCode: value,
+              state: match.stateName || prev.profile.state,
+              district: match.districtName || prev.profile.district,
+              taluk: match.talukName || match.area || prev.profile.taluk
+            }
+          }));
+          showToast(`Resolved location for PIN ${value}: ${match.districtName}, ${match.stateName}`);
+        })
+        .catch(() => showToast('Could not look up the PIN code on the server.', 'error'));
     }
   };
 
@@ -215,45 +195,31 @@ export default function OrganisationSettings() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (loadEvent) => {
-      const dataUrl = loadEvent.target?.result;
-      if (dataUrl) {
-        setSettings((prev) => ({
-          ...prev,
-          profile: {
-            ...prev.profile,
-            logo: dataUrl
-          }
-        }));
-        showToast('Logo updated successfully.');
-      }
-    };
-    reader.readAsDataURL(file);
+    const form = new FormData();
+    form.append('file', file);
+    api.post('/system/settings/logo', form)
+      .then(({ data }) => {
+        const preview = URL.createObjectURL(file);
+        const apply = (prev) => ({ ...prev, profile: { ...prev.profile, logo: preview, logoPath: data.logo_path } });
+        setSettings(apply);
+        setSavedSettingsSnapshot(apply);
+        showToast('Logo uploaded successfully.');
+      })
+      .catch((err) => showToast(err.response?.data?.detail || 'Failed to upload the logo.', 'error'));
   };
 
   const handleRemoveLogo = () => {
-    setSettings((prev) => ({
-      ...prev,
-      profile: {
-        ...prev.profile,
-        logo: null
-      }
-    }));
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const handleResetDefaultLogo = () => {
-    setSettings((prev) => ({
-      ...prev,
-      profile: {
-        ...prev.profile,
-        logo: DEFAULT_ORGANISATION_SETTINGS.profile.logo
-      }
-    }));
-    showToast('Logo reset to default HMS emblem.');
+    api.put('/system/settings', { logo_path: null })
+      .then(() => {
+        const apply = (prev) => ({ ...prev, profile: { ...prev.profile, logo: null, logoPath: null } });
+        setSettings(apply);
+        setSavedSettingsSnapshot(apply);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        showToast('Logo removed.');
+      })
+      .catch((err) => showToast(err.response?.data?.detail || 'Failed to remove the logo.', 'error'));
   };
 
   // Validation
@@ -337,27 +303,8 @@ export default function OrganisationSettings() {
 
     
 
-    // API Sync
-    const apiPayload = {
-      name_en: payload.profile.organisationName,
-      registration_no: payload.profile.registrationNumber,
-      website: payload.profile.website,
-      address_en: payload.profile.addressLine1,
-      email: payload.contact.email,
-      mobile: payload.contact.contactNumber,
-      phone: payload.contact.alternateContactNumber,
-      print_header_enabled: payload.printHeaders.showLogo,
-      receipt_footer_note_en: payload.printHeaders.footerText,
-      president_title_en: payload.printHeaders.presidentTitleEn,
-      secretary_title_en: payload.printHeaders.secretaryTitleEn,
-      treasurer_title_en: payload.printHeaders.treasurerTitleEn,
-      pay_mode_cash_en: payload.printHeaders.payModeCashEn,
-      pay_mode_cheque_en: payload.printHeaders.payModeChequeEn,
-      pay_mode_dd_en: payload.printHeaders.payModeDdEn,
-      pay_mode_upi_en: payload.printHeaders.payModeUpiEn,
-      notify_email_enabled: payload.notifications.enableNotifications
-    };
-    
+    const apiPayload = settingsToApi(payload);
+
     api.put('/system/settings', apiPayload)
       .then(() => {
         setSavedSettingsSnapshot(payload);
@@ -374,13 +321,11 @@ export default function OrganisationSettings() {
   };
 
   // Reset to last saved snapshot
-  const handleReset = () => {
-    const lastSaved = getStoredOrganisationSettings();
-    setSettings(lastSaved);
-    setSavedSettingsSnapshot(lastSaved);
+  const handleReset = async () => {
+    await fetchSettings();
     setErrors({});
     setIsDirty(false);
-    showToast('Settings restored to last saved values.');
+    showToast('Settings restored to the values saved on the server.');
   };
 
   return (
@@ -415,17 +360,7 @@ export default function OrganisationSettings() {
       {/* BREADCRUMB & HEADER                                  */}
       {/* ---------------------------------------------------- */}
       <div>
-        <nav className="flex items-center gap-1.5 text-xs text-[#863221] mb-2 font-medium">
-          <Link to="/dashboard" className="hover:text-[#510601] transition-colors">
-            Dashboard
-          </Link>
-          <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-          <span className="text-[#863221]">Masters</span>
-          <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-          <span className="text-[#510601] font-semibold">Organisation Settings</span>
-        </nav>
-
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
               Organisation Settings

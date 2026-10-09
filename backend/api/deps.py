@@ -16,6 +16,7 @@ def get_db() -> Generator:
         db.close()
 
 def get_current_user(
+    request: Request,
     db: Session = Depends(get_db),
     token: str = Depends(oauth2_scheme)
 ) -> User:
@@ -47,6 +48,10 @@ def get_current_user(
     # FastAPI caches the get_db dependency per request, so this is the same
     # session instance every endpoint in the request uses.
     db._current_user_id = user.id
+    # The web panel asks for a reason before every change and sends it in
+    # X-Action-Reason; the audit listener stores it with each activity row.
+    reason = (request.headers.get("X-Action-Reason") or "").strip()
+    db._action_reason = reason[:500] or None
     return user
 
 def get_user_role(db: Session, user: User):
@@ -196,6 +201,6 @@ def read_guard(module: str, exempt_prefixes: tuple = ()):
         if any(f"/{module}{p}" in request.url.path for p in exempt_prefixes):
             return
         token = await oauth2_scheme(request)
-        current_user = get_current_user(db=db, token=token)
+        current_user = get_current_user(request=request, db=db, token=token)
         require_permission(f"{module}.read")(db=db, current_user=current_user)
     return _guard

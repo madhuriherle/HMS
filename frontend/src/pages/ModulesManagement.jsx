@@ -30,6 +30,7 @@ const emptyForm = {
   opens_module_id: '',
   display_order: 0,
   min_rank_level: '',
+  permission_code: '',
   status: true
 };
 
@@ -147,6 +148,7 @@ export default function ModulesManagement() {
       opens_module_id: m.opens_module_id ?? '',
       display_order: m.display_order ?? 0,
       min_rank_level: m.min_rank_level ?? '',
+      permission_code: m.permission_code || '',
       status: Boolean(m.status)
     });
     setFormErrors({});
@@ -217,6 +219,7 @@ export default function ModulesManagement() {
         formData.min_rank_level === '' || formData.min_rank_level == null
           ? null
           : Number(formData.min_rank_level),
+      permission_code: (formData.permission_code || '').trim() || null,
       status: Boolean(formData.status)
     };
     if (modalMode === 'add') {
@@ -338,15 +341,7 @@ export default function ModulesManagement() {
 
       {/* Header, Search & Filters */}
       <SearchFilterBar
-        breadcrumb={
-          <nav className="flex items-center gap-1.5 text-xs text-[#863221] font-medium mb-1">
-            <Link to="/dashboard" className="hover:text-[#510601] transition-colors">Dashboard</Link>
-            <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-            <span>System</span>
-            <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-            <span className="text-[#510601] font-semibold">Modules</span>
-          </nav>
-        }
+        
         title="Module Master"
         searchQuery={searchQuery}
         onSearchChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
@@ -756,6 +751,23 @@ export default function ModulesManagement() {
                     {formErrors.min_rank_level}
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
+                  Privilege that shows this page
+                </label>
+                <input
+                  type="text"
+                  name="permission_code"
+                  value={formData.permission_code}
+                  onChange={handleFormChange}
+                  placeholder="e.g. masters.read (empty = no privilege gate)"
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
+                />
+                <p className="text-[10px] text-[#863221]/70 mt-1">
+                  Roles holding this privilege see the page in the sidebar. Must be an existing privilege code.
+                </p>
               </div>
 
               <div>

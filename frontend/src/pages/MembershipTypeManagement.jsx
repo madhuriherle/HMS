@@ -129,9 +129,7 @@ export default function MembershipTypeManagement() {
     }, 3500);
   };
 
-  useEffect(() => {
-    setMembershipTypes(getStoredMembershipTypes());
-  }, []);
+
 
   // ----------------------------------------------------
   // SUMMARY METRICS
@@ -284,78 +282,29 @@ export default function MembershipTypeManagement() {
     }
   };
 
-  const handleSavePriceUpdate = (e) => {
+  const isPendingApproval = (data) => Boolean(data && (data.approval_request_id || data.status === 'PENDING'));
+
+  const handleSavePriceUpdate = async (e) => {
     e.preventDefault();
     if (!validatePriceForm()) return;
 
-    const today = new Date().toISOString().split('T')[0];
-    const newPriceVal = Number(priceFormData.newPrice);
     const target = priceTargetItem;
-
-    const updatedHistory = (target.priceHistory || []).map((ph, idx) => {
-      if (idx === 0 && ph.effectiveTo === 'Present') {
-        let effectiveEnd = today;
-        try {
-          const d = new Date(priceFormData.effectiveFrom);
-          d.setDate(d.getDate() - 1);
-          effectiveEnd = d.toISOString().split('T')[0];
-        } catch {
-          effectiveEnd = today;
-        }
-
-        return {
-          ...ph,
-          effectiveTo: effectiveEnd
-        };
-      }
-      return ph;
-    });
-
-    const newHistoryEntry = {
-      id: `PH-${target.id}-${updatedHistory.length + 1}`,
-      membershipTypeId: target.id,
-      price: newPriceVal,
-      effectiveFrom: priceFormData.effectiveFrom,
-      effectiveTo: 'Present',
-      reason: priceFormData.reason?.trim() || 'Price revision',
-      changedAt: today
-    };
-
-    const finalHistory = [newHistoryEntry, ...updatedHistory];
-
-    const updated = membershipTypes.map(m => m.id === target.id ? {
-      ...m,
-      currentPrice: newPriceVal,
-      effectiveFrom: priceFormData.effectiveFrom,
-      updatedAt: today,
-      priceHistory: finalHistory
-    } : m);
-
-    setMembershipTypes(updated);
-    saveStoredMembershipTypes(updated);
-
-    if (viewingItem && viewingItem.id === target.id) {
-      setViewingItem({
-        ...viewingItem,
-        currentPrice: newPriceVal,
-        effectiveFrom: priceFormData.effectiveFrom,
-        updatedAt: today,
-        priceHistory: finalHistory
+    try {
+      const { data } = await api.post(`/masters/membership-types/${target.id}/prices`, {
+        amount: Number(priceFormData.newPrice),
+        effective_from: priceFormData.effectiveFrom,
+        change_reason: priceFormData.reason?.trim() || 'Price revision'
       });
+      showToast(
+        isPendingApproval(data)
+          ? `Price change for "${target.name}" submitted for approval.`
+          : `Price for "${target.name}" updated to ${formatINR(Number(priceFormData.newPrice))}.`
+      );
+      setIsUpdatePriceOpen(false);
+      await fetchMembershipTypes();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error updating price', 'error');
     }
-
-    if (historyTargetItem && historyTargetItem.id === target.id) {
-      setHistoryTargetItem({
-        ...historyTargetItem,
-        currentPrice: newPriceVal,
-        effectiveFrom: priceFormData.effectiveFrom,
-        updatedAt: today,
-        priceHistory: finalHistory
-      });
-    }
-
-    showToast(`Price for "${target.name}" updated to ${formatINR(newPriceVal)}.`);
-    setIsUpdatePriceOpen(false);
   };
 
   // ----------------------------------------------------
@@ -368,25 +317,20 @@ export default function MembershipTypeManagement() {
     });
   };
 
-  const handleConfirmStatusToggle = () => {
+  const handleConfirmStatusToggle = async () => {
     if (!statusDialog) return;
     const { item, newStatus } = statusDialog;
-    const today = new Date().toISOString().split('T')[0];
-
-    const updated = membershipTypes.map(m => m.id === item.id ? {
-      ...m,
-      status: newStatus,
-      updatedAt: today
-    } : m);
-
-    setMembershipTypes(updated);
-    saveStoredMembershipTypes(updated);
-
-    if (viewingItem && viewingItem.id === item.id) {
-      setViewingItem(prev => ({ ...prev, status: newStatus, updatedAt: today }));
+    try {
+      const { data } = await api.put(`/masters/membership-types/${item.id}`, { status: newStatus === 'Active' });
+      showToast(
+        isPendingApproval(data)
+          ? `Status change for "${item.name}" submitted for approval.`
+          : `Membership Type "${item.name}" is now ${newStatus}.`
+      );
+      await fetchMembershipTypes();
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'Error updating status', 'error');
     }
-
-    showToast(`Membership Type "${item.name}" is now ${newStatus}.`);
     setStatusDialog(null);
   };
 
@@ -435,15 +379,7 @@ export default function MembershipTypeManagement() {
 
       {/* Breadcrumb & Header */}
       <div>
-        <nav className="flex items-center gap-1.5 text-xs text-[#863221] mb-2 font-medium">
-          <Link to="/dashboard" className="hover:text-[#510601] transition-colors">Dashboard</Link>
-          <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-          <span>Master Management</span>
-          <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-          <span className="text-[#510601] font-semibold">Membership Types</span>
-        </nav>
-
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
               Membership Types

@@ -26,13 +26,8 @@ import {
   CreditCard
 } from 'lucide-react';
 import Modal from '../components/Modal';
-import {
-  getStoredReceipts,
-  getStoredMembers,
-  getStoredUnapprovedMembers,
-  isReceiptUnmapped,
-  PARTICULARS_OPTIONS
-} from '../utils/receiptStore';
+import { isReceiptUnmapped } from '../utils/displayHelpers';
+import { loadParticulars, loadMembers, loadPaymentModeConfigs } from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
@@ -104,20 +99,31 @@ export default function ReceiptTracking() {
     }, 4000);
   };
 
+  // Particular names for the filter / edit dropdowns come from the Particulars master
+  const [particularOptions, setParticularOptions] = useState([]);
+  const [paymentModeOptions, setPaymentModeOptions] = useState([]);
+
   const reloadData = async () => {
-    try {
-      setReceipts(await fetchReceipts());
-    } catch (error) {
-      console.warn('Failed to load receipts from API, using local fallback.', error);
-      setReceipts(getStoredReceipts());
-    }
-    try {
-      const membersRes = await api.get('/members/', { params: { limit: 500 } });
-      setMembers((membersRes.data?.data || []).map((m) => ({ ...m, name: [m.first_name_en, m.last_name_en].filter(Boolean).join(' ') })));
-    } catch (error) {
-      setMembers(getStoredMembers());
-    }
-    setUnapprovedMembers(getStoredUnapprovedMembers());
+    const fail = (what) => (error) => {
+      console.error(`Failed to load ${what}.`, error);
+      showToast(error.response?.data?.detail || `Failed to load ${what} from the server.`, 'error');
+    };
+    await Promise.all([
+      fetchReceipts().then(setReceipts).catch(fail('receipts')),
+      api.get('/members/', { params: { limit: 500 } })
+        .then((res) => setMembers((res.data?.data || []).map((m) => ({
+          ...m,
+          name: [m.first_name_en, m.last_name_en].filter(Boolean).join(' ')
+        }))))
+        .catch(fail('members')),
+      loadMembers({ approval_status: 'UNAPPROVED' }).then(setUnapprovedMembers).catch(fail('unapproved members')),
+      loadParticulars()
+        .then((all) => setParticularOptions(all.filter((p) => p.status === 'Active').map((p) => p.name)))
+        .catch(fail('particulars')),
+      loadPaymentModeConfigs()
+        .then((all) => setPaymentModeOptions([...new Set(all.filter((c) => c.status === 'Active').map((c) => c.paymentMode))]))
+        .catch(fail('payment modes'))
+    ]);
   };
 
   // Synchronize on mount
@@ -328,16 +334,8 @@ export default function ReceiptTracking() {
 
       {/* Header, Filter & Search Toolbar */}
       <SearchFilterBar
-        breadcrumb={
-          <nav className="flex items-center gap-1.5 text-xs text-[#863221] font-medium mb-1">
-            <Link to="/dashboard" className="hover:text-[#510601] transition-colors">Dashboard</Link>
-            <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-            <span className="text-[#863221]">Receipts</span>
-            <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-            <span className="text-[#510601] font-semibold">Receipt Tracking</span>
-          </nav>
-        }
-        title={<h1 className="text-2xl font-bold text-[#180200] tracking-tight">Receipt Tracking</h1>}
+        
+        title={<h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Receipt Tracking</h1>}
         searchQuery={searchQuery}
         onSearchChange={(val) => setSearchQuery(val)}
         searchPlaceholder="Search..."
@@ -357,7 +355,7 @@ export default function ReceiptTracking() {
           onChange={(val) => setParticularsFilter(val)}
           options={[
             { value: 'ALL', label: 'All Receipt Types' },
-            ...PARTICULARS_OPTIONS.map((opt) => ({ value: opt, label: opt }))
+            ...particularOptions.map((opt) => ({ value: opt, label: opt }))
           ]}
           widthClass="w-full sm:w-56"
         />
@@ -778,7 +776,7 @@ export default function ReceiptTracking() {
                       onChange={handleEditChange}
                       className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601] cursor-pointer"
                     >
-                      {PARTICULARS_OPTIONS.map((opt) => (
+                      {particularOptions.map((opt) => (
                         <option key={opt} value={opt}>
                           {opt}
                         </option>
@@ -810,18 +808,18 @@ export default function ReceiptTracking() {
                     </label>
                     <select
                       name="paymentMode"
-                      value={editFormData.paymentMode || 'Online'}
+                      value={editFormData.paymentMode || ''}
                       onChange={handleEditChange}
                       className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601] cursor-pointer"
                     >
-                      <option value="Online">Online</option>
-                      <option value="Offline">Offline</option>
-                      <option value="Cash">Cash</option>
-                      <option value="Cheque">Cheque</option>
-                      <option value="NEFT/RTGS">NEFT/RTGS</option>
-                      <option value="KBL 1075">KBL 1075</option>
-                      <option value="SBI">SBI</option>
-                      <option value="Canara Bank">Canara Bank</option>
+                      {editFormData.paymentMode && !paymentModeOptions.includes(editFormData.paymentMode) && (
+                        <option value={editFormData.paymentMode}>{editFormData.paymentMode}</option>
+                      )}
+                      {paymentModeOptions.map((mode) => (
+                        <option key={mode} value={mode}>
+                          {mode}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

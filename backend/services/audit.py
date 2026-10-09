@@ -71,6 +71,7 @@ def setup_audit_listeners(engine):
             if not table or table in _AUDIT_TABLES:
                 return
             entity_id = getattr(obj, "id", None)
+            reason = getattr(session, "_action_reason", None)
 
             session.add(
                 UserActivityLog(
@@ -78,6 +79,7 @@ def setup_audit_listeners(engine):
                     action=action,
                     entity_type=table,
                     entity_id=entity_id,
+                    details={"reason": reason} if reason else None,
                     created_at=now,
                 )
             )
@@ -92,6 +94,8 @@ def setup_audit_listeners(engine):
                 member_id = obj.id if table == "members" else getattr(obj, "member_id", None)
             if member_id is not None:
                 details = {"entity_type": table, "entity_id": entity_id}
+                if reason:
+                    details["reason"] = reason
                 if action == "UPDATE":
                     changes = _change_details(obj)
                     if changes:

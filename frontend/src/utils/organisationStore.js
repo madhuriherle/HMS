@@ -1,6 +1,6 @@
-import logoImg from '../assets/logo.png';
-
-const STORAGE_KEY = 'hms_organisation_settings_v1';
+// Organisation settings are stored on the server (GET/PUT /system/settings).
+// Nothing is kept in the browser: this file only holds the form's empty shape
+// and the mapping between the form and the API.
 
 export const ORGANISATION_TYPES = [
   'Non-Profit / Community Trust',
@@ -11,110 +11,90 @@ export const ORGANISATION_TYPES = [
   'General Organisation'
 ];
 
-export const DEFAULT_ORGANISATION_SETTINGS = {
+export const EMPTY_ORGANISATION_SETTINGS = {
   profile: {
-    organisationName: 'Shri Akhila Havyaka Mahasabha (R)',
-    shortName: 'HMS',
-    registrationNumber: 'REG-KAR-1943-0028',
-    organisationType: 'Non-Profit / Community Trust',
-    establishedYear: '1943',
-    logo: logoImg,
-    addressLine1: '#11, 8th Cross, Malleshwaram',
-    addressLine2: 'Near Circle Maramma Temple',
-    country: 'India',
-    state: 'Karnataka',
-    district: 'Bengaluru Urban',
-    taluk: 'Malleshwaram',
-    postalCode: '560003',
-    website: 'https://www.havyakamahasabha.org',
-    email: 'info@havyakamahasabha.org',
-    phone: '080-23348899',
-    mobile: '9845012345'
+    organisationName: '', shortName: '', registrationNumber: '', organisationType: '',
+    establishedYear: '', logo: null, logoPath: null, addressLine1: '', addressLine2: '',
+    country: '', state: '', district: '', taluk: '', postalCode: '', website: '',
+    email: '', phone: '', mobile: ''
   },
   printHeaders: {
-    showLogo: true,
-    organisationName: 'Shri Akhila Havyaka Mahasabha (R)',
-    headerLine1: 'Central Administrative Office & Cultural Centre',
-    headerLine2: 'Malleshwaram, Bengaluru, Karnataka - 560003',
-    address: '#11, 8th Cross, Malleshwaram, Bengaluru - 560003',
-    phone: '+91 80 23348899 / 9845012345',
-    email: 'receipts@havyakamahasabha.org',
-    website: 'www.havyakamahasabha.org',
-    footerText: 'Thank you for your generous contribution. This is a computer-generated receipt.'
+    showLogo: false, organisationName: '', headerLine1: '', headerLine2: '', address: '',
+    phone: '', email: '', website: '', footerText: '',
+    presidentTitleEn: '', secretaryTitleEn: '', treasurerTitleEn: '',
+    payModeCashEn: '', payModeChequeEn: '', payModeDdEn: '', payModeUpiEn: ''
   },
   notifications: {
-    enableNotifications: true,
-    showInAppNotifications: true,
-    newMembershipRegistration: true,
-    membershipApproval: true,
-    membershipActivation: true,
-    membershipTypeChange: true,
-    membershipExpiry: true,
-    receiptCreated: true,
-    receiptMapped: true,
-    receiptPaymentUpdate: true
+    enableNotifications: false, showInAppNotifications: false, newMembershipRegistration: false,
+    membershipApproval: false, membershipActivation: false, membershipTypeChange: false,
+    membershipExpiry: false, receiptCreated: false, receiptMapped: false, receiptPaymentUpdate: false
   },
   contact: {
-    displayContactInfo: true,
-    primaryContactName: 'Shri Radhakrishna Bhat',
-    designation: 'General Secretary',
-    contactNumber: '9845012345',
-    alternateContactNumber: '080-23348899',
-    email: 'secretary@havyakamahasabha.org',
-    alternateEmail: 'admin@havyakamahasabha.org',
-    supportContactNumber: '9480112233',
-    supportEmail: 'support@havyakamahasabha.org',
-    officeAddress: '#11, 8th Cross, Malleshwaram, Bengaluru, Karnataka - 560003',
-    workingDays: 'Monday - Saturday (Sunday Closed)',
-    workingHours: '09:30 AM - 05:30 PM IST'
+    displayContactInfo: false, primaryContactName: '', designation: '', contactNumber: '',
+    alternateContactNumber: '', email: '', alternateEmail: '', supportContactNumber: '',
+    supportEmail: '', officeAddress: '', workingDays: '', workingHours: ''
   }
 };
 
-/**
- * Retrieve saved organisation settings or fallback to defaults.
- */
-export const getStoredOrganisationSettings = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      return {
-        profile: { ...DEFAULT_ORGANISATION_SETTINGS.profile, ...(parsed.profile || {}) },
-        printHeaders: { ...DEFAULT_ORGANISATION_SETTINGS.printHeaders, ...(parsed.printHeaders || {}) },
-        notifications: { ...DEFAULT_ORGANISATION_SETTINGS.notifications, ...(parsed.notifications || {}) },
-        contact: { ...DEFAULT_ORGANISATION_SETTINGS.contact, ...(parsed.contact || {}) }
-      };
-    }
-  } catch (err) {
-    console.error('Failed to read organisation settings from storage:', err);
-  }
-  return JSON.parse(JSON.stringify(DEFAULT_ORGANISATION_SETTINGS));
+const GROUPS = ['profile', 'printHeaders', 'notifications', 'contact'];
+
+// Server response -> form. Columns win; `extra` holds the fields without a column.
+export const settingsFromApi = (d = {}) => {
+  const extra = d.extra || {};
+  const out = {};
+  GROUPS.forEach((g) => {
+    out[g] = { ...EMPTY_ORGANISATION_SETTINGS[g], ...(extra[g] || {}) };
+  });
+  const set = (group, key, value) => {
+    if (value !== undefined && value !== null) out[group][key] = value;
+  };
+  set('profile', 'organisationName', d.name_en);
+  set('profile', 'registrationNumber', d.registration_no);
+  set('profile', 'website', d.website);
+  set('profile', 'addressLine1', d.address_en);
+  out.profile.logoPath = d.logo_path || null;
+  set('contact', 'email', d.email);
+  set('contact', 'contactNumber', d.mobile);
+  set('contact', 'alternateContactNumber', d.phone);
+  set('printHeaders', 'showLogo', d.print_header_enabled);
+  set('printHeaders', 'footerText', d.receipt_footer_note_en);
+  set('printHeaders', 'presidentTitleEn', d.president_title_en);
+  set('printHeaders', 'secretaryTitleEn', d.secretary_title_en);
+  set('printHeaders', 'treasurerTitleEn', d.treasurer_title_en);
+  set('printHeaders', 'payModeCashEn', d.pay_mode_cash_en);
+  set('printHeaders', 'payModeChequeEn', d.pay_mode_cheque_en);
+  set('printHeaders', 'payModeDdEn', d.pay_mode_dd_en);
+  set('printHeaders', 'payModeUpiEn', d.pay_mode_upi_en);
+  set('notifications', 'enableNotifications', d.notify_email_enabled);
+  return out;
 };
 
-/**
- * Persist organisation settings in localStorage and dispatch sync event.
- */
-export const saveStoredOrganisationSettings = (settings) => {
-  try {
-    const merged = {
-      profile: { ...DEFAULT_ORGANISATION_SETTINGS.profile, ...(settings.profile || {}) },
-      printHeaders: { ...DEFAULT_ORGANISATION_SETTINGS.printHeaders, ...(settings.printHeaders || {}) },
-      notifications: { ...DEFAULT_ORGANISATION_SETTINGS.notifications, ...(settings.notifications || {}) },
-      contact: { ...DEFAULT_ORGANISATION_SETTINGS.contact, ...(settings.contact || {}) }
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-    window.dispatchEvent(new CustomEvent('hms_settings_updated', { detail: merged }));
-    return true;
-  } catch (err) {
-    console.error('Failed to save organisation settings to storage:', err);
-    return false;
-  }
-};
-
-/**
- * Helper to get active organisation name for receipts / headers.
- */
-export const getActiveOrganisationName = () => {
-  const settings = getStoredOrganisationSettings();
-  return settings.profile?.organisationName || DEFAULT_ORGANISATION_SETTINGS.profile.organisationName;
+// Form -> server body (columns + the whole form as `extra`, minus the logo image).
+export const settingsToApi = (s) => {
+  const extra = {};
+  GROUPS.forEach((g) => {
+    extra[g] = { ...s[g] };
+  });
+  delete extra.profile.logo;
+  delete extra.profile.logoPath;
+  return {
+    name_en: s.profile.organisationName,
+    registration_no: s.profile.registrationNumber,
+    website: s.profile.website,
+    address_en: s.profile.addressLine1,
+    email: s.contact.email,
+    mobile: s.contact.contactNumber,
+    phone: s.contact.alternateContactNumber,
+    print_header_enabled: s.printHeaders.showLogo,
+    receipt_footer_note_en: s.printHeaders.footerText,
+    president_title_en: s.printHeaders.presidentTitleEn,
+    secretary_title_en: s.printHeaders.secretaryTitleEn,
+    treasurer_title_en: s.printHeaders.treasurerTitleEn,
+    pay_mode_cash_en: s.printHeaders.payModeCashEn,
+    pay_mode_cheque_en: s.printHeaders.payModeChequeEn,
+    pay_mode_dd_en: s.printHeaders.payModeDdEn,
+    pay_mode_upi_en: s.printHeaders.payModeUpiEn,
+    notify_email_enabled: s.notifications.enableNotifications,
+    extra
+  };
 };

@@ -19,7 +19,7 @@ import BankDetailsManagement from './pages/BankDetailsManagement';
 
 function App() {
   return (
-    <Router>
+    <Router basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route path="/" element={<Login />} />
 

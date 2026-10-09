@@ -193,13 +193,16 @@ def delete_service_type(
 def read_payment_modes(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
-    skip: int = 0, limit: int = 100,
+    page: int = 1,
+    limit: int = 100,
     status: Optional[bool] = None
 ) -> Any:
-    q = db.query(models.masters.PaymentMode)
+    q = db.query(models.masters.PaymentMode).filter(
+        models.masters.PaymentMode.is_deleted == False  # noqa: E712
+    )
     if status is not None:
         q = q.filter(models.masters.PaymentMode.status == status)
-    return q.offset(skip).limit(limit).all()
+    return paginate(q.order_by(models.masters.PaymentMode.id), page, limit)
 
 @router.get("/payment-modes/{id}", response_model=schemas_masters.PaymentMode)
 def read_payment_mode(

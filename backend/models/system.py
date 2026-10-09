@@ -112,3 +112,7 @@ class OrganisationSettings(AuditMixin, Base):
     notify_whatsapp_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     notify_reply_to_email: Mapped[str] = mapped_column(String(200), nullable=True)
     notify_footer_note: Mapped[str] = mapped_column(Text, nullable=True)
+    # Screen settings that have no column of their own (organisation type, extra
+    # contact people, working hours, notification toggles...), stored as one
+    # JSON object so the panel keeps nothing in the browser.
+    extra: Mapped[dict] = mapped_column(JSON, nullable=True)

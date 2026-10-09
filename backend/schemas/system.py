@@ -79,6 +79,7 @@ class OrganisationSettingsUpdate(BaseModel):
     notify_whatsapp_enabled: Optional[bool] = None
     notify_reply_to_email: Optional[str] = None
     notify_footer_note: Optional[str] = None
+    extra: Optional[dict] = None
 
 class OrganisationSettings(OrganisationSettingsUpdate):
     """Response shape of GET/PUT /system/settings."""
