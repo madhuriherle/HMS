@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './components/Login';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
+import NotFound from './pages/NotFound';
 import MembershipTypeManagement from './pages/MembershipTypeManagement';
 import ReceiptTypeManagement from './pages/ReceiptTypeManagement';
 import LocationSetup from './pages/LocationSetup';
@@ -114,13 +115,8 @@ function App() {
           <Route path="receipts/label-list" element={<PermissionGate required="members.read" title="Access Restricted"><LabelList /></PermissionGate>} />
           <Route path="magazine/labels" element={<PermissionGate required="members.read" title="Access Restricted"><LabelList /></PermissionGate>} />
 
-          {/* Placeholder routes for other menu items to prevent 404s during navigation */}
-          <Route path="*" element={
-            <div className="flex flex-col items-center justify-center h-full text-[#863221]">
-              <h2 className="text-2xl font-bold mb-2 text-[#180200]">Coming Soon</h2>
-              <p>This module is currently under development.</p>
-            </div>
-          } />
+          {/* Anything else inside the panel */}
+          <Route path="*" element={<NotFound />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
