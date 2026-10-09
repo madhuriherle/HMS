@@ -30,6 +30,7 @@ import { COUNTRY_CODES } from '../utils/countryCodes';
 import { toISODate } from '../utils/dateUtils';
 import DateInput from '../components/DateInput';
 import CountryCodeSelect from '../components/CountryCodeSelect';
+import PermissionGate from '../components/PermissionGate';
 import SearchableFormSelect from '../components/SearchableFormSelect';
 import useAuth from '../hooks/useAuth';
 
@@ -795,6 +796,7 @@ export default function RegisterNewMember() {
   };
 
   return (
+    <PermissionGate required={isViewMode ? 'members.read' : 'members.write'}>
     <div className="max-w-[1240px] mx-auto space-y-6">
       {/* ---------------------------------------------------- */}
       {/* BREADCRUMB & HEADER                                  */}
@@ -1760,5 +1762,6 @@ export default function RegisterNewMember() {
         </form>
       </div>
     </div>
+    </PermissionGate>
   );
 }

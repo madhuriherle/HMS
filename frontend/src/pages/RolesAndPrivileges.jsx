@@ -733,6 +733,8 @@ export default function RolesAndPrivileges() {
                       ) : (
                         <button
                           onClick={openAddModal}
+                          disabled={!hasPermission('roles.write')}
+                          title={!hasPermission('roles.write') ? 'You need the roles.write permission' : undefined}
                           className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                         >
                           Add Role
@@ -822,7 +824,7 @@ export default function RolesAndPrivileges() {
         onClose={() => setIsAddEditOpen(false)}
       >
         <div
-          className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200"
+          className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -1262,7 +1264,7 @@ export default function RolesAndPrivileges() {
       >
         {viewingRole && (
           <div
-            className="bg-white rounded-2xl max-w-3xl w-full border border-[#E8DFD8] shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-3xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

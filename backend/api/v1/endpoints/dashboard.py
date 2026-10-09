@@ -38,26 +38,34 @@ def get_dashboard(
     pending_type_changes = db.query(MembershipTypeChangeRequest).filter(MembershipTypeChangeRequest.status == "PENDING").count()
     pending_deletions = db.query(MemberDeletionRequest).filter(MemberDeletionRequest.status == "PENDING").count()
 
+    # Every block of numbers is shown only to someone who may read that data;
+    # a block the user may not see comes back as null.
+    held = deps.user_permission_codes(db, current_user)
+    all_access = deps.is_all_access(db, current_user)
+
+    def allowed(code: str) -> bool:
+        return all_access or code in held
+
     return {
         "members": {
             "total": total_members,
             "approved": approved_members,
             "unapproved": unapproved_members,
             "inactive": inactive_members,
-        },
+        } if allowed("members.read") else None,
         "receipts": {
             "total_count": total_receipts,
             "total_amount": float(total_receipt_amount),
-        },
+        } if allowed("receipts.read") else None,
         "magazines": {
             "active_subscriptions": active_subscriptions,
             "paused_subscriptions": paused_subscriptions,
             "returns_this_month": returns_this_month,
-        },
+        } if allowed("magazines.read") else None,
         "pending_approvals": {
             "profile_changes": pending_profile_changes,
             "type_changes": pending_type_changes,
             "deletion_requests": pending_deletions,
             "total": pending_profile_changes + pending_type_changes + pending_deletions,
-        }
+        } if allowed("members.approvals.read") else None,
     }

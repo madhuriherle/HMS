@@ -730,6 +730,8 @@ export default function UserManagement() {
                       ) : (
                         <button
                           onClick={openAddModal}
+                          disabled={!hasPermission('users.management.write')}
+                          title={!hasPermission('users.management.write') ? 'You need the users.management.write permission' : undefined}
                           className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                         >
                           Add User
@@ -819,7 +821,7 @@ export default function UserManagement() {
         onClose={() => setIsAddEditOpen(false)}
       >
         <div
-          className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]"
+          className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -832,9 +834,6 @@ export default function UserManagement() {
                 <h3 className="text-base font-bold text-[#180200]">
                   {modalMode === 'add' ? 'Add User' : 'Edit User'}
                 </h3>
-                <p className="text-xs text-[#863221]">
-                  {modalMode === 'add' ? 'Create a new user account and assign system access role.' : 'Modify account details and update assigned role.'}
-                </p>
               </div>
             </div>
             <button
@@ -1175,7 +1174,7 @@ export default function UserManagement() {
       >
         {viewingUser && (
           <div
-            className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-3xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}

@@ -60,10 +60,10 @@ export default function Dashboard() {
   const [viewingMember, setViewingMember] = useState(null);
   
   const [stats, setStats] = useState({
-    total: 0,
-    approved: 0,
-    pending: 0,
-    magazineCount: 0
+    total: null,
+    approved: null,
+    pending: null,
+    magazineCount: null
   });
   
   const [recentActivity, setRecentActivity] = useState([]);
@@ -74,21 +74,22 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dashRes, reportRes, membersRes] = await Promise.all([
+        const [dashRes, reportRes, membersRes] = await Promise.allSettled([
           api.get('/dashboard'),
           api.get('/reports/summary'),
           api.get('/members?limit=5&sort_by=created_at&sort_desc=true')
         ]);
         
-        const dData = dashRes.data;
+        // each part loads on its own: a privilege the user lacks hides that part only
+        const dData = dashRes.status === 'fulfilled' ? dashRes.value.data : {};
         setStats({
-          total: dData.members?.total || 0,
-          approved: dData.members?.approved || 0,
-          pending: dData.members?.unapproved || 0,
-          magazineCount: dData.magazines?.active_subscriptions || 0
+          total: dData.members ? dData.members.total || 0 : null,
+          approved: dData.members ? dData.members.approved || 0 : null,
+          pending: dData.members ? dData.members.unapproved || 0 : null,
+          magazineCount: dData.magazines ? dData.magazines.active_subscriptions || 0 : null
         });
         
-        const rData = reportRes.data;
+        const rData = reportRes.status === 'fulfilled' ? reportRes.value.data : {};
         if (rData.memberships?.by_type) {
           setMembershipTypeData(rData.memberships.by_type.map(item => ({
             name: item.membership_type,
@@ -96,7 +97,7 @@ export default function Dashboard() {
           })));
         }
         
-        const mData = membersRes.data;
+        const mData = membersRes.status === 'fulfilled' ? membersRes.value.data : {};
         if (mData.items) {
           setRecentActivity(mData.items.map(m => ({
             id: m.id,
@@ -115,10 +116,10 @@ export default function Dashboard() {
   }, []);
 
   const statCards = [
-    { id: 1, title: 'Total Members', value: stats.total.toLocaleString(), icon: 'users', color: '#510601', trend: '' },
-    { id: 2, title: 'Approved Members', value: stats.approved.toLocaleString(), icon: 'user-check', color: '#3D705C', trend: '' },
-    { id: 3, title: 'Pending Approvals', value: stats.pending.toLocaleString(), icon: 'clock', color: '#EE6A00', trend: '' },
-    { id: 4, title: 'This Month Magazine Count', value: stats.magazineCount.toLocaleString(), icon: 'book-open', color: '#8C1801', trend: '' },
+    { id: 1, title: 'Total Members', value: stats.total === null ? '—' : stats.total.toLocaleString(), icon: 'users', color: '#510601', trend: '' },
+    { id: 2, title: 'Approved Members', value: stats.approved === null ? '—' : stats.approved.toLocaleString(), icon: 'user-check', color: '#3D705C', trend: '' },
+    { id: 3, title: 'Pending Approvals', value: stats.pending === null ? '—' : stats.pending.toLocaleString(), icon: 'clock', color: '#EE6A00', trend: '' },
+    { id: 4, title: 'This Month Magazine Count', value: stats.magazineCount === null ? '—' : stats.magazineCount.toLocaleString(), icon: 'book-open', color: '#8C1801', trend: '' },
   ];
 
 
@@ -346,10 +347,11 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={() => handleOpenMemberView(item)}
-                        className="text-[#3D705C] hover:text-[#180200] transition-colors p-1.5 rounded-lg hover:bg-[#3D705C]/10 cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer"
                         title={`View ${item.name}'s Profile`}
                       >
-                        <Eye className="h-4 w-4" />
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>View</span>
                       </button>
                     </td>
                   </tr>
@@ -366,7 +368,7 @@ export default function Dashboard() {
       <Modal isOpen={Boolean(viewingMember)} onClose={() => setViewingMember(null)}>
         {viewingMember && (
           <div
-            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -401,7 +403,8 @@ export default function Dashboard() {
             </div>
 
             {/* Profile Body */}
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto text-xs text-[#180200]">
+            <div className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs text-[#180200]">
               {/* Card 1: Contact & Personal Info */}
               <div className="bg-[#FAF7F2]/60 rounded-xl p-4 border border-[#E8DFD8] grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div>
@@ -503,7 +506,7 @@ export default function Dashboard() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between px-6 py-3.5 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+            </div>\n            <div className="shrink-0 flex items-center justify-between px-6 py-3.5 border-t border-[#E8DFD8] bg-[#FAF7F2]">
               <Link
                 to="/dashboard/membership/list"
                 onClick={() => setViewingMember(null)}
