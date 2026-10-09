@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "smoke": "node scripts/render-smoke.mjs",
+    "smoke": "node scripts/check-undefined.mjs && node scripts/render-smoke.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

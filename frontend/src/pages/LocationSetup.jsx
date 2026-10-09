@@ -1630,19 +1630,19 @@ export default function LocationSetup() {
             </div>
 
             {/* Pagination Controls */}
-            {filteredPostalCodes.length > 0 && (
+            {postalTotalRecords > 0 && (
               <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#863221]">
                 <div className="flex items-center gap-2">
                   <span>Showing</span>
                   <span className="font-bold text-[#180200]">
-                    {Math.min((postalCurrentPage - 1) * postalPageSize + 1, filteredPostalCodes.length)}
+                    {Math.min((postalCurrentPage - 1) * postalPageSize + 1, postalTotalRecords)}
                   </span>
                   <span>to</span>
                   <span className="font-bold text-[#180200]">
-                    {Math.min(postalCurrentPage * postalPageSize, filteredPostalCodes.length)}
+                    {Math.min(postalCurrentPage * postalPageSize, postalTotalRecords)}
                   </span>
                   <span>of</span>
-                  <span className="font-bold text-[#180200]">{filteredPostalCodes.length}</span>
+                  <span className="font-bold text-[#180200]">{postalTotalRecords}</span>
                   <span>entries</span>
                 </div>
 
