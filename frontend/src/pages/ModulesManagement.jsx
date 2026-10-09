@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
 import MenuArranger from '../components/MenuArranger';
+import IconPicker from '../components/IconPicker';
+import { MENU_ICONS } from '../utils/menuIcons';
 import { moduleTreeRows } from '../utils/menuArrange';
 import FilterSelect from '../components/FilterSelect';
 import {
@@ -466,7 +468,7 @@ export default function ModulesManagement() {
                           <span className="w-4 -ml-1" />
                         )}
                         <div className="w-8 h-8 rounded-lg bg-[#510601]/10 text-[#510601] border border-[#510601]/20 flex items-center justify-center shrink-0">
-                          <Layers className="w-4 h-4" />
+                          {React.createElement(MENU_ICONS[m.icon] || Layers, { className: "w-4 h-4" })}
                         </div>
                         <div>
                           <p className="font-bold text-[#180200] leading-tight">{m.name_en}</p>
@@ -816,14 +818,11 @@ export default function ModulesManagement() {
 
               <div>
                 <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                  Icon Name
+                  Icon
                 </label>
-                <input
-                  type="text"
-                  name="icon"
+                <IconPicker
                   value={formData.icon}
-                  onChange={handleFormChange}
-                  className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
+                  onChange={(name) => setFormData((prev) => ({ ...prev, icon: name }))}
                 />
               </div>
 

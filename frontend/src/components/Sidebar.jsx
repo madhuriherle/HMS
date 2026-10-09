@@ -1,41 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  Activity,
-  BadgeCheck,
-  Bell,
-  BarChart3,
-  BookOpen,
-  Building2,
-  Calendar,
-  CheckCircle,
   ChevronDown,
   ChevronRight,
   Circle,
-  CreditCard,
-  Database,
-  FilePlus,
-  FileText,
-  IdCard,
-  Key,
-  LayoutDashboard,
-  LayoutGrid,
-  Link as LinkIcon,
   List,
-  ListChecks,
-  Map,
-  MapPin,
-  Receipt,
-  Search,
-  Settings,
-  Shield,
-  Upload,
-  User,
-  UserCheck,
-  UserPlus,
-  Users,
   X
 } from 'lucide-react';
+import { MENU_ICONS } from '../utils/menuIcons';
 import clsx from 'clsx';
 import api from '../api';
 import fullLogo from '../assets/logo.png';
@@ -43,38 +15,7 @@ import fullLogo from '../assets/logo.png';
 // The menu itself (names, order, links, which privilege shows each page) lives
 // in the database `modules` table and comes from GET /users/modules/menu.
 // This table only turns the icon *name* stored on a module into a component.
-const ICONS = {
-  'layout-dashboard': LayoutDashboard,
-  list: List,
-  'user-check': UserCheck,
-  'user-plus': UserPlus,
-  'file-plus': FilePlus,
-  search: Search,
-  'layout-grid': LayoutGrid,
-  'map-pin': MapPin,
-  badge: BadgeCheck,
-  'list-checks': ListChecks,
-  building: Building2,
-  'credit-card': CreditCard,
-  database: Database,
-  users: Users,
-  user: User,
-  shield: Shield,
-  key: Key,
-  'id-card': IdCard,
-  'check-circle': CheckCircle,
-  'book-open': BookOpen,
-  receipt: Receipt,
-  'bar-chart': BarChart3,
-  bell: Bell,
-  activity: Activity,
-  calendar: Calendar,
-  link: LinkIcon,
-  upload: Upload,
-  settings: Settings,
-  map: Map,
-  'file-text': FileText,
-};
+const ICONS = MENU_ICONS;
 
 // Only modules that open a page of this panel belong in the sidebar.
 const isPanelRoute = (route) => typeof route === 'string' && route.startsWith('/dashboard');

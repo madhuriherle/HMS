@@ -40,6 +40,7 @@ const pages = process.argv.slice(2).length ? process.argv.slice(2) : [
   'RolesAndPrivileges', 'UserManagement', 'ModulesManagement', 'OrganisationSettings', 'Dashboard', 'LabelList', 'NotFound',
   'components/MenuArranger',
   'components/MemberLookupCard',
+  'components/IconPicker',
 ];
 
 // components that need props to render: one entry, or a list of variants (each with text it must contain)
@@ -47,6 +48,12 @@ const FOUND = { id: 7, kind: 'member', name: 'SRI. Ramesh Rao', member_code: 'HM
   membership_type: 'Mahaposhaka', mobile: '9800000007', district: 'BENGALURU', approval_status: 'APPROVED', member_status: 'ACTIVE', valid_till: '2027-03-12',
   last_receipt: { receipt_number: 'R-55', receipt_date: '2026-10-01', amount: 1000 }, warnings: [{ code: 'expired', text: 'Membership expired on 12-03-2026' }] };
 const SAMPLE_PROPS = {
+  'components/IconPicker': [
+    { props: { value: '', onChange() {} }, text: 'Choose an icon' },
+    { props: { value: 'database', onChange() {} }, text: 'database' },
+    { props: { value: 'not-an-icon', onChange() {} }, text: 'has no picture in the list' },
+    { props: { value: 'users', onChange() {}, defaultOpen: true }, text: 'aria-label="Search icons"' },
+  ],
   'components/MenuArranger': {
     modules: [
       { id: 1, parent_id: null, display_order: 1, name_en: 'Masters', code: 'masters', route: null, status: true },
