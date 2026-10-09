@@ -39,9 +39,13 @@ const pages = process.argv.slice(2).length ? process.argv.slice(2) : [
   'MembershipList', 'UnapprovedMembership', 'RegisterNewMember', 'ReceiptEntry', 'ReceiptTracking', 'Approvals',
   'RolesAndPrivileges', 'UserManagement', 'ModulesManagement', 'OrganisationSettings', 'Dashboard', 'LabelList', 'NotFound',
   'components/MenuArranger',
+  'components/MemberLookupCard',
 ];
 
-// components that need props to render
+// components that need props to render: one entry, or a list of variants (each with text it must contain)
+const FOUND = { id: 7, kind: 'member', name: 'SRI. Ramesh Rao', member_code: 'HMS-0007', membership_number: 'HMSM-000007', registration_number: 'REG-2026-0007',
+  membership_type: 'Mahaposhaka', mobile: '9800000007', district: 'BENGALURU', approval_status: 'APPROVED', member_status: 'ACTIVE', valid_till: '2027-03-12',
+  last_receipt: { receipt_number: 'R-55', receipt_date: '2026-10-01', amount: 1000 }, warnings: [{ code: 'expired', text: 'Membership expired on 12-03-2026' }] };
 const SAMPLE_PROPS = {
   'components/MenuArranger': {
     modules: [
@@ -50,14 +54,26 @@ const SAMPLE_PROPS = {
       { id: 3, parent_id: null, display_order: 2, name_en: 'Reports', code: 'reports', route: null, status: false },
     ],
   },
+  'components/MemberLookupCard': [
+    { props: { lookup: { status: 'idle', matches: [] }, onUse() {} }, text: '' },
+    { props: { lookup: { status: 'loading', matches: [] }, onUse() {} }, text: 'Checking this number' },
+    { props: { lookup: { status: 'error', matches: [] }, onUse() {} }, text: 'Could not check' },
+    { props: { lookup: { status: 'done', matches: [] }, onUse() {} }, text: 'No member or applicant has this number' },
+    { props: { lookup: { status: 'done', matches: [FOUND] }, onUse() {} }, text: 'Use this member' },
+    { props: { lookup: { status: 'done', matches: [{ ...FOUND, kind: 'applicant', member_status: 'INACTIVE', last_receipt: null }] }, onUse() {} }, text: 'Applicant (not yet approved)' },
+  ],
 };
 let failed = 0;
 for (const name of pages) {
   try {
     const mod = await server.ssrLoadModule(name.includes('/') ? `/src/${name}.jsx` : `/src/pages/${name}.jsx`);
     const Page = mod.default;
-    const html = renderToString(React.createElement(MemoryRouter, null, React.createElement(Page, SAMPLE_PROPS[name] || null)));
-    console.log(`ok     ${name.padEnd(28)} ${html.length} chars`);
+    const variants = Array.isArray(SAMPLE_PROPS[name]) ? SAMPLE_PROPS[name] : [{ props: SAMPLE_PROPS[name] || null, text: '' }];
+    for (const v of variants) {
+      const html = renderToString(React.createElement(MemoryRouter, null, React.createElement(Page, v.props)));
+      if (v.text && !html.includes(v.text.replace(/&/g, '&amp;'))) throw new Error('expected text not rendered: ' + v.text);
+      console.log(`ok     ${name.padEnd(28)} ${html.length} chars${v.text ? '   [' + v.text + ']' : ''}`);
+    }
   } catch (e) {
     failed += 1;
     console.log(`CRASH  ${name.padEnd(28)} ${String(e && e.message).split('\n')[0].slice(0, 140)}`);

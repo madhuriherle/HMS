@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   ChevronRight,
@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import PermissionGate from '../components/PermissionGate';
+import MemberLookupCard from '../components/MemberLookupCard';
 import DateInput from '../components/DateInput';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
@@ -210,6 +211,9 @@ export default function ReceiptEntry() {
   const [memberProfile, setMemberProfile] = useState(null); // renewal date + payment history of the chosen approved member
   const [lookupMembershipNo, setLookupMembershipNo] = useState('');
   const [lookupError, setLookupError] = useState('');
+  // "who is this membership number?" answer from the server, shown under the Membership No. box
+  const [numberLookup, setNumberLookup] = useState({ status: 'idle', number: '', matches: [] });
+  const lookupSeq = useRef(0);
   const [matchedExistingReceipt, setMatchedExistingReceipt] = useState(null);
 
   // Search and pagination state for Right-Side Membership List Table
@@ -458,6 +462,27 @@ export default function ReceiptEntry() {
   // ----------------------------------------------------
   // MEMBERSHIP NUMBER LOOKUP LOGIC (over the members loaded from the server)
   // ----------------------------------------------------
+  useEffect(() => {
+    const number = String(formData.membershipNo || '').trim();
+    if (entrySource !== 'normal' || number.length < 3) {
+      setNumberLookup({ status: 'idle', number, matches: [] });
+      return undefined;
+    }
+    setNumberLookup({ status: 'loading', number, matches: [] });
+    const seq = (lookupSeq.current += 1);
+    const timer = setTimeout(() => {
+      api
+        .get('/receipts/member-lookup', { params: { number } })
+        .then(({ data }) => {
+          if (seq === lookupSeq.current) setNumberLookup({ status: 'done', number, matches: data?.matches || [] });
+        })
+        .catch(() => {
+          if (seq === lookupSeq.current) setNumberLookup({ status: 'error', number, matches: [] });
+        });
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [formData.membershipNo, entrySource]);
+
   const findMemberByQuery = (query) => {
     const clean = String(query || '').trim().toLowerCase();
     if (!clean) return null;
@@ -478,6 +503,32 @@ export default function ReceiptEntry() {
     setLookupMembershipNo('');
     clearAutoPopulatedMemberFields();
     showToast('Member unassigned. Switched to direct receipt entry mode.');
+  };
+
+  // "Use this member" on the lookup card: link the receipt to the member / applicant that was found
+  const handleUseLookedUpMember = async (match) => {
+    let mem = null;
+    try {
+      const { data } = await api.get(`/members/${match.id}`); // the full record, when this login may read it
+      mem = toEntryMember(data, locations);
+    } catch (_) {
+      mem = null;
+    }
+    if (!mem) {
+      mem = {
+        id: match.id,
+        fullName: match.name,
+        name: match.name,
+        mobile: match.mobile || '',
+        membershipNumber: match.membership_number || match.member_code || '',
+        registrationNumber: match.registration_number,
+        membershipType: match.membership_type || '',
+        districtName: match.district || '',
+        status: match.member_status === 'ACTIVE' ? 'Active' : 'Inactive',
+      };
+    }
+    if (match.kind === 'applicant') handleAssignFromUnapproved(mem);
+    else handleAssignFromMembership(mem);
   };
 
   // "ASSIGN TO RECEIPT" FROM BOTTOM UNAPPROVED MEMBERS TABLE (FLOW 1)
@@ -570,12 +621,6 @@ export default function ReceiptEntry() {
       const clean = String(value || '').trim();
       if (!clean) {
         clearAutoPopulatedMemberFields();
-      } else {
-        const found = findMemberByQuery(clean);
-        if (found) {
-          setSelectedMember(found);
-          setLookupError('');
-        }
       }
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -681,9 +726,14 @@ export default function ReceiptEntry() {
 
     // 11. Membership No Validation (Only if no member is selected and membershipNo is manually entered)
     if (!selectedMember && formData.membershipNo.trim()) {
-      const lookedUp = findMemberByQuery(formData.membershipNo);
-      if (!lookedUp) {
-        errors.membershipNo = `Membership Number / ID "${formData.membershipNo}" does not exist.`;
+      const typed = formData.membershipNo.trim();
+      const answered = numberLookup.status === 'done' && numberLookup.number === typed;
+      if (answered && numberLookup.matches.length === 0) {
+        errors.membershipNo = `Membership Number / ID "${typed}" does not exist.`;
+      } else if (answered) {
+        errors.membershipNo = `This number belongs to ${numberLookup.matches[0].name}. Click "Use this member" to link the receipt, or clear the box.`;
+      } else if (!findMemberByQuery(typed)) {
+        errors.membershipNo = `Membership Number / ID "${typed}" could not be checked. Please wait a moment and try again.`;
       }
     }
 
@@ -1266,6 +1316,7 @@ export default function ReceiptEntry() {
 
                           className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
                         />
+                        <MemberLookupCard lookup={numberLookup} onUse={handleUseLookedUpMember} />
                       </div>
 
                       {/* PAN */}
@@ -1365,6 +1416,7 @@ export default function ReceiptEntry() {
 
                         className="w-full px-2.5 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
                       />
+                        <MemberLookupCard lookup={numberLookup} onUse={handleUseLookedUpMember} />
                     </div>
 
                     {/* PAN */}

@@ -65,6 +65,7 @@ SUB_MODULE_AREAS = {
             ("POST", r"^/receipts/?$"),
             ("GET", r"^/receipts/renewals-due/?$"),
             ("GET", r"^/receipts/tracking/?$"),  # the entry screen checks existing receipt numbers
+            ("GET", r"^/receipts/member-lookup/?$"),  # "who is this membership number?"
         ]),
         ("receipts.tracking", "Receipt Tracking", [
             ("GET", r"^/receipts/?$"),

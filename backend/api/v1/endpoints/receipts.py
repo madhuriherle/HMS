@@ -553,6 +553,116 @@ def activate_member_from_receipt(
     }
 
 
+def _member_card(db: Session, member: Member, today: date) -> dict:
+    """The small card Receipt Entry shows for a member or applicant (never the full profile)."""
+    from models.masters import District
+
+    row = (
+        db.query(MemberMembership, MembershipType)
+        .outerjoin(MembershipType, MembershipType.id == MemberMembership.membership_type_id)
+        .filter(MemberMembership.member_id == member.id, MemberMembership.is_deleted == False)  # noqa: E712
+        .order_by(MemberMembership.applied_at.desc(), MemberMembership.id.desc())
+        .first()
+    )
+    membership, mtype = row if row else (None, None)
+    district = (
+        db.query(District.name_en).filter(District.id == member.district_id).scalar() if member.district_id else None
+    )
+    last = (
+        db.query(Receipt)
+        .join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id)
+        .filter(
+            ReceiptAllocation.member_id == member.id, ReceiptAllocation.is_deleted == False,  # noqa: E712
+            Receipt.is_deleted == False, Receipt.payment_status != "CANCELLED",  # noqa: E712
+        )
+        .order_by(Receipt.receipt_date.desc(), Receipt.id.desc())
+        .first()
+    )
+    valid_till = membership.expires_at.date() if membership and membership.expires_at else None
+    year = member.created_at.year if member.created_at else today.year
+
+    warnings = []
+    if member.approval_status != "APPROVED":
+        warnings.append({"code": "not_approved", "text": "Applicant: not yet approved"})
+    if member.member_status != "ACTIVE":
+        warnings.append({"code": "inactive", "text": "This member is inactive"})
+    if valid_till and valid_till < today:
+        warnings.append({"code": "expired", "text": f"Membership expired on {valid_till.strftime('%d-%m-%Y')}"})
+
+    return {
+        "id": member.id,
+        "kind": "member" if member.approval_status == "APPROVED" else "applicant",
+        "name": " ".join(p for p in (member.name_title, member.first_name_en, member.middle_name_en, member.last_name_en) if p),
+        "member_code": member.member_code,
+        "membership_number": membership.membership_number if membership else None,
+        "registration_number": f"REG-{year}-{member.id:04d}",
+        "membership_type": mtype.name_en if mtype else None,
+        "mobile": member.mobile,
+        "district": district,
+        "approval_status": member.approval_status,
+        "member_status": member.member_status,
+        "valid_till": valid_till,
+        "last_receipt": {
+            "receipt_number": last.receipt_number,
+            "receipt_date": last.receipt_date,
+            "amount": float(last.net_amount),
+        } if last else None,
+        "warnings": warnings,
+    }
+
+
+@router.get("/member-lookup")
+def lookup_member_for_receipt(
+    number: str,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Who is this number? Backs the Membership No. box of Receipt Entry.
+
+    Accepts a member code, a membership number (e.g. HMSM-000123), an applicant's registration number
+    (REG-2026-0007, as shown on the screens) or a 10-digit mobile number. Matching is exact and ignores case.
+    Returns at most 5 small cards; a mobile number shared by a family can match more than one.
+    """
+    import re
+
+    raw = (number or "").strip()
+    if len(raw) < 3:
+        return {"number": raw, "found": False, "matches": []}
+
+    ids: list = []
+
+    def add(rows):
+        for (mid,) in rows:
+            if mid not in ids:
+                ids.append(mid)
+
+    upper = raw.upper()
+    live = Member.is_deleted == False  # noqa: E712
+    add(db.query(Member.id).filter(live, func.upper(Member.member_code) == upper).limit(5))
+    add(
+        db.query(MemberMembership.member_id)
+        .join(Member, Member.id == MemberMembership.member_id)
+        .filter(live, MemberMembership.is_deleted == False, func.upper(MemberMembership.membership_number) == upper)  # noqa: E712
+        .limit(5)
+    )
+    reg = re.fullmatch(r"REG-(\d{4})-(\d+)", raw, flags=re.IGNORECASE)
+    if reg:
+        add(
+            db.query(Member.id)
+            .filter(live, Member.id == int(reg.group(2)), func.extract("year", Member.created_at) == int(reg.group(1)))
+            .limit(1)
+        )
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) >= 10:
+        add(db.query(Member.id).filter(live, Member.mobile.in_({digits, digits[-10:]})).limit(5))
+
+    members = db.query(Member).filter(live, Member.id.in_(ids[:5])).all() if ids else []
+    members.sort(key=lambda m: ids.index(m.id))
+    today = date.today()
+    matches = [_member_card(db, m, today) for m in members]
+    return {"number": raw, "found": bool(matches), "matches": matches}
+
+
 @router.get("/allocations")
 def read_allocations(
     db: Session = Depends(deps.get_db),
