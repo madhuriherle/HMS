@@ -33,7 +33,7 @@ logger = logging.getLogger("hms.seed")
 # module -> [(sub_module_code, label, [request path prefixes])]
 SUB_MODULE_AREAS = {
     "masters": [
-        ("masters.location", "Location Setup", ["/masters/states", "/masters/districts", "/masters/taluks", "/masters/postal-codes"]),
+        ("masters.location", "Location Setup", ["/masters/states", "/masters/districts", "/masters/taluks", "/masters/postal-codes", "/masters/states-summary"]),
         ("masters.membership_types", "Membership Types", ["/masters/membership-types", "/masters/membership-credit-settings"]),
         ("masters.particulars", "Particulars Master", ["/masters/particulars", "/masters/service-types"]),
         ("masters.payment_modes", "Payment Mode Setup", ["/masters/payment-modes"]),
