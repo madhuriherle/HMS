@@ -22,3 +22,14 @@ frontend/dist/
 .vscode/
 .idea/
 .DS_Store
+
+# Server-access scripts: they hold credentials, so they must never be committed
+/check_nginx.py
+/deploy_*.py
+/fix_pagination.py
+/fix_role.py
+/patch_nginx*.py
+/seed_user.py
+/test_api.py
+/diff.patch
+*.bak
