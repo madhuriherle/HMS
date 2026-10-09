@@ -397,7 +397,11 @@ export default function BankDetailsManagement() {
       if (!isOffline && effectiveBank) {
         const banksRes = await api.get('/masters/banks?limit=1000');
         const banks = banksRes.data?.data || [];
-        let bank = banks.find(b => b.name_en === effectiveBank && b.account_number === formData.accountNumber.trim());
+        // Same bank + same account (blank counts as blank) is one bank, so saving never makes a duplicate
+        const norm = (v) => String(v || '').trim().toLowerCase();
+        let bank = banks.find(
+          (b) => norm(b.name_en) === norm(effectiveBank) && norm(b.account_number) === norm(formData.accountNumber)
+        );
         
         if (!bank) {
           const bankCode = effectiveBank.substring(0,3).toUpperCase() + Date.now().toString().slice(-4);

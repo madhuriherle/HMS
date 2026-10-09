@@ -122,3 +122,14 @@ def test_receipt_server_validation(client, admin_headers):
     assert post(n="ref", transaction_reference="x" * 151).status_code == 422, "reference too long"
     assert post(n="chq", cheque_number="x" * 51).status_code == 422, "cheque number too long"
     assert post(n="x" * 60).status_code == 422, "receipt number too long"
+
+
+def test_duplicate_bank_is_refused(client, admin_headers):
+    """The same bank + account (blank counts as blank) cannot be entered twice."""
+    h, s = admin_headers, _sfx()
+    body = {"code": f"DU{s}A", "name_en": f"Dup Bank {s}", "account_number": "", "branch_name": "", "ifsc_code": ""}
+    assert client.post(f"{API}/masters/banks", headers=h, json=body).status_code == 201
+    again = client.post(f"{API}/masters/banks", headers=h, json={**body, "code": f"DU{s}B", "name_en": f"  dup bank {s} "})
+    assert again.status_code == 409, again.text
+    other_acct = client.post(f"{API}/masters/banks", headers=h, json={**body, "code": f"DU{s}C", "account_number": "123456"})
+    assert other_acct.status_code == 201, "same bank, different account is allowed"

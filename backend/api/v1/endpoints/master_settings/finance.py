@@ -62,6 +62,19 @@ def create_bank(
     ).first()
     if dup:
         raise HTTPException(409, f"Bank code '{bank_in.code}' already exists")
+    # The same bank with the same account number (blank = blank) must not be entered twice
+    wanted_acct = (bank_in.account_number or "").strip().lower()
+    for other in db.query(Bank).filter(Bank.is_deleted == False).all():  # noqa: E712
+        if (
+            (other.name_en or "").strip().lower() == bank_in.name_en.strip().lower()
+            and (other.account_number or "").strip().lower() == wanted_acct
+        ):
+            raise HTTPException(
+                409,
+                f"Bank '{bank_in.name_en}'"
+                + (f" with account {bank_in.account_number}" if wanted_acct else "")
+                + " already exists",
+            )
     return crud_masters.bank.create(db=db, obj_in=bank_in, created_by=current_user.id)
 
 
