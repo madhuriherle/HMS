@@ -47,9 +47,7 @@ const badge = (status) =>
       : 'bg-amber-50 text-amber-700 border-amber-200';
 
 export default function Approvals() {
-  const { hasPermission, profile, isAllAccess } = useAuth();
-  // Nobody approves their own request (an all-access owner may)
-  const isOwnRequest = (row) => !isAllAccess && row.requested_by != null && profile?.id === row.requested_by;
+  const { hasPermission } = useAuth();
   const [kindKey, setKindKey] = useState('requests');
   const status = 'PENDING'; // the queue only lists requests still waiting for a reviewer
   const [rows, setRows] = useState([]);
@@ -188,8 +186,8 @@ export default function Approvals() {
                             <button
                               type="button"
                               onClick={() => approve(r)}
-                              disabled={!hasPermission('approvals.write') || isOwnRequest(r)}
-                              title={!hasPermission('approvals.write') ? 'Requires approvals.write permission' : isOwnRequest(r) ? 'You cannot approve your own request. Another approver must review it.' : 'Approve'}
+                              disabled={!hasPermission('approvals.write')}
+                              title={!hasPermission('approvals.write') ? 'Requires approvals.write permission' : 'Approve'}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />

@@ -11,26 +11,20 @@ def _pending_state(client, headers, name):
     return r.json()
 
 
-def test_nobody_approves_their_own_request(client, admin_headers):
-    # a clerk whose masters.write needs approval, and who may also approve (approvals.write)
+def test_a_holder_of_approve_permission_can_approve_their_own_request(client, admin_headers):
+    # a clerk whose masters.write needs approval, and who also holds the approve permission
     _, _, clerk = _staff_with_role(
         client, admin_headers, "selfappr_clerk", "SelfApprClerk", "SELFAPPR_CLERK",
         permission_grants=[("masters.write", True), ("approvals.write", False)],
     )
     filed = _pending_state(client, clerk, "Gate Nadu")
     assert filed["status"] == "PENDING"
-    rid = filed["approval_request_id"]
+    states = lambda: client.get(f"{API}/masters/states", headers=admin_headers, params={"limit": 200}).json()["data"]
+    assert not any(s["name_en"] == "Gate Nadu" for s in states()), "waits until approved"
 
-    # the maker cannot be the checker
-    own = client.put(f"{API}/approvals/requests/{rid}/approve", headers=clerk)
-    assert own.status_code == 403, own.text
-    assert "own request" in own.text
-
-    # another approver can; the action then really happens
-    done = client.put(f"{API}/approvals/requests/{rid}/approve", headers=admin_headers)
+    done = client.put(f"{API}/approvals/requests/{filed['approval_request_id']}/approve", headers=clerk)
     assert done.status_code == 200, done.text
-    states = client.get(f"{API}/masters/states", headers=admin_headers, params={"limit": 200}).json()["data"]
-    assert any(s["name_en"] == "Gate Nadu" for s in states)
+    assert any(s["name_en"] == "Gate Nadu" for s in states())
 
 
 def test_membership_credit_settings_respect_the_approval_grant(client, admin_headers):
