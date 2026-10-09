@@ -1025,6 +1025,9 @@ export default function LocationSetup() {
                           <span className={`w-1.5 h-1.5 rounded-full ${st.status === 'Active' ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                           <span>{st.status}</span>
                         </button>
+                        {/* Edit / Delete of a state are switched off for now (Karnataka and Kerala are the only states).
+                            Remove this comment (this line and the closing line) to bring them back. */}
+                        {/*
                         <button
                           type="button"
                           disabled={!hasPermission('masters.location.write')}
@@ -1051,6 +1054,7 @@ export default function LocationSetup() {
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>Delete</span>
                         </button>
+                        */}
                       </div>
                     </div>
                   </div>
