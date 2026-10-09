@@ -15,7 +15,7 @@ def test_nobody_approves_their_own_request(client, admin_headers):
     # a clerk whose masters.write needs approval, and who may also approve (approvals.write)
     _, _, clerk = _staff_with_role(
         client, admin_headers, "selfappr_clerk", "SelfApprClerk", "SELFAPPR_CLERK",
-        permission_grants=[("masters.write", True), ("approvals.write", False)],
+        permission_grants=[("masters.write", True), ("approvals.write", False), ("masters.write.approve", False)],
     )
     filed = _pending_state(client, clerk, "Gate Nadu")
     assert filed["status"] == "PENDING"

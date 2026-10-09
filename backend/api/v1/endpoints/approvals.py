@@ -604,6 +604,23 @@ def read_generic_requests(
     return paginate(q.order_by(ApprovalRequest.id.desc()), page, limit)
 
 
+def _require_approve_authority(db: Session, user: User, req) -> None:
+    """Finalizing a request needs the matching `<permission_code>.approve` privilege
+    (all-access roles always may). If that privilege was never seeded for the code, the
+    route-level approvals.write check is all that applies."""
+    from models.users import Permission, Role
+    role = db.query(Role).filter(Role.id == user.role_id).first()
+    if role and role.is_all_access:
+        return
+    needed = f"{req.permission_code}.approve"
+    exists = db.query(Permission.id).filter(Permission.code == needed, Permission.is_deleted == False).first()  # noqa: E712
+    if exists and needed not in deps.user_permission_codes(db, user):
+        raise HTTPException(
+            403,
+            f"You are not authorised to finalize this request. It needs the '{needed}' privilege.",
+        )
+
+
 @router.put("/requests/{id}/approve")
 async def approve_generic_request(
     *, db: Session = Depends(deps.get_db),
@@ -623,6 +640,7 @@ async def approve_generic_request(
         raise HTTPException(404, "Approval request not found")
     if req.status != "PENDING":
         raise HTTPException(400, f"Request is already {req.status}")
+    _require_approve_authority(db, current_user, req)
     if req.requested_by == current_user.id:
         # An all-access owner could do the action directly, so only they may approve their own request
         from models.users import Role
@@ -678,6 +696,7 @@ def reject_generic_request(
         raise HTTPException(404, "Approval request not found")
     if req.status != "PENDING":
         raise HTTPException(400, f"Request is already {req.status}")
+    _require_approve_authority(db, current_user, req)
     req.status = "REJECTED"
     req.reviewed_by = current_user.id
     req.reviewed_at = _now()

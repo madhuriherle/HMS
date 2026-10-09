@@ -822,7 +822,7 @@ export default function RolesAndPrivileges() {
         onClose={() => setIsAddEditOpen(false)}
       >
         <div
-          className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+          className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -994,7 +994,7 @@ export default function RolesAndPrivileges() {
                           ? (isSysTarget
                             ? 'Super Admin / System roles maintain permanent full-access across all modules.'
                             : 'This role is at or above your rank, so its access levels can only be viewed.')
-                          : 'Select the specific modules and permissions assigned to this user role.'}
+                          : null}
                       </p>
                     </div>
                   </div>
@@ -1070,8 +1070,7 @@ export default function RolesAndPrivileges() {
                 <div className="flex items-start gap-2 p-3 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-[11px] text-[#863221]">
                   <Clock className="w-4 h-4 shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
-                    Ticking the <span className="font-bold text-[#180200]">Approval</span> chip on a granted privilege makes every action under it go to the
-                    <span className="font-bold text-[#180200]"> Approvals</span> queue instead of applying immediately (maker-checker). Leave it off for instant access.
+                    Tick <span className="font-bold text-[#180200]">Approval</span> to send actions to the Approvals queue instead of applying instantly.
                   </p>
                 </div>
                 {(() => {
@@ -1185,7 +1184,7 @@ export default function RolesAndPrivileges() {
                                     }`}>
                                       {priv.name}
                                     </p>
-                                    {!isReadOnly && isChecked && (
+                                    {!isReadOnly && isChecked && !String(priv.id).endsWith('.approve') && priv.id !== 'approvals.write' && (
                                       <button
                                         type="button"
                                         onClick={(e) => {
@@ -1262,7 +1261,7 @@ export default function RolesAndPrivileges() {
       >
         {viewingRole && (
           <div
-            className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-3xl w-full border border-[#E8DFD8] shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
