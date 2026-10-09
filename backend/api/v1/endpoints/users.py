@@ -17,6 +17,7 @@ Rules (same as the Anegudde inventory system):
 """
 
 import uuid
+from pydantic import BaseModel
 from typing import Any, List, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -267,6 +268,51 @@ def create_module(*, db: Session = Depends(deps.get_db), current_user: User = De
     _check_module_refs(db, module_in.parent_id, module_in.opens_module_id)
     _check_permission_code(db, module_in.permission_code)
     return crud_users.module.create(db=db, obj_in=module_in, created_by=current_user.id)
+
+
+class ModuleReorderItem(BaseModel):
+    id: int
+    parent_id: Optional[int] = None
+    display_order: int
+
+
+class ModuleReorder(BaseModel):
+    items: List[ModuleReorderItem]
+
+
+@router.put("/modules/reorder")
+def reorder_modules(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_superuser),
+    payload: ModuleReorder,
+) -> Any:
+    """Rearrange the sidebar: set parent and display order of many modules in one call (Rank 1)."""
+    ids = [i.id for i in payload.items]
+    if len(set(ids)) != len(ids):
+        raise HTTPException(400, "A module appears more than once")
+    live = {m.id: m for m in db.query(Module).filter(Module.is_deleted == False).all()}  # noqa: E712
+    unknown = [i for i in ids if i not in live]
+    if unknown:
+        raise HTTPException(404, f"Unknown module id(s): {', '.join(str(i) for i in unknown)}")
+    final_parent = {mid: m.parent_id for mid, m in live.items()}
+    for item in payload.items:
+        if item.parent_id is not None and item.parent_id not in live:
+            raise HTTPException(400, f"Unknown parent module id {item.parent_id}")
+        final_parent[item.id] = item.parent_id
+    for item in payload.items:  # no module may end up inside itself
+        seen, cur = {item.id}, final_parent.get(item.id)
+        while cur is not None:
+            if cur in seen:
+                raise HTTPException(400, f"'{live[item.id].name_en}' cannot be placed inside itself or one of its own sub-modules")
+            seen.add(cur)
+            cur = final_parent.get(cur)
+    for item in payload.items:
+        m = live[item.id]
+        m.parent_id = item.parent_id
+        m.display_order = item.display_order
+        m.updated_by = current_user.id
+    db.commit()
+    return {"updated": len(payload.items)}
 
 
 @router.put("/modules/{module_id}", response_model=schemas_users.Module)

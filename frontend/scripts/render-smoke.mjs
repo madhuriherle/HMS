@@ -38,13 +38,25 @@ const pages = process.argv.slice(2).length ? process.argv.slice(2) : [
   'LocationSetup', 'MembershipTypeManagement', 'ReceiptTypeManagement', 'BankDetailsManagement', 'MasterLists',
   'MembershipList', 'UnapprovedMembership', 'RegisterNewMember', 'ReceiptEntry', 'ReceiptTracking', 'Approvals',
   'RolesAndPrivileges', 'UserManagement', 'ModulesManagement', 'OrganisationSettings', 'Dashboard', 'LabelList', 'NotFound',
+  'components/MenuArranger',
 ];
+
+// components that need props to render
+const SAMPLE_PROPS = {
+  'components/MenuArranger': {
+    modules: [
+      { id: 1, parent_id: null, display_order: 1, name_en: 'Masters', code: 'masters', route: null, status: true },
+      { id: 2, parent_id: 1, display_order: 1, name_en: 'Banks', code: 'masters.banks', route: '/b', status: true },
+      { id: 3, parent_id: null, display_order: 2, name_en: 'Reports', code: 'reports', route: null, status: false },
+    ],
+  },
+};
 let failed = 0;
 for (const name of pages) {
   try {
-    const mod = await server.ssrLoadModule(`/src/pages/${name}.jsx`);
+    const mod = await server.ssrLoadModule(name.includes('/') ? `/src/${name}.jsx` : `/src/pages/${name}.jsx`);
     const Page = mod.default;
-    const html = renderToString(React.createElement(MemoryRouter, null, React.createElement(Page)));
+    const html = renderToString(React.createElement(MemoryRouter, null, React.createElement(Page, SAMPLE_PROPS[name] || null)));
     console.log(`ok     ${name.padEnd(28)} ${html.length} chars`);
   } catch (e) {
     failed += 1;

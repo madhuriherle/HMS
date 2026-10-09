@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
+import MenuArranger from '../components/MenuArranger';
 import FilterSelect from '../components/FilterSelect';
 import {
   Layers,
@@ -47,6 +48,7 @@ export default function ModulesManagement() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
+  const [view, setView] = useState('table'); // 'table' | 'arrange' (drag and drop the sidebar order)
 
   const [isAddEditOpen, setIsAddEditOpen] = useState(false);
   const [modalMode, setModalMode] = useState('add');
@@ -372,6 +374,26 @@ export default function ModulesManagement() {
         )}
       </Modal>
 
+      {/* View switch */}
+      <div className="inline-flex p-1 bg-white border border-[#E8DFD8] rounded-xl self-start">
+        {[['table', 'Table'], ['arrange', 'Arrange menu']].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setView(key)}
+            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+              view === key ? 'bg-[#510601] text-white' : 'text-[#510601] hover:bg-[#FAF7F2]'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'arrange' ? (
+        <MenuArranger modules={modules} onSaved={fetchModules} />
+      ) : (
+        <>
       {/* Header, Search & Filters */}
       <SearchFilterBar
         
@@ -582,6 +604,9 @@ export default function ModulesManagement() {
           </div>
         )}
       </div>
+
+        </>
+      )}
 
       {/* ADD / EDIT MODAL */}
       <Modal isOpen={isAddEditOpen} onClose={() => setIsAddEditOpen(false)}>

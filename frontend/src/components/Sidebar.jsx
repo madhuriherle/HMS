@@ -116,18 +116,23 @@ export default function Sidebar({ isOpen, onClose }) {
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .get('/users/modules/menu')
-      .then((res) => {
-        if (cancelled) return;
-        setVisibleMenuItems(toMenuItems(res.data));
-        setMenuState('ready');
-      })
-      .catch(() => {
-        if (!cancelled) setMenuState('error');
-      });
+    const loadMenu = () =>
+      api
+        .get('/users/modules/menu')
+        .then((res) => {
+          if (cancelled) return;
+          setVisibleMenuItems(toMenuItems(res.data));
+          setMenuState('ready');
+        })
+        .catch(() => {
+          if (!cancelled) setMenuState('error');
+        });
+    loadMenu();
+    // Module Master > Arrange menu announces a new order
+    window.addEventListener('hms-menu-change', loadMenu);
     return () => {
       cancelled = true;
+      window.removeEventListener('hms-menu-change', loadMenu);
     };
   }, []);
 
