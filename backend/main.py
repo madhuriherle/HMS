@@ -95,6 +95,9 @@ async def request_context(request: Request, call_next):
 
 # ── Middleware ──────────────────────────────
 _origins = settings.cors_origins
+from services.permission_areas import RequestPathMiddleware  # noqa: E402
+app.add_middleware(RequestPathMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,

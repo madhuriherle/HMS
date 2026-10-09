@@ -25,6 +25,33 @@ import logging
 
 logger = logging.getLogger("hms.seed")
 
+# ── sub-modules ──────────────────────────────────────────────
+# A module can be split into areas (pages) that each get their own Read / Write / Delete
+# privileges, e.g. masters.banks.write. The API keeps asking for the module-level code
+# (masters.write); services.permission_areas turns it into the area's code from the request
+# path, so one rule covers every route.
+# module -> [(sub_module_code, label, [request path prefixes])]
+SUB_MODULE_AREAS = {
+    "masters": [
+        ("masters.location", "Location Setup", ["/masters/states", "/masters/districts", "/masters/taluks", "/masters/postal-codes"]),
+        ("masters.membership_types", "Membership Types", ["/masters/membership-types", "/masters/membership-credit-settings"]),
+        ("masters.particulars", "Particulars Master", ["/masters/particulars", "/masters/service-types"]),
+        ("masters.payment_modes", "Payment Mode Setup", ["/masters/payment-modes"]),
+        ("masters.banks", "Bank Master", ["/masters/banks"]),
+    ],
+    "engagements": [
+        ("engagements.affiliations", "Affiliations", ["/engagements/affiliations"]),
+        ("engagements.associates", "Associates", ["/engagements/associates"]),
+        ("engagements.press_media", "Press & Media", ["/engagements/press-media"]),
+        ("engagements.committee", "Committee", ["/engagements/committee"]),
+    ],
+}
+# sub-modules that are not menu pages need a module row of their own (menu pages already have one)
+_ENGAGEMENT_SUBS = [
+    (code, label, "engagements", None, None, i + 1, None)
+    for i, (code, label, _paths) in enumerate(SUB_MODULE_AREAS["engagements"])
+]
+
 # ── modules ──────────────────────────────────────────────────
 # (code, name, parent_code, route, icon, display_order, min_rank_level)
 MODULE_CATALOG = [
@@ -44,6 +71,10 @@ MODULE_CATALOG = [
     ("engagements", "Affiliation, Associates & Press", None, "/engagements", "link", 100, None),
     ("imports", "Imports", None, "/imports", "upload", 110, None),
     ("system", "System", None, "/system", "settings", 120, 1),
+]
+MODULE_CATALOG += [  # sub-modules of Affiliation, Associates & Press (no menu page yet, so no route)
+    (code, label, parent, route, icon, order, rank)
+    for code, label, parent, route, icon, order, rank in _ENGAGEMENT_SUBS
 ]
 
 _READ_WRITE_DELETE = (
@@ -87,6 +118,12 @@ PERMISSION_CATALOG += [
     ("system.write", "system", "Write system", f"Edit {_DESC['system']}"),
     ("imports.write", "imports", "Bulk imports", "CSV imports such as postal codes"),
 ]
+
+# Read / Write / Delete for every sub-module area
+for _module, _areas in SUB_MODULE_AREAS.items():
+    for _sub, _label, _paths in _areas:
+        for _a in ("read", "write", "delete"):
+            PERMISSION_CATALOG.append((f"{_sub}.{_a}", _sub, f"{_a.title()} {_label}", f"{_a.title()} {_label.lower()}"))
 
 # ── organisation settings (singleton row, id = 1) ────────────
 # Defaults mirror the Sabha's printed receipt book so the receipt/label
@@ -186,12 +223,12 @@ MENU_PAGE_CATALOG = [
     ("receipts.entry", "Receipt Entry", "receipts", "/dashboard/receipts/entry", "file-plus", 1, "receipts.read", None),
     ("receipts.tracking", "Receipt Tracking", "receipts", "/dashboard/receipts/tracking", "search", 2, "receipts.read", None),
     ("users.modules", "Modules", "users", "/dashboard/users/modules", "layout-grid", 4, None, 1),
-    ("masters.location", "Location Setup", "masters", "/dashboard/master/location-setup", "map-pin", 1, "masters.read", None),
-    ("masters.membership_types", "Membership Types", "masters", "/dashboard/master/membership-type", "badge", 2, "masters.read", None),
-    ("masters.particulars", "Particulars Master", "masters", "/dashboard/master/receipt-type", "list-checks", 3, "masters.read", None),
+    ("masters.location", "Location Setup", "masters", "/dashboard/master/location-setup", "map-pin", 1, "masters.location.read", None),
+    ("masters.membership_types", "Membership Types", "masters", "/dashboard/master/membership-type", "badge", 2, "masters.membership_types.read", None),
+    ("masters.particulars", "Particulars Master", "masters", "/dashboard/master/receipt-type", "list-checks", 3, "masters.particulars.read", None),
     ("masters.organisation", "Organisation Settings", "masters", "/dashboard/master/organisation-settings", "building", 4, "system.read", None),
-    ("masters.payment_modes", "Payment Mode Setup", "masters", "/dashboard/master/payment-modes", "credit-card", 5, "masters.read", None),
-    ("masters.banks", "Bank Master", "masters", "/dashboard/master/banks", "building", 6, "masters.read", None),
+    ("masters.payment_modes", "Payment Mode Setup", "masters", "/dashboard/master/payment-modes", "credit-card", 5, "masters.payment_modes.read", None),
+    ("masters.banks", "Bank Master", "masters", "/dashboard/master/banks", "building", 6, "masters.banks.read", None),
     # Personal Masters screen is switched off for now (also switched off in migration 0025):
     # ("masters.personal", "Personal Masters", "masters", "/dashboard/master/personal-masters", "list-checks", 7, "masters.read", None),
     # parent may list alternatives ("a|b"): the first module code that exists is used

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from db.session import SessionLocal
 from core.security import decode_token
 from models.users import User
+from services.permission_areas import resolve as resolve_permission
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -116,6 +117,7 @@ def permission_requires_approval(db: Session, user: User, permission_code: str) 
     role = get_user_role(db, user)
     if not role or role.is_all_access:
         return False
+    permission_code = resolve_permission(permission_code)
     from models.users import Permission, RolePermission
     gated = (
         db.query(RolePermission.requires_approval)
@@ -159,9 +161,10 @@ def require_permission(permission_code: str):
         role = get_user_role(db, current_user)
         if not role or not role.status:
             raise HTTPException(403, "No active role assigned to this user")
-        if not role.is_all_access and permission_code not in user_permission_codes(db, current_user):
-            raise HTTPException(403, f"Not enough permissions. Required: {permission_code}")
-        _module_gate(db, current_user, permission_code)
+        code = resolve_permission(permission_code)  # the sub-module's privilege for this page, if it has one
+        if not role.is_all_access and code not in user_permission_codes(db, current_user):
+            raise HTTPException(403, f"Not enough permissions. Required: {code}")
+        _module_gate(db, current_user, code)
         return current_user
     return _check
 
@@ -176,7 +179,8 @@ def require_any_permission(*permission_codes: str):
         if not role or not role.status:
             raise HTTPException(403, "No active role assigned to this user")
         held = user_permission_codes(db, current_user)
-        matched = [c for c in permission_codes if role.is_all_access or c in held]
+        resolved = [resolve_permission(c) for c in permission_codes]
+        matched = [c for c in resolved if role.is_all_access or c in held]
         if not matched:
             raise HTTPException(403, f"Not enough permissions. Required one of: {', '.join(permission_codes)}")
         last = None

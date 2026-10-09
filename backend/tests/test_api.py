@@ -660,7 +660,13 @@ def _staff_with_role(client, admin_headers, username, role_name, role_code, perm
     grants = {}
     for code, requires_approval in permission_grants:
         grants[code] = grants.get(code, False) or requires_approval
-    from db.seed_defaults import MODULE_CATALOG
+    from db.seed_defaults import MODULE_CATALOG, SUB_MODULE_AREAS
+    # a module-level grant (masters.write) also carries every sub-module of that module, as the
+    # migration does for existing roles; tests that want ONE area pass its own code instead
+    for code, flag in list(grants.items()):
+        module, _, action = code.rpartition(".")
+        for sub, _label, _paths in SUB_MODULE_AREAS.get(module, []):
+            grants.setdefault(f"{sub}.{action}", flag)
     known_modules = {m[0] for m in MODULE_CATALOG}
     for code in list(grants):
         module = code.rsplit(".", 1)[0]
