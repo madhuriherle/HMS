@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import {
@@ -422,10 +423,26 @@ export default function RolesAndPrivileges() {
     }
   };
 
+  // Write and Delete need Read: a screen cannot be used without being able to open it.
+  // Ticking Write/Delete also ticks Read; unticking Read also unticks Write/Delete.
+  const readCodeFor = (code) => {
+    if (code === 'approvals.write' || !/\.(write|delete)$/.test(code)) return null;
+    const read = code.replace(/\.(write|delete)$/, '.read');
+    return allPrivilegeIds.includes(read) ? read : null;
+  };
+  const writeCodesFor = (readCode) =>
+    allPrivilegeIds.filter((c) => c !== 'approvals.write' && /\.(write|delete)$/.test(c) && c.replace(/\.(write|delete)$/, '.read') === readCode);
+
   const handleTogglePrivilege = (id) => {
-    setSelectedPrivileges(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    setSelectedPrivileges(prev => {
+      if (prev.includes(id)) {
+        const drop = new Set([id]);
+        if (id.endsWith('.read')) writeCodesFor(id).forEach((c) => drop.add(c));
+        return prev.filter(x => !drop.has(x));
+      }
+      const read = readCodeFor(id);
+      return Array.from(new Set([...prev, id, ...(read ? [read] : [])]));
+    });
   };
 
   const handleToggleApprovalGate = (id) => {
@@ -957,8 +974,8 @@ export default function RolesAndPrivileges() {
       {/* ============================================================ */}
       {/* CONFIGURE PRIVILEGES MODAL                                   */}
       {/* ============================================================ */}
-      {privilegeTargetRole && (
-      <div className="fixed top-0 right-0 bottom-0 left-0 lg:left-64 z-40 bg-[#FAF7F2] flex flex-col overflow-hidden animate-in fade-in duration-150">
+      {privilegeTargetRole && createPortal(
+      <div className="fixed top-0 right-0 bottom-0 left-0 lg:left-64 z-40 bg-[#FAF7F2] flex flex-col overflow-hidden">
         {privilegeTargetRole && (() => {
           const isSysTarget = isSystemRole(privilegeTargetRole);
           const isProtectedTarget = !isSysTarget && (privilegeTargetRole.rank_level ?? 99) <= myRankLevel;
@@ -1252,8 +1269,8 @@ export default function RolesAndPrivileges() {
             </div>
           );
         })()}
-      </div>
-      )}
+      </div>,
+      document.body)}
 
       {/* ============================================================ */}
       {/* VIEW DETAILS MODAL                                           */}

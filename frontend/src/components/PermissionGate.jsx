@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { Lock } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
@@ -23,7 +24,7 @@ export default function PermissionGate({
 
   const missing = Array.isArray(required) ? required : [required];
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[9000] bg-[#FAF7F2] overflow-y-auto flex items-center justify-center p-4">
     <div className="w-full max-w-xl bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-8 sm:p-12 text-center">
       <div className="w-14 h-14 rounded-full bg-[#FFC107]/15 text-[#863221] flex items-center justify-center mx-auto mb-4">
@@ -58,6 +59,7 @@ export default function PermissionGate({
         Back to Dashboard
       </Link>
     </div>
-    </div>
+    </div>,
+    document.body
   );
 }
