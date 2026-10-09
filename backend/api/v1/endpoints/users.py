@@ -175,7 +175,7 @@ def my_menu(db: Session = Depends(deps.get_db), current_user: User = Depends(dep
         visible = bool(kids)
         if not visible:
             if role.is_all_access:
-                visible = bool(m.route or m.parent_id is None)
+                visible = bool(m.route)  # a module with no page and nothing visible inside it is not shown
             elif m.permission_code:
                 # page gated by one explicit privilege
                 visible = bool(m.route) and m.permission_code in held

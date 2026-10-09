@@ -130,7 +130,7 @@ MODULE_CATALOG = [
     ("users", "Users", None, None, "users", 20, None),
     ("users.management", "User Management", "users", "/users", "user", 1, None),
     ("roles", "Role Management", "users", "/users/roles", "shield", 2, None),
-    ("users.privileges", "Privileges", "users", "/users/privileges", "key", 3, None),
+    ("users.privileges", "Privileges", "users", None, "key", 3, None),  # edited inside Role Management, no page of its own
     ("members", "Membership", None, "/members", "id-card", 30, None),
     ("approvals", "Approvals", None, "/approvals", "check-circle", 35, None),
     ("magazines", "Magazine", None, "/magazines", "book-open", 40, None),
@@ -141,7 +141,7 @@ MODULE_CATALOG = [
     ("events", "Events", None, "/events", "calendar", 90, None),
     ("engagements", "Affiliation, Associates & Press", None, "/engagements", "link", 100, None),
     ("imports", "Imports", None, "/imports", "upload", 110, None),
-    ("system", "System", None, "/system", "settings", 120, 1),
+    ("system", "System", None, None, "settings", 120, 1),  # holds Organisation Settings (a Masters page) and future screens
 ]
 MODULE_CATALOG += [  # sub-modules of Affiliation, Associates & Press (no menu page yet, so no route)
     (code, label, parent, route, icon, order, rank)
