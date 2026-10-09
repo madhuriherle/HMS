@@ -8,7 +8,7 @@ export default function NotFound() {
   const navigate = useNavigate();
 
   return (
-    <div className="hms-nf relative flex flex-col items-center justify-center text-center px-4 py-12 sm:py-16 overflow-hidden">
+    <div className="hms-nf relative min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center text-center px-4 py-12 sm:py-16 overflow-hidden">
       {/* floating dots */}
       <span className="hms-nf-dot hms-nf-dot-1" />
       <span className="hms-nf-dot hms-nf-dot-2" />

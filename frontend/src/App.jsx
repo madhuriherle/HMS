@@ -115,11 +115,10 @@ function App() {
           <Route path="receipts/label-list" element={<PermissionGate required="members.read" title="Access Restricted"><LabelList /></PermissionGate>} />
           <Route path="magazine/labels" element={<PermissionGate required="members.read" title="Access Restricted"><LabelList /></PermissionGate>} />
 
-          {/* Anything else inside the panel */}
-          <Route path="*" element={<NotFound />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Any unknown address: a full-screen page, no panel around it */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
   );
