@@ -508,7 +508,7 @@ export default function RegisterNewMember() {
     }
   };
 
-  const handlePinChange = (val) => {
+  const handlePinChange = async (val) => {
     const cleanVal = val.replace(/\D/g, '').slice(0, 6);
     setFormData((prev) => ({
       ...prev,
@@ -526,6 +526,7 @@ export default function RegisterNewMember() {
     }
 
     if (cleanVal.length === 6) {
+      // 1. Try local data first
       const matchInfo = findLocationByPin(postalCodes, cleanVal);
       if (matchInfo.found) {
         setFormData((prev) => ({
@@ -535,6 +536,26 @@ export default function RegisterNewMember() {
           district: matchInfo.districtName || '',
           state: matchInfo.stateName || ''
         }));
+      } else {
+        // 2. If not found locally, use free public API
+        try {
+          const res = await fetch(`https://api.postalpincode.in/pincode/${cleanVal}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data[0] && data[0].Status === 'Success') {
+              const postOffice = data[0].PostOffice[0];
+              setFormData((prev) => ({
+                ...prev,
+                locality: prev.locality || postOffice.Name || '',
+                taluk: postOffice.Block || '',
+                district: postOffice.District || '',
+                state: postOffice.State || ''
+              }));
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch pin code details from API", err);
+        }
       }
     }
   };

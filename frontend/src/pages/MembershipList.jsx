@@ -360,7 +360,7 @@ export default function MembershipList() {
   // ----------------------------------------------------
   // PIN LOOKUP HELPER (LOCATION SETUP INTEGRATION)
   // ----------------------------------------------------
-  const handlePinCodeLookup = (pin) => {
+  const handlePinCodeLookup = async (pin) => {
     if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) return;
 
     const lookup = findLocationByPin(postalCodes, pin);
@@ -401,6 +401,36 @@ export default function MembershipList() {
 
       showToast(`Location auto-resolved: ${lookup.area}, ${lookup.talukName ? lookup.talukName + ', ' : ''}${lookup.districtName}, ${lookup.stateName}`);
     } else {
+      try {
+        const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data[0] && data[0].Status === 'Success') {
+            const postOffice = data[0].PostOffice[0];
+            setFormData((prev) => ({
+              ...prev,
+              postalCode: pin,
+              country: 'India',
+              stateName: postOffice.State || '',
+              districtName: postOffice.District || '',
+              post: postOffice.Name || '',
+              place: postOffice.Block || '',
+              city: postOffice.Name || '',
+              area: postOffice.Name || ''
+            }));
+            setFormErrors((prev) => {
+              const next = { ...prev };
+              delete next.postalCode;
+              return next;
+            });
+            showToast(`Location fetched from API: ${postOffice.Name}, ${postOffice.District}, ${postOffice.State}`);
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("API Fetch Error", err);
+      }
+
       // Clear previously auto-populated location fields
       setFormData((prev) => ({
         ...prev,
@@ -412,7 +442,7 @@ export default function MembershipList() {
         area: ''
       }));
 
-      const errorMsg = 'PIN Code not found in Location Setup. Please import the PIN Code data or verify the PIN Code.';
+      const errorMsg = 'PIN Code not found in Location Setup or API. Please verify the PIN Code.';
       setFormErrors((prev) => ({
         ...prev,
         postalCode: errorMsg
