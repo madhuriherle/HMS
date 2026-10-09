@@ -83,6 +83,7 @@ export default function BankDetailsManagement() {
   // Status Toggle Confirmation Dialog State
   const [statusDialog, setStatusDialog] = useState(null); // { item, newStatus }
   const [deleteDialog, setDeleteDialog] = useState(null); // payment mode to delete
+  const [blockedDialog, setBlockedDialog] = useState(null); // payment mode that receipts still use
 
   // Toast / Feedback State
   const [toastMessage, setToastMessage] = useState(null);
@@ -122,7 +123,7 @@ export default function BankDetailsManagement() {
 
   useEffect(() => {
     fetchConfigs();
-    loadReceipts()
+    loadReceipts({ limit: 25000 })
       .then(setReceipts)
       .catch((error) => showToast(error.response?.data?.detail || 'Failed to load receipts from the server.', 'error'));
   }, []);
@@ -437,6 +438,23 @@ export default function BankDetailsManagement() {
 
   const isPendingApproval = (data) => Boolean(data && (data.approval_request_id || data.status === 'PENDING'));
 
+  // How many receipts were recorded with this payment mode / bank account
+  const getModeUsageCount = (cfg) => {
+    const bank = (cfg.bankAccount || '').trim().toLowerCase();
+    const mode = (cfg.paymentMode || '').trim().toLowerCase();
+    const label = formatPaymentModeLabel(cfg).trim().toLowerCase();
+    return receipts.filter((r) => {
+      const rBank = (r.bankName || r.bankAccount || '').trim().toLowerCase();
+      const rMode = (r.paymentMode || '').trim().toLowerCase();
+      return bank ? rBank === bank : rMode === mode || rMode === label;
+    }).length;
+  };
+
+  const handleDeleteClick = (cfg) => {
+    if (getModeUsageCount(cfg) > 0) setBlockedDialog(cfg);
+    else setDeleteDialog(cfg);
+  };
+
   const handleToggleStatusClick = (config) => {
     setStatusDialog({ item: config, newStatus: config.status === 'Active' ? 'Inactive' : 'Active' });
   };
@@ -538,7 +556,6 @@ export default function BankDetailsManagement() {
               <Search className="w-4 h-4 text-[#863221]/60 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search by Payment Mode, Bank, Branch, IFSC, Account..."
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
@@ -621,6 +638,9 @@ export default function BankDetailsManagement() {
                         <span className="font-black text-[#180200] text-sm font-serif">
                           {config.paymentMode}
                         </span>
+                        <div className="text-[10px] text-[#863221]/80 mt-0.5">
+                          Used in {getModeUsageCount(config)} receipt{getModeUsageCount(config) === 1 ? '' : 's'}
+                        </div>
                       </td>
 
                       {/* Column: Display in Receipts */}
@@ -678,7 +698,7 @@ export default function BankDetailsManagement() {
                           {/* Delete Button */}
                           <button
                             type="button"
-                            onClick={() => setDeleteDialog(config)}
+                            onClick={() => handleDeleteClick(config)}
                             disabled={!hasPermission('masters.delete')}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#ED4636] hover:bg-red-50 border border-red-200 rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete Payment Mode'}
@@ -838,7 +858,6 @@ export default function BankDetailsManagement() {
                     name="customPaymentMode"
                     value={formData.customPaymentMode}
                     onChange={handleInputChange}
-                    placeholder="Enter custom Payment Mode (e.g. Card, POS, RTGS)"
                     className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none uppercase"
                   />
                 </div>
@@ -893,7 +912,6 @@ export default function BankDetailsManagement() {
                         name="customBankAccount"
                         value={formData.customBankAccount}
                         onChange={handleInputChange}
-                        placeholder="Enter custom Bank Account name (e.g. HDFC 4088)"
                         className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none uppercase"
                       />
                     </div>
@@ -922,7 +940,6 @@ export default function BankDetailsManagement() {
                     name="branch"
                     value={formData.branch || ''}
                     onChange={handleInputChange}
-                    placeholder="e.g. Malleswaram, Jayanagar, Kumbashi"
                     className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none"
                   />
                   {formErrors.branch && (
@@ -944,7 +961,6 @@ export default function BankDetailsManagement() {
                     value={formData.ifscCode || ''}
                     onChange={handleInputChange}
                     maxLength={11}
-                    placeholder="e.g. KARB0000107"
                     className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm font-mono uppercase text-[#180200] placeholder-[#863221]/40 focus:outline-none"
                   />
                   {formErrors.ifscCode && (
@@ -965,7 +981,6 @@ export default function BankDetailsManagement() {
                     name="accountNumber"
                     value={formData.accountNumber || ''}
                     onChange={handleInputChange}
-                    placeholder="e.g. 010750010001075"
                     className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm font-mono text-[#180200] placeholder-[#863221]/40 focus:outline-none"
                   />
                   {formErrors.accountNumber && (
@@ -1226,6 +1241,44 @@ export default function BankDetailsManagement() {
                   }`}
               >
                 Confirm {statusDialog.newStatus}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Cannot delete: receipts still use this mode */}
+      <Modal isOpen={!!blockedDialog} onClose={() => setBlockedDialog(null)} className="p-4">
+        {blockedDialog && (
+          <div className="bg-white rounded-2xl shadow-xl border border-[#E8DFD8] w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-5 text-center">
+              <div className="w-12 h-12 rounded-full mx-auto flex items-center justify-center mb-3 bg-amber-50 text-amber-600">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h4 className="text-base font-bold text-[#180200] font-serif mb-1">Cannot Delete Payment Mode</h4>
+              <p className="text-xs text-[#863221] leading-relaxed">
+                {`"${formatPaymentModeLabel(blockedDialog)}" is used by ${getModeUsageCount(blockedDialog)} receipt(s). Deactivate it instead: it disappears from Receipt Entry and the recorded receipts stay unchanged.`}
+              </p>
+            </div>
+            <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setBlockedDialog(null)}
+                className="px-4 py-2 border border-[#E8DFD8] text-xs font-semibold text-[#863221] hover:bg-white rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!hasPermission('masters.write') || (blockedDialog.status || 'Active') !== 'Active'}
+                onClick={() => {
+                  const cfg = blockedDialog;
+                  setBlockedDialog(null);
+                  setStatusDialog({ item: cfg, newStatus: 'Inactive' });
+                }}
+                className="px-5 py-2 text-xs font-bold text-white rounded-xl shadow-sm transition-colors cursor-pointer bg-[#510601] hover:bg-[#3D0400] disabled:opacity-40"
+              >
+                Deactivate Instead
               </button>
             </div>
           </div>

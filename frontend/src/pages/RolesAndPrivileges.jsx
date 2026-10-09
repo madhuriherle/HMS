@@ -27,6 +27,7 @@ import {
   FileText
 } from 'lucide-react';
 import api from '../api';
+import { formatDate } from '../utils/dateUtils';
 import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
@@ -560,7 +561,6 @@ export default function RolesAndPrivileges() {
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#863221]/50" />
               <input
                 type="text"
-                placeholder="Search by role name or description..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                 className="w-full pl-10 pr-9 py-2 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] shadow-sm transition-all"
@@ -692,7 +692,7 @@ export default function RolesAndPrivileges() {
                         </button>
                       </td>
                       <td className="px-6 py-4 text-xs text-[#863221]/80 font-medium">
-                        {role.createdAt}
+                        {formatDate(role.createdAt)}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -900,7 +900,6 @@ export default function RolesAndPrivileges() {
                 name="name"
                 value={formData.name}
                 onChange={handleFormChange}
-                placeholder="e.g. Membership Auditor"
                 className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.name
                   ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                   : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -924,7 +923,6 @@ export default function RolesAndPrivileges() {
                 rows={3}
                 value={formData.description}
                 onChange={handleFormChange}
-                placeholder="Describe the scope, responsibilities, and permissions for this role..."
                 className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors resize-none"
               />
             </div>
@@ -940,7 +938,6 @@ export default function RolesAndPrivileges() {
                 min={myRankLevel + 1}
                 value={formData.rank_level}
                 onChange={handleFormChange}
-                placeholder="e.g. 20"
                 className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.rank_level
                   ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                   : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -1073,7 +1070,6 @@ export default function RolesAndPrivileges() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#863221]/50" />
                     <input
                       type="text"
-                      placeholder="Search privileges or modules..."
                       value={privilegeSearch}
                       onChange={(e) => setPrivilegeSearch(e.target.value)}
                       className="w-full pl-9 pr-8 py-1.5 bg-white border border-[#E8DFD8] rounded-lg text-xs text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601]"
@@ -1343,10 +1339,10 @@ export default function RolesAndPrivileges() {
 
                 <div className="grid grid-cols-2 gap-3 text-xs text-[#863221]">
                   <div>
-                    <span className="font-semibold">Created Date:</span> {viewingRole.createdAt}
+                    <span className="font-semibold">Created Date:</span> {formatDate(viewingRole.createdAt)}
                   </div>
                   <div>
-                    <span className="font-semibold">Last Updated:</span> {viewingRole.updatedAt}
+                    <span className="font-semibold">Last Updated:</span> {formatDate(viewingRole.updatedAt)}
                   </div>
                 </div>
               </div>

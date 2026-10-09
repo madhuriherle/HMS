@@ -12,6 +12,7 @@ import Modal from '../components/Modal';
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
 import api from '../api';
+import { getTodayDisplayDate } from '../utils/dateUtils';
 import Swal from 'sweetalert2';
 import { normalizeMember, unwrapList } from '../utils/apiAdapters';
 
@@ -121,9 +122,7 @@ export default function Dashboard() {
   ];
 
 
-  const currentDate = new Date().toLocaleDateString('en-US', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-  });
+  const currentDate = `${new Date().toLocaleDateString('en-US', { weekday: 'long' })}, ${getTodayDisplayDate()}`;
 
   // Everything shown in the member popup is read from the server
   const handleOpenMemberView = async (item) => {
@@ -161,7 +160,8 @@ export default function Dashboard() {
         icon: 'error',
         title: 'Could not load member',
         text: err.response?.data?.detail || 'The server could not return this member.',
-        confirmButtonColor: '#510601'
+        confirmButtonColor: '#510601',
+        customClass: { popup: 'hms-mini-swal' }
       });
     }
   };
@@ -197,7 +197,7 @@ export default function Dashboard() {
             </div>
             <span className="text-xs font-semibold text-[#180200] text-center">Add Receipt</span>
           </Link>
-          <Link to="/dashboard/membership/list" state={{ openAddModal: true }} className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#3D705C] hover:shadow-md transition-all group h-full">
+          <Link to="/dashboard/membership/register" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#3D705C] hover:shadow-md transition-all group h-full">
             <div className="h-10 w-10 rounded-full bg-[#3D705C]/10 flex items-center justify-center mb-3 group-hover:bg-[#3D705C] transition-colors">
               <UserPlus className="h-5 w-5 text-[#3D705C] group-hover:text-white transition-colors" />
             </div>

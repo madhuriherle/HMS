@@ -32,6 +32,8 @@ import {
   XCircle
 } from 'lucide-react';
 import api from '../api';
+import { formatDate } from '../utils/dateUtils';
+import MemberApplicationDetails from '../components/MemberApplicationDetails';
 import { askReason } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import {
@@ -302,7 +304,6 @@ export default function UnapprovedMembership() {
           setSearchQuery(val);
           setCurrentPage(1);
         }}
-        searchPlaceholder="Search..."
         activeFiltersCount={
           (typeFilter !== 'ALL' ? 1 : 0) +
           (stateFilter !== 'ALL' ? 1 : 0) +
@@ -346,7 +347,7 @@ export default function UnapprovedMembership() {
           }}
           options={[
             { value: 'ALL', label: 'All Receipt Status' },
-            { value: 'Pending', label: 'Pending' },
+            { value: 'Pending', label: 'Unassigned' },
             { value: 'Assigned', label: 'Assigned' }
           ]}
           widthClass="w-full sm:w-40"
@@ -489,7 +490,7 @@ export default function UnapprovedMembership() {
 
                       {/* Registration Date */}
                       <td className="py-3.5 px-4 font-mono text-xs text-[#180200]">
-                        {m.registrationDate || '—'}
+                        {formatDate(m.registrationDate)}
                       </td>
 
                       {/* Receipt Status Badge */}
@@ -504,7 +505,7 @@ export default function UnapprovedMembership() {
                             className={`w-1.5 h-1.5 rounded-full ${isAssigned ? 'bg-emerald-600' : 'bg-amber-500'
                               }`}
                           />
-                          <span>{m.receiptStatus || 'Pending'}</span>
+                          <span>{(m.receiptStatus || 'Pending') === 'Pending' ? 'Unassigned' : m.receiptStatus}</span>
                         </span>
                         {m.assignedReceiptNumber && (
                           <div className="text-[10px] font-mono text-[#510601] font-bold mt-0.5">
@@ -669,7 +670,7 @@ export default function UnapprovedMembership() {
                     </span>
                   </div>
                   <p className="text-xs text-[#863221]">
-                    Application ID: <span className="font-mono">{viewingMember.id}</span> • Registered on {viewingMember.registrationDate || '—'}
+                    Application ID: <span className="font-mono">{viewingMember.id}</span> • Registered on {formatDate(viewingMember.registrationDate)}
                   </p>
                 </div>
               </div>
@@ -694,7 +695,7 @@ export default function UnapprovedMembership() {
                       : 'bg-amber-50 text-amber-800 border border-amber-200'
                       }`}
                   >
-                    {viewingMember.receiptStatus || 'Pending'}
+                    {(viewingMember.receiptStatus || 'Pending') === 'Pending' ? 'Unassigned' : viewingMember.receiptStatus}
                   </span>
                 </div>
                 {viewingMember.assignedReceiptNumber && (
@@ -738,10 +739,46 @@ export default function UnapprovedMembership() {
                   </div>
                   <div>
                     <span className="text-[10px] uppercase font-bold text-[#863221]">Date of Birth</span>
-                    <p className="font-medium mt-0.5">{viewingMember.birthDate || '—'}</p>
+                    <p className="font-medium mt-0.5">{formatDate(viewingMember.birthDate)}</p>
                   </div>
                 </div>
               </div>
+
+              {/* New registration-form details */}
+              <MemberApplicationDetails member={viewingMember} />
+
+              {/* The receipt linked to this application */}
+              {viewingMember.receipt && (
+                <div className="bg-white rounded-xl p-4 border border-[#E8DFD8] space-y-3">
+                  <div className="text-xs font-bold text-[#510601] uppercase tracking-wider">Receipt Information</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#863221]">Receipt Number</span>
+                      <p className="font-mono font-bold mt-0.5">{viewingMember.receipt.receiptNumber || '—'}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#863221]">Receipt Date</span>
+                      <p className="font-medium mt-0.5">{formatDate(viewingMember.receipt.receiptDate)}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#863221]">Amount</span>
+                      <p className="font-mono font-bold mt-0.5">₹{Number(viewingMember.receipt.amount || 0).toLocaleString('en-IN')}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#863221]">Payment Mode</span>
+                      <p className="font-medium mt-0.5">{viewingMember.receipt.paymentMode || '—'}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#863221]">Bank Account</span>
+                      <p className="font-medium mt-0.5">{viewingMember.receipt.bankName || '—'}</p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-[#863221]">Transaction ID</span>
+                      <p className="font-mono mt-0.5">{viewingMember.receipt.transactionId || '—'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Section 2: Address & Location */}
               <div className="bg-white rounded-xl p-4 border border-[#E8DFD8] space-y-3">

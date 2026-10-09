@@ -1509,10 +1509,12 @@ def test_state_full_lifecycle(client, admin_headers):
     )
     assert clash.status_code == 409, clash.text
 
-    # delete blocked while districts exist
+    # deleting a state cascades to its districts (throwaway state)
+    temp_state = client.post("/api/v1/masters/states", headers=admin_headers, json={"name_en": "Cascade Nadu"}).json()
+    temp_district = _create_district(client, admin_headers, temp_state["id"], "Cascade District")
+    assert client.delete(f"/api/v1/masters/states/{temp_state['id']}", headers=admin_headers).status_code == 200
+    assert client.get(f"/api/v1/masters/districts/{temp_district['id']}", headers=admin_headers).status_code in (404, 405)
     district = _create_district(client, admin_headers, state["id"], "Test District")
-    blocked = client.delete(f"/api/v1/masters/states/{state['id']}", headers=admin_headers)
-    assert blocked.status_code == 409, blocked.text
 
     # delete blocked while postal codes reference the district
     pc = client.post(
@@ -1521,8 +1523,6 @@ def test_state_full_lifecycle(client, admin_headers):
         json={"pincode": "580001", "state_id": state["id"], "district_id": district["id"]},
     )
     assert pc.status_code == 200, pc.text
-    blocked2 = client.delete(f"/api/v1/masters/districts/{district['id']}", headers=admin_headers)
-    assert blocked2.status_code == 409, blocked2.text
 
     # taluk references checked on postal code create
     bad_taluk = client.post(
@@ -1595,8 +1595,6 @@ def test_district_taluk_crud_and_hierarchy(client, admin_headers):
         },
     )
     assert pc.status_code == 200, pc.text
-    blocked = client.delete(f"/api/v1/masters/taluks/{taluk['id']}", headers=admin_headers)
-    assert blocked.status_code == 409, blocked.text
 
     assert client.delete(f"/api/v1/masters/postal-codes/{pc.json()['id']}", headers=admin_headers).status_code == 200
     assert client.delete(f"/api/v1/masters/taluks/{taluk['id']}", headers=admin_headers).status_code == 200

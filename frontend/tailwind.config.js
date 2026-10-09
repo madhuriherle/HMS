@@ -6,6 +6,9 @@ export default {
   ],
   theme: {
     extend: {
+      fontSize: {
+        'm': '0.875rem',
+      },
       colors: {
         brand: {
           primary: 'var(--brand-primary, #510601)',

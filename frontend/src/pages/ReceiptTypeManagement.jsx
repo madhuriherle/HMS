@@ -483,7 +483,6 @@ export default function ReceiptTypeManagement() {
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#863221]/50" />
               <input
                 type="text"
-                placeholder="Search particular or sub-type..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                 className="w-full pl-10 pr-9 py-2 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] shadow-sm transition-all"
@@ -906,7 +905,6 @@ export default function ReceiptTypeManagement() {
                 name="name"
                 value={typeFormData.name}
                 onChange={handleTypeFormChange}
-                placeholder="e.g. Donation, Cultural Events, Hostel Payment"
                 className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-medium text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${typeFormErrors.name
                   ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                   : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -1029,7 +1027,6 @@ export default function ReceiptTypeManagement() {
                 name="name"
                 value={subTypeFormData.name}
                 onChange={handleSubTypeFormChange}
-                placeholder="e.g. Building Fund, Vidya Prothsaha Nidhi"
                 className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-medium text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${subTypeFormErrors.name
                   ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                   : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'

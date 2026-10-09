@@ -24,6 +24,16 @@ export const unwrapList = (payload) => {
   return [];
 };
 
+const ageFromIso = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  let years = now.getFullYear() - d.getFullYear();
+  if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) years -= 1;
+  return years >= 0 ? String(years) : '';
+};
+
 export const normalizeMember = (member) => {
   const fullName = fullNameFromMember(member);
   const address = [member.address_line1, member.address_line2, member.locality]
@@ -68,6 +78,24 @@ export const normalizeMember = (member) => {
     remarks: member.remarks || '',
     magazineRemarks: firstDefined(member.address_remarks, member.magazineRemarks, ''),
     nativeDetails: firstDefined(member.native_place_text, member.nativeDetails, ''),
+    // details captured on the Register New Member form
+    nameTitle: member.name_title || '',
+    fatherHusbandName: member.father_husband_name || '',
+    aadharNumber: member.aadhaar_number || '',
+    whatsappNumber: member.whatsapp_number
+      ? `${member.whatsapp_country_code || member.mobile_country_code || '+91'} ${member.whatsapp_number}`
+      : '',
+    qualification: member.qualification_text || '',
+    employment: member.occupation || '',
+    nativePlaceText: member.native_place_text || '',
+    appliedOnBehalfOf: member.applied_on_behalf_of || '',
+    magazineNeededLabel: member.magazine_needed === true ? 'Yes' : member.magazine_needed === false ? 'No' : '',
+    membershipTypeCategory: member.membership_type_category || '',
+    referredBy: [member.referred_by_number, member.referred_by_name].filter(Boolean).join(' - '),
+    familyMembership: [member.family_membership_number, member.family_membership_name].filter(Boolean).join(' - '),
+    registrationPayment: member.registration_payment || null,
+    photoPath: member.photo_path || '',
+    age: ageFromIso(member.date_of_birth),
   };
 };
 
@@ -119,14 +147,15 @@ const receiptTypeToApi = (value) => {
 
 const receiptTypeFromApi = (value) => titleCase(value || 'MEMBERSHIP');
 
-const paymentModeToApi = (value) => {
+const paymentModeToApi = (value, bankAccount = '') => {
   const clean = String(value || '').toLowerCase();
   if (clean.includes('cash')) return 'CASH';
   if (clean.includes('cheque')) return 'CHEQUE';
   if (clean.includes('upi')) return 'UPI';
   if (clean.includes('card')) return 'CARD';
   if (clean.includes('online') || clean.includes('net') || clean.includes('bank')) return 'NETBANKING';
-  return 'OTHER';
+  // a payment mode named after a bank account (e.g. "SBI") is a bank transfer
+  return bankAccount ? 'NETBANKING' : 'OTHER';
 };
 
 const paymentModeFromApi = (value) => titleCase(value || 'OTHER');
@@ -160,14 +189,15 @@ export const receiptToApiPayload = (formData, selectedMember = null) => {
     receipt_date: formData.receiptDate,
     receipt_type: receiptTypeToApi(formData.particulars),
     payer_name: formData.name.trim() || null,
-    payment_mode: paymentModeToApi(formData.paymentMode),
+    payment_mode: paymentModeToApi(formData.paymentMode, formData.bankAccount),
     transaction_reference: formData.transactionId.trim() || null,
+    bank_account: (formData.bankAccount || '').trim() || null,
     transaction_date: formData.transactionDate || null,
     gross_amount: amount,
     discount_amount: 0,
     net_amount: amount,
     source: 'OFFLINE',
-    is_renewal: Boolean(selectedMember?.registrationNumber),
+    is_renewal: Boolean(formData.isRenewal),
     notes: (formData.description || '').trim() || (formData.paymentReceivedDetails || '').trim() || null,
     items: [
       {
@@ -183,11 +213,11 @@ export const receiptToApiPayload = (formData, selectedMember = null) => {
 };
 
 export const fetchMembers = async (params = {}) => {
-  const { data } = await api.get('/members/', { params: { limit: 500, ...params } });
+  const { data } = await api.get('/members/', { params: { limit: 5000, ...params } });
   return unwrapList(data).map(normalizeMember);
 };
 
 export const fetchReceipts = async (params = {}) => {
-  const { data } = await api.get('/receipts/tracking', { params: { limit: 500, ...params } });
+  const { data } = await api.get('/receipts/tracking', { params: { limit: 5000, ...params } });
   return unwrapList(data).map(normalizeReceipt);
 };

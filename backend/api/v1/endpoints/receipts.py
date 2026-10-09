@@ -350,6 +350,8 @@ def read_receipt_tracking(
             "payment_mode": r.payment_mode,
             "payment_status": r.payment_status,
             "transaction_reference": r.transaction_reference,
+            "bank_account": r.bank_account,
+            "notes": r.notes,
             "cheque_number": r.cheque_number,
             "cheque_date": r.cheque_date,
             "is_renewal": r.is_renewal,

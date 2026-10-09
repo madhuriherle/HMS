@@ -18,16 +18,8 @@ export const formatPaymentModeLabel = (config) => {
 
 export const isReceiptUnmapped = (receipt) => {
   if (!receipt) return false;
-  if (receipt.isUnmapped === true) return true;
-  if (receipt.status === 'Unassigned' || receipt.status === 'Unmapped') return true;
-  const hasMember = Boolean(receipt.memberId || (receipt.membershipNo && String(receipt.membershipNo).trim() !== ''));
-  if (!hasMember) {
-    const name = String(receipt.name || '').trim().toLowerCase();
-    if (!name || name === 'unassigned' || name === 'unmapped' || name === 'unassigned / unmapped') {
-      return true;
-    }
-  }
-  return false;
+  // a receipt is assigned when the server has linked it to a member
+  return !(receipt.memberId || (receipt.membershipNo && String(receipt.membershipNo).trim() !== ''));
 };
 
 // Cumulative membership calculation: which membership type the amount paid has

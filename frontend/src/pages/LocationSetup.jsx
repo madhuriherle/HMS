@@ -918,17 +918,8 @@ export default function LocationSetup() {
         <div className="space-y-6">
           {/* Section 1: States Card */}
           <div className="bg-white rounded-xl border border-[#E8DFD8] p-5 shadow-sm">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4 border-b border-[#E8DFD8]">
-              <div>
-
-                <p className="text-xs text-[#863221] mt-1">
-                  Select a state to view and manage its districts and taluks below. Creation of arbitrary states outside Karnataka & Kerala is restricted.
-                </p>
-              </div>
-            </div>
-
             {/* State Selection Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {states.map((st) => {
                 const isSelected = st.id === selectedStateId;
                 const stateDistCount = districts.filter((d) => d.stateId === st.id).length;
@@ -1051,7 +1042,6 @@ export default function LocationSetup() {
                   <Search className="w-4 h-4 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Search district name..."
                     value={districtSearchQuery}
                     onChange={(e) => setDistrictSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-[#E8DFD8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#510601]"
@@ -1212,7 +1202,6 @@ export default function LocationSetup() {
                   <Search className="w-4 h-4 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder="Search taluk name..."
                     value={talukSearchQuery}
                     onChange={(e) => setTalukSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-[#E8DFD8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#510601]"
@@ -1330,7 +1319,6 @@ export default function LocationSetup() {
                 <Search className="w-4 h-4 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search by 6-digit PIN Code, Post Office, or Taluk name..."
                   value={postalSearchQuery}
                   onChange={(e) => {
                     setPostalSearchQuery(e.target.value);
@@ -1714,7 +1702,6 @@ export default function LocationSetup() {
                     setDistrictFormErrors({ ...districtFormErrors, name: null });
                   }
                 }}
-                placeholder="e.g. Bengaluru Urban, Dakshina Kannada"
                 className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-medium text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${
                   districtFormErrors.name
                     ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
@@ -1870,7 +1857,6 @@ export default function LocationSetup() {
                     setTalukFormErrors({ ...talukFormErrors, name: null });
                   }
                 }}
-                placeholder="e.g. Mangaluru, Sirsi, Udupi"
                 className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-medium text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${
                   talukFormErrors.name
                     ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
@@ -1970,7 +1956,6 @@ export default function LocationSetup() {
                       setPostalFormErrors({ ...postalFormErrors, postalCode: null });
                     }
                   }}
-                  placeholder="e.g. 576101"
                   className={`w-full px-3.5 py-2.5 text-sm font-mono bg-white border rounded-xl focus:outline-none transition-colors ${
                     postalFormErrors.postalCode
                       ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
@@ -1999,7 +1984,6 @@ export default function LocationSetup() {
                       setPostalFormErrors({ ...postalFormErrors, area: null });
                     }
                   }}
-                  placeholder="e.g. Udupi H.O, Malleswaram"
                   className={`w-full px-3.5 py-2.5 text-sm bg-white border rounded-xl focus:outline-none transition-colors ${
                     postalFormErrors.area
                       ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'

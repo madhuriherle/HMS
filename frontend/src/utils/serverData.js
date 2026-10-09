@@ -97,6 +97,11 @@ export const loadGothras = async () => {
   return rows(res).filter((g) => g.status !== false).map((g) => g.name_en || g.name);
 };
 
+export const loadQualifications = async () => {
+  const res = await api.get('/masters/qualifications', { params: { limit: 1000 } });
+  return rows(res).filter((q) => q.status !== false).map((q) => q.name_en || q.name);
+};
+
 export const loadParticulars = async () => {
   const res = await api.get('/masters/particulars', { params: { limit: 2000 } });
   const all = rows(res);
@@ -170,6 +175,7 @@ export const loadUnapprovedMembers = async () => {
       ...m,
       receiptStatus: receipt ? 'Assigned' : 'Pending',
       assignedReceiptNumber: receipt ? receipt.receiptNumber : '',
+      receipt: receipt || null,
       registrationDate: m.created_at ? String(m.created_at).slice(0, 10) : '',
     };
   });

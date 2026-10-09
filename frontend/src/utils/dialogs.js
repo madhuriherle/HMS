@@ -20,7 +20,6 @@ export const askReason = async ({ title, text, confirmText = 'Confirm', danger =
     text,
     icon: danger ? 'warning' : 'question',
     input: 'textarea',
-    inputPlaceholder: 'Reason (required)',
     inputAttributes: { maxlength: 500 },
     showCancelButton: true,
     confirmButtonText: confirmText,
@@ -28,6 +27,7 @@ export const askReason = async ({ title, text, confirmText = 'Confirm', danger =
     cancelButtonColor: '#863221',
     reverseButtons: true,
     allowOutsideClick: false,
+    customClass: { popup: 'hms-mini-swal' },
     inputValidator: (v) => (!v || !v.trim() ? 'A reason is required' : undefined)
   });
   return res.isConfirmed ? res.value.trim() : null;
@@ -43,61 +43,29 @@ export const confirmYesNo = async ({ title, text, confirmText = 'Yes', danger = 
     confirmButtonText: confirmText,
     confirmButtonColor: danger ? DANGER : BRAND,
     cancelButtonColor: '#863221',
-    reverseButtons: true
+    reverseButtons: true,
+    customClass: { popup: 'hms-mini-swal' }
   });
   return res.isConfirmed;
 };
 
-// Small form in a popup.
-//   fields: [{ name, label, type: 'text'|'number'|'date'|'month'|'select'|'textarea'|'file',
-//              required, value, options: [{ value, label }], placeholder }]
-// Resolves with { name: value } (File objects for type 'file'), or null when cancelled.
-export const askForm = async ({ title, text, fields, confirmText = 'Save' }) => {
-  const html = fields
-    .map((f) => {
-      const id = `swal-f-${f.name}`;
-      const label = `<label for="${id}" style="display:block;text-align:left;font-size:12px;font-weight:700;color:#180200;margin-top:12px">${esc(f.label)}${f.required ? ' *' : ''}</label>`;
-      if (f.type === 'select') {
-        const opts = (f.options || [])
-          .map((o) => `<option value="${esc(o.value)}"${String(o.value) === String(f.value ?? '') ? ' selected' : ''}>${esc(o.label)}</option>`)
-          .join('');
-        return `${label}<select id="${id}" style="${INPUT_CLASS}"><option value="">-- Select --</option>${opts}</select>`;
-      }
-      if (f.type === 'textarea') {
-        return `${label}<textarea id="${id}" rows="3" style="${INPUT_CLASS}" placeholder="${esc(f.placeholder)}">${esc(f.value)}</textarea>`;
-      }
-      return `${label}<input id="${id}" type="${f.type || 'text'}" value="${esc(f.value)}" placeholder="${esc(f.placeholder)}" style="${INPUT_CLASS}" />`;
-    })
-    .join('');
+let formHost = null;
 
-  const res = await Swal.fire({
-    title,
-    text,
-    html,
-    showCancelButton: true,
-    confirmButtonText: confirmText,
-    confirmButtonColor: BRAND,
-    cancelButtonColor: '#863221',
-    reverseButtons: true,
-    focusConfirm: false,
-    allowOutsideClick: false,
-    preConfirm: () => {
-      const out = {};
-      for (const f of fields) {
-        const el = document.getElementById(`swal-f-${f.name}`);
-        let value = f.type === 'file' ? el.files?.[0] || null : (el.value || '').trim();
-        if (f.required && !value) {
-          Swal.showValidationMessage(`${f.label} is required`);
-          return false;
-        }
-        if (f.type === 'number' && value !== '') value = Number(value);
-        out[f.name] = value;
-      }
-      return out;
-    }
-  });
-  return res.isConfirmed ? res.value : null;
+export const registerFormHost = (fn) => {
+  formHost = fn;
+  return () => {
+    if (formHost === fn) formHost = null;
+  };
 };
+
+export const askForm = (config) =>
+  new Promise((resolve) => {
+    if (!formHost) {
+      resolve(null);
+      return;
+    }
+    formHost({ ...config, resolve });
+  });
 
 // Scrollable list of checkboxes. Resolves with the ticked values, or null when cancelled.
 //   items: [{ value, label, hint, checked }]
@@ -134,8 +102,9 @@ export const showError = (err, fallback) =>
     icon: 'error',
     title: 'Something went wrong',
     text: (typeof err?.response?.data?.detail === 'string' && err.response.data.detail) || fallback,
-    confirmButtonColor: BRAND
+    confirmButtonColor: BRAND,
+    customClass: { popup: 'hms-mini-swal' }
   });
 
 export const showSuccess = (text) =>
-  Swal.fire({ icon: 'success', title: 'Done', text, confirmButtonColor: BRAND, timer: 2500 });
+  Swal.fire({ icon: 'success', title: 'Done', text, confirmButtonColor: BRAND, customClass: { popup: 'hms-mini-swal' } });

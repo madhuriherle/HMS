@@ -25,6 +25,11 @@ import {
   FileText
 } from 'lucide-react';
 import api from '../api';
+import { formatDate as formatDateShared } from '../utils/dateUtils';
+import DateInput from '../components/DateInput';
+
+// 'Present' marks the open-ended current price; real dates are shown as DD-MM-YYYY
+const formatDate = (v) => (v === 'Present' ? v : formatDateShared(v));
 import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
@@ -36,16 +41,6 @@ const formatINR = (amount) => {
     currency: 'INR',
     maximumFractionDigits: 0
   }).format(amount || 0);
-};
-
-// Helper to format date string (YYYY-MM-DD to DD-MM-YYYY or readable string)
-const formatDate = (dateStr) => {
-  if (!dateStr || dateStr === 'Present') return dateStr;
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
-  return dateStr;
 };
 
 export default function MembershipTypeManagement() {
@@ -481,7 +476,6 @@ export default function MembershipTypeManagement() {
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#863221]/50" />
               <input
                 type="text"
-                placeholder="Search membership type..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                 className="w-full pl-10 pr-9 py-2 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] shadow-sm transition-all"
@@ -774,7 +768,6 @@ export default function MembershipTypeManagement() {
                 name="name"
                 value={formData.name}
                 onChange={handleFormChange}
-                placeholder="e.g. Mahapalaka, Poshaka"
                 className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-medium text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.name
                   ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                   : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -802,7 +795,6 @@ export default function MembershipTypeManagement() {
                   name="amount"
                   value={formData.amount}
                   onChange={handleFormChange}
-                  placeholder="e.g. 10000"
                   className={`w-full pl-8 pr-4 py-2.5 bg-white border rounded-xl text-sm font-mono font-bold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.amount
                     ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                     : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -1005,7 +997,6 @@ export default function MembershipTypeManagement() {
                     name="newPrice"
                     value={priceFormData.newPrice}
                     onChange={handlePriceFormChange}
-                    placeholder="e.g. 1000"
                     className={`w-full pl-8 pr-4 py-2.5 bg-white border rounded-xl text-sm font-mono font-bold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${priceFormErrors.newPrice
                       ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                       : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -1025,8 +1016,7 @@ export default function MembershipTypeManagement() {
                 <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
                   Effective From <span className="text-[#ED4636]">*</span>
                 </label>
-                <input
-                  type="date"
+                <DateInput
                   name="effectiveFrom"
                   value={priceFormData.effectiveFrom}
                   onChange={handlePriceFormChange}
@@ -1053,7 +1043,6 @@ export default function MembershipTypeManagement() {
                   rows={2}
                   value={priceFormData.reason}
                   onChange={handlePriceFormChange}
-                  placeholder="e.g. Membership fee revised for the new financial year."
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors resize-none"
                 />
               </div>

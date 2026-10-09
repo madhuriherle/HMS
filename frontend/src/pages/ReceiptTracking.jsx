@@ -31,6 +31,9 @@ import { loadParticulars, loadMembers, loadPaymentModeConfigs } from '../utils/s
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
+import { formatDate } from '../utils/dateUtils';
+import DateInput from '../components/DateInput';
+import { apiErrorMessage } from '../utils/apiError';
 import { askForm, askReason, confirmYesNo } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import { fetchReceipts, normalizeReceipt, receiptToApiPayload } from '../utils/apiAdapters';
@@ -46,15 +49,6 @@ const formatINR = (amount) => {
 };
 
 // Helper to format date string (YYYY-MM-DD to DD-MM-YYYY)
-const formatDate = (dateStr) => {
-  if (!dateStr) return '—';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
-  return dateStr;
-};
-
 // Helper for number to words (Indian Numbering System)
 const numberToWords = (num) => {
   if (!num || isNaN(num) || num <= 0) return '';
@@ -276,11 +270,13 @@ export default function ReceiptTracking() {
       delete apiPayload.receipt_number;
       delete apiPayload.items;
       delete apiPayload.allocations;
-      const { data } = await api.put(`/receipts/${editingReceipt.id}`, apiPayload);
-      const updated = normalizeReceipt(data);
-      setReceipts((prev) => prev.map((r) => (r.id === editingReceipt.id ? updated : r)));
-      showToast(`Receipt #${updated.receiptNumber} updated successfully.`);
+      const editId = editingReceipt.id;
+      // Close the form first so the confirmation popup opens over a closed form.
       setEditingReceipt(null);
+      const { data } = await api.put(`/receipts/${editId}`, apiPayload);
+      const updated = normalizeReceipt(data);
+      setReceipts((prev) => prev.map((r) => (r.id === editId ? updated : r)));
+      showToast(`Receipt #${updated.receiptNumber} updated successfully.`);
     } catch (error) {
       console.error('Failed to update receipt.', error);
       showToast(error.response?.data?.detail || 'Failed to update receipt through API.', 'error');
@@ -457,7 +453,6 @@ export default function ReceiptTracking() {
         title={<h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Receipt Tracking</h1>}
         searchQuery={searchQuery}
         onSearchChange={(val) => setSearchQuery(val)}
-        searchPlaceholder="Search..."
         activeFiltersCount={
           (particularsFilter !== 'ALL' ? 1 : 0) +
           (statusFilter !== 'ALL' ? 1 : 0)
@@ -500,16 +495,18 @@ export default function ReceiptTracking() {
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
                 <th className="py-3.5 px-4 whitespace-nowrap">Receipt Number</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Receipt Date</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Member Name</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Name</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Mobile</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Receipt Type</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap">Amount</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Payment Mode</th>
                 <th className="py-3.5 px-4 text-right whitespace-nowrap min-w-[170px]">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
               {filteredReceipts.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-14 text-center text-[#863221]">
+                  <td colSpan="8" className="py-14 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <FileSpreadsheet className="w-10 h-10 text-[#863221]/40" />
                       <p className="text-base font-bold text-[#180200]">No receipts found</p>
@@ -550,28 +547,24 @@ export default function ReceiptTracking() {
 
                       {/* Column 3: Member Name */}
                       <td className="py-3.5 px-4">
-                        {isUnmapped ? (
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold bg-amber-200/60 text-amber-900 border border-amber-300/80 shadow-2xs">
-                            <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                            <span>Unassigned</span>
-                          </div>
-                        ) : (
-                          <div>
-                            <span className="font-bold text-[#180200]">
-                              {receipt.name || '—'}
-                            </span>
-                            {receipt.membershipNo && (
-                              <div className="text-[10px] font-mono text-[#863221] mt-0.5">
-                                #{receipt.membershipNo}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        <div>
+                          <span className="font-bold text-[#180200]">{receipt.name || '—'}</span>
+                          {isUnmapped ? (
+                            <div className="mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-200/60 text-amber-900 border border-amber-300/80">
+                              <AlertTriangle className="w-3 h-3 text-amber-700 shrink-0" />
+                              <span>Unassigned</span>
+                            </div>
+                          ) : (
+                            receipt.membershipNo && (
+                              <div className="text-[10px] font-mono text-[#863221] mt-0.5">#{receipt.membershipNo}</div>
+                            )
+                          )}
+                        </div>
                       </td>
 
                       {/* Column 4: Mobile */}
                       <td className="py-3.5 px-4 font-mono text-xs">
-                        {isUnmapped || !receipt.mobile ? (
+                        {!receipt.mobile ? (
                           <span className="text-gray-400">—</span>
                         ) : (
                           receipt.mobile
@@ -582,6 +575,12 @@ export default function ReceiptTracking() {
                       <td className="py-3.5 px-4 font-semibold text-[#510601] text-xs">
                         {receipt.particulars || 'Membership'}
                       </td>
+
+                      {/* Column 5b/5c: Amount and Payment Mode */}
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-xs whitespace-nowrap">
+                        {formatINR(receipt.amount)}
+                      </td>
+                      <td className="py-3.5 px-4 text-xs">{receipt.paymentMode || '—'}</td>
 
                       {/* Column 6: Action */}
                       <td className="py-3.5 px-4 text-right">
@@ -885,8 +884,7 @@ export default function ReceiptTracking() {
                     <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
                       Receipt Date <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="date"
+                    <DateInput
                       name="receiptDate"
                       value={editFormData.receiptDate || ''}
                       onChange={handleEditChange}
@@ -904,7 +902,6 @@ export default function ReceiptTracking() {
                       name="name"
                       value={editFormData.name || ''}
                       onChange={handleEditChange}
-                      placeholder="Leave blank for unassigned"
                       className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]"
                     />
                   </div>
@@ -920,7 +917,6 @@ export default function ReceiptTracking() {
                       value={editFormData.mobile || ''}
                       onChange={handleEditChange}
                       maxLength={10}
-                      placeholder="10-digit mobile"
                       className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl font-mono text-xs focus:outline-none focus:border-[#510601]"
                     />
                   </div>

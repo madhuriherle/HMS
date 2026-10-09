@@ -32,6 +32,7 @@ import {
   Upload,
   User,
   UserCheck,
+  UserPlus,
   Users,
   X
 } from 'lucide-react';
@@ -46,6 +47,7 @@ const ICONS = {
   'layout-dashboard': LayoutDashboard,
   list: List,
   'user-check': UserCheck,
+  'user-plus': UserPlus,
   'file-plus': FilePlus,
   search: Search,
   'layout-grid': LayoutGrid,

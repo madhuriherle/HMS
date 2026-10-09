@@ -17,13 +17,25 @@ import UnapprovedMembership from './pages/UnapprovedMembership';
 import OrganisationSettings from './pages/OrganisationSettings';
 import BankDetailsManagement from './pages/BankDetailsManagement';
 import Approvals from './pages/Approvals';
-import PersonalMasters, { BankMaster } from './pages/MasterLists';
+import RegisterNewMember from './pages/RegisterNewMember';
+import FormModalHost from './components/FormModalHost';
+import { BankMaster } from './pages/MasterLists';
+// Personal Masters (gotra / qualification / native place) screen is switched off for now:
+// import PersonalMasters, { BankMaster } from './pages/MasterLists';
 
 function App() {
   return (
     <Router basename={import.meta.env.BASE_URL}>
+      <FormModalHost />
       <Routes>
         <Route path="/" element={<Login />} />
+
+        {/* Shortcuts without the /dashboard prefix */}
+        <Route path="/membership/register" element={<Navigate to="/dashboard/membership/register" replace />} />
+        <Route path="/membership/add" element={<Navigate to="/dashboard/membership/register" replace />} />
+        <Route path="/membership/list" element={<Navigate to="/dashboard/membership/list" replace />} />
+        <Route path="/membership/unapproved" element={<Navigate to="/dashboard/membership/unapproved" replace />} />
+        <Route path="/membership" element={<Navigate to="/dashboard/membership/list" replace />} />
 
         <Route path="/dashboard" element={<MainLayout />}>
           <Route index element={<Dashboard />} />
@@ -31,8 +43,10 @@ function App() {
           {/* Membership Module Routes */}
           <Route path="membership/list" element={<MembershipList />} />
           <Route path="membership/unapproved" element={<UnapprovedMembership />} />
-          <Route path="membership/register" element={<MembershipList />} />
-          <Route path="membership/add" element={<MembershipList />} />
+          <Route path="membership/register" element={<RegisterNewMember />} />
+          <Route path="membership/add" element={<RegisterNewMember />} />
+          <Route path="membership/edit/:id" element={<RegisterNewMember />} />
+          <Route path="membership/view/:id" element={<RegisterNewMember />} />
           <Route path="membership" element={<Navigate to="/dashboard/membership/list" replace />} />
           <Route path="members" element={<Navigate to="/dashboard/membership/list" replace />} />
           <Route path="members/list" element={<Navigate to="/dashboard/membership/list" replace />} />
@@ -57,7 +71,7 @@ function App() {
           <Route path="settings" element={<OrganisationSettings />} />
           <Route path="master/payment-modes" element={<BankDetailsManagement />} />
           <Route path="master/banks" element={<BankMaster />} />
-          <Route path="master/personal-masters" element={<PersonalMasters />} />
+          {/* <Route path="master/personal-masters" element={<PersonalMasters />} /> */}
           <Route path="approvals" element={<Approvals />} />
           <Route path="masters/payment-modes" element={<BankDetailsManagement />} />
           <Route path="master/payment-mode" element={<BankDetailsManagement />} />

@@ -11,6 +11,8 @@ class Receipt(AuditMixin, Base):
     payer_name: Mapped[str] = mapped_column(String(200), nullable=True)
     payment_mode: Mapped[str] = mapped_column(String(30), nullable=False) 
     transaction_reference: Mapped[str] = mapped_column(String(150), nullable=True)
+    # bank account the money went into (online / cheque receipts)
+    bank_account: Mapped[str] = mapped_column(String(150), nullable=True)
     transaction_date: Mapped[Date] = mapped_column(Date, nullable=True)
     gross_amount: Mapped[float] = mapped_column(Numeric(12,2), nullable=False)
     discount_amount: Mapped[float] = mapped_column(Numeric(12,2), default=0)

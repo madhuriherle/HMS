@@ -181,7 +181,8 @@ def seed_modules(db) -> int:
 MENU_PAGE_CATALOG = [
     ("dashboard", "Dashboard", None, "/dashboard", "layout-dashboard", 5, None, None),
     ("members.list", "Membership List", "members", "/dashboard/membership/list", "list", 1, "members.read", None),
-    ("members.unapproved", "Unapproved Membership", "members", "/dashboard/membership/unapproved", "user-check", 2, "members.approvals.read", None),
+    ("members.unapproved", "Unapproved Members", "members", "/dashboard/membership/unapproved", "user-check", 2, "members.approvals.read", None),
+    ("members.register", "Register New Member", "members", "/dashboard/membership/register", "user-plus", 3, "members.write", None),
     ("receipts.entry", "Receipt Entry", "receipts", "/dashboard/receipts/entry", "file-plus", 1, "receipts.read", None),
     ("receipts.tracking", "Receipt Tracking", "receipts", "/dashboard/receipts/tracking", "search", 2, "receipts.read", None),
     ("users.modules", "Modules", "users", "/dashboard/users/modules", "layout-grid", 4, None, 1),
@@ -191,7 +192,8 @@ MENU_PAGE_CATALOG = [
     ("masters.organisation", "Organisation Settings", "masters", "/dashboard/master/organisation-settings", "building", 4, "system.read", None),
     ("masters.payment_modes", "Payment Mode Setup", "masters", "/dashboard/master/payment-modes", "credit-card", 5, "masters.read", None),
     ("masters.banks", "Bank Master", "masters", "/dashboard/master/banks", "building", 6, "masters.read", None),
-    ("masters.personal", "Personal Masters", "masters", "/dashboard/master/personal-masters", "list-checks", 7, "masters.read", None),
+    # Personal Masters screen is switched off for now (also switched off in migration 0025):
+    # ("masters.personal", "Personal Masters", "masters", "/dashboard/master/personal-masters", "list-checks", 7, "masters.read", None),
     # parent may list alternatives ("a|b"): the first module code that exists is used
     ("approvals.requests", "Approval Requests", "approvals|members.approvals", "/dashboard/approvals", "check-circle", 1, "members.approvals.read", None),
 ]
@@ -199,6 +201,12 @@ MENU_PAGE_CATALOG = [
 # Older rows were seeded with API-style routes; point them at the real pages,
 # but only while they still hold the old value (so admin edits are kept).
 # code -> (old route, new route)
+# Renames, applied only while the row still has the old name (admin renames are kept).
+# code -> (old name, new name)
+MENU_NAME_FIXES = {
+    "members.unapproved": ("Unapproved Membership", "Unapproved Members"),
+}
+
 MENU_ROUTE_FIXES = {
     "users.management": ("/users", "/dashboard/users/list"),
     "roles": ("/users/roles", "/dashboard/users/roles"),
@@ -232,8 +240,43 @@ def seed_menu_pages(db) -> int:
         m = rows.get(code)
         if m is not None and m.route == old:
             m.route = new
+    for code, (old, new) in MENU_NAME_FIXES.items():
+        m = rows.get(code)
+        if m is not None and m.name_en == old:
+            m.name_en = new
     db.commit()
     return created
+
+
+# ── personal master starter values ───────────────────────────
+GOTRA_VALUES = [
+    "Vasista", "Vishwamitra", "Kashyapa", "Aangiras",
+    "Goutama", "Jamadagni", "Bharadwaja", "Mouna Bharghava",
+]
+
+QUALIFICATION_VALUES = [
+    "BE", "BTech", "MBA", "MCA", "ME", "MTech", "MS Eng", "CA", "CS", "MBBS", "MD", "MS Med",
+    "MSc", "MCom", "MA", "MFA", "ML", "BCom", "BSc", "BCA", "BBA", "BA", "BDS", "BFA", "BArch",
+    "BFD", "BDes", "BJMC", "LLB", "BAMS", "BPharm", "PhD", "Diploma", "ICWA", "MPharm", "BHMS",
+    "BHM", "BSc in Nursing", "MSc in Nursing", "BL", "MHA", "BLA", "BSc MLT", "MSc MLT", "BNYS",
+    "BPT", "MPT", "MPED", "PUC", "HIGH SCHOOL", "OTHERS", "ANY",
+]
+
+
+def seed_personal_master_values(db) -> int:
+    """Load the starter gotras and qualifications, but only into a master that
+    has no rows yet (an admin's own list is never touched). Returns rows added."""
+    from models.masters import Gotra, Qualification
+
+    added = 0
+    for model, values in ((Gotra, GOTRA_VALUES), (Qualification, QUALIFICATION_VALUES)):
+        if db.query(model).filter(model.is_deleted == False).count():  # noqa: E712
+            continue
+        for name in values:
+            db.add(model(name_en=name, status=True))
+            added += 1
+    db.commit()
+    return added
 
 
 def seed_permissions(db) -> int:

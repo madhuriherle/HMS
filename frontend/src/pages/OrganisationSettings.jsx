@@ -548,7 +548,6 @@ export default function OrganisationSettings() {
                   name="organisationName"
                   value={settings.profile.organisationName}
                   onChange={handleProfileChange}
-                  placeholder="e.g. Shri Akhila Havyaka Mahasabha (R)"
                   className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-bold text-[#180200] focus:outline-none transition-colors ${errors.profile_organisationName
                     ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                     : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -572,7 +571,6 @@ export default function OrganisationSettings() {
                   name="shortName"
                   value={settings.profile.shortName}
                   onChange={handleProfileChange}
-                  placeholder="e.g. HMS"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm font-bold text-[#510601] focus:outline-none"
                 />
               </div>
@@ -587,7 +585,6 @@ export default function OrganisationSettings() {
                   name="registrationNumber"
                   value={settings.profile.registrationNumber}
                   onChange={handleProfileChange}
-                  placeholder="e.g. REG-KAR-1943-0028"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm font-mono font-semibold text-[#180200] focus:outline-none"
                 />
               </div>
@@ -622,7 +619,6 @@ export default function OrganisationSettings() {
                   value={settings.profile.establishedYear}
                   onChange={handleProfileChange}
                   maxLength={4}
-                  placeholder="e.g. 1943"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm font-mono text-[#180200] focus:outline-none"
                 />
               </div>
@@ -651,7 +647,6 @@ export default function OrganisationSettings() {
                   name="addressLine1"
                   value={settings.profile.addressLine1}
                   onChange={handleProfileChange}
-                  placeholder="e.g. #11, 8th Cross, Malleshwaram"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm text-[#180200] focus:outline-none"
                 />
               </div>
@@ -666,7 +661,6 @@ export default function OrganisationSettings() {
                   name="addressLine2"
                   value={settings.profile.addressLine2}
                   onChange={handleProfileChange}
-                  placeholder="e.g. Near Circle Maramma Temple"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm text-[#180200] focus:outline-none"
                 />
               </div>
@@ -681,7 +675,6 @@ export default function OrganisationSettings() {
                   name="country"
                   value={settings.profile.country}
                   onChange={handleProfileChange}
-                  placeholder="e.g. India"
                   className="w-full px-3.5 py-2.5 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-sm font-semibold text-[#180200] focus:outline-none"
                 />
               </div>
@@ -696,7 +689,6 @@ export default function OrganisationSettings() {
                   name="state"
                   value={settings.profile.state}
                   onChange={handleProfileChange}
-                  placeholder="e.g. Karnataka"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-sm text-[#180200] focus:outline-none"
                 />
               </div>
@@ -711,7 +703,6 @@ export default function OrganisationSettings() {
                   name="district"
                   value={settings.profile.district}
                   onChange={handleProfileChange}
-                  placeholder="e.g. Bengaluru Urban"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-sm text-[#180200] focus:outline-none"
                 />
               </div>
@@ -726,7 +717,6 @@ export default function OrganisationSettings() {
                   name="taluk"
                   value={settings.profile.taluk}
                   onChange={handleProfileChange}
-                  placeholder="e.g. Malleshwaram"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-sm text-[#180200] focus:outline-none"
                 />
               </div>
@@ -743,7 +733,6 @@ export default function OrganisationSettings() {
                   value={settings.profile.postalCode}
                   onChange={handleProfileChange}
                   maxLength={6}
-                  placeholder="e.g. 560003"
                   className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-mono font-bold text-[#180200] focus:outline-none transition-colors ${errors.profile_postalCode
                     ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                     : 'border-[#E8DFD8] focus:border-[#510601]'
@@ -783,7 +772,6 @@ export default function OrganisationSettings() {
                     name="website"
                     value={settings.profile.website}
                     onChange={handleProfileChange}
-                    placeholder="https://www.havyakamahasabha.org"
                     className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none"
                   />
                 </div>
@@ -801,7 +789,6 @@ export default function OrganisationSettings() {
                     name="email"
                     value={settings.profile.email}
                     onChange={handleProfileChange}
-                    placeholder="info@havyakamahasabha.org"
                     className={`w-full pl-9 pr-3.5 py-2.5 bg-white border rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none transition-colors ${errors.profile_email
                       ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                       : 'border-[#E8DFD8] focus:border-[#510601]'
@@ -825,7 +812,6 @@ export default function OrganisationSettings() {
                     name="phone"
                     value={settings.profile.phone}
                     onChange={handleProfileChange}
-                    placeholder="e.g. 080-23348899"
                     className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-xs sm:text-sm font-mono text-[#180200] focus:outline-none"
                   />
                 </div>
@@ -846,7 +832,6 @@ export default function OrganisationSettings() {
                     value={settings.profile.mobile}
                     onChange={handleProfileChange}
                     maxLength={10}
-                    placeholder="9845012345"
                     className={`w-full pl-11 pr-3.5 py-2.5 bg-white border rounded-xl text-xs sm:text-sm font-mono text-[#180200] focus:outline-none transition-colors ${errors.profile_mobile
                       ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                       : 'border-[#E8DFD8] focus:border-[#510601]'
@@ -914,7 +899,6 @@ export default function OrganisationSettings() {
                   name="organisationName"
                   value={settings.printHeaders.organisationName}
                   onChange={handlePrintHeadersChange}
-                  placeholder="e.g. Shri Akhila Havyaka Mahasabha (R)"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm font-bold text-[#180200] focus:outline-none"
                 />
               </div>
@@ -929,7 +913,6 @@ export default function OrganisationSettings() {
                   name="headerLine1"
                   value={settings.printHeaders.headerLine1}
                   onChange={handlePrintHeadersChange}
-                  placeholder="e.g. Central Administrative Office & Cultural Centre"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none"
                 />
               </div>
@@ -944,7 +927,6 @@ export default function OrganisationSettings() {
                   name="headerLine2"
                   value={settings.printHeaders.headerLine2}
                   onChange={handlePrintHeadersChange}
-                  placeholder="e.g. Malleshwaram, Bengaluru, Karnataka - 560003"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none"
                 />
               </div>
@@ -959,7 +941,6 @@ export default function OrganisationSettings() {
                   name="address"
                   value={settings.printHeaders.address}
                   onChange={handlePrintHeadersChange}
-                  placeholder="#11, 8th Cross, Malleshwaram, Bengaluru - 560003"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none"
                 />
               </div>
@@ -975,7 +956,6 @@ export default function OrganisationSettings() {
                     name="phone"
                     value={settings.printHeaders.phone}
                     onChange={handlePrintHeadersChange}
-                    placeholder="+91 80 23348899"
                     className="w-full px-3 py-2 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-xs text-[#180200] focus:outline-none font-mono"
                   />
                 </div>
@@ -989,7 +969,6 @@ export default function OrganisationSettings() {
                     name="email"
                     value={settings.printHeaders.email}
                     onChange={handlePrintHeadersChange}
-                    placeholder="receipts@hms.org"
                     className="w-full px-3 py-2 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-xs text-[#180200] focus:outline-none"
                   />
                 </div>
@@ -1003,7 +982,6 @@ export default function OrganisationSettings() {
                     name="website"
                     value={settings.printHeaders.website}
                     onChange={handlePrintHeadersChange}
-                    placeholder="www.hms.org"
                     className="w-full px-3 py-2 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-xs text-[#180200] focus:outline-none"
                   />
                 </div>
@@ -1019,7 +997,6 @@ export default function OrganisationSettings() {
                   rows={2}
                   value={settings.printHeaders.footerText}
                   onChange={handlePrintHeadersChange}
-                  placeholder="Enter footer acknowledgment text..."
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-xs text-[#180200] focus:outline-none resize-none"
                 />
               </div>
@@ -1351,7 +1328,6 @@ export default function OrganisationSettings() {
                   name="primaryContactName"
                   value={settings.contact.primaryContactName}
                   onChange={handleContactChange}
-                  placeholder="e.g. Shri Radhakrishna Bhat"
                   className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] focus:outline-none transition-colors ${errors.contact_primaryContactName
                     ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                     : 'border-[#E8DFD8] focus:border-[#510601]'
@@ -1375,7 +1351,6 @@ export default function OrganisationSettings() {
                   name="designation"
                   value={settings.contact.designation}
                   onChange={handleContactChange}
-                  placeholder="e.g. General Secretary"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-sm text-[#180200] focus:outline-none"
                 />
               </div>
@@ -1395,7 +1370,6 @@ export default function OrganisationSettings() {
                     value={settings.contact.contactNumber}
                     onChange={handleContactChange}
                     maxLength={10}
-                    placeholder="9845012345"
                     className={`w-full pl-11 pr-3.5 py-2.5 bg-white border rounded-xl text-sm font-mono text-[#180200] focus:outline-none transition-colors ${errors.contact_contactNumber
                       ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                       : 'border-[#E8DFD8] focus:border-[#510601]'
@@ -1417,7 +1391,6 @@ export default function OrganisationSettings() {
                   name="alternateContactNumber"
                   value={settings.contact.alternateContactNumber}
                   onChange={handleContactChange}
-                  placeholder="e.g. 080-23348899"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-sm font-mono text-[#180200] focus:outline-none"
                 />
               </div>
@@ -1434,7 +1407,6 @@ export default function OrganisationSettings() {
                     name="email"
                     value={settings.contact.email}
                     onChange={handleContactChange}
-                    placeholder="secretary@havyakamahasabha.org"
                     className={`w-full pl-9 pr-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none transition-colors ${errors.contact_email
                       ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                       : 'border-[#E8DFD8] focus:border-[#510601]'
@@ -1458,7 +1430,6 @@ export default function OrganisationSettings() {
                     name="alternateEmail"
                     value={settings.contact.alternateEmail}
                     onChange={handleContactChange}
-                    placeholder="admin@havyakamahasabha.org"
                     className={`w-full pl-9 pr-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none ${errors.contact_alternateEmail
                       ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
                       : 'border-[#E8DFD8] focus:border-[#510601]'
@@ -1496,7 +1467,6 @@ export default function OrganisationSettings() {
                     name="supportContactNumber"
                     value={settings.contact.supportContactNumber}
                     onChange={handleContactChange}
-                    placeholder="e.g. 9480112233"
                     className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-sm font-mono text-[#180200] focus:outline-none"
                   />
                 </div>
@@ -1514,7 +1484,6 @@ export default function OrganisationSettings() {
                     name="supportEmail"
                     value={settings.contact.supportEmail}
                     onChange={handleContactChange}
-                    placeholder="support@havyakamahasabha.org"
                     className={`w-full pl-9 pr-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none ${errors.contact_supportEmail
                       ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
                       : 'border-[#E8DFD8] focus:border-[#510601]'
@@ -1550,7 +1519,6 @@ export default function OrganisationSettings() {
                   rows={2}
                   value={settings.contact.officeAddress}
                   onChange={handleContactChange}
-                  placeholder="#11, 8th Cross, Malleshwaram, Bengaluru, Karnataka - 560003"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none resize-none"
                 />
               </div>
@@ -1565,7 +1533,6 @@ export default function OrganisationSettings() {
                   name="workingDays"
                   value={settings.contact.workingDays}
                   onChange={handleContactChange}
-                  placeholder="e.g. Monday - Saturday (Sunday Closed)"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none"
                 />
               </div>
@@ -1580,7 +1547,6 @@ export default function OrganisationSettings() {
                   name="workingHours"
                   value={settings.contact.workingHours}
                   onChange={handleContactChange}
-                  placeholder="e.g. 09:30 AM - 05:30 PM IST"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none"
                 />
               </div>

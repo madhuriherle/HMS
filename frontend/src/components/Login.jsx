@@ -136,7 +136,6 @@ export default function Login() {
                 autoComplete="username"
                 value={formData.username}
                 onChange={handleChange}
-                placeholder="Enter username"
                 className={`w-full pl-12 pr-4 py-3.5 bg-[#F5EDE3] border rounded-[14px] text-sm sm:text-base text-[#280E07] placeholder-[#A69385] focus:outline-none focus:ring-0 focus:border-[#D5C2B1] focus:bg-[#F5EDE3] active:bg-[#F5EDE3] caret-[#5B140A] login-input-field transition-colors ${
                   errors.username
                     ? 'border-red-400 ring-1 ring-red-400/30'
@@ -169,7 +168,6 @@ export default function Login() {
                 autoComplete="current-password"
                 value={formData.password}
                 onChange={handleChange}
-                placeholder="••••••••"
                 className={`w-full pl-12 pr-12 py-3.5 bg-[#F5EDE3] border rounded-[14px] text-sm sm:text-base text-[#280E07] placeholder-[#A69385] focus:outline-none focus:ring-0 focus:border-[#D5C2B1] focus:bg-[#F5EDE3] active:bg-[#F5EDE3] caret-[#5B140A] login-input-field transition-colors ${
                   errors.password
                     ? 'border-red-400 ring-1 ring-red-400/30'

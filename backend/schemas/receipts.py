@@ -60,6 +60,7 @@ class ReceiptBase(BaseModel):
     payer_name: Optional[str] = None
     payment_mode: str
     transaction_reference: Optional[str] = None
+    bank_account: Optional[str] = None
     transaction_date: Optional[date] = None
     gross_amount: float
     discount_amount: float = 0.0

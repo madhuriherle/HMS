@@ -232,6 +232,8 @@ export default function ModulesManagement() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
+    // Close the form first so the confirmation popup opens over a closed form.
+    setIsAddEditOpen(false);
     setSaving(true);
     try {
       if (modalMode === 'add') {
@@ -241,7 +243,6 @@ export default function ModulesManagement() {
         await api.put(`/users/modules/${editingModule.id}`, buildPayload());
         showToast('Module updated successfully.');
       }
-      setIsAddEditOpen(false);
       setFormData(emptyForm);
       await fetchModules();
     } catch (err) {
@@ -376,7 +377,6 @@ export default function ModulesManagement() {
         title="Module Master"
         searchQuery={searchQuery}
         onSearchChange={(val) => { setSearchQuery(val); setCurrentPage(1); }}
-        searchPlaceholder="Search modules by name, code or route..."
         activeFiltersCount={hasActiveFilters ? 1 : 0}
         onResetFilters={handleClearFilters}
         rightSlot={
@@ -629,7 +629,6 @@ export default function ModulesManagement() {
                   value={formData.code}
                   onChange={handleFormChange}
                   disabled={modalMode === 'edit'}
-                  placeholder="e.g. MEMBERSHIP"
                   className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors disabled:bg-gray-50 disabled:text-[#863221]/60 ${formErrors.code
                     ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                     : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -655,7 +654,6 @@ export default function ModulesManagement() {
                   name="name_en"
                   value={formData.name_en}
                   onChange={handleFormChange}
-                  placeholder="e.g. Membership"
                   className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.name_en
                     ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                     : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -678,7 +676,6 @@ export default function ModulesManagement() {
                   name="name_kn"
                   value={formData.name_kn}
                   onChange={handleFormChange}
-                  placeholder="ಕನ್ನಡ ಹೆಸರು"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
                 />
               </div>
@@ -692,7 +689,6 @@ export default function ModulesManagement() {
                   name="route"
                   value={formData.route}
                   onChange={handleFormChange}
-                  placeholder="e.g. /dashboard/membership/list"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-mono text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
                 />
               </div>
@@ -774,7 +770,6 @@ export default function ModulesManagement() {
                   min="1"
                   value={formData.min_rank_level}
                   onChange={handleFormChange}
-                  placeholder="Empty = no rank gate"
                   className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.min_rank_level
                     ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                     : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -800,7 +795,6 @@ export default function ModulesManagement() {
                   name="permission_code"
                   value={formData.permission_code}
                   onChange={handleFormChange}
-                  placeholder="e.g. masters.read (empty = no privilege gate)"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
                 />
                 <p className="text-[10px] text-[#863221]/70 mt-1">
@@ -817,7 +811,6 @@ export default function ModulesManagement() {
                   name="icon"
                   value={formData.icon}
                   onChange={handleFormChange}
-                  placeholder="e.g. Users"
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
                 />
               </div>
@@ -847,7 +840,6 @@ export default function ModulesManagement() {
                 rows={2}
                 value={formData.description}
                 onChange={handleFormChange}
-                placeholder="What this module covers..."
                 className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors resize-none"
               />
             </div>

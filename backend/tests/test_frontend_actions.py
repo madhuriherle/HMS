@@ -137,6 +137,5 @@ def test_module_link_privileges_and_new_menu_pages(client, admin_headers):
     for name, route in (
         ("Approval Requests", "/dashboard/approvals"),
         ("Bank Master", "/dashboard/master/banks"),
-        ("Personal Masters", "/dashboard/master/personal-masters"),
     ):
         assert menu.get(name, {}).get("route") == route, (name, menu.get(name))

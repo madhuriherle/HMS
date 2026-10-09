@@ -6,7 +6,7 @@ export default function SearchFilterBar({
   breadcrumb,
   searchQuery = '',
   onSearchChange,
-  searchPlaceholder = 'Search...',
+  searchPlaceholder = '',
   activeFiltersCount = 0,
   onResetFilters,
   children,
@@ -57,7 +57,6 @@ export default function SearchFilterBar({
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange?.(e.target.value)}
-              placeholder={searchPlaceholder}
               className="w-full pl-10 pr-9 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] text-[#180200] placeholder-[#863221]/40 transition-colors shadow-sm"
             />
             {searchQuery && (

@@ -68,12 +68,13 @@ export const confirmAction = async (method, url) => {
     text: `Are you sure you want to ${verb.toLowerCase()} this ${entity}?`,
     icon: verb === 'Delete' ? 'warning' : 'question',
     showCancelButton: true,
-    confirmButtonText: 'Yes, I am sure',
+    confirmButtonText: 'Yes',
     cancelButtonText: 'Cancel',
     confirmButtonColor: verb === 'Delete' ? '#ED4636' : '#510601',
     cancelButtonColor: '#863221',
     reverseButtons: true,
     allowOutsideClick: false,
+    customClass: { popup: 'hms-mini-swal' },
   });
 
   if (!result.isConfirmed) return null;

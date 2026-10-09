@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Search, Edit3, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Edit3, Trash2, RefreshCw } from 'lucide-react';
 import api from '../api';
 import PermissionGate from '../components/PermissionGate';
+import SearchFilterBar from '../components/SearchFilterBar';
+import FilterSelect from '../components/FilterSelect';
 import useAuth from '../hooks/useAuth';
 import { askForm, confirmYesNo, showError, showSuccess } from '../utils/dialogs';
 
@@ -12,10 +14,11 @@ const makeCode = (name) => `${String(name).replace(/[^A-Za-z0-9]/g, '').slice(0,
 // Everything is read from and written to the server.
 //   fields:  [{ name, label, type, required, options }]   -> keys sent to the API as-is
 //   columns: [{ label, render(row) }]
-function MasterTable({ title, subtitle, endpoint, fields, columns, withCode }) {
+function MasterTable({ title, subtitle, endpoint, fields, columns, withCode, pageTitle }) {
   const { hasPermission } = useAuth();
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,15 +41,23 @@ function MasterTable({ title, subtitle, endpoint, fields, columns, withCode }) {
   }, [load]);
 
   const visible = useMemo(() => {
+    let list = rows;
+    if (statusFilter !== 'ALL') {
+      const want = statusFilter === 'Active';
+      list = list.filter((r) => Boolean(r.status) === want);
+    }
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => JSON.stringify(r).toLowerCase().includes(q));
-  }, [rows, search]);
+    if (!q) return list;
+    return list.filter((r) => JSON.stringify(r).toLowerCase().includes(q));
+  }, [rows, search, statusFilter]);
 
-  const formFields = (row) => fields.map((f) => ({ ...f, value: row ? row[f.name] ?? '' : '' }));
+  const formFields = (row) => [
+    ...fields.map((f) => ({ ...f, value: row ? row[f.name] ?? '' : '' })),
+    { name: 'status', label: 'Status', type: 'status', required: true, value: row ? (row.status ? 'Active' : 'Inactive') : 'Active' }
+  ];
 
   const toBody = (values) => {
-    const body = {};
+    const body = { status: values.status !== 'Inactive' };
     fields.forEach((f) => {
       const v = values[f.name];
       body[f.name] = v === '' || v === undefined ? null : f.type === 'select' && /^\d+$/.test(String(v)) ? Number(v) : v;
@@ -65,7 +76,7 @@ function MasterTable({ title, subtitle, endpoint, fields, columns, withCode }) {
     try {
       const body = toBody(values);
       if (withCode) body.code = makeCode(values.name_en);
-      const { data } = await api.post(endpoint, { ...body, status: true });
+      const { data } = await api.post(endpoint, body);
       await done(data, 'Added.', 'Submitted for approval.');
     } catch (err) {
       await showError(err, 'Could not add.');
@@ -117,43 +128,49 @@ function MasterTable({ title, subtitle, endpoint, fields, columns, withCode }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-[#180200]">{title}</h2>
-          {subtitle && <p className="text-xs text-[#863221] mt-0.5">{subtitle}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={load}
-            className="p-2 bg-white border border-[#E8DFD8] rounded-xl text-[#510601] hover:bg-[#FAF7F2] cursor-pointer"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          <button
-            type="button"
-            onClick={add}
-            disabled={!hasPermission('masters.write')}
-            title={!hasPermission('masters.write') ? 'Requires masters.write permission' : `Add ${title}`}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-40"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add</span>
-          </button>
-        </div>
-      </div>
-
-      <div className="relative max-w-sm">
-        <Search className="w-4 h-4 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search…"
-          className="w-full pl-9 pr-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-sm focus:outline-none focus:border-[#510601]"
+      <SearchFilterBar
+        title={pageTitle ? pageTitle : <h2 className="text-lg font-bold text-[#180200]">{title}</h2>}
+        searchQuery={search}
+        onSearchChange={(val) => setSearch(val)}
+        activeFiltersCount={statusFilter !== 'ALL' ? 1 : 0}
+        onResetFilters={() => {
+          setSearch('');
+          setStatusFilter('ALL');
+        }}
+        rightSlot={
+          <>
+            <button
+              type="button"
+              onClick={load}
+              className="p-2 bg-white border border-[#E8DFD8] rounded-xl text-[#510601] hover:bg-[#FAF7F2] cursor-pointer shrink-0"
+              title="Refresh"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              type="button"
+              onClick={add}
+              disabled={!hasPermission('masters.write')}
+              title={!hasPermission('masters.write') ? 'Requires masters.write permission' : `Add ${title}`}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-40 shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add</span>
+            </button>
+          </>
+        }
+      >
+        <FilterSelect
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: 'ALL', label: 'All Status' },
+            { value: 'Active', label: 'Active' },
+            { value: 'Inactive', label: 'Inactive' }
+          ]}
+          widthClass="w-full sm:w-40"
         />
-      </div>
+      </SearchFilterBar>
 
       {error && <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>}
 
@@ -233,10 +250,9 @@ export function BankMaster() {
   return (
     <PermissionGate required="masters.read">
       <div className="space-y-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Bank Master</h1>
         <MasterTable
+          pageTitle="Bank Master"
           title="Bank"
-          subtitle="Bank accounts used by the Payment Mode Setup."
           endpoint="/masters/banks"
           withCode
           fields={[

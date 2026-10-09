@@ -5,7 +5,7 @@ export default function FilterSelect({
   value,
   onChange,
   options = [],
-  placeholder = 'Select...',
+  placeholder = '',
   className = '',
   widthClass = 'w-44 sm:w-48'
 }) {

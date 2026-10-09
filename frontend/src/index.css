@@ -175,3 +175,41 @@
     box-shadow: none !important;
   }
 }
+
+/* Popups must sit above every form modal (the app's Modal is z-index 9999) */
+.swal2-container {
+  z-index: 100000 !important;
+}
+
+/* Compact "cute" SweetAlert used for confirmations and success/error results */
+.hms-mini-swal {
+  width: 21rem !important;
+  max-width: calc(100vw - 2rem) !important;
+  padding: 1.1rem 1.1rem 1rem !important;
+  border-radius: 1.25rem !important;
+}
+.hms-mini-swal .swal2-icon {
+  zoom: 0.65;
+  margin: 0.4rem auto 0.4rem !important;
+}
+.hms-mini-swal .swal2-title {
+  font-size: 1.05rem !important;
+  padding: 0 !important;
+  color: #180200;
+}
+.hms-mini-swal .swal2-html-container {
+  font-size: 0.85rem !important;
+  margin: 0.35rem 0 0 !important;
+  color: #863221;
+}
+.hms-mini-swal .swal2-actions {
+  margin: 1rem 0 0 !important;
+  gap: 0.5rem;
+}
+.hms-mini-swal .swal2-styled {
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  padding: 0.55rem 1.1rem !important;
+  border-radius: 0.7rem !important;
+  margin: 0 !important;
+}

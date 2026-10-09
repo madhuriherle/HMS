@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { CheckCircle2, XCircle, RefreshCw, Inbox } from 'lucide-react';
 import api from '../api';
+import { formatDateTime } from '../utils/dateUtils';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import { askReason, confirmYesNo, showError, showSuccess } from '../utils/dialogs';
@@ -192,7 +193,7 @@ export default function Approvals() {
                         {kind.detail(r) || '—'}
                       </td>
                       <td className="py-3 px-4 text-[#863221]">
-                        {r.created_at ? String(r.created_at).slice(0, 16).replace('T', ' ') : '—'}
+                        {formatDateTime(r.created_at, '—', false)}
                         {r.requested_by ? <div className="text-[10px]">by user #{r.requested_by}</div> : null}
                       </td>
                       <td className="py-3 px-4 text-center">

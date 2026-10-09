@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
@@ -45,6 +45,7 @@ import {
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
+import MemberApplicationDetails from '../components/MemberApplicationDetails';
 import { askForm } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import {
@@ -60,6 +61,7 @@ const MEMBER_CATEGORIES = ['Individual', 'Family', 'Institutional', 'Senior Citi
 
 export default function MembershipList() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { hasPermission } = useAuth();
   // ----------------------------------------------------
   // MASTER STORES
@@ -75,7 +77,7 @@ export default function MembershipList() {
 
   const loadMembers = async () => {
     try {
-      setMembers(await fetchMembers());
+      setMembers(await fetchMembers({ approval_status: 'APPROVED' }));
     } catch (error) {
       console.error('Failed to load members.', error);
       showToast(error.response?.data?.detail || 'Failed to load members from the server.', 'error');
@@ -423,85 +425,12 @@ export default function MembershipList() {
   // ADD / EDIT FORM HANDLERS
   // ----------------------------------------------------
   const handleOpenAddModal = () => {
-    setFormModalMode('add');
-    setEditingMember(null);
-    setActiveFormSection('personal');
-
-    const firstActiveType = activeMembershipTypes[0];
-    const firstActiveState = states.find((s) => s.status === 'Active') || states[0];
-    const matchDists = districts.filter((d) => d.stateId === firstActiveState?.id && d.status === 'Active');
-    const firstDist = matchDists[0];
-
-    setFormData({
-      ...initialFormState,
-      stateId: firstActiveState ? firstActiveState.id : '',
-      stateName: firstActiveState ? firstActiveState.name : '',
-      districtId: firstDist ? firstDist.id : '',
-      districtName: firstDist ? firstDist.name : '',
-      membershipTypeId: firstActiveType ? firstActiveType.id : '',
-      membershipType: firstActiveType ? firstActiveType.name : ''
-    });
-    setFormErrors({});
-    setIsFormModalOpen(true);
+    navigate('/dashboard/membership/register');
   };
 
-  // Open modal if navigated with openAddModal state or via register/add path
-  useEffect(() => {
-    if (
-      location.state?.openAddModal ||
-      location.pathname.endsWith('/register') ||
-      location.pathname.endsWith('/add')
-    ) {
-      handleOpenAddModal();
-      // Clean up state history so refresh doesn't force modal reopen
-      window.history.replaceState({}, document.title);
-    }
-  }, [location.state, location.pathname]);
 
   const handleOpenEditModal = (member) => {
-    setFormModalMode('edit');
-    setEditingMember(member);
-    setActiveFormSection('personal');
-
-    setFormData({
-      name: member.fullName || member.name || '',
-      address: member.addressLine || member.address || '',
-      remarks: member.remarks || '',
-      phone: member.phone || '',
-      mobile: member.mobile || member.mobileNumber || '',
-      email: member.email || '',
-
-      country: member.country || 'India',
-      stateId: member.stateId || '',
-      stateName: member.stateName || '',
-      districtId: member.districtId || '',
-      districtName: member.districtName || '',
-      postalCode: member.postalCode || '',
-      post: member.post || member.talukName || '',
-      city: member.city || member.place || '',
-      area: member.area || '',
-      place: member.place || '',
-      grama: member.grama || '',
-      village: member.village || '',
-      labelPoint: member.labelPoint || '',
-
-      membershipTypeId: member.membershipTypeId || '',
-      membershipType: member.membershipType || '',
-      category: member.category || 'Individual',
-      profession: member.profession || '',
-      company: member.company || '',
-
-      website: member.website || '',
-      gothra: member.gothra || '',
-      bloodGroup: member.bloodGroup || 'O+',
-      birthDate: member.birthDate || '',
-      status: member.status === 'Approved' ? 'Active' : member.status || 'Active',
-      expireDate: member.expireDate || '',
-      magazineRemarks: member.magazineRemarks || '',
-      nativeDetails: member.nativeDetails || ''
-    });
-    setFormErrors({});
-    setIsFormModalOpen(true);
+    navigate(`/dashboard/membership/edit/${member.id}`);
   };
 
   const validateForm = () => {
@@ -703,7 +632,6 @@ export default function MembershipList() {
           setSearchQuery(val);
           setCurrentPage(1);
         }}
-        searchPlaceholder="Search..."
         activeFiltersCount={
           (typeFilter !== 'ALL' ? 1 : 0) +
           (statusFilter !== 'ALL' ? 1 : 0) +
@@ -712,16 +640,39 @@ export default function MembershipList() {
         }
         onResetFilters={handleClearFilters}
         rightSlot={
-          <button
-            type="button"
-            onClick={handleOpenAddModal}
-            disabled={!hasPermission('members.write')}
-            title={!hasPermission('members.write') ? 'Requires members.write permission' : undefined}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#510601] hover:bg-[#863221] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-sm cursor-pointer hover:shadow-md shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Membership</span>
-          </button>
+          <>
+            {selectedMemberIds.size > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setIsLabelPreviewOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#510601] text-[#510601] text-xs sm:text-sm font-bold rounded-xl hover:bg-[#FAF7F2] transition-colors cursor-pointer shrink-0"
+                  title="Preview and print address labels for the selected members"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print Labels ({selectedMemberIds.size})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMemberIds(new Set())}
+                  className="flex items-center justify-center w-9 h-9 bg-white border border-[#E8DFD8] text-[#863221] rounded-xl hover:bg-[#FAF7F2] hover:text-[#510601] transition-colors cursor-pointer shrink-0"
+                  title="Clear selection"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={handleOpenAddModal}
+              disabled={!hasPermission('members.write')}
+              title={!hasPermission('members.write') ? 'Requires members.write permission' : undefined}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#510601] hover:bg-[#863221] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-sm cursor-pointer hover:shadow-md shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Membership</span>
+            </button>
+          </>
         }
       >
         {/* 1. Membership Type Filter */}
@@ -1051,698 +1002,6 @@ export default function MembershipList() {
       </div>
 
       {/* ==================================================== */}
-      {/* MODAL 1: ADD / EDIT MEMBERSHIP FORM MODAL            */}
-      {/* ==================================================== */}
-      <Modal isOpen={isFormModalOpen} onClose={() => setIsFormModalOpen(false)}>
-        <div
-          className="bg-white rounded-2xl max-w-3xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Modal Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
-                <UserCheck className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-[#180200]">
-                  {formModalMode === 'add' ? 'Register New Membership' : 'Edit Member Profile'}
-                </h3>
-                <p className="text-xs text-[#863221]">
-                  {formModalMode === 'add'
-                    ? 'Fill member personal, geographic location, and membership type details.'
-                    : `Editing details for "${editingMember?.fullName || editingMember?.name}"`}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsFormModalOpen(false)}
-              className="text-[#863221]/60 hover:text-[#180200] p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Form Navigation Tabs */}
-          <div className="flex items-center border-b border-[#E8DFD8] px-6 bg-white overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => setActiveFormSection('personal')}
-              className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeFormSection === 'personal'
-                ? 'border-[#510601] text-[#510601]'
-                : 'border-transparent text-[#863221] hover:text-[#180200]'
-                }`}
-            >
-              1. Personal / Basic Details
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveFormSection('location')}
-              className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeFormSection === 'location'
-                ? 'border-[#510601] text-[#510601]'
-                : 'border-transparent text-[#863221] hover:text-[#180200]'
-                }`}
-            >
-              2. Location Details
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveFormSection('membership')}
-              className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeFormSection === 'membership'
-                ? 'border-[#510601] text-[#510601]'
-                : 'border-transparent text-[#863221] hover:text-[#180200]'
-                }`}
-            >
-              3. Membership Details
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveFormSection('additional')}
-              className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${activeFormSection === 'additional'
-                ? 'border-[#510601] text-[#510601]'
-                : 'border-transparent text-[#863221] hover:text-[#180200]'
-                }`}
-            >
-              4. Additional Details
-            </button>
-          </div>
-
-          {/* Form Content */}
-          <form onSubmit={handleSaveMember}>
-            <div className="p-6 space-y-4 max-h-[65vh] overflow-y-auto">
-              {/* TAB 1: PERSONAL / BASIC DETAILS */}
-              {activeFormSection === 'personal' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Full Name */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Full Name <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="e.g. S. N. Hegde, Malathi Bhat"
-                        className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-medium text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.name
-                          ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
-                          : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                          }`}
-                      />
-                      {formErrors.name && (
-                        <p className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          {formErrors.name}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Mobile Number */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Mobile Number <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        maxLength={10}
-                        value={formData.mobile}
-                        onChange={(e) =>
-                          setFormData({ ...formData, mobile: e.target.value.replace(/\D/g, '') })
-                        }
-                        placeholder="10-digit mobile number"
-                        className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-mono font-medium text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.mobile
-                          ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
-                          : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                          }`}
-                      />
-                      {formErrors.mobile && (
-                        <p className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          {formErrors.mobile}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Phone (Landline/Alternative) */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Phone (Alternative / Landline)
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.phone}
-                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                        placeholder="e.g. 080-23456789"
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
-                      />
-                    </div>
-
-                    {/* Email */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Email Address
-                      </label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="e.g. member@havyakamahasabha.org"
-                        className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-medium text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.email
-                          ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
-                          : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                          }`}
-                      />
-                      {formErrors.email && (
-                        <p className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          {formErrors.email}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Address Line */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Street Address / House Details <span className="text-red-500">*</span>
-                      </label>
-                      <textarea
-                        rows={2}
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        placeholder="e.g. No. 42, Sri Rama Nilaya, 8th Cross, Malleswaram"
-                        className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-medium text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.address
-                          ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
-                          : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                          }`}
-                      />
-                      {formErrors.address && (
-                        <p className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          {formErrors.address}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Remarks */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        General Remarks
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.remarks}
-                        onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                        placeholder="Additional notes about member registration"
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 2: LOCATION DETAILS (INTEGRATED WITH LOCATION SETUP MASTER) */}
-              {activeFormSection === 'location' && (
-                <div className="space-y-4">
-                  {/* PIN Code Lookup helper alert */}
-                  <div className="bg-[#FAF7F2] p-3 rounded-xl border border-[#E8DFD8] flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-xs text-[#863221]">
-                      <Sparkles className="w-4 h-4 text-[#510601]" />
-                      <span>
-                        Enter 6-digit PIN Code below to automatically resolve State, District, Taluk, and Post Office from Location Setup.
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {/* PIN Code */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        PIN Code (6 Digits)
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          maxLength={6}
-                          value={formData.postalCode}
-                          onChange={(e) => {
-                            const val = e.target.value.replace(/\D/g, '');
-                            if (val.length === 6) {
-                              setFormData((prev) => ({ ...prev, postalCode: val }));
-                              handlePinCodeLookup(val);
-                            } else {
-                              setFormData((prev) => ({
-                                ...prev,
-                                postalCode: val,
-                                ...(prev.postalCode && prev.postalCode.length === 6 ? {
-                                  districtId: '',
-                                  districtName: '',
-                                  post: '',
-                                  place: '',
-                                  city: '',
-                                  area: ''
-                                } : {})
-                              }));
-                              setFormErrors((prev) => {
-                                if (!prev.postalCode) return prev;
-                                const next = { ...prev };
-                                delete next.postalCode;
-                                return next;
-                              });
-                            }
-                          }}
-                          placeholder="e.g. 576101"
-                          className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-mono font-bold focus:outline-none transition-colors ${
-                            formErrors.postalCode
-                              ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20 text-red-700'
-                              : 'border-[#E8DFD8] text-[#510601] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                          }`}
-                        />
-                      </div>
-                      {formErrors.postalCode && (
-                        <p className="text-xs text-red-600 mt-1 font-medium">{formErrors.postalCode}</p>
-                      )}
-                    </div>
-
-                    {/* Country */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Country
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.country}
-                        onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-
-                    {/* State (from Location Setup) */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        State <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.stateId}
-                        onChange={(e) => {
-                          const newStateId = toId(e.target.value);
-                          const stObj = states.find((s) => s.id === newStateId);
-                          const matchingDists = districts.filter(
-                            (d) => d.stateId === newStateId && (formModalMode === 'edit' || d.status === 'Active')
-                          );
-                          const firstD = matchingDists[0];
-
-                          setFormData({
-                            ...formData,
-                            stateId: newStateId,
-                            stateName: stObj ? stObj.name : '',
-                            districtId: firstD ? firstD.id : '',
-                            districtName: firstD ? firstD.name : ''
-                          });
-                        }}
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      >
-                        {states
-                          .filter((s) => formModalMode === 'edit' || s.status === 'Active')
-                          .map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-
-                    {/* District (from Location Setup) */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        District
-                      </label>
-                      <select
-                        value={formData.districtId}
-                        onChange={(e) => {
-                          const newDistId = toId(e.target.value);
-                          const distObj = districts.find((d) => d.id === newDistId);
-                          setFormData({
-                            ...formData,
-                            districtId: newDistId,
-                            districtName: distObj ? distObj.name : ''
-                          });
-                        }}
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      >
-                        <option value="">-- Select District --</option>
-                        {formDistricts.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Post Office / Taluk */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Post Office / Taluk
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.post}
-                        onChange={(e) => setFormData({ ...formData, post: e.target.value })}
-                        placeholder="e.g. Udupi H.O, Sirsi"
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-
-                    {/* City / Place */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        City / Place
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.city}
-                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                        placeholder="e.g. Bengaluru, Mangaluru"
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-
-                    {/* Area / Place */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Area / Locality
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.area}
-                        onChange={(e) => setFormData({ ...formData, area: e.target.value })}
-                        placeholder="e.g. Malleswaram, Kadri"
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-
-                    {/* Grama / Village */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Grama / Village
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.grama}
-                        onChange={(e) => setFormData({ ...formData, grama: e.target.value })}
-                        placeholder="e.g. Halasinakatte, Hegde"
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-
-                    {/* Label Point */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Label Point / Dispatch Hub
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.labelPoint}
-                        onChange={(e) => setFormData({ ...formData, labelPoint: e.target.value })}
-                        placeholder="e.g. Primary Delivery, Central Hub"
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 3: MEMBERSHIP DETAILS (INTEGRATED WITH MEMBERSHIP TYPE MASTER) */}
-              {activeFormSection === 'membership' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Membership Type (from Master) */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Membership Type <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        value={formData.membershipTypeId}
-                        onChange={(e) => {
-                          const typeId = toId(e.target.value);
-                          const tObj = membershipTypes.find((mt) => mt.id === typeId);
-                          setFormData({
-                            ...formData,
-                            membershipTypeId: typeId,
-                            membershipType: tObj ? tObj.name : ''
-                          });
-                        }}
-                        className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] focus:outline-none transition-colors ${formErrors.membershipTypeId
-                          ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
-                          : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                          }`}
-                      >
-                        <option value="">-- Select Membership Type --</option>
-                        {activeMembershipTypes.map((mt) => (
-                          <option key={mt.id} value={mt.id}>
-                            {mt.name} (Rs. {mt.currentPrice?.toLocaleString('en-IN')})
-                          </option>
-                        ))}
-                      </select>
-                      {formErrors.membershipTypeId && (
-                        <p className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          {formErrors.membershipTypeId}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Category */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Category
-                      </label>
-                      <select
-                        value={formData.category}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      >
-                        {MEMBER_CATEGORIES.map((cat) => (
-                          <option key={cat} value={cat}>
-                            {cat}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Profession */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Profession
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.profession}
-                        onChange={(e) => setFormData({ ...formData, profession: e.target.value })}
-                        placeholder="e.g. Advocate, Engineer, Agriculture, Doctor"
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-
-                    {/* Company */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Company / Organization
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.company}
-                        onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-                        placeholder="e.g. Infosys, Self Employed, Govt"
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 4: ADDITIONAL MEMBER DETAILS */}
-              {activeFormSection === 'additional' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {/* Gotra */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Gotra
-                      </label>
-                      <select
-                        value={formData.gothra}
-                        onChange={(e) => setFormData({ ...formData, gothra: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      >
-                        <option value="">-- Select Gotra --</option>
-                        {gothras.map((g) => (
-                          <option key={g} value={g}>
-                            {g}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Blood Group */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Blood Group
-                      </label>
-                      <select
-                        value={formData.bloodGroup}
-                        onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      >
-                        {BLOOD_GROUPS.map((bg) => (
-                          <option key={bg} value={bg}>
-                            {bg}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Birth Date */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Date of Birth
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.birthDate}
-                        onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-
-                    {/* Status */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Status
-                      </label>
-                      <select
-                        value={formData.status}
-                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      >
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                      </select>
-                    </div>
-
-                    {/* Expire Date (Conditional / Optional) */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Expire Date (if applicable)
-                      </label>
-                      <input
-                        type="date"
-                        value={formData.expireDate}
-                        onChange={(e) => setFormData({ ...formData, expireDate: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-
-                    {/* Website */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Website / Social
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.website}
-                        onChange={(e) => setFormData({ ...formData, website: e.target.value })}
-                        placeholder="https://..."
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-
-                    {/* Native Details */}
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Native Place & Family Heritage Details
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.nativeDetails}
-                        onChange={(e) => setFormData({ ...formData, nativeDetails: e.target.value })}
-                        placeholder="e.g. Sirsi - Sonda Matha, Hegde Mane"
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-
-                    {/* Magazine Remarks */}
-                    <div className="sm:col-span-3">
-                      <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                        Magazine Dispatch Remarks (Havyaka Sandesha)
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.magazineRemarks}
-                        onChange={(e) => setFormData({ ...formData, magazineRemarks: e.target.value })}
-                        placeholder="e.g. Send to Sirsi address, By Post"
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601]"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/60">
-              <div className="flex items-center gap-2">
-                {activeFormSection !== 'personal' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (activeFormSection === 'location') setActiveFormSection('personal');
-                      else if (activeFormSection === 'membership') setActiveFormSection('location');
-                      else if (activeFormSection === 'additional') setActiveFormSection('membership');
-                    }}
-                    className="py-2 px-3 text-xs font-semibold text-[#863221] hover:bg-white rounded-xl border border-[#E8DFD8] transition-colors cursor-pointer"
-                  >
-                    Previous Section
-                  </button>
-                )}
-                {activeFormSection !== 'additional' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (activeFormSection === 'personal') setActiveFormSection('location');
-                      else if (activeFormSection === 'location') setActiveFormSection('membership');
-                      else if (activeFormSection === 'membership') setActiveFormSection('additional');
-                    }}
-                    className="py-2 px-3 text-xs font-semibold text-[#510601] hover:bg-white rounded-xl border border-[#510601]/20 transition-colors cursor-pointer"
-                  >
-                    Next Section
-                  </button>
-                )}
-              </div>
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsFormModalOpen(false)}
-                  className="py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!hasPermission('members.write')}
-                  title={!hasPermission('members.write') ? 'Requires members.write permission' : undefined}
-                  className="py-2.5 px-5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {formModalMode === 'add' ? 'Complete Registration' : 'Save Changes'}
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      </Modal>
-
-      {/* ==================================================== */}
       {/* MODAL 2: VIEW MEMBER PROFILE MODAL                   */}
       {/* ==================================================== */}
       <Modal isOpen={Boolean(viewingMember)} onClose={() => setViewingMember(null)}>
@@ -2063,6 +1322,9 @@ export default function MembershipList() {
                   <p className="font-bold mt-0.5">{viewingMember.bloodGroup || '—'}</p>
                 </div>
               </div>
+
+              {/* New registration-form details */}
+              <MemberApplicationDetails member={viewingMember} />
 
               {/* Card 2: Address & Location Details */}
               <div className="bg-white rounded-xl p-4 border border-[#E8DFD8] space-y-3">

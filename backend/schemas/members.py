@@ -19,6 +19,9 @@ EDITABLE_MEMBER_FIELDS: Set[str] = {
     "country", "city", "post", "category", "company", "website", "remarks",
 
     "aadhaar_number", "referred_by_member_id",
+    "name_title", "whatsapp_country_code", "applied_on_behalf_of", "magazine_needed",
+    "membership_type_category", "referred_by_number", "referred_by_name",
+    "family_membership_number", "family_membership_name", "registration_payment",
     "state_id", "district_id", "taluk_id", "pincode_id",
 }
 
@@ -52,6 +55,16 @@ class MemberBase(BaseModel):
     aadhaar_number: Optional[str] = None
     whatsapp_number: Optional[str] = None
     referred_by_member_id: Optional[int] = None
+    name_title: Optional[str] = None
+    whatsapp_country_code: Optional[str] = None
+    applied_on_behalf_of: Optional[str] = None
+    magazine_needed: Optional[bool] = None
+    membership_type_category: Optional[str] = None
+    referred_by_number: Optional[str] = None
+    referred_by_name: Optional[str] = None
+    family_membership_number: Optional[str] = None
+    family_membership_name: Optional[str] = None
+    registration_payment: Optional[dict] = None
 
     father_name: Optional[str] = None
     father_membership_number: Optional[str] = None
@@ -162,6 +175,16 @@ class MemberUpdate(BaseModel):
     aadhaar_number: Optional[str] = None
     whatsapp_number: Optional[str] = None
     referred_by_member_id: Optional[int] = None
+    name_title: Optional[str] = None
+    whatsapp_country_code: Optional[str] = None
+    applied_on_behalf_of: Optional[str] = None
+    magazine_needed: Optional[bool] = None
+    membership_type_category: Optional[str] = None
+    referred_by_number: Optional[str] = None
+    referred_by_name: Optional[str] = None
+    family_membership_number: Optional[str] = None
+    family_membership_name: Optional[str] = None
+    registration_payment: Optional[dict] = None
 
     father_name: Optional[str] = None
     father_membership_number: Optional[str] = None

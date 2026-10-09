@@ -32,6 +32,7 @@ import {
   FileText
 } from 'lucide-react';
 import api from '../api';
+import { formatDate, formatDateTime } from '../utils/dateUtils';
 import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
@@ -497,7 +498,6 @@ export default function UserManagement() {
           setSearchQuery(val);
           setCurrentPage(1);
         }}
-        searchPlaceholder="Search..."
         activeFiltersCount={
           (roleFilter !== 'ALL' ? 1 : 0) +
           (statusFilter !== 'ALL' ? 1 : 0)
@@ -662,7 +662,7 @@ export default function UserManagement() {
 
                       {/* Last Login */}
                       <td className="px-6 py-4 text-xs text-[#863221]/80 font-medium">
-                        {user.lastLogin || 'Never'}
+                        {formatDateTime(user.lastLogin, 'Never', false)}
                       </td>
 
                       {/* Actions */}
@@ -863,7 +863,6 @@ export default function UserManagement() {
                     name="fullName"
                     value={formData.fullName}
                     onChange={handleFormChange}
-                    placeholder="e.g. Ramesh Bhat"
                     className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.fullName
                         ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                         : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -888,7 +887,6 @@ export default function UserManagement() {
                     value={formData.username}
                     onChange={handleFormChange}
                     disabled={modalMode === 'edit'}
-                    placeholder="e.g. ramesh.bhat"
                     className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-mono font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed ${formErrors.username
                         ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                         : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -917,7 +915,6 @@ export default function UserManagement() {
                       name="email"
                       value={formData.email}
                       onChange={handleFormChange}
-                      placeholder="e.g. ramesh@hmsmma.com"
                       className={`w-full pl-10 pr-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.email
                           ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                           : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -945,7 +942,6 @@ export default function UserManagement() {
                       value={formData.mobile}
                       onChange={handleFormChange}
                       maxLength={10}
-                      placeholder="10-digit number"
                       className={`w-full pl-10 pr-3.5 py-2.5 bg-white border rounded-xl text-sm font-mono text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.mobile
                           ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                           : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -979,7 +975,6 @@ export default function UserManagement() {
                       name="password"
                       value={formData.password}
                       onChange={handleFormChange}
-                      placeholder={modalMode === 'add' ? 'Min. 6 characters' : 'Enter new password'}
                       className={`w-full pl-10 pr-10 py-2.5 bg-white border rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.password
                           ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                           : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -1017,7 +1012,6 @@ export default function UserManagement() {
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleFormChange}
-                      placeholder="Re-type password"
                       className={`w-full pl-10 pr-10 py-2.5 bg-white border rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.confirmPassword
                           ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
                           : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -1239,12 +1233,12 @@ export default function UserManagement() {
 
                 <div>
                   <p className="text-[#863221] font-semibold uppercase">Created Date</p>
-                  <p className="text-[#180200] font-medium mt-0.5">{viewingUser.createdAt}</p>
+                  <p className="text-[#180200] font-medium mt-0.5">{formatDate(viewingUser.createdAt)}</p>
                 </div>
 
                 <div>
                   <p className="text-[#863221] font-semibold uppercase">Last Login</p>
-                  <p className="text-[#180200] font-medium mt-0.5">{viewingUser.lastLogin || 'Never'}</p>
+                  <p className="text-[#180200] font-medium mt-0.5">{formatDateTime(viewingUser.lastLogin, 'Never', false)}</p>
                 </div>
               </div>
 

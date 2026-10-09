@@ -27,19 +27,10 @@ import {
   Download
 } from 'lucide-react';
 import { loadMembers, loadMembershipTypes, loadReceipts } from '../utils/serverData';
+import { formatDate } from '../utils/dateUtils';
 import api from '../api';
 import { askForm } from '../utils/dialogs';
 import useAuth from '../hooks/useAuth';
-
-// Date formatter
-const formatDate = (dateStr) => {
-  if (!dateStr) return '—';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}-${parts[1]}-${parts[0]}`;
-  }
-  return dateStr;
-};
 
 export default function LabelList() {
   const { hasPermission } = useAuth();
@@ -364,7 +355,6 @@ export default function LabelList() {
           setSearchQuery(val);
           setCurrentPage(1);
         }}
-        searchPlaceholder="Search..."
         activeFiltersCount={membershipTypeFilter !== 'ALL' ? 1 : 0}
         onResetFilters={() => {
           setSearchQuery('');
