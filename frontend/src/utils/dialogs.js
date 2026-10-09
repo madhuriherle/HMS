@@ -103,8 +103,8 @@ export const showError = (err, fallback) =>
     title: 'Something went wrong',
     text: (typeof err?.response?.data?.detail === 'string' && err.response.data.detail) || fallback,
     confirmButtonColor: BRAND,
-    customClass: { popup: 'hms-mini-swal' }
+    customClass: { popup: 'hms-mini-swal hms-result-swal' }
   });
 
 export const showSuccess = (text) =>
-  Swal.fire({ icon: 'success', title: 'Done', text, confirmButtonColor: BRAND, customClass: { popup: 'hms-mini-swal' } });
+  Swal.fire({ icon: 'success', title: 'Done', text, confirmButtonColor: BRAND, customClass: { popup: 'hms-mini-swal hms-result-swal' } });

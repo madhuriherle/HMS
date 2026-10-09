@@ -213,3 +213,23 @@
   border-radius: 0.7rem !important;
   margin: 0 !important;
 }
+
+/* Success / failure result popups are a little larger than the confirmations */
+.hms-mini-swal.hms-result-swal {
+  width: 27rem !important;
+  padding: 1.6rem 1.5rem 1.4rem !important;
+}
+.hms-result-swal .swal2-icon {
+  zoom: 0.95;
+  margin: 0.4rem auto 0.6rem !important;
+}
+.hms-result-swal .swal2-title {
+  font-size: 1.4rem !important;
+}
+.hms-result-swal .swal2-html-container {
+  font-size: 1rem !important;
+}
+.hms-result-swal .swal2-styled {
+  font-size: 0.95rem !important;
+  padding: 0.7rem 2rem !important;
+}

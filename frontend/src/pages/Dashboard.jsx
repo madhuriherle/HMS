@@ -161,7 +161,7 @@ export default function Dashboard() {
         title: 'Could not load member',
         text: err.response?.data?.detail || 'The server could not return this member.',
         confirmButtonColor: '#510601',
-        customClass: { popup: 'hms-mini-swal' }
+        customClass: { popup: 'hms-mini-swal hms-result-swal' }
       });
     }
   };

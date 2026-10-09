@@ -9,7 +9,7 @@ const ResultPopup = Swal.mixin({
   position: 'center',
   confirmButtonText: 'OK',
   confirmButtonColor: BRAND,
-  customClass: { popup: 'hms-mini-swal' },
+  customClass: { popup: 'hms-mini-swal hms-result-swal' },
 });
 
 export const notifySuccess = (message, title = 'Success!') =>
