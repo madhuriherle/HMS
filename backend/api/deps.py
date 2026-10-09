@@ -144,10 +144,18 @@ def _module_gate(db: Session, user: User, permission_code: str) -> None:
     )
     if not row:
         return
-    if not row.status:
-        raise HTTPException(403, f"The '{row.name_en}' module is currently disabled by administrator.")
-    if row.min_rank_level and user_rank(db, user) > row.min_rank_level:
-        raise HTTPException(403, f"This module requires Rank {row.min_rank_level} or higher access.")
+    # a sub-module is only as available as every module above it
+    rank = None
+    seen = set()
+    while row is not None and row.id not in seen:
+        seen.add(row.id)
+        if not row.status:
+            raise HTTPException(403, f"The '{row.name_en}' module is currently disabled by administrator.")
+        if row.min_rank_level:
+            rank = user_rank(db, user) if rank is None else rank
+            if rank > row.min_rank_level:
+                raise HTTPException(403, f"This module requires Rank {row.min_rank_level} or higher access.")
+        row = db.query(Module).filter(Module.id == row.parent_id).first() if row.parent_id else None
 
 
 def require_permission(permission_code: str):

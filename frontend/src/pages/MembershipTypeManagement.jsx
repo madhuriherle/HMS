@@ -401,7 +401,7 @@ export default function MembershipTypeManagement() {
   };
 
   return (
-    <PermissionGate required="masters.read">
+    <PermissionGate required="masters.membership_types.read">
     <div className="space-y-6">
 
       {/* Centered Success / Feedback Toast Popup Modal */}
@@ -454,8 +454,8 @@ export default function MembershipTypeManagement() {
 
           <button
             onClick={openAddModal}
-            disabled={!hasPermission('masters.write')}
-            title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+            disabled={!hasPermission('masters.membership_types.write')}
+            title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : undefined}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer self-start sm:self-auto"
           >
             <Plus className="w-4 h-4" />
@@ -556,13 +556,13 @@ export default function MembershipTypeManagement() {
                       <td className="px-5 py-4 text-center">
                         <button
                           type="button"
-                          disabled={!hasPermission('masters.write')}
+                          disabled={!hasPermission('masters.membership_types.write')}
                           onClick={() => promptToggleStatus(item)}
                           className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${isActive
                             ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                             }`}
-                          title={!hasPermission('masters.write') ? 'Requires masters.write permission' : `Click to set as ${isActive ? 'Inactive' : 'Active'}`}
+                          title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : `Click to set as ${isActive ? 'Inactive' : 'Active'}`}
                         >
                           <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                           <span>{item.status}</span>
@@ -589,9 +589,9 @@ export default function MembershipTypeManagement() {
                           {/* Edit Button */}
                           <button
                             onClick={() => openEditModal(item)}
-                            disabled={!hasPermission('masters.write')}
+                            disabled={!hasPermission('masters.membership_types.write')}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit Membership Type'}
+                            title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : 'Edit Membership Type'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -600,9 +600,9 @@ export default function MembershipTypeManagement() {
                           {/* Delete Button */}
                           <button
                             onClick={() => handleConfirmDelete(item)}
-                            disabled={!hasPermission('masters.delete')}
+                            disabled={!hasPermission('masters.membership_types.delete')}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete Membership Type'}
+                            title={!hasPermission('masters.membership_types.delete') ? 'Requires masters.membership_types.delete permission' : 'Delete Membership Type'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                             <span>Delete</span>
@@ -635,8 +635,8 @@ export default function MembershipTypeManagement() {
                       ) : (
                         <button
                           onClick={openAddModal}
-                          disabled={!hasPermission('masters.write')}
-                          title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+                          disabled={!hasPermission('masters.membership_types.write')}
+                          title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : undefined}
                           className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                         >
                           Add Membership Type
@@ -1068,8 +1068,8 @@ export default function MembershipTypeManagement() {
 
                 <button
                   type="button"
-                  disabled={!hasPermission('masters.write')}
-                  title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+                  disabled={!hasPermission('masters.membership_types.write')}
+                  title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : undefined}
                   onClick={() => {
                     const item = historyTargetItem;
                     setHistoryTargetItem(null);
@@ -1292,8 +1292,8 @@ export default function MembershipTypeManagement() {
               </button>
               <button
                 type="button"
-                disabled={!hasPermission('masters.write')}
-                title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+                disabled={!hasPermission('masters.membership_types.write')}
+                title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : undefined}
                 onClick={handleConfirmStatusToggle}
                 className={`w-full py-2.5 px-4 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer ${statusDialog.newStatus === 'Inactive'
                   ? 'bg-[#ED4636] hover:bg-[#C93324]'

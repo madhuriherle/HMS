@@ -502,7 +502,7 @@ export default function BankDetailsManagement() {
   };
 
   return (
-    <PermissionGate required="masters.read">
+    <PermissionGate required="masters.payment_modes.read">
     <div className="space-y-6">
       {/* Toast Notification */}
       {toastMessage && (
@@ -541,8 +541,8 @@ export default function BankDetailsManagement() {
         <button
           onClick={openAddModal}
           id="btn-add-payment-mode"
-          disabled={!hasPermission('masters.write')}
-          title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+          disabled={!hasPermission('masters.payment_modes.write')}
+          title={!hasPermission('masters.payment_modes.write') ? 'Requires masters.payment_modes.write permission' : undefined}
           className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#510601] hover:bg-[#3D0400] active:bg-[#200200] text-white text-sm font-bold rounded-xl shadow-sm hover:shadow transition-all duration-200 cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4" />
@@ -656,13 +656,13 @@ export default function BankDetailsManagement() {
                       <td className="py-4 px-4 sm:px-6 text-center">
                         <button
                           type="button"
-                          disabled={!hasPermission('masters.write')}
+                          disabled={!hasPermission('masters.payment_modes.write')}
                           onClick={() => handleToggleStatusClick(config)}
                           className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-all cursor-pointer ${isActive
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
                             : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
                             }`}
-                          title={!hasPermission('masters.write') ? 'Requires masters.write permission' : `Click to change status to ${isActive ? 'Inactive' : 'Active'}`}
+                          title={!hasPermission('masters.payment_modes.write') ? 'Requires masters.payment_modes.write permission' : `Click to change status to ${isActive ? 'Inactive' : 'Active'}`}
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-gray-400'}`}
@@ -689,9 +689,9 @@ export default function BankDetailsManagement() {
                           <button
                             type="button"
                             onClick={() => openEditModal(config)}
-                            disabled={!hasPermission('masters.write')}
+                            disabled={!hasPermission('masters.payment_modes.write')}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit Payment Mode'}
+                            title={!hasPermission('masters.payment_modes.write') ? 'Requires masters.payment_modes.write permission' : 'Edit Payment Mode'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>
@@ -701,9 +701,9 @@ export default function BankDetailsManagement() {
                           <button
                             type="button"
                             onClick={() => handleDeleteClick(config)}
-                            disabled={!hasPermission('masters.delete')}
+                            disabled={!hasPermission('masters.payment_modes.delete')}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete Payment Mode'}
+                            title={!hasPermission('masters.payment_modes.delete') ? 'Requires masters.payment_modes.delete permission' : 'Delete Payment Mode'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                             <span>Delete</span>
@@ -738,8 +738,8 @@ export default function BankDetailsManagement() {
                       ) : (
                         <button
                           onClick={openAddModal}
-                          disabled={!hasPermission('masters.write')}
-                          title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+                          disabled={!hasPermission('masters.payment_modes.write')}
+                          title={!hasPermission('masters.payment_modes.write') ? 'Requires masters.payment_modes.write permission' : undefined}
                           className="px-4 py-2 bg-[#510601] text-white text-xs font-bold rounded-xl hover:bg-[#3D0400] transition-colors"
                         >
                           + Add First Payment Mode
@@ -1215,8 +1215,8 @@ export default function BankDetailsManagement() {
               </button>
               <button
                 type="button"
-                disabled={!hasPermission('masters.write')}
-                title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+                disabled={!hasPermission('masters.payment_modes.write')}
+                title={!hasPermission('masters.payment_modes.write') ? 'Requires masters.payment_modes.write permission' : undefined}
                 onClick={confirmStatusToggle}
                 className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-sm transition-colors cursor-pointer ${statusDialog.newStatus === 'Active'
                   ? 'bg-emerald-700 hover:bg-emerald-800'
@@ -1253,7 +1253,7 @@ export default function BankDetailsManagement() {
               </button>
               <button
                 type="button"
-                disabled={!hasPermission('masters.write') || (blockedDialog.status || 'Active') !== 'Active'}
+                disabled={!hasPermission('masters.payment_modes.write') || (blockedDialog.status || 'Active') !== 'Active'}
                 onClick={() => {
                   const cfg = blockedDialog;
                   setBlockedDialog(null);
@@ -1291,7 +1291,7 @@ export default function BankDetailsManagement() {
               </button>
               <button
                 type="button"
-                disabled={!hasPermission('masters.delete')}
+                disabled={!hasPermission('masters.payment_modes.delete')}
                 onClick={confirmDelete}
                 className="px-5 py-2 text-xs font-bold text-white rounded-xl shadow-sm transition-colors cursor-pointer bg-[#ED4636] hover:bg-[#C93324] disabled:opacity-40"
               >

@@ -869,7 +869,7 @@ export default function LocationSetup() {
   };
 
   return (
-    <PermissionGate required="masters.read">
+    <PermissionGate required="masters.location.read">
     <div className="space-y-6">
       {/* ---------------------------------------------------- */}
       {/* BREADCRUMB & HEADER                                  */}
@@ -957,7 +957,7 @@ export default function LocationSetup() {
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
-                          disabled={!hasPermission('masters.write')}
+                          disabled={!hasPermission('masters.location.write')}
                           onClick={(e) => {
                             e.stopPropagation();
                             setStatusDialog({
@@ -971,33 +971,33 @@ export default function LocationSetup() {
                               ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
                               : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                           }`}
-                          title={!hasPermission('masters.write') ? 'Requires masters.write permission' : `Click to ${st.status === 'Active' ? 'deactivate' : 'activate'}`}
+                          title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : `Click to ${st.status === 'Active' ? 'deactivate' : 'activate'}`}
                         >
                           <span className={`w-1.5 h-1.5 rounded-full ${st.status === 'Active' ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                           <span>{st.status}</span>
                         </button>
                         <button
                           type="button"
-                          disabled={!hasPermission('masters.write')}
+                          disabled={!hasPermission('masters.location.write')}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleEditState(st);
                           }}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                          title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit State'}
+                          title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit State'}
                         >
                           <Pencil className="w-3.5 h-3.5" />
                           <span>Edit</span>
                         </button>
                         <button
                           type="button"
-                          disabled={!hasPermission('masters.delete')}
+                          disabled={!hasPermission('masters.location.delete')}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleDeleteState(st);
                           }}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                          title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete State'}
+                          title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete State'}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                           <span>Delete</span>
@@ -1029,8 +1029,8 @@ export default function LocationSetup() {
                 <button
                   type="button"
                   onClick={handleOpenAddDistrict}
-                  disabled={!hasPermission('masters.write')}
-                  title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+                  disabled={!hasPermission('masters.location.write')}
+                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-[#510601] text-white text-xs font-semibold rounded-lg hover:bg-[#863221] transition-colors self-start sm:self-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1107,7 +1107,7 @@ export default function LocationSetup() {
                             <td className="py-2.5 px-3 text-center">
                               <button
                                 type="button"
-                                disabled={!hasPermission('masters.write')}
+                                disabled={!hasPermission('masters.location.write')}
                                 onClick={() =>
                                   setStatusDialog({
                                     type: 'district',
@@ -1120,7 +1120,7 @@ export default function LocationSetup() {
                                     ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                                 }`}
-                                title={!hasPermission('masters.write') ? 'Requires masters.write permission' : `Click to ${dist.status === 'Active' ? 'deactivate' : 'activate'}`}
+                                title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : `Click to ${dist.status === 'Active' ? 'deactivate' : 'activate'}`}
                               >
                                 <span className={`w-1.5 h-1.5 rounded-full ${dist.status === 'Active' ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                                 <span>{dist.status}</span>
@@ -1131,9 +1131,9 @@ export default function LocationSetup() {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditDistrict(dist)}
-                                  disabled={!hasPermission('masters.write')}
+                                  disabled={!hasPermission('masters.location.write')}
                                   className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                  title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit District'}
+                                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit District'}
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
                                   <span>Edit</span>
@@ -1141,9 +1141,9 @@ export default function LocationSetup() {
                                 <button
                                   type="button"
                                   onClick={() => setDeleteDialog({ type: 'district', item: dist })}
-                                  disabled={!hasPermission('masters.delete')}
+                                  disabled={!hasPermission('masters.location.delete')}
                                   className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                  title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete District'}
+                                  title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete District'}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                   <span>Delete</span>
@@ -1178,8 +1178,8 @@ export default function LocationSetup() {
                 <button
                   type="button"
                   onClick={handleOpenAddTaluk}
-                  disabled={!currentDistrictForTaluk || !hasPermission('masters.write')}
-                  title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+                  disabled={!currentDistrictForTaluk || !hasPermission('masters.location.write')}
+                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-[#510601] text-white text-xs font-semibold rounded-lg hover:bg-[#863221] disabled:opacity-50 transition-colors self-start sm:self-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1257,7 +1257,7 @@ export default function LocationSetup() {
                             <td className="py-2.5 px-3 text-center">
                               <button
                                 type="button"
-                                disabled={!hasPermission('masters.write')}
+                                disabled={!hasPermission('masters.location.write')}
                                 onClick={() =>
                                   setStatusDialog({
                                     type: 'taluk',
@@ -1270,7 +1270,7 @@ export default function LocationSetup() {
                                     ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
                                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                                 }`}
-                                title={!hasPermission('masters.write') ? 'Requires masters.write permission' : `Click to ${tk.status === 'Active' ? 'deactivate' : 'activate'}`}
+                                title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : `Click to ${tk.status === 'Active' ? 'deactivate' : 'activate'}`}
                               >
                                 <span className={`w-1.5 h-1.5 rounded-full ${tk.status === 'Active' ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                                 <span>{tk.status}</span>
@@ -1281,9 +1281,9 @@ export default function LocationSetup() {
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditTaluk(tk)}
-                                  disabled={!hasPermission('masters.write')}
+                                  disabled={!hasPermission('masters.location.write')}
                                   className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                  title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit Taluk'}
+                                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit Taluk'}
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
                                   <span>Edit</span>
@@ -1291,9 +1291,9 @@ export default function LocationSetup() {
                                 <button
                                   type="button"
                                   onClick={() => setDeleteDialog({ type: 'taluk', item: tk })}
-                                  disabled={!hasPermission('masters.delete')}
+                                  disabled={!hasPermission('masters.location.delete')}
                                   className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                  title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete Taluk'}
+                                  title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete Taluk'}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                   <span>Delete</span>
@@ -1351,8 +1351,8 @@ export default function LocationSetup() {
                 <button
                   type="button"
                   onClick={handleOpenAddPostal}
-                  disabled={!hasPermission('masters.write')}
-                  title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+                  disabled={!hasPermission('masters.location.write')}
+                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
                   className="flex items-center gap-1.5 px-4 py-2 bg-[#510601] text-white text-sm font-semibold rounded-lg hover:bg-[#863221] transition-colors shadow-sm"
                 >
                   <Plus className="w-4 h-4" />
@@ -1360,8 +1360,8 @@ export default function LocationSetup() {
                 </button>
                 <button
                   type="button"
-                  disabled={!hasPermission('masters.write')}
-                  title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+                  disabled={!hasPermission('masters.location.write')}
+                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
                   onClick={() => {
                     setImportFile(null);
                     setImportPreviewRows([]);
@@ -1529,7 +1529,7 @@ export default function LocationSetup() {
                           <td className="py-3 px-4 text-center">
                             <button
                               type="button"
-                              disabled={!hasPermission('masters.write')}
+                              disabled={!hasPermission('masters.location.write')}
                               onClick={() =>
                                 setStatusDialog({
                                   type: 'postal',
@@ -1542,7 +1542,7 @@ export default function LocationSetup() {
                                   ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                               }`}
-                              title={!hasPermission('masters.write') ? 'Requires masters.write permission' : `Click to ${displayStatus === 'Active' ? 'deactivate' : 'activate'}`}
+                              title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : `Click to ${displayStatus === 'Active' ? 'deactivate' : 'activate'}`}
                             >
                               <span className={`w-1.5 h-1.5 rounded-full ${displayStatus === 'Active' ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                               <span>{displayStatus}</span>
@@ -1553,9 +1553,9 @@ export default function LocationSetup() {
                               <button
                                 type="button"
                                 onClick={() => handleOpenEditPostal(item)}
-                                disabled={!hasPermission('masters.write')}
+                                disabled={!hasPermission('masters.location.write')}
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                title={!hasPermission('masters.write') ? 'Requires masters.write permission' : 'Edit PIN Code Mapping'}
+                                title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit PIN Code Mapping'}
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                                 <span>Edit</span>
@@ -1563,9 +1563,9 @@ export default function LocationSetup() {
                               <button
                                 type="button"
                                 onClick={() => setDeleteDialog({ type: 'postal', item })}
-                                disabled={!hasPermission('masters.delete')}
+                                disabled={!hasPermission('masters.location.delete')}
                                 className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : 'Delete PIN Code'}
+                                title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete PIN Code'}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                                 <span>Delete</span>
@@ -2309,8 +2309,8 @@ export default function LocationSetup() {
                 </button>
                 <button
                   type="button"
-                  disabled={(!importSummary || importSummary.valid === 0) || !hasPermission('masters.write')}
-                  title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+                  disabled={(!importSummary || importSummary.valid === 0) || !hasPermission('masters.location.write')}
+                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
                   onClick={handleCommitImport}
                   className="py-2.5 px-5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-sm disabled:opacity-40 transition-colors cursor-pointer"
                 >
@@ -2376,8 +2376,8 @@ export default function LocationSetup() {
               </button>
               <button
                 type="button"
-                disabled={!hasPermission('masters.write')}
-                title={!hasPermission('masters.write') ? 'Requires masters.write permission' : undefined}
+                disabled={!hasPermission('masters.location.write')}
+                title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
                 onClick={handleConfirmStatusToggle}
                 className={`w-full py-2.5 px-4 text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer ${
                   statusDialog.nextStatus === 'Inactive'
@@ -2434,8 +2434,8 @@ export default function LocationSetup() {
               </button>
               <button
                 type="button"
-                disabled={!hasPermission('masters.delete')}
-                title={!hasPermission('masters.delete') ? 'Requires masters.delete permission' : undefined}
+                disabled={!hasPermission('masters.location.delete')}
+                title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : undefined}
                 onClick={handleConfirmDelete}
                 className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
               >

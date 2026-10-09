@@ -408,7 +408,7 @@ def test_sidebar_menu_comes_from_modules_table(client, admin_headers):
                              "rank_level": 50}).json()
     rid = role["id"]
     r = client.put(f"{API}/users/roles/{rid}/permissions", headers=admin_headers,
-                   json={"permission_codes": ["masters.read"], "approval_required_codes": []})
+                   json={"permission_codes": ["masters.location.read", "masters.payment_modes.read", "masters.membership_types.read"], "approval_required_codes": []})
     assert r.status_code == 200, r.text
     u = client.post(f"{API}/users/", headers=admin_headers,
                     json={"name": "Menu User", "username": f"mu{s}", "email": f"mu{s}@x.com",
@@ -419,6 +419,7 @@ def test_sidebar_menu_comes_from_modules_table(client, admin_headers):
     mine = _flat_menu(client.get(f"{API}/users/modules/menu", headers={"Authorization": f"Bearer {tok}"}).json())
     assert "Location Setup" in mine and "Payment Mode Setup" in mine and "Membership Types" in mine
     assert "Organisation Settings" not in mine, "needs system.read"
+    assert "Bank Master" not in mine and "Particulars Master" not in mine, "each Masters page has its own Read privilege"
     assert "Receipt Entry" not in mine and "Membership List" not in mine
     assert "Modules" not in mine, "rank 1 only"
 

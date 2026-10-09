@@ -667,7 +667,7 @@ def _staff_with_role(client, admin_headers, username, role_name, role_code, perm
         module, _, action = code.rpartition(".")
         for sub, _label, _paths in SUB_MODULE_AREAS.get(module, []):
             grants.setdefault(f"{sub}.{action}", flag)
-    known_modules = {m[0] for m in MODULE_CATALOG}
+    known_modules = {m[0] for m in MODULE_CATALOG} | {s for areas in SUB_MODULE_AREAS.values() for s, _l, _p in areas}
     for code in list(grants):
         module = code.rsplit(".", 1)[0]
         if module in known_modules:  # meta-codes like approvals.write have no own module
@@ -2118,7 +2118,7 @@ def test_me_returns_role_rank_and_privileges(client, admin_headers):
     )
     me2 = client.get("/api/v1/auth/me", headers=headers).json()
     assert me2["is_all_access"] is False and me2["role_rank_level"] == 10
-    assert set(me2["privileges"]) == {"masters.write", "masters.read"}
+    assert {"masters.write", "masters.read"} <= set(me2["privileges"])  # plus each Masters page, from the module-level grant
 
 
 def test_superadmin_protections(client, admin_headers):

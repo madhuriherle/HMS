@@ -21,6 +21,8 @@ import {
   Users,
   Key,
   CheckSquare,
+  Check,
+  Minus,
   Square,
   Lock,
   Calendar,
@@ -40,6 +42,7 @@ export default function RolesAndPrivileges() {
   
   const [allPrivileges, setAllPrivileges] = useState([]);
   const [allPrivilegeIds, setAllPrivilegeIds] = useState([]);
+  const [privilegeRows, setPrivilegeRows] = useState([]); // module / sub-module rows for the privilege table
 
   const [loading, setLoading] = useState(true);
 
@@ -80,10 +83,25 @@ export default function RolesAndPrivileges() {
         const privRes = await api.get('/users/modules/privilege-tree');
         let formattedGroups = [];
         let allIds = [];
+        const matrixRows = [];
 
-        const traverse = (modList, path = "") => {
+        const traverse = (modList, path = "", depth = 0) => {
            for (const mod of modList) {
               const currentPath = path ? `${path} > ${mod.name}` : mod.name;
+              // one table row per module: Read / Write / Delete cells, anything else goes to "Other"
+              const cells = { read: null, write: null, delete: null };
+              const other = [];
+              for (const pr of mod.privileges || []) {
+                const suffix = pr.code.startsWith(`${mod.code}.`) ? pr.code.slice(mod.code.length + 1) : null;
+                if (suffix && Object.prototype.hasOwnProperty.call(cells, suffix)) cells[suffix] = { id: pr.code, name: pr.name, description: pr.description };
+                else other.push({ id: pr.code, name: pr.name, description: pr.description });
+              }
+              if ((mod.privileges && mod.privileges.length > 0) || (mod.submodules && mod.submodules.length > 0)) {
+                matrixRows.push({
+                  code: mod.code, name: mod.name, depth, min_rank_level: mod.min_rank_level ?? null,
+                  cells, other, hasChildren: Boolean(mod.submodules && mod.submodules.length > 0)
+                });
+              }
               if (mod.privileges && mod.privileges.length > 0) {
                  const formattedPrivs = mod.privileges.map(p => ({
                     id: p.code, // using code as id for frontend
@@ -98,7 +116,7 @@ export default function RolesAndPrivileges() {
                  allIds.push(...formattedPrivs.map(p => p.id));
               }
               if (mod.submodules && mod.submodules.length > 0) {
-                 traverse(mod.submodules, currentPath);
+                 traverse(mod.submodules, currentPath, depth + 1);
               }
            }
         };
@@ -106,6 +124,7 @@ export default function RolesAndPrivileges() {
         traverse(privRes.data);
         setAllPrivileges(formattedGroups);
         setAllPrivilegeIds(allIds);
+        setPrivilegeRows(matrixRows);
 
       } catch (err) {
         console.error("Error fetching data", err);
@@ -442,6 +461,19 @@ export default function RolesAndPrivileges() {
       }
       const read = readCodeFor(id);
       return Array.from(new Set([...prev, id, ...(read ? [read] : [])]));
+    });
+  };
+
+  // Tick or clear several privileges at once (a column or a row of the table)
+  const applyPrivilegeBulk = (codes, on) => {
+    setSelectedPrivileges(prev => {
+      const set = new Set(prev);
+      if (on) {
+        codes.forEach((c) => { set.add(c); const r = readCodeFor(c); if (r) set.add(r); });
+      } else {
+        codes.forEach((c) => { set.delete(c); if (c.endsWith('.read')) writeCodesFor(c).forEach((w) => set.delete(w)); });
+      }
+      return Array.from(set);
     });
   };
 
@@ -1089,157 +1121,171 @@ export default function RolesAndPrivileges() {
                 <div className="flex items-start gap-2 p-3 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-[11px] text-[#863221]">
                   <Clock className="w-4 h-4 shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
-                    <span className="font-bold text-[#180200]">Needs approval</span> (the chip on a privilege): this role's own actions wait in the Approvals queue instead of applying instantly.
-                    {' '}<span className="font-bold text-[#180200]">Approve requests</span> (Approvals group) is separate: it lets the person finalize other people's requests.
+                    Tick <span className="font-bold text-[#180200]">Read</span>, <span className="font-bold text-[#180200]">Write</span> (add and edit) and <span className="font-bold text-[#180200]">Delete</span> for each module and page; a header row ticks everything below it. Write or Delete also ticks Read.
+                    {' '}The <span className="font-bold text-[#180200]">clock</span> next to a ticked Write or Delete makes this role’s own actions wait for approval. <span className="font-bold text-[#180200]">Approve requests</span> (under Other) lets the person finalize other people’s requests.
                   </p>
                 </div>
                 {(() => {
                   const targetRank = privilegeTargetRole.rank_level ?? 99;
-                  const groups = filteredPrivilegeGroups.filter(
-                    g => g.min_rank_level == null || targetRank <= g.min_rank_level
-                  );
-                  if (groups.length === 0) {
+                  const q = privilegeSearch.toLowerCase().trim();
+                  const reachable = privilegeRows.filter((r) => r.min_rank_level == null || targetRank <= r.min_rank_level);
+                  // a row matches the search by its own name or privilege names; a header row stays if a row below it matches
+                  const rowMatches = (r) =>
+                    !q || r.name.toLowerCase().includes(q)
+                    || [r.cells.read, r.cells.write, r.cells.delete, ...r.other].some((c) => c && (c.name.toLowerCase().includes(q) || c.id.toLowerCase().includes(q)));
+                  const rows = reachable.filter((r, i) => {
+                    if (rowMatches(r)) return true;
+                    for (let j = i + 1; j < reachable.length && reachable[j].depth > r.depth; j += 1) {
+                      if (rowMatches(reachable[j])) return true;
+                    }
+                    return false;
+                  });
+                  if (rows.length === 0) {
                     return (
                       <div className="py-12 text-center text-[#863221]">
                         <p className="text-sm font-semibold">
-                          {filteredPrivilegeGroups.length === 0
-                            ? `No privileges match "${privilegeSearch}"`
-                            : 'No modules are reachable from this role\u2019s rank.'}
+                          {reachable.length === 0 ? 'No modules are reachable from this role\u2019s rank.' : `No privileges match "${privilegeSearch}"`}
                         </p>
-                        {filteredPrivilegeGroups.length === 0 && (
-                          <button
-                            onClick={() => setPrivilegeSearch('')}
-                            className="text-xs text-[#510601] hover:underline mt-1 font-medium"
-                          >
+                        {reachable.length > 0 && (
+                          <button onClick={() => setPrivilegeSearch('')} className="text-xs text-[#510601] hover:underline mt-1 font-medium">
                             Clear Search
                           </button>
                         )}
                       </div>
                     );
                   }
-                  return groups.map((group) => {
-                    const groupPrivIds = group.privileges.map(p => p.id);
-                    const selectedInGroup = isReadOnly
-                      ? groupPrivIds
-                      : groupPrivIds.filter(id => selectedPrivileges.includes(id));
-                    const isAllInGroupSelected = selectedInGroup.length === groupPrivIds.length && groupPrivIds.length > 0;
 
-                    return (
-                      <div
-                        key={group.id}
-                        className="bg-white rounded-xl border border-[#E8DFD8] shadow-2xs overflow-hidden transition-all hover:border-[#863221]/40"
-                      >
-                        {/* Module Header Bar */}
-                        <div className="px-4 py-3 bg-[#FAF7F2] border-b border-[#E8DFD8] flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <Layers className="w-4 h-4 text-[#863221]" />
-                            <div>
-                              <span className="text-xs font-bold text-[#180200] uppercase tracking-wide">
-                                {group.module}
-                              </span>
-                              {group.min_rank_level != null && (
-                                <span className="ml-2 inline-flex items-center px-1.5 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[9px] font-bold rounded">
-                                  Rank {group.min_rank_level}+
-                                </span>
-                              )}
-                              <span className="text-[11px] text-[#863221]/70 ml-2 hidden sm:inline">
-                                {group.description}
-                              </span>
-                            </div>
-                          </div>
+                  // the rows a header row covers: itself and every row indented below it
+                  const subtreeOf = (idx) => {
+                    const list = [rows[idx]];
+                    for (let j = idx + 1; j < rows.length && rows[j].depth > rows[idx].depth; j += 1) list.push(rows[j]);
+                    return list;
+                  };
+                  const isOn = (id) => isReadOnly || selectedPrivileges.includes(id);
+                  const colCodes = (list, col) => list.map((r) => r.cells[col]?.id).filter(Boolean);
+                  const allCodes = (list) => list.flatMap((r) => [r.cells.read, r.cells.write, r.cells.delete, ...r.other]).filter(Boolean).map((c) => c.id);
+                  // state of a group of privileges: 'all' | 'some' | 'none' | 'na' (nothing to tick)
+                  const stateOf = (codes) => {
+                    if (codes.length === 0) return 'na';
+                    const on = codes.filter(isOn).length;
+                    return on === codes.length ? 'all' : on > 0 ? 'some' : 'none';
+                  };
+                  const Box = ({ state, onClick, label }) => (
+                    <button
+                      type="button"
+                      disabled={isReadOnly}
+                      onClick={onClick}
+                      aria-label={label}
+                      title={label}
+                      className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+                        state === 'all' ? 'bg-[#510601] border-[#510601] text-white'
+                          : state === 'some' ? 'bg-[#510601]/15 border-[#510601]/50 text-[#510601]'
+                            : 'bg-white border-[#D9CEC4] hover:border-[#510601]'
+                      } ${isReadOnly ? 'opacity-60 cursor-default' : 'cursor-pointer'}`}
+                    >
+                      {state === 'all' && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
+                      {state === 'some' && <Minus className="w-3.5 h-3.5" strokeWidth={3} />}
+                    </button>
+                  );
 
-                          <div className="flex items-center gap-3">
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                              isAllInGroupSelected
-                                ? 'bg-[#3D705C]/15 text-[#3D705C]'
-                                : selectedInGroup.length > 0
-                                  ? 'bg-[#FFC107]/20 text-[#863221]'
-                                  : 'bg-gray-100 text-gray-500'
-                            }`}>
-                              {selectedInGroup.length} / {groupPrivIds.length}
-                            </span>
-
-                            {!isReadOnly && (
-                              <button
-                                type="button"
-                                onClick={() => handleToggleModulePrivileges(groupPrivIds)}
-                                className="text-xs font-semibold text-[#510601] hover:underline cursor-pointer flex items-center gap-1"
-                              >
-                                {isAllInGroupSelected ? 'Deselect Module' : 'Select All'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Privileges Checkboxes Grid */}
-                        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
-                          {group.privileges.map((priv) => {
-                            const isChecked = isReadOnly || selectedPrivileges.includes(priv.id);
-
-                            return (
-                              <div
-                                key={priv.id}
-                                onClick={() => !isReadOnly && handleTogglePrivilege(priv.id)}
-                                className={`p-3 rounded-xl border transition-all select-none flex items-start gap-2.5 ${
-                                  isReadOnly
-                                    ? 'bg-[#FAF7F2]/60 border-[#E8DFD8] cursor-not-allowed opacity-90'
-                                    : isChecked
-                                      ? 'bg-[#510601]/5 border-[#510601]/40 shadow-2xs cursor-pointer'
-                                      : 'bg-white border-[#E8DFD8] hover:border-[#863221]/30 hover:bg-[#FAF7F2]/40 cursor-pointer'
-                                }`}
-                              >
-                                <div className="pt-0.5 shrink-0">
-                                  {isChecked ? (
-                                    <CheckSquare className={`w-4 h-4 ${isReadOnly ? 'text-[#863221]' : 'text-[#510601]'}`} />
-                                  ) : (
-                                    <Square className="w-4 h-4 text-[#863221]/40" />
+                  return (
+                    <div className="bg-white rounded-xl border border-[#E8DFD8] overflow-x-auto">
+                      <table className="w-full min-w-[720px] text-sm border-collapse">
+                        <thead className="sticky top-0 z-10">
+                          <tr className="bg-[#FAF7F2] text-[11px] font-bold uppercase tracking-wider text-[#863221] border-b border-[#E8DFD8]">
+                            <th className="text-left px-4 py-3 w-[34%]">Module</th>
+                            <th className="px-3 py-3 w-[9%] text-center">Read</th>
+                            <th className="px-3 py-3 w-[13%] text-center">Write</th>
+                            <th className="px-3 py-3 w-[13%] text-center">Delete</th>
+                            <th className="px-3 py-3 text-left">Other</th>
+                            <th className="px-3 py-3 w-[7%] text-center">All</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((r, idx) => {
+                            const sub = subtreeOf(idx);
+                            const rowAll = allCodes(sub);
+                            const cellFor = (col) => {
+                              // a header row's cell covers its whole subtree; a leaf row's cell is its own privilege
+                              const codes = r.hasChildren ? colCodes(sub, col) : colCodes([r], col);
+                              if (codes.length === 0) return <span className="text-[#D9CEC4]">–</span>;
+                              const own = r.cells[col];
+                              return (
+                                <div className="inline-flex items-center gap-1.5">
+                                  <Box
+                                    state={stateOf(codes)}
+                                    label={`${col} — ${r.name}${r.hasChildren ? ' (all below)' : ''}`}
+                                    onClick={() => {
+                                      if (!r.hasChildren && own) handleTogglePrivilege(own.id);
+                                      else applyPrivilegeBulk(codes, stateOf(codes) !== 'all');
+                                    }}
+                                  />
+                                  {!isReadOnly && own && col !== 'read' && isOn(own.id) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleApprovalGate(own.id)}
+                                      title={approvalRequiredCodes.includes(own.id)
+                                        ? 'Needs approval: this role\u2019s actions here wait in the Approvals queue. Click to allow them to apply directly.'
+                                        : 'Click to make this role\u2019s actions here wait for approval (maker-checker).'}
+                                      className={`p-1 rounded-md transition-colors ${
+                                        approvalRequiredCodes.includes(own.id)
+                                          ? 'bg-[#FFC107]/25 text-[#863221]'
+                                          : 'text-[#C9BCB0] hover:text-[#863221] hover:bg-[#FAF7F2]'
+                                      }`}
+                                    >
+                                      <Clock className="w-3.5 h-3.5" />
+                                    </button>
                                   )}
                                 </div>
-                                <div className="min-w-0">
-                                  <div className="flex items-center justify-between gap-2">
-                                    <p className={`text-xs font-semibold leading-snug ${
-                                      isChecked
-                                        ? (isReadOnly ? 'text-[#863221]' : 'text-[#510601]')
-                                        : 'text-[#180200]'
-                                    }`}>
-                                      {priv.name}
-                                    </p>
-                                    {!isReadOnly && isChecked && priv.id !== 'approvals.write' && (
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleToggleApprovalGate(priv.id);
-                                        }}
-                                        title={approvalRequiredCodes.includes(priv.id)
-                                          ? 'Actions under this privilege are filed for approval before they execute. Click to allow instant execution.'
-                                          : 'File actions under this privilege for approval before they execute (maker-checker).'}
-                                        className={`shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-wide transition-all ${
-                                          approvalRequiredCodes.includes(priv.id)
-                                            ? 'bg-[#FFC107]/20 border-[#FFC107]/50 text-[#863221] hover:bg-[#FFC107]/35'
-                                            : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-[#FFC107]/40 hover:text-[#863221]'
-                                        }`}>
-                                        <Clock className="w-2.5 h-2.5" />
-                                        Needs approval
-                                      </button>
+                              );
+                            };
+                            return (
+                              <tr
+                                key={r.code}
+                                className={`border-b border-[#F0E8E0] transition-colors ${r.hasChildren ? 'bg-[#FAF7F2]/70' : 'hover:bg-[#FAF7F2]/50'}`}
+                              >
+                                <td className="px-4 py-2.5" style={{ paddingLeft: `${16 + r.depth * 22}px` }}>
+                                  <div className="flex items-center gap-2">
+                                    {r.hasChildren ? <Layers className="w-4 h-4 text-[#863221] shrink-0" /> : <span className="w-1.5 h-1.5 rounded-full bg-[#C9BCB0] shrink-0" />}
+                                    <span className={r.hasChildren ? 'text-xs font-bold uppercase tracking-wide text-[#180200]' : 'text-sm font-medium text-[#180200]'}>
+                                      {r.name}
+                                    </span>
+                                    {r.min_rank_level != null && (
+                                      <span className="px-1.5 py-0.5 bg-[#FFC107]/20 text-[#863221] text-[9px] font-bold rounded">Rank {r.min_rank_level}+</span>
                                     )}
                                   </div>
-                                  {approvalRequiredCodes.includes(priv.id) && isChecked && (
-                                    <p className="text-[9px] font-semibold text-[#863221] mt-0.5">
-                                      This role's actions wait for approval
-                                    </p>
+                                </td>
+                                <td className="px-3 py-2.5 text-center">{cellFor('read')}</td>
+                                <td className="px-3 py-2.5 text-center">{cellFor('write')}</td>
+                                <td className="px-3 py-2.5 text-center">{cellFor('delete')}</td>
+                                <td className="px-3 py-2.5">
+                                  {r.other.length === 0 ? <span className="text-[#D9CEC4]">–</span> : (
+                                    <div className="flex flex-col gap-1">
+                                      {r.other.map((o) => (
+                                        <label key={o.id} className="inline-flex items-center gap-2 text-xs text-[#180200] cursor-pointer" title={o.description || o.id}>
+                                          <Box state={stateOf([o.id])} label={o.name} onClick={() => handleTogglePrivilege(o.id)} />
+                                          <span>{o.name}</span>
+                                        </label>
+                                      ))}
+                                    </div>
                                   )}
-                                  <p className="text-[11px] text-[#863221]/70 mt-0.5 leading-relaxed">
-                                    {priv.description}
-                                  </p>
-                                </div>
-                              </div>
+                                </td>
+                                <td className="px-3 py-2.5 text-center">
+                                  {rowAll.length === 0 ? <span className="text-[#D9CEC4]">–</span> : (
+                                    <Box
+                                      state={stateOf(rowAll)}
+                                      label={`Everything for ${r.name}${r.hasChildren ? ' and the pages below it' : ''}`}
+                                      onClick={() => applyPrivilegeBulk(rowAll, stateOf(rowAll) !== 'all')}
+                                    />
+                                  )}
+                                </td>
+                              </tr>
                             );
                           })}
-                        </div>
-                      </div>
-                    );
-                  });
+                        </tbody>
+                      </table>
+                    </div>
+                  );
                 })()}
               </div>
 
