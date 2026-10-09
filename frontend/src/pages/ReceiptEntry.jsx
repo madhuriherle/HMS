@@ -1067,21 +1067,9 @@ export default function ReceiptEntry() {
 
 
       {/* ------------------------------------------------------------ */}
-      {/* BREADCRUMB & PAGE HEADER                                     */}
+      {/* PAGE HEADER                                    */}
       {/* ------------------------------------------------------------ */}
       <div>
-        <nav className="flex items-center gap-2 text-xs font-semibold text-[#863221] uppercase tracking-wider mb-2">
-          <Link to="/dashboard" className="hover:text-[#510601] transition-colors">
-            Dashboard
-          </Link>
-          <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-          <Link to="/dashboard/receipts/tracking" className="hover:text-[#510601] transition-colors">
-            Receipt Management
-          </Link>
-          <ChevronRight className="w-3.5 h-3.5 text-[#863221]/50" />
-          <span className="text-[#180200]">Receipt Entry</span>
-        </nav>
-
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">

@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { Menu, User, LogOut } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import api from '../api';
+import Swal from 'sweetalert2';
 
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -46,14 +47,29 @@ export default function MainLayout() {
     return () => window.removeEventListener('storage', syncUser);
   }, []);
 
-  const handleLogout = () => {
-    try {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('hms_auth_token');
-      localStorage.removeItem('hms_user_profile');
-    } catch (_) {}
-    navigate('/');
+  const handleLogout = async () => {
+    const result = await Swal.fire({
+      title: 'Log out?',
+      text: 'Are you sure you want to log out?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, log out',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#ED4636',
+      cancelButtonColor: '#863221',
+      reverseButtons: true,
+      customClass: { popup: 'hms-mini-swal' },
+    });
+
+    if (result.isConfirmed) {
+      try {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('hms_auth_token');
+        localStorage.removeItem('hms_user_profile');
+      } catch (_) {}
+      navigate('/');
+    }
   };
 
   const displayName = currentUser?.name || currentUser?.username || currentUser?.fullName || '';
