@@ -606,84 +606,49 @@ export default function RolesAndPrivileges() {
       {/* Roles Table Card */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[860px]">
+          <table className="w-full text-left border-collapse min-w-[520px]">
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-semibold text-[#863221] uppercase tracking-wider">
-                <th className="px-6 py-3.5">Role Name</th>
-                <th className="px-6 py-3.5 text-center">Rank</th>
-                <th className="px-6 py-3.5">Description</th>
-                <th className="px-6 py-3.5 text-center">Users Count</th>
-                <th className="px-6 py-3.5 text-center">Privileges</th>
-                <th className="px-6 py-3.5">Status</th>
-                <th className="px-6 py-3.5">Created Date</th>
-                <th className="px-6 py-3.5 text-right">Actions</th>
+                <th className="px-6 py-3">Role Name</th>
+                <th className="px-6 py-3">Users</th>
+                <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DFD8] text-sm">
               {paginatedRoles.length > 0 ? (
                 paginatedRoles.map((role) => {
-                  const privCount = (role.permission_codes || role.privileges) ? (role.permission_codes || role.privileges).length : 0;
                   const isSys = isSystemRole(role);
                   const isLocked = !canManageRole(role);
-                  const isFullAdmin = isSys || privCount === allPrivilegeIds.length;
                   const isActive = isRoleActive(role);
                   const isDeleteDisabled = isLocked || (role.usersCount || 0) > 0;
 
                   return (
                     <tr key={role.id} className="hover:bg-[#FAF7F2]/50 transition-colors group">
-                      <td className="px-6 py-4 font-bold text-[#180200]">
+                      <td className="px-6 py-3 font-bold text-[#180200]">
                         <div className="flex items-center gap-2">
                           <span>{role.name}</span>
                           {isSys && (
-                            <span className="px-2 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[10px] font-bold rounded-md">
+                            <span className="px-2 py-0.5 bg-[#FFC107]/20 text-[#863221] text-[10px] font-bold rounded-md">
                               System
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center">
-                        <span
-                          className={`inline-flex items-center justify-center min-w-[2.25rem] px-2 py-1 rounded-lg text-xs font-bold border ${role.rank_level === 1
-                            ? 'bg-[#FFC107]/15 border-[#FFC107]/40 text-[#863221]'
-                            : 'bg-[#510601]/5 border-[#E8DFD8] text-[#510601]'
-                          }`}
-                          title={`Rank ${role.rank_level} (1 = highest authority)`}
-                        >
-                          {role.rank_level ?? 99}
-                        </span>
+                      <td className="px-6 py-3 text-xs font-semibold text-[#180200]">
+                        {role.usersCount} {role.usersCount === 1 ? 'User' : 'Users'}
                       </td>
-                      <td className="px-6 py-4 text-xs text-[#180200]/80 max-w-xs truncate" title={role.description}>
-                        {role.description || '—'}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg text-xs font-semibold text-[#180200]">
-                          <Users className="w-3.5 h-3.5 text-[#863221]" />
-                          {role.usersCount} {role.usersCount === 1 ? 'User' : 'Users'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <button
-                          onClick={() => openPrivilegeModal(role)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-[#FAF7F2] border border-[#E8DFD8] hover:border-[#510601] text-[#510601] rounded-full text-xs font-semibold shadow-2xs transition-all cursor-pointer group-hover:shadow-xs"
-                          title={isSys ? "View System Privileges (Read-Only)" : "Configure access permissions"}
-                        >
-                          <Key className="w-3.5 h-3.5 text-[#863221]" />
-                          <span>
-                            {isFullAdmin ? 'All Access (32/32)' : `${privCount} Privileges`}
-                          </span>
-                        </button>
-                      </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-3">
                         <button
                           type="button"
                           disabled={isLocked || !hasPermission('roles.write')}
                           onClick={() => !isLocked && promptToggleStatus(role)}
                           className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold transition-all ${
                             isLocked
-                              ? 'bg-[#3D705C]/10 text-[#3D705C] border border-[#3D705C]/20 cursor-not-allowed opacity-80'
+                              ? 'bg-[#3D705C]/10 text-[#3D705C] cursor-not-allowed opacity-80'
                               : isActive
-                                ? 'bg-[#3D705C]/10 text-[#3D705C] border border-[#3D705C]/20 hover:bg-[#3D705C]/20 cursor-pointer hover:opacity-80 active:scale-95'
-                                : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200 cursor-pointer hover:opacity-80 active:scale-95'
+                                ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 cursor-pointer hover:opacity-80 active:scale-95'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer hover:opacity-80 active:scale-95'
                           }`}
                           title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? 'System role is permanently Active' : isLocked ? 'Role is at or above your rank' : (isActive ? 'Click to deactivate role' : 'Click to activate role')}
                         >
@@ -691,61 +656,46 @@ export default function RolesAndPrivileges() {
                           {isActive ? 'Active' : 'Inactive'}
                         </button>
                       </td>
-                      <td className="px-6 py-4 text-xs text-[#863221]/80 font-medium">
-                        {formatDate(role.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {/* Configure Privileges (Shield Icon) */}
+                          {/* Privileges */}
                           <button
                             disabled={isSys}
                             onClick={() => !isSys && openPrivilegeModal(role)}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
-                              isSys
-                                ? 'text-gray-300 border-transparent cursor-not-allowed opacity-40'
-                                : 'text-[#510601] bg-[#FAF7F2] hover:bg-[#F1E7DE] border-[#E8DFD8] cursor-pointer'
-                            }`}
-                            title={isSys ? "System role privileges are permanent and cannot be modified" : "Configure Privileges"}
+                            className={`p-2 rounded-lg transition-colors ${isSys ? 'text-gray-300 cursor-not-allowed opacity-40' : 'text-[#510601] hover:bg-[#F1E7DE] cursor-pointer'}`}
+                            title={isSys ? 'System role privileges are permanent and cannot be modified' : 'Configure Privileges'}
                           >
-                            <ShieldCheck className="w-3.5 h-3.5" />
-                            <span>Privileges</span>
+                            <ShieldCheck className="w-4 h-4" />
                           </button>
 
-                          {/* View Details */}
+                          {/* View details (rank, description, privileges, dates) */}
                           <button
                             onClick={() => setViewingRole(role)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-all cursor-pointer"
+                            className="p-2 rounded-lg text-[#510601] hover:bg-[#F1E7DE] transition-colors cursor-pointer"
                             title="View Details"
                           >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>View</span>
+                            <Eye className="w-4 h-4" />
                           </button>
 
-                          {/* Edit Role */}
+                          {/* Edit */}
                           <button
                             disabled={isLocked || !hasPermission('roles.write')}
                             onClick={() => !isLocked && openEditModal(role)}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
-                              isLocked
-                                ? 'text-gray-300 border-transparent cursor-not-allowed opacity-40'
-                                : 'text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200 cursor-pointer'
-                            }`}
-                            title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? "System role cannot be edited" : isLocked ? "Role is at or above your rank" : "Edit Role"}
+                            className={`p-2 rounded-lg transition-colors ${isLocked ? 'text-gray-300 cursor-not-allowed opacity-40' : 'text-amber-700 hover:bg-amber-50 cursor-pointer'}`}
+                            title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? 'System role cannot be edited' : isLocked ? 'Role is at or above your rank' : 'Edit Role'}
                           >
-                            <Pencil className="w-3.5 h-3.5" />
-                            <span>Edit</span>
+                            <Pencil className="w-4 h-4" />
                           </button>
 
-                          {/* Delete Role (Only included if role is deletable) */}
+                          {/* Delete (only for deletable roles) */}
                           {!isDeleteDisabled && (
                             <button
                               disabled={isLocked || !hasPermission('roles.delete')}
                               onClick={() => setDeleteTargetRole(role)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                               title={!hasPermission('roles.delete') ? 'You need the roles.delete permission' : 'Delete Role'}
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Delete</span>
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           )}
                         </div>
@@ -755,7 +705,7 @@ export default function RolesAndPrivileges() {
                 })
               ) : (
                 <tr>
-                  <td colSpan="8" className="px-6 py-12 text-center text-[#863221]">
+                  <td colSpan="4" className="px-6 py-12 text-center text-[#863221]">
                     <div className="w-12 h-12 rounded-full bg-[#FAF7F2] text-[#863221]/60 flex items-center justify-center mx-auto mb-3">
                       <Shield className="w-6 h-6" />
                     </div>
