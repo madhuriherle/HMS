@@ -1070,7 +1070,8 @@ export default function RolesAndPrivileges() {
                 <div className="flex items-start gap-2 p-3 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-[11px] text-[#863221]">
                   <Clock className="w-4 h-4 shrink-0 mt-0.5" />
                   <p className="leading-relaxed">
-                    Tick <span className="font-bold text-[#180200]">Approval</span> to send actions to the Approvals queue instead of applying instantly.
+                    <span className="font-bold text-[#180200]">Needs approval</span> (the chip on a privilege): this role's own actions wait in the Approvals queue instead of applying instantly.
+                    {' '}<span className="font-bold text-[#180200]">Approve requests</span> (Approvals group) is separate: it lets the person finalize other people's requests.
                   </p>
                 </div>
                 {(() => {
@@ -1200,13 +1201,13 @@ export default function RolesAndPrivileges() {
                                             : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-[#FFC107]/40 hover:text-[#863221]'
                                         }`}>
                                         <Clock className="w-2.5 h-2.5" />
-                                        Approval
+                                        Needs approval
                                       </button>
                                     )}
                                   </div>
                                   {approvalRequiredCodes.includes(priv.id) && isChecked && (
                                     <p className="text-[9px] font-semibold text-[#863221] mt-0.5">
-                                      Actions need admin approval
+                                      This role's actions wait for approval
                                     </p>
                                   )}
                                   <p className="text-[11px] text-[#863221]/70 mt-0.5 leading-relaxed">
