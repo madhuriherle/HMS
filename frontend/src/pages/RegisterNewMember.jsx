@@ -656,15 +656,6 @@ export default function RegisterNewMember() {
       errors.name = 'New Member Name is required';
     }
 
-    if (!cleanFather) {
-      errors.fatherName = "Father's Name is required";
-      errors.fatherHusbandName = "Father's Name is required";
-    }
-
-    if (formData.isMarried === 'YES' && !(formData.spouseName || '').trim()) {
-      errors.spouseName = 'Spouse Name is required when married';
-    }
-
     // International Mobile Validation
     const mobileValidation = validateInternationalPhone(
       formData.mobile,
@@ -706,17 +697,8 @@ export default function RegisterNewMember() {
       }
     }
 
-    if (!formData.gothra) {
-      errors.gothra = 'Please select Gotra';
-    }
-
-    if (!formData.gender) {
-      errors.gender = 'Please select Gender';
-    }
-
-    if (!cleanAadhar) {
-      errors.aadharNumber = 'Aadhar Number is required';
-    } else if (!hasDigits(cleanAadhar, rules?.aadhaar?.digits)) {
+    // Aadhaar and PIN are optional for now; when typed they must still be the right length
+    if (cleanAadhar && !hasDigits(cleanAadhar, rules?.aadhaar?.digits)) {
       errors.aadharNumber = `Aadhar must be a ${rules?.aadhaar?.digits}-digit number`;
     }
 
@@ -724,22 +706,8 @@ export default function RegisterNewMember() {
       errors.address = 'Communication Address is required';
     }
 
-    if (!cleanPin) {
-      errors.postalCode = 'PIN Code is required';
-    } else if (!hasDigits(cleanPin, rules?.pincode?.digits)) {
+    if (cleanPin && !hasDigits(cleanPin, rules?.pincode?.digits)) {
       errors.postalCode = `PIN Code must be ${rules?.pincode?.digits} numeric digits`;
-    }
-
-    if (!formData.appliedOnBehalfOf) {
-      errors.appliedOnBehalfOf = 'Please select applying behalf';
-    }
-
-    if (!formData.qualification) {
-      errors.qualification = 'Please select Qualification';
-    }
-
-    if (!formData.magazineNeeded) {
-      errors.magazineNeeded = 'Please select YES/NO for Magazine';
     }
 
     setFormErrors(errors);
@@ -1161,7 +1129,7 @@ export default function RegisterNewMember() {
                     {/* Father Name */}
                     <div>
                       <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        Father's Name: <span className="text-red-600">*</span>
+                        Father's Name:
                       </label>
                       <input
                         type="text"
@@ -1311,7 +1279,7 @@ export default function RegisterNewMember() {
                   {/* Gothra */}
                   <div>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Gothra: <span className="text-red-600">*</span>
+                      Gothra:
                     </label>
                     <select
                       value={formData.gothra}
@@ -1337,7 +1305,7 @@ export default function RegisterNewMember() {
                   {/* Gender */}
                   <div>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Gender: <span className="text-red-600">*</span>
+                      Gender:
                     </label>
                     <select
                       value={formData.gender}
@@ -1380,7 +1348,7 @@ export default function RegisterNewMember() {
                   {/* Aadhar Number */}
                   <div>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Aadhar Number: <span className="text-red-600">*</span>
+                      Aadhar Number:
                     </label>
                     <input
                       type="text"
@@ -1425,7 +1393,7 @@ export default function RegisterNewMember() {
                   {/* Pin Code with Autocomplete */}
                   <div className="relative" ref={pinWrapperRef}>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Pin Code: <span className="text-red-600">*</span>
+                      Pin Code:
                     </label>
                     <div className="relative">
                       <input
@@ -1514,7 +1482,7 @@ export default function RegisterNewMember() {
                   {/* Applying this Membership on behalf of */}
                   <div>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Applying this Membership on behalf of: <span className="text-red-600">*</span>
+                      Applying this Membership on behalf of:
                     </label>
                     <select
                       value={formData.appliedOnBehalfOf}
@@ -1542,7 +1510,7 @@ export default function RegisterNewMember() {
                   {/* Qualification */}
                   <div>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Qualification: <span className="text-red-600">*</span>
+                      Qualification:
                     </label>
                     <SearchableFormSelect
                       value={formData.qualification}
@@ -1579,7 +1547,7 @@ export default function RegisterNewMember() {
                   {/* Magazine Needed */}
                   <div>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Do you need Havyaka Magazine Every month? <span className="text-red-600">*</span>
+                      Do you need Havyaka Magazine Every month?
                     </label>
                     <select
                       value={formData.magazineNeeded}
@@ -1622,7 +1590,7 @@ export default function RegisterNewMember() {
                       <div className="space-y-3 bg-white p-3.5 rounded-lg border border-[#DFD5CC]">
                         <div>
                           <label className="block text-xs text-[#3D140C] mb-1 font-semibold">
-                            Father's Name: <span className="text-red-600">*</span>
+                            Father's Name:
                           </label>
                           <input
                             type="text"
@@ -1772,7 +1740,7 @@ export default function RegisterNewMember() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-3 border-t border-[#DFD5CC] bg-white p-3.5 rounded-lg border">
                         <div>
                           <label className="block text-xs text-[#3D140C] mb-1 font-semibold">
-                            Spouse Name: <span className="text-red-600">*</span>
+                            Spouse Name:
                           </label>
                           <input
                             type="text"

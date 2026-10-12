@@ -20,7 +20,9 @@ api.interceptors.request.use(
         // Every change needs a confirmation + reason (sent to the audit log).
         const method = (config.method || 'get').toLowerCase();
         const isAuth = (config.url || '').includes('/auth/');
-        if (!READ_METHODS.includes(method) && !isAuth && !config.headers['X-Action-Reason']) {
+        // a POST that only previews / looks something up changes nothing, so it never asks for confirmation
+        const isReadOnlyPost = /\/(preview|lookup|validate)$/.test((config.url || '').split('?')[0]);
+        if (!READ_METHODS.includes(method) && !isAuth && !isReadOnlyPost && !config.headers['X-Action-Reason']) {
             // A caller that already collected a reason (e.g. member delete) passes params.reason.
             const supplied = config.params?.reason;
             const reason = supplied ? String(supplied) : await confirmAction(method, config.url);

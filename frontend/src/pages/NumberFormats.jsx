@@ -66,22 +66,20 @@ function FormatCard({ item, options, canWrite, onSaved }) {
   };
 
   return (
-    <section className="bg-white border border-[#E8DFD8] rounded-2xl px-5 py-4 space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-sm font-bold text-[#180200]">{item.label}</h3>
-        <p className="text-sm text-[#863221]">
-          <span className="font-mono font-bold text-[#510601] text-base">{example}</span>
-          <span className="ml-3 text-xs">next: <span className="font-mono">{item.next_number}</span></span>
-        </p>
+    <section className="bg-white border border-[#E8DFD8] rounded-2xl p-5 space-y-5">
+      <div className="rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] px-5 py-4">
+        <p className="text-[11px] font-semibold uppercase text-[#863221]">{item.label}</p>
+        <p className="font-mono text-2xl font-bold text-[#510601] mt-1 break-all">{example}</p>
+        <p className="text-xs text-[#863221] mt-1">next: <span className="font-mono">{item.next_number}</span></p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div>
           <label className={labelCls}>Prefix</label>
           <input className={fieldCls} value={form.prefix || ''} maxLength={12} disabled={!canWrite}
             onChange={(e) => set({ prefix: e.target.value.toUpperCase() })} />
         </div>
-        <div className="col-span-2">
+        <div>
           <label className={labelCls}>Date in number</label>
           <select className={fieldCls} value={form.date_part} disabled={!canWrite} onChange={(e) => set({ date_part: e.target.value })}>
             {options.date_parts.map((d) => (
@@ -92,7 +90,7 @@ function FormatCard({ item, options, canWrite, onSaved }) {
         <div>
           <label className={labelCls}>Separator</label>
           <select className={fieldCls} value={form.separator} disabled={!canWrite} onChange={(e) => set({ separator: e.target.value })}>
-            {options.separators.map((s) => <option key={s} value={s}>{SEP_LABEL[s]}</option>)}
+            {options.separators.map((sp) => <option key={sp} value={sp}>{SEP_LABEL[sp]}</option>)}
           </select>
         </div>
         <div>
@@ -101,7 +99,7 @@ function FormatCard({ item, options, canWrite, onSaved }) {
             {[3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
-        <div className="col-span-2">
+        <div>
           <label className={labelCls}>Restart</label>
           <select className={fieldCls} value={form.restart} disabled={!canWrite} onChange={(e) => setRestart(e.target.value)}>
             {options.restarts.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -117,19 +115,17 @@ function FormatCard({ item, options, canWrite, onSaved }) {
           <input className={fieldCls} value={form.suffix || ''} maxLength={12} disabled={!canWrite}
             onChange={(e) => set({ suffix: e.target.value.toUpperCase() })} />
         </div>
+        {item.doc_type === 'RECEIPT' && (
+          <label className="col-span-2 inline-flex items-end gap-2 pb-2 text-xs text-[#180200] cursor-pointer">
+            <input type="checkbox" className="accent-[#510601]" checked={form.allow_manual} disabled={!canWrite}
+              onChange={(e) => set({ allow_manual: e.target.checked })} />
+            Allow typing a number by hand
+          </label>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs">
-          {item.doc_type === 'RECEIPT' && (
-            <label className="inline-flex items-center gap-2 text-[#180200] cursor-pointer">
-              <input type="checkbox" className="accent-[#510601]" checked={form.allow_manual} disabled={!canWrite}
-                onChange={(e) => set({ allow_manual: e.target.checked })} />
-              Allow typing a number by hand
-            </label>
-          )}
-          {error && <span className="font-semibold text-red-700">{error}</span>}
-        </div>
+        <span className="text-xs font-semibold text-red-700">{error}</span>
         <div className="flex gap-2">
           <button type="button" onClick={() => setForm(item)} disabled={!dirty || saving}
             className="px-3.5 py-1.5 text-xs font-semibold border border-[#E8DFD8] text-[#863221] rounded-lg hover:bg-[#FAF7F2] disabled:opacity-40 cursor-pointer">
@@ -163,18 +159,41 @@ export default function NumberFormats() {
     load();
   }, []);
 
+  const [selected, setSelected] = useState('MEMBER_CODE');
+  const current = data?.data.find((d) => d.doc_type === selected);
+
   return (
     <PermissionGate required="system.read">
       <div className="space-y-4">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-xl font-bold text-[#180200]">Number Formats</h2>
-          <p className="text-xs text-[#863221]">Applies to new numbers only.</p>
-        </div>
+        <h2 className="text-xl font-bold text-[#180200]">Number Formats</h2>
         {loadError && <p className="text-sm font-semibold text-red-700">{loadError}</p>}
         {!data && !loadError && <p className="text-sm text-[#863221]">Loading...</p>}
-        {data?.data.map((item) => (
-          <FormatCard key={item.doc_type} item={item} options={data.options} canWrite={hasPermission('system.write')} onSaved={load} />
-        ))}
+        {data && (
+          <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4 items-start">
+            <div className="flex md:flex-col gap-3">
+              {data.data.map((d) => (
+                <button
+                  key={d.doc_type}
+                  type="button"
+                  onClick={() => setSelected(d.doc_type)}
+                  className={`flex-1 text-left rounded-2xl border px-4 py-3 transition-colors cursor-pointer ${
+                    d.doc_type === selected
+                      ? 'bg-[#510601] border-[#510601] text-white'
+                      : 'bg-white border-[#E8DFD8] text-[#180200] hover:bg-[#FAF7F2]'
+                  }`}
+                >
+                  <span className="block text-sm font-bold">{d.label}</span>
+                  <span className={`block font-mono text-xs mt-1 break-all ${d.doc_type === selected ? 'text-white/80' : 'text-[#863221]'}`}>
+                    {d.example}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {current && (
+              <FormatCard key={current.doc_type} item={current} options={data.options} canWrite={hasPermission('system.write')} onSaved={load} />
+            )}
+          </div>
+        )}
       </div>
     </PermissionGate>
   );
