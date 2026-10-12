@@ -681,7 +681,7 @@ export default function ReceiptTypeManagement() {
 
                         {/* Action Buttons */}
                         <td className="px-5 py-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5 flex-nowrap">
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
 
                             {/* Add Sub-Type Button */}
                             <button

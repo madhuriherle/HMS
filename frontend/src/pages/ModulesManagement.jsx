@@ -542,7 +542,7 @@ export default function ModulesManagement() {
                       </button>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex flex-wrap items-center justify-end gap-1.5">
                         <button
                           onClick={() => handleLinkPrivileges(m)}
                           className="btn-act"

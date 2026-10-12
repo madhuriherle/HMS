@@ -1209,7 +1209,7 @@ export default function LocationSetup() {
                               </button>
                             </td>
                             <td className="py-2.5 px-3 text-right">
-                              <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex flex-wrap items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditDistrict(dist)}
@@ -1358,7 +1358,7 @@ export default function LocationSetup() {
                               </button>
                             </td>
                             <td className="py-2.5 px-3 text-right">
-                              <div className="flex items-center justify-end gap-1">
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
                                 <button
                                   type="button"
                                   onClick={() => handleOpenEditTaluk(tk)}

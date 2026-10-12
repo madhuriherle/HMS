@@ -885,19 +885,10 @@ export default function BankDetailsManagement() {
       >
         {viewingItem && (() => {
           const isBank = !['Cash', 'Cheque', 'DD'].includes(viewingItem.paymentMode);
-          const lookup = BANK_DETAILS_LOOKUP[viewingItem.bankAccount] || {};
-          const account = viewingItem.accountNumber || lookup.accountNumber;
           const rows = [
             ['Payment mode', viewingItem.paymentMode],
             ['Status', viewingItem.status || 'Active'],
-            ...(isBank
-              ? [
-                  ['Bank', viewingItem.bankAccount || '-'],
-                  ['Branch', viewingItem.branch || lookup.branch || '-'],
-                  ['IFSC', viewingItem.ifscCode || lookup.ifscCode || '-'],
-                  ['Account no.', account || '-'],
-                ]
-              : []),
+            ...(isBank ? [['Bank account', viewingItem.bankAccount || '-']] : []),
             ['Shown on receipt as', formatPaymentModeLabel(viewingItem)],
           ];
           return (
@@ -912,15 +903,6 @@ export default function BankDetailsManagement() {
                 ))}
               </dl>
               <div className="mt-4 flex justify-end gap-2">
-                {account && (
-                  <button
-                    type="button"
-                    onClick={() => handleCopyText(viewingItem.id, account)}
-                    className="px-3.5 py-2 border border-[#E8DFD8] text-xs font-semibold text-[#863221] hover:bg-[#FAF7F2] rounded-xl cursor-pointer"
-                  >
-                    {copiedId === viewingItem.id ? 'Copied' : 'Copy account no.'}
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => setViewingItem(null)}

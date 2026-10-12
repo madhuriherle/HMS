@@ -898,7 +898,7 @@ export default function ReceiptTracking() {
 
                       {/* Column 6: Action */}
                       <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-0.5">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
                           {/* View Action */}
                           <button
                             type="button"

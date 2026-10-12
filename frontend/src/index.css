@@ -2,21 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Row actions (View / Edit / Delete / Print / Approve): one tinted icon button everywhere.
-   The colour follows the icon inside, so no screen has to choose it. A button with an icon hides its
-   word (the title shows on hover); a button without an icon stays a text button. */
+/* Row actions (View / Edit / Delete / Print / Approve): one tinted icon-and-name button everywhere.
+   The colour follows the icon inside, so no screen has to choose it. */
 @layer components {
   .btn-act {
     --act: 81 6 1;
-    @apply inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg shrink-0 cursor-pointer transition-colors;
+    @apply inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg shrink-0 cursor-pointer transition-colors whitespace-nowrap;
     color: rgb(var(--act));
     background-color: rgb(var(--act) / 0.09);
   }
   .btn-act:hover { background-color: rgb(var(--act) / 0.18); }
   .btn-act:disabled { @apply opacity-40 cursor-not-allowed; }
   .btn-act:disabled:hover { background-color: rgb(var(--act) / 0.09); }
-  .btn-act:has(svg) { width: 2rem; height: 2rem; padding: 0; }
-  .btn-act:has(svg) > span { display: none; }
   .btn-act:has(.lucide-pencil) { --act: 180 83 9; }
   .btn-act:has(.lucide-printer) { --act: 134 50 33; }
   .btn-act:has(.lucide-eye) { --act: 81 6 1; }

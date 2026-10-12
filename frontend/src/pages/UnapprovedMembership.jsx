@@ -501,7 +501,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
                       {/* Actions: Assign to Receipt, View & Approve */}
                       <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-0.5 flex-wrap sm:flex-nowrap">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
                           {/* 1. Assign to Receipt Action */}
                           <button
                             type="button"

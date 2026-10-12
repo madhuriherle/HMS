@@ -911,7 +911,7 @@ export default function MembershipList() {
 
                       {/* Action Buttons: View, Edit, Delete */}
                       <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-0.5">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
