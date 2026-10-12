@@ -16,6 +16,7 @@ import ReceiptTracking from './pages/ReceiptTracking';
 import LabelList from './pages/LabelList';
 import MembershipList from './pages/MembershipList';
 import UnapprovedMembership from './pages/UnapprovedMembership';
+import AssignedApprovals from './pages/AssignedApprovals';
 import OrganisationSettings from './pages/OrganisationSettings';
 import BankDetailsManagement from './pages/BankDetailsManagement';
 import Approvals from './pages/Approvals';
@@ -58,7 +59,7 @@ function App() {
           {/* Membership Module Routes */}
           <Route path="membership/list" element={<MembershipList />} />
           <Route path="membership/unapproved" element={<UnapprovedMembership />} />
-          <Route path="membership/assigned" element={<UnapprovedMembership assignedOnly />} />
+          <Route path="membership/assigned" element={<AssignedApprovals />} />
           <Route path="membership/register" element={<RegisterNewMember />} />
           <Route path="membership/add" element={<RegisterNewMember />} />
           <Route path="membership/edit/:id" element={<RegisterNewMember />} />
