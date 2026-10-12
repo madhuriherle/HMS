@@ -1,12 +1,16 @@
-from sqlalchemy import String, BigInteger, Boolean, DateTime, Date, Numeric, Text, ForeignKey
+from sqlalchemy import text
+from sqlalchemy import Index, event
+from sqlalchemy import String, Integer, BigInteger, Boolean, DateTime, Date, Numeric, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from models.base import Base, AuditMixin
 
 class Receipt(AuditMixin, Base):
     __tablename__ = "receipts"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    receipt_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    receipt_number: Mapped[str] = mapped_column(String(50), nullable=False)
     receipt_date: Mapped[Date] = mapped_column(Date, nullable=False)
+    # "2026-27" (April-March) derived from receipt_date; receipt numbers are unique within it.
+    financial_year: Mapped[str] = mapped_column(String(7), nullable=False)
     receipt_type: Mapped[str] = mapped_column(String(30), nullable=False) 
     payer_name: Mapped[str] = mapped_column(String(200), nullable=True)
     payment_mode: Mapped[str] = mapped_column(String(30), nullable=False) 
@@ -31,8 +35,13 @@ class ReceiptItem(AuditMixin, Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
     receipt_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("receipts.id"), nullable=False)
     item_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    # One receipt, many lines: the particular this line is for (master row + a name
+    # snapshot so history survives a rename), its sub-type / free-text detail and the amount.
+    particular_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("particulars.id"), nullable=True)
+    particular_name: Mapped[str] = mapped_column(String(150), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     amount: Mapped[float] = mapped_column(Numeric(12,2), nullable=False)
+    line_no: Mapped[int] = mapped_column(Integer, nullable=True)
 
 class ReceiptAllocation(AuditMixin, Base):
     __tablename__ = "receipt_allocations"
@@ -68,3 +77,18 @@ class RefundTransaction(AuditMixin, Base):
     amount: Mapped[float] = mapped_column(Numeric(12,2), nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False)
     refund_reference: Mapped[str] = mapped_column(String(255), nullable=True)
+
+
+# Unique among live rows only, so a soft-deleted record never blocks re-using its code/number.
+Index("uq_receipts_fy_number_active", Receipt.__table__.c.financial_year, Receipt.__table__.c.receipt_number, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
+
+
+def _set_financial_year(mapper, connection, target):
+    from services.receipt_numbers import financial_year_for
+    if target.receipt_date:
+        target.financial_year = financial_year_for(target.receipt_date)
+
+
+event.listen(Receipt, "before_insert", _set_financial_year)
+event.listen(Receipt, "before_update", _set_financial_year)

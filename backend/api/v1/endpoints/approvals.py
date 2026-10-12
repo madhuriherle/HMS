@@ -23,6 +23,7 @@ import models.approval_requests  # noqa: F401  # register approval_requests tabl
 from schemas.members import EDITABLE_MEMBER_FIELDS
 from schemas.common import BulkApprovalAction, BulkRejectionAction
 from services.pricing import active_price
+from services import receipt_numbers
 from services.sequences import generate_next_number
 
 router = APIRouter()
@@ -374,7 +375,7 @@ def approve_type_change(
                 f" -> {new_type.code if new_type else req.requested_type_id}"
             )
             receipt = Receipt(
-                receipt_number=generate_next_number(db, "RECEIPT", "REC"),
+                receipt_number=receipt_numbers.next_receipt_number(db, receipt_numbers.financial_year_for(date.today())),
                 receipt_date=date.today(),
                 receipt_type="TYPE_CHANGE",
                 payer_name=payer,

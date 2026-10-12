@@ -1,3 +1,5 @@
+from sqlalchemy import text
+from sqlalchemy import Index
 from sqlalchemy import String, BigInteger, Boolean, DateTime, Date, Numeric, Text, ForeignKey, CHAR, JSON, Enum
 from typing import Optional
 from sqlalchemy.orm import Mapped, mapped_column, relationship, backref
@@ -44,7 +46,7 @@ class PostalCode(AuditMixin, Base):
 class MembershipType(AuditMixin, Base):
     __tablename__ = "membership_types"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    code: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(30), nullable=False)
     name_en: Mapped[str] = mapped_column(String(100), nullable=False)
     name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
@@ -71,7 +73,7 @@ class HmsSetting(AuditMixin, Base):
 class DocumentType(AuditMixin, Base):
     __tablename__ = "document_types"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
     name_en: Mapped[str] = mapped_column(String(100), nullable=False)
     name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
     is_required: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -81,7 +83,7 @@ class DocumentType(AuditMixin, Base):
 class Particular(AuditMixin, Base):
     __tablename__ = "particulars"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
     name_en: Mapped[str] = mapped_column(String(100), nullable=False)
     name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
     parent_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("particulars.id"), nullable=True)
@@ -92,7 +94,7 @@ class Particular(AuditMixin, Base):
 class ServiceType(AuditMixin, Base):
     __tablename__ = "service_types"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
     name_en: Mapped[str] = mapped_column(String(100), nullable=False)
     name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
@@ -105,7 +107,7 @@ class ServiceType(AuditMixin, Base):
 class Bank(AuditMixin, Base):
     __tablename__ = "banks"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
     name_en: Mapped[str] = mapped_column(String(100), nullable=False)
     name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
     account_number: Mapped[str] = mapped_column(String(50), nullable=True)
@@ -165,3 +167,16 @@ class DeletionReason(AuditMixin, Base):
     # Applies to SOFT and/or PERMANENT deletion flows (both when NULL).
     applies_to: Mapped[str] = mapped_column(String(10), nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+# Unique among live rows only, so a soft-deleted record never blocks re-using its code/number.
+Index("uq_membership_types_code_active", MembershipType.__table__.c.code, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
+Index("uq_document_types_code_active", DocumentType.__table__.c.code, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
+Index("uq_particulars_code_active", Particular.__table__.c.code, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
+Index("uq_service_types_code_active", ServiceType.__table__.c.code, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
+Index("uq_banks_code_active", Bank.__table__.c.code, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))

@@ -14,7 +14,7 @@ class Member(AuditMixin, Base):
         ),
     )
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    member_code: Mapped[str] = mapped_column(String(30), unique=True, nullable=True)
+    member_code: Mapped[str] = mapped_column(String(30), nullable=True)
     first_name_en: Mapped[str] = mapped_column(String(100), nullable=False)
     middle_name_en: Mapped[str] = mapped_column(String(100), nullable=True)
     last_name_en: Mapped[str] = mapped_column(String(100), nullable=True)
@@ -102,7 +102,7 @@ class MemberMembership(AuditMixin, Base):
     member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=False)
     membership_type_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("membership_types.id"), nullable=False)
     price_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("membership_type_prices.id"), nullable=True)
-    membership_number: Mapped[str] = mapped_column(String(30), unique=True, nullable=True)
+    membership_number: Mapped[str] = mapped_column(String(30), nullable=True)
     # Family membership: dependents point at the head's number (Mangalya
     # parity: family_membership_number / family_membership_name).
     family_membership_number: Mapped[str] = mapped_column(String(30), nullable=True)
@@ -249,3 +249,10 @@ class MemberKycRequest(AuditMixin, Base):
     expires_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
     submitted_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="PENDING")
+
+
+# Unique among live rows only, so a soft-deleted record never blocks re-using its code/number.
+Index("uq_members_member_code_active", Member.__table__.c.member_code, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
+Index("uq_member_memberships_membership_number_active", MemberMembership.__table__.c.membership_number, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))

@@ -113,6 +113,9 @@ def delete_bank(
     obj = crud_masters.bank.get(db, id)
     if not obj:
         raise HTTPException(404, "Bank not found")
+    modes = [m.payment_mode for m in db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.bank_id == id).all()]
+    if modes:
+        raise HTTPException(409, f"Bank is used by payment mode(s) {', '.join(sorted(set(modes)))}; delete those first")
     return crud_masters.bank.remove(db, id=id, deleted_by=current_user.id)
 
 
@@ -274,9 +277,11 @@ def delete_payment_mode(
     item = db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.id == id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Payment mode not found")
+    # Snapshot before the row is gone: reading a deleted instance after the commit raises.
+    snapshot = schemas_masters.PaymentMode.model_validate(item)
     db.delete(item)
     db.commit()
-    return item
+    return snapshot
 
 
 # ─────────────── PARTICULARS ────────────────
@@ -325,4 +330,7 @@ def delete_particular(
     obj = crud_masters.particular.get(db, id)
     if not obj:
         raise HTTPException(404, "Particular not found")
+    # Deleting a particular takes its sub-types with it.
+    for sub in db.query(Particular).filter(Particular.parent_id == id, Particular.is_deleted == False).all():  # noqa: E712
+        crud_masters.particular.remove(db, id=sub.id, deleted_by=current_user.id)
     return crud_masters.particular.remove(db, id=id, deleted_by=current_user.id)

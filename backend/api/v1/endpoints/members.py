@@ -1,9 +1,11 @@
 from typing import Any, List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks, Request
+import glob
+import os
 import pydantic
 from pydantic import model_validator, ConfigDict
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from crud import members as crud_members
 from schemas import members as schemas_members
 from schemas.common import PendingApproval
@@ -11,10 +13,11 @@ from api import deps
 from models.masters import ServiceType
 from models.members import Member, MemberApprovalHistory, MemberMembership, MemberServiceOptin
 from models.users import User
+from core.config import settings
 from core.pagination import paginate
 from services.sequences import generate_next_number
 from services.pricing import active_price
-from services.file_upload import save_upload
+from services.file_upload import IMAGE_TYPES, save_upload
 from services import approval_gate
 from datetime import datetime, timezone
 
@@ -456,6 +459,74 @@ def export_labels(
         headers={"Content-Disposition": "attachment; filename=labels.pdf"}
     )
 
+@router.get("/lookup")
+def lookup_member(
+    number: str = Query(..., description="Membership number, member code, registration number, or mobile"),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Lookup a member by code, membership number, registration number, or mobile number."""
+    import re
+    raw = (number or "").strip()
+    if len(raw) < 3:
+        return {"number": raw, "found": False, "matches": [], "member": None}
+
+    ids: list = []
+
+    def add(rows):
+        for (mid,) in rows:
+            if mid not in ids:
+                ids.append(mid)
+
+    upper = raw.upper()
+    live = Member.is_deleted == False  # noqa: E712
+    add(db.query(Member.id).filter(live, func.upper(Member.member_code) == upper).limit(5))
+    add(
+        db.query(MemberMembership.member_id)
+        .join(Member, Member.id == MemberMembership.member_id)
+        .filter(live, MemberMembership.is_deleted == False, func.upper(MemberMembership.membership_number) == upper)  # noqa: E712
+        .limit(5)
+    )
+    reg = re.fullmatch(r"REG-(\d{4})-(\d+)", raw, flags=re.IGNORECASE)
+    if reg:
+        add(
+            db.query(Member.id)
+            .filter(live, Member.id == int(reg.group(2)), func.extract("year", Member.created_at) == int(reg.group(1)))
+            .limit(1)
+        )
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) >= 10:
+        add(db.query(Member.id).filter(live, Member.mobile.in_({digits, digits[-10:]})).limit(5))
+
+    members = db.query(Member).filter(live, Member.id.in_(ids[:5])).all() if ids else []
+    members.sort(key=lambda m: ids.index(m.id))
+
+    matches = []
+    for m in members:
+        membership = db.query(MemberMembership).filter(
+            MemberMembership.member_id == m.id,
+            MemberMembership.is_deleted == False,
+        ).order_by(MemberMembership.id.desc()).first()
+        full_name = " ".join(p for p in (m.name_title, m.first_name_en, m.middle_name_en, m.last_name_en) if p)
+        matches.append({
+            "id": m.id,
+            "name": full_name or m.full_name_kn or f"Member #{m.id}",
+            "member_code": m.member_code,
+            "membership_number": membership.membership_number if membership else None,
+            "mobile": m.mobile,
+            "gender": m.gender,
+            "approval_status": m.approval_status,
+            "member_status": m.member_status,
+        })
+
+    return {
+        "number": raw,
+        "found": bool(matches),
+        "matches": matches,
+        "member": matches[0] if matches else None,
+    }
+
+
 @router.get("/{id}", response_model=schemas_members.Member)
 def read_member(
     *,
@@ -874,8 +945,13 @@ async def upload_member_photo(
     member = crud_members.member.get(db=db, id=id)
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
-    meta = await save_upload(file, subfolder="member_photos")
-    member.photo_path = meta["file_path"]
+    # One folder per member (by primary key); only the current photo is kept.
+    folder = f"images/members/{member.id}"
+    meta = await save_upload(file, subfolder=folder, filename="photo", allowed_types=IMAGE_TYPES)
+    for old in glob.glob(os.path.join(settings.UPLOAD_DIR, folder, "photo.*")):
+        if os.path.abspath(old) != os.path.abspath(meta["file_path"]):
+            os.remove(old)
+    member.photo_path = meta["file_path"].replace("\\", "/")
     member.updated_by = current_user.id
     db.commit()
     return {"photo_path": meta["file_path"]}

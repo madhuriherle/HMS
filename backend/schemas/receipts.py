@@ -14,6 +14,8 @@ def _check_non_negative(field: str, value: float) -> float:
 
 class ReceiptItemBase(BaseModel):
     item_type: str
+    particular_id: Optional[int] = None
+    particular_name: Optional[str] = None
     description: Optional[str] = None
     amount: float
 
@@ -133,11 +135,13 @@ class ReceiptUpdate(BaseModel):
     """Manage a receipt entry. payment_status is intentionally absent —
     use POST /receipts/{id}/cancel so the cancellation is recorded."""
 
+    receipt_number: Optional[str] = None
     receipt_date: Optional[date] = None
     receipt_type: Optional[str] = None
     payer_name: Optional[str] = None
     payment_mode: Optional[str] = None
     transaction_reference: Optional[str] = None
+    items: Optional[List[ReceiptItemBase]] = None
     gross_amount: Optional[float] = None
     discount_amount: Optional[float] = None
     net_amount: Optional[float] = None

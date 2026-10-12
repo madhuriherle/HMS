@@ -1,3 +1,5 @@
+from sqlalchemy import text
+from sqlalchemy import Index
 from sqlalchemy import String, BigInteger, Boolean, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from models.base import Base, AuditMixin
@@ -30,7 +32,7 @@ class AffiliationMagazineSetting(AuditMixin, Base):
 class Associate(AuditMixin, Base):
     __tablename__ = "associates"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    associate_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=True)
+    associate_number: Mapped[str] = mapped_column(String(50), nullable=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
     organization: Mapped[str] = mapped_column(String(255), nullable=True)
     mobile: Mapped[str] = mapped_column(String(20), nullable=True)
@@ -101,3 +103,8 @@ class CommitteeMemberLink(AuditMixin, Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
     committee_member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("committee_members.id"), nullable=False)
     hms_member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=False)
+
+
+# Unique among live rows only, so a soft-deleted record never blocks re-using its code/number.
+Index("uq_associates_associate_number_active", Associate.__table__.c.associate_number, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))

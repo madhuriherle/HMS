@@ -479,7 +479,7 @@ def test_generic_approval_engine_receipts_nested_and_decimal_fields(client, admi
     body = approved.json()
     assert float(body["net_amount"]) == 700.0
     assert body["payer_name"] == "Gated Receipt Payer"
-    assert re.match(r"^REC-\d{8}-\d{6}$", body["receipt_number"])
+    assert re.match(r"^\d{4}-\d{2}/\d{4}$", body["receipt_number"])
 
 
 def test_password_fields_never_captured_by_generic_engine(client, admin_headers):
@@ -1166,7 +1166,7 @@ def test_receipt_creation_and_sequence(client, admin_headers):
 
     number_1 = first.json()["receipt_number"]
     number_2 = second.json()["receipt_number"]
-    pattern = r"^REC-\d{8}-\d{6}$"
+    pattern = r"^\d{4}-\d{2}/\d{4}$"
     assert re.match(pattern, number_1), number_1
     assert re.match(pattern, number_2), number_2
     assert number_1 != number_2
@@ -2269,7 +2269,7 @@ def test_member_list_filters_and_edit(client, admin_headers):
     assert not any(m["id"] == m2["id"] for m in females["data"])
 
     unapproved = client.get(
-        "/api/v1/members/", headers=admin_headers, params={"approval_status": "UNAPPROVED"}
+        "/api/v1/members/", headers=admin_headers, params={"approval_status": "UNAPPROVED", "limit": 100}
     ).json()
     assert any(m["id"] == m1["id"] for m in unapproved["data"])
 
@@ -2910,7 +2910,7 @@ def test_receipt_entry_online_offline_and_management(client, admin_headers):
     assert created.status_code == 201, created.text
     receipt = created.json()
     assert receipt["source"] == "OFFLINE"
-    assert receipt["receipt_number"].startswith("REC-")
+    assert re.match(r"^\d{4}-\d{2}/\d{4}$", receipt["receipt_number"])
 
     # unknown source rejected at validation
     bad_source = dict(payload, source="PHONE")

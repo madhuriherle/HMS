@@ -1,5 +1,6 @@
 from typing import Any, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from api import deps
 from models.members import Member, MemberMembership
@@ -10,6 +11,7 @@ from models.receipts import (
     Receipt,
     ReceiptAllocation,
     ReceiptCancellation,
+    ReceiptItem,
     RefundTransaction,
 )
 from schemas import receipts as schemas_receipts
@@ -17,12 +19,13 @@ from schemas.common import PendingApproval
 from crud import receipts as crud_receipts
 from crud.receipts import allocated_total
 from core.pagination import paginate
+from services import receipt_numbers
 from services.sequences import generate_next_number
 from services import approval_gate
 from services.exports import render_export
 from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import func, or_
-from models.masters import MembershipType
+from models.masters import MembershipType, Particular
 
 from services import membership_credit
 
@@ -46,6 +49,23 @@ VALID_PAYMENT_MODES = {"CASH", "CHEQUE", "UPI", "CARD", "NETBANKING", "OTHER"}
 def _validate_enum(value: str, allowed: set, field: str) -> None:
     if value not in allowed:
         raise HTTPException(400, f"{field} must be one of {sorted(allowed)}")
+
+
+def _validate_lines(db: Session, items, net: float) -> None:
+    """Multi-line receipts: every line must reference a real particular and the lines must add up to
+    the receipt's net amount. (A single legacy line without a particular id is not cross-checked.)"""
+    if not items or (len(items) == 1 and not items[0].particular_id):
+        return
+    total = round(sum(float(i.amount) for i in items), 2)
+    if abs(total - float(net)) > 0.01:
+        raise HTTPException(
+            400, f"The particular lines add up to {total:.2f} but the receipt amount is {float(net):.2f}"
+        )
+    ids = {i.particular_id for i in items if i.particular_id}
+    if ids:
+        found = {p.id for p in db.query(Particular.id).filter(Particular.id.in_(ids))}
+        if ids - found:
+            raise HTTPException(400, f"Unknown particular id(s): {sorted(ids - found)}")
 
 
 def _get_member_or_404(db: Session, member_id: int) -> Member:
@@ -194,6 +214,8 @@ def create_receipt(
     _validate_enum(receipt_in.receipt_type, VALID_RECEIPT_TYPES, "receipt_type")
     _validate_enum(receipt_in.payment_mode, VALID_PAYMENT_MODES, "payment_mode")
 
+    _validate_lines(db, receipt_in.items, receipt_in.net_amount)
+
     # Pre-validate payee mappings so the whole entry fails before anything is written.
     inline_total = 0.0
     for alloc in receipt_in.allocations:
@@ -207,10 +229,20 @@ def create_receipt(
             f"receipt net_amount {receipt_in.net_amount}",
         )
 
-    receipt_no = receipt_in.receipt_number or generate_next_number(db, "RECEIPT", "REC")
-    created = crud_receipts.receipt.create_with_items(
-        db=db, obj_in=receipt_in, created_by=current_user.id, receipt_number=receipt_no
-    )
+    fy = receipt_numbers.financial_year_for(receipt_in.receipt_date)
+    typed = (receipt_in.receipt_number or "").strip()
+    if typed:
+        receipt_numbers.assert_number_free(db, fy, typed)
+        receipt_no = typed
+    else:
+        receipt_no = receipt_numbers.next_receipt_number(db, fy)
+    try:
+        created = crud_receipts.receipt.create_with_items(
+            db=db, obj_in=receipt_in, created_by=current_user.id, receipt_number=receipt_no
+        )
+    except IntegrityError:  # two people saved the same number at once
+        db.rollback()
+        raise HTTPException(409, receipt_numbers.duplicate_message(receipt_no, fy))
     if receipt_in.allocations:
         membership_credit.recompute_members(
             db, [a.member_id for a in receipt_in.allocations], current_user.id
@@ -328,6 +360,22 @@ def read_receipt_tracking(
         )
         .all()
     )
+    lines_by_receipt: dict[int, list] = {}
+    if receipt_ids:
+        for it in (
+            db.query(ReceiptItem)
+            .filter(ReceiptItem.receipt_id.in_(receipt_ids), ReceiptItem.is_deleted == False)  # noqa: E712
+            .order_by(ReceiptItem.receipt_id, ReceiptItem.line_no, ReceiptItem.id)
+        ):
+            lines_by_receipt.setdefault(it.receipt_id, []).append({
+                "id": it.id,
+                "item_type": it.item_type,
+                "particular_id": it.particular_id,
+                "particular": it.particular_name or it.item_type,
+                "description": it.description,
+                "amount": float(it.amount),
+            })
+
     by_receipt: dict[int, list] = {}
     for alloc, member, membership, associate in allocs:
         by_receipt.setdefault(alloc.receipt_id, []).append((member, membership, associate))
@@ -370,6 +418,8 @@ def read_receipt_tracking(
             "membership_number": first_membership.membership_number if first_membership else None,
             "membership_expiry_date": first_membership.expires_at if first_membership else None,
             "allocation_count": len(links),
+            "items": lines_by_receipt.get(r.id, []),
+            "items_count": len(lines_by_receipt.get(r.id, [])),
         })
 
     if export:
@@ -611,6 +661,25 @@ def _member_card(db: Session, member: Member, today: date) -> dict:
     }
 
 
+@router.get("/next-number")
+def next_receipt_number(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    date: Optional[date] = None,
+) -> Any:
+    """Receipt Entry defaults: the date to start with (last receipt entered, else
+    today) and the next free ``YYYY-YY/NNNN`` number for that date's financial year."""
+    default_date = receipt_numbers.default_entry_date(db)
+    on = date or default_date
+    fy = receipt_numbers.financial_year_for(on)
+    return {
+        "default_date": default_date,
+        "receipt_date": on,
+        "financial_year": fy,
+        "receipt_number": receipt_numbers.next_receipt_number(db, fy),
+    }
+
+
 @router.get("/member-lookup")
 def lookup_member_for_receipt(
     number: str,
@@ -733,6 +802,24 @@ def update_receipt(
     if "payment_mode" in data and data["payment_mode"]:
         _validate_enum(data["payment_mode"], VALID_PAYMENT_MODES, "payment_mode")
 
+    new_items = receipt_in.items if "items" in data else None
+    data.pop("items", None)
+    if new_items is not None:
+        if not new_items:
+            raise HTTPException(400, "A receipt needs at least one particular line")
+        total = round(sum(float(i.amount) for i in new_items), 2)
+        data["gross_amount"] = total
+        data["net_amount"] = round(total - float(data.get("discount_amount", receipt.discount_amount)), 2)
+        _validate_lines(db, new_items, total)
+    if "receipt_number" in data:
+        data["receipt_number"] = (data["receipt_number"] or "").strip() or receipt.receipt_number
+    new_number = data.get("receipt_number", receipt.receipt_number)
+    new_date = data.get("receipt_date") or receipt.receipt_date
+    if new_number != receipt.receipt_number or new_date != receipt.receipt_date:
+        receipt_numbers.assert_number_free(
+            db, receipt_numbers.financial_year_for(new_date), new_number, exclude_id=receipt.id
+        )
+
     net = data.get("net_amount", float(receipt.net_amount))
     allocated = allocated_total(db, receipt.id)
     if net < allocated - 0.01:
@@ -741,7 +828,25 @@ def update_receipt(
             f"net_amount {net} is below the already-allocated total {allocated}; "
             f"remove allocations first",
         )
-    return crud_receipts.receipt.update(db, db_obj=receipt, obj_in=data, updated_by=current_user.id)
+    try:
+        updated = crud_receipts.receipt.update(db, db_obj=receipt, obj_in=data, updated_by=current_user.id)
+        if new_items is not None:
+            for old in db.query(ReceiptItem).filter(ReceiptItem.receipt_id == receipt.id, ReceiptItem.is_deleted == False):  # noqa: E712
+                old.is_deleted = True
+                old.deleted_by = current_user.id
+            for line_no, it in enumerate(new_items, start=1):
+                db.add(ReceiptItem(
+                    receipt_id=receipt.id, item_type=it.item_type, particular_id=it.particular_id,
+                    particular_name=it.particular_name, description=it.description,
+                    amount=it.amount, line_no=line_no, created_by=current_user.id,
+                ))
+            db.commit()
+            db.refresh(updated)
+        return updated
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, receipt_numbers.duplicate_message(
+            new_number, receipt_numbers.financial_year_for(new_date)))
 
 
 @router.delete("/{id}", response_model=Union[schemas_receipts.Receipt, PendingApproval])

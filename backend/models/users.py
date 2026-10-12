@@ -14,7 +14,7 @@ class User(AuditMixin, Base):
     )
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
-    username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    username: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     email: Mapped[str] = mapped_column(String(191), nullable=True, index=True)
     mobile: Mapped[str] = mapped_column(String(20), nullable=True, index=True)
     mobile_country_code: Mapped[str] = mapped_column(String(5), default="+91")
@@ -39,7 +39,7 @@ class Module(AuditMixin, Base):
     instead of living only as free-text strings on Permission.module."""
     __tablename__ = "modules"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    code: Mapped[str] = mapped_column(String(80), unique=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
     name_en: Mapped[str] = mapped_column(String(100), nullable=False)
     name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
@@ -61,7 +61,7 @@ class Role(AuditMixin, Base):
     __tablename__ = "roles"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
     # 1 = top; a larger number is a weaker role. Users/roles can only be
@@ -105,3 +105,12 @@ class RolePermission(AuditMixin, Base):
     # executing (see api.deps.permission_requires_approval). Lets the same
     # permission code be "free" for one role and "gated" for another.
     requires_approval: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+# Unique among live rows only, so a soft-deleted record never blocks re-using its code/number.
+Index("uq_users_username_active", User.__table__.c.username, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
+Index("uq_modules_code_active", Module.__table__.c.code, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
+Index("uq_roles_code_active", Role.__table__.c.code, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))

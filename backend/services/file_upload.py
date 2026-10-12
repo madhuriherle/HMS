@@ -11,9 +11,22 @@ ALLOWED_TYPES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 }
 
-async def save_upload(file: UploadFile, subfolder: str = "general") -> dict:
-    """Save an uploaded file to disk and return its metadata."""
-    if file.content_type not in ALLOWED_TYPES:
+IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
+
+
+async def save_upload(
+    file: UploadFile,
+    subfolder: str = "general",
+    *,
+    filename: str | None = None,
+    allowed_types: set | None = None,
+) -> dict:
+    """Save an uploaded file to disk and return its metadata.
+
+    ``filename`` (without extension) replaces the random name, and
+    ``allowed_types`` narrows the accepted content types.
+    """
+    if file.content_type not in (allowed_types or ALLOWED_TYPES):
         raise HTTPException(status_code=400, detail=f"File type '{file.content_type}' not allowed")
 
     contents = await file.read()
@@ -23,7 +36,7 @@ async def save_upload(file: UploadFile, subfolder: str = "general") -> dict:
         raise HTTPException(status_code=400, detail=f"File exceeds {settings.MAX_FILE_SIZE_MB}MB limit")
 
     ext = os.path.splitext(file.filename)[1]
-    filename = f"{uuid.uuid4().hex}{ext}"
+    filename = f"{filename or uuid.uuid4().hex}{ext.lower() if filename else ext}"
     folder = os.path.join(settings.UPLOAD_DIR, subfolder)
     os.makedirs(folder, exist_ok=True)
     filepath = os.path.join(folder, filename)

@@ -28,12 +28,15 @@ class CRUDReceipt(CRUDBase[Receipt, ReceiptCreate, ReceiptUpdate]):
         db.add(db_obj)
         db.flush()  # mint the receipt id before dependants reference it
 
-        for item in obj_in.items:
+        for line_no, item in enumerate(obj_in.items, start=1):
             db.add(ReceiptItem(
                 receipt_id=db_obj.id,
                 item_type=item.item_type,
+                particular_id=item.particular_id,
+                particular_name=item.particular_name,
                 description=item.description,
                 amount=item.amount,
+                line_no=line_no,
                 created_by=created_by,
             ))
 

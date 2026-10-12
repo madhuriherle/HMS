@@ -1,3 +1,5 @@
+from sqlalchemy import text
+from sqlalchemy import Index
 from sqlalchemy import String, BigInteger, Boolean, DateTime, Date, Text, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from models.base import Base, AuditMixin
@@ -5,7 +7,7 @@ from models.base import Base, AuditMixin
 class NotificationTemplate(AuditMixin, Base):
     __tablename__ = "notification_templates"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    template_name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    template_name: Mapped[str] = mapped_column(String(100), nullable=False)
     provider_template_id: Mapped[str] = mapped_column(String(100), nullable=True)
     language: Mapped[str] = mapped_column(String(10), default="en")
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -67,3 +69,8 @@ class NotificationImportBatch(AuditMixin, Base):
     campaign_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("notification_campaigns.id"), nullable=False)
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False)
+
+
+# Unique among live rows only, so a soft-deleted record never blocks re-using its code/number.
+Index("uq_notification_templates_template_name_active", NotificationTemplate.__table__.c.template_name, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))

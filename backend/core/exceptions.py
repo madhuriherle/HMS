@@ -47,8 +47,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 async def integrity_error_handler(request: Request, exc: IntegrityError):
-    """Handle DB unique constraint / FK violations cleanly."""
-    return JSONResponse(
-        status_code=status.HTTP_409_CONFLICT,
-        content={"detail": "Database integrity error. Possibly a duplicate entry."}
-    )
+    """Turn DB unique / foreign-key / not-null violations into a clear 409."""
+    raw = str(getattr(exc, "orig", exc)).lower()
+    if "foreign key" in raw:
+        detail = "This record is linked to other records (or points to one that no longer exists), so the action was blocked."
+    elif "unique" in raw or "duplicate" in raw:
+        detail = "A record with the same code / number / name already exists."
+    elif "not null" in raw or "null value" in raw:
+        detail = "A required field is missing."
+    else:
+        detail = "Database integrity error. Possibly a duplicate entry."
+    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": detail})
