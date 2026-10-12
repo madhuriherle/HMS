@@ -95,9 +95,6 @@ export default function Login() {
           className="w-16 h-20 sm:w-18 sm:h-22 object-contain filter drop-shadow-sm shrink-0"
         />
         <div className="flex-1 flex flex-col items-start justify-center">
-          <span className="text-[20px] sm:text-[22px] font-bold text-[#4A1208] leading-snug font-kannada tracking-wide">
-            ಶ್ರೀ ಅಖಿಲ ಹವ್ಯಕ ಮಹಾಸಭಾ (ರಿ.)
-          </span>
           <span className="text-[11.5px] sm:text-[12.5px] font-bold text-[#4A1208] tracking-wider uppercase mt-1">
             SHRI AKHILA HAVYAKA MAHASABHA (R.)
           </span>

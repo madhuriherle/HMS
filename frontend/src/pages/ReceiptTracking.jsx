@@ -778,15 +778,17 @@ export default function ReceiptTracking() {
                     Select
                   </label>
                 )}
-                <button type="button" onClick={() => setViewingReceipt(receipt)} className="btn-act">View</button>
-                <button type="button" onClick={() => openReceiptPdf(receipt)} className="btn-act">Print</button>
+                <button type="button" onClick={() => setViewingReceipt(receipt)} className="btn-act" title="View"><Eye className="w-3.5 h-3.5" /><span>View</span></button>
+                <button type="button" onClick={() => openReceiptPdf(receipt)} className="btn-act" title="Print"><Printer className="w-3.5 h-3.5" /><span>Print</span></button>
                 <button
                   type="button"
                   onClick={() => handleOpenEdit(receipt)}
                   disabled={!hasPermission('receipts.tracking.write')}
                   className="btn-act"
+                  title="Edit"
                 >
-                  Edit
+                  <Pencil className="w-3.5 h-3.5" />
+                  <span>Edit</span>
                 </button>
               </div>
             </div>

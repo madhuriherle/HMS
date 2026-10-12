@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ChevronLeft, ChevronRight, Check } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Check, Eye, Pencil } from 'lucide-react';
 import api from '../api';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
@@ -184,8 +184,10 @@ export default function AssignedApprovals() {
                           type="button"
                           onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
                           className="btn-act"
+                          title="View"
                         >
-                          View
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View</span>
                         </button>
                         <button
                           type="button"
@@ -194,7 +196,8 @@ export default function AssignedApprovals() {
                           className="btn-act"
                           title={hasPermission('members.list.write') ? 'Edit Application' : 'Requires members.list.write permission'}
                         >
-                          Edit
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit</span>
                         </button>
                         <button
                           type="button"
@@ -203,7 +206,8 @@ export default function AssignedApprovals() {
                           title={canApprove ? 'Approve and give the permanent membership number' : 'Requires members.unapproved.write permission'}
                           className="btn-act btn-act-ok"
                         >
-                          Approve
+                          <Check className="w-3.5 h-3.5" />
+                          <span>Approve</span>
                         </button>
                       </td>
                     </tr>

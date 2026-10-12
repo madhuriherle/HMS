@@ -810,7 +810,8 @@ export default function MembershipList() {
                     title="Select All on page"
                   />
                 </th>
-                <th className="py-3 px-4">Member</th>
+                <th className="py-3 px-4">Member No.</th>
+                <th className="py-3 px-4">Name</th>
                 <th className="py-3 px-4">Contact</th>
                 <th className="py-3 px-4">Type</th>
                 <th className="py-3 px-4 text-center">Status</th>
@@ -820,7 +821,7 @@ export default function MembershipList() {
             <tbody className="divide-y divide-[#E8DFD8]">
               {paginatedMembers.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-[#863221]">
+                  <td colSpan="7" className="py-12 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center">
                       <AlertCircle className="w-8 h-8 text-[#863221]/40 mb-2" />
                       <p className="font-semibold text-sm text-[#180200]">No members found</p>
@@ -851,18 +852,14 @@ export default function MembershipList() {
                         />
                       </td>
 
-                      {/* Membership No. & Name */}
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          {m.membershipNumber && (
-                            <span className="font-mono font-bold text-xs text-[#510601]">
-                              #{m.membershipNumber}
-                            </span>
-                          )}
-                          <span className="font-bold text-[#180200] text-sm">
-                            {m.fullName || m.name}
-                          </span>
-                        </div>
+                      {/* Membership No. */}
+                      <td className="py-3 px-4 font-mono font-bold text-xs text-[#510601] whitespace-nowrap">
+                        {m.membershipNumber ? `#${m.membershipNumber}` : '—'}
+                      </td>
+
+                      {/* Name */}
+                      <td className="py-3 px-4 font-bold text-[#180200] text-sm">
+                        {m.fullName || m.name}
                       </td>
 
                       {/* Contact Info (Mobile & Email) */}

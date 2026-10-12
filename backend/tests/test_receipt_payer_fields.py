@@ -27,3 +27,17 @@ def test_receipt_edit_keeps_bank_account_transaction_date_and_payer_details(clie
     got = client.get(f"{API}/receipts/{rid}", headers=h).json()
     assert got["bank_account"] == "SBI Main" and got["transaction_date"] == "2026-10-05"
     assert got["payer_pan"] == "ABCDE1234F" and got["payer_mobile"] == "9123456780"
+
+
+def test_tracking_rows_carry_the_payer_pan_for_reuse(client, admin_headers):
+    from test_frontend_contract import API, _sfx
+    s = _sfx()
+    body = {"receipt_date": "2026-04-10", "receipt_type": "DONATION", "payment_mode": "CASH", "gross_amount": 10, "net_amount": 10,
+            "source": "OFFLINE", "receipt_number": "2026-27/PAN" + s, "payer_pan": "ABCDE1234F",
+            "items": [{"item_type": "DONATION", "particular_name": "Seva", "amount": 10}]}
+    r = client.post(f"{API}/receipts/", headers=admin_headers, json=body)
+    assert r.status_code == 201, r.text
+    rows = client.get(f"{API}/receipts/tracking", headers=admin_headers, params={"limit": 500}).json()
+    rows = rows["data"] if isinstance(rows, dict) else rows
+    row = next(x for x in rows if x["id"] == r.json()["id"])
+    assert row["payer_pan"] == "ABCDE1234F"

@@ -440,26 +440,22 @@ export default function ReceiptEntry() {
     const memNo = member.membershipNumber || member.registrationNumber || member.id || '';
     const memType = member.membershipType || member.membershipTypeCategory || '';
 
-    // Receipt Number, Receipt Date, and PAN must strictly remain EMPTY per business requirement
+    // Only who is paying is filled in: name, membership no., mobile and PAN (members hold no PAN, so it is the
+    // one on their latest receipt that has one). The particulars, amount, payment mode and the rest are what THIS
+    // payment is for (a member may give a different donation each time), so they are left to the person
+    // entering the receipt. The receipt number and date are never taken from the member.
     setMatchedExistingReceipt(null);
+    const lastPan = existingReceipts
+      .filter((r) => member.id != null && String(r.memberId) === String(member.id) && r.panNo)
+      .sort((a, b) => Number(b.id) - Number(a.id))[0]?.panNo;
     setFormData((prev) => ({
       ...prev,
-      panNo: '', // Strictly MANUAL entry (never auto-fill even if present)
+      panNo: lastPan || '',
       name: member.fullName || member.name || '',
       membershipNo: memNo,
       mobile: member.mobile || '',
       membershipType: memType,
-      membershipTypeId: member.membershipTypeId || '',
-      particulars: defaultParticular || prev.particulars,
-      donationSubType: '',
-      othersDescription: '',
-      amount: member.amount !== '' && member.amount !== undefined ? String(member.amount) : prev.amount || '',
-      paymentMode: member.paymentMode || prev.paymentMode || 'Cash',
-      bankAccount: member.bankAccount || '',
-      transactionId: member.transactionId || '',
-      transactionDate: member.transactionDate || '',
-      paymentReceivedDetails: member.bankAccount ? `Bank: ${member.bankAccount}` : member.paymentRemarks || `Membership payment for #${memNo}`,
-      description: member.paymentRemarks || `Membership registration receipt for ${member.fullName || member.name}`
+      membershipTypeId: member.membershipTypeId || ''
     }));
     setFormErrors({});
 
@@ -474,8 +470,7 @@ export default function ReceiptEntry() {
           setFormData((prev) => ({
             ...prev,
             membershipType: ms.type_name_en || prev.membershipType,
-            membershipTypeId: ms.membership_type_id || prev.membershipTypeId,
-            amount: prev.amount || (ms.current_price ? String(ms.current_price) : '')
+            membershipTypeId: ms.membership_type_id || prev.membershipTypeId
           }));
         })
         .catch(() => {});

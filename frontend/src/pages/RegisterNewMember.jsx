@@ -1570,20 +1570,20 @@ export default function RegisterNewMember() {
                 </div>
 
                 {/* ═══════════════════════════════════════════════════════ */}
-                {/* Section: Family & Relationship Details (ಕುಟುಂಬದ ವಿವರಗಳು) */}
+                {/* Section: Family & Relationship Details */}
                 {/* ═══════════════════════════════════════════════════════ */}
                 <div className="pt-4 border-t border-[#DFD5CC] space-y-5">
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-[#8C1801]" />
                     <h3 className="text-sm font-bold text-[#8C1801]">
-                      Family & Relationship Details (ಕುಟುಂಬದ ವಿವರಗಳು)
+                      Family & Relationship Details
                     </h3>
                   </div>
 
                   {/* 1. Parents Details */}
                   <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E8DFD8] space-y-4">
                     <h4 className="text-xs font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
-                      <span>Parents Details (ತಂದೆ / ತಾಯಿಯ ವಿವರಗಳು)</span>
+                      <span>Parents Details</span>
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       {/* Father's Info */}
@@ -1705,7 +1705,7 @@ export default function RegisterNewMember() {
                       <div>
                         <h4 className="text-xs font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
                           <Heart className="w-3.5 h-3.5 text-[#8C1801]" />
-                          <span>Marital Status & Spouse (ವೈವಾಹಿಕ ಸ್ಥಿತಿ)</span>
+                          <span>Marital Status & Spouse</span>
                         </h4>
                         <p className="text-xs text-stone-600 mt-0.5">Are you married?</p>
                       </div>
@@ -1720,7 +1720,7 @@ export default function RegisterNewMember() {
                               : 'text-stone-700 hover:text-[#510601]'
                           }`}
                         >
-                          No (ಅವಿವಾಹಿತ)
+                          No
                         </button>
                         <button
                           type="button"
@@ -1731,7 +1731,7 @@ export default function RegisterNewMember() {
                               : 'text-stone-700 hover:text-[#510601]'
                           }`}
                         >
-                          Yes (ವಿವಾಹಿತ)
+                          Yes
                         </button>
                       </div>
                     </div>
@@ -1802,7 +1802,7 @@ export default function RegisterNewMember() {
                       <div>
                         <h4 className="text-xs font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5 text-[#8C1801]" />
-                          <span>Children Details (ಮಕ್ಕಳ ವಿವರಗಳು)</span>
+                          <span>Children Details</span>
                         </h4>
                         <p className="text-xs text-stone-600 mt-0.5">Do you have children?</p>
                       </div>
@@ -1817,7 +1817,7 @@ export default function RegisterNewMember() {
                               : 'text-stone-700 hover:text-[#510601]'
                           }`}
                         >
-                          No (ಇಲ್ಲ)
+                          No
                         </button>
                         <button
                           type="button"
@@ -1836,7 +1836,7 @@ export default function RegisterNewMember() {
                               : 'text-stone-700 hover:text-[#510601]'
                           }`}
                         >
-                          Yes (ಹೌದು)
+                          Yes
                         </button>
                       </div>
                     </div>

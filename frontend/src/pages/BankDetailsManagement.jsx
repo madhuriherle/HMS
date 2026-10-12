@@ -649,7 +649,7 @@ export default function BankDetailsManagement() {
                           <button
                             type="button"
                             onClick={() => setViewingItem(config)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer"
+                            className="btn-act"
                             title="View Configuration Details"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -661,7 +661,7 @@ export default function BankDetailsManagement() {
                             type="button"
                             onClick={() => openEditModal(config)}
                             disabled={!hasPermission('masters.payment_modes.write')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="btn-act"
                             title={!hasPermission('masters.payment_modes.write') ? 'Requires masters.payment_modes.write permission' : 'Edit Payment Mode'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -673,7 +673,7 @@ export default function BankDetailsManagement() {
                             type="button"
                             onClick={() => handleDeleteClick(config)}
                             disabled={!hasPermission('masters.payment_modes.delete')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="btn-act btn-act-danger"
                             title={!hasPermission('masters.payment_modes.delete') ? 'Requires masters.payment_modes.delete permission' : 'Delete Payment Mode'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
