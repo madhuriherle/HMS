@@ -20,6 +20,7 @@ import OrganisationSettings from './pages/OrganisationSettings';
 import BankDetailsManagement from './pages/BankDetailsManagement';
 import Approvals from './pages/Approvals';
 import RegisterNewMember from './pages/RegisterNewMember';
+import MemberProfile from './pages/MemberProfile';
 import FormModalHost from './components/FormModalHost';
 import { BankMaster } from './pages/MasterLists';
 // Personal Masters (gotra / qualification / native place) screen is switched off for now:
@@ -61,6 +62,7 @@ function App() {
           <Route path="membership/edit/:id" element={<RegisterNewMember />} />
           <Route path="membership/view/:id" element={<RegisterNewMember />} />
           <Route path="membership" element={<Navigate to="/dashboard/membership/list" replace />} />
+          <Route path="membership/profile/:id" element={<MemberProfile />} />
           <Route path="members" element={<Navigate to="/dashboard/membership/list" replace />} />
           <Route path="members/list" element={<Navigate to="/dashboard/membership/list" replace />} />
 

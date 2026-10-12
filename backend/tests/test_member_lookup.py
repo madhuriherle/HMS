@@ -54,7 +54,7 @@ def test_lookup_finds_members_and_applicants_by_every_kind_of_number(client, adm
 
 def test_lookup_not_found_and_too_short(client, admin_headers):
     h = admin_headers
-    assert _lookup(client, h, "HMSM-DOES-NOT-EXIST") == {"number": "HMSM-DOES-NOT-EXIST", "found": False, "matches": []}
+    assert _lookup(client, h, "HMSM-DOES-NOT-EXIST") == {"number": "HMSM-DOES-NOT-EXIST", "found": False, "exact": False, "matches": []}
     assert _lookup(client, h, "REG-2020-9999")["found"] is False
     assert _lookup(client, h, "ab")["found"] is False, "two characters are not a number"
     assert _lookup(client, h, "   ")["found"] is False
@@ -106,3 +106,16 @@ def test_members_lookup_endpoint(client, admin_headers):
     assert data["member"]["id"] == mid
     assert data["member"]["member_code"] == code
 
+
+
+def test_lookup_falls_back_to_name_and_partial_mobile(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    mid, _t, code = _approved_member(client, h, s)
+    exact = client.get(f"{API}/receipts/member-lookup", headers=h, params={"number": code}).json()
+    assert exact["exact"] is True
+    name = client.get(f"{API}/members/{mid}", headers=h).json()["first_name_en"][:4]
+    fuzzy = client.get(f"{API}/receipts/member-lookup", headers=h, params={"number": name}).json()
+    assert fuzzy["found"] is True and fuzzy["exact"] is False
+    assert mid in [m["id"] for m in fuzzy["matches"]]
+    none = client.get(f"{API}/receipts/member-lookup", headers=h, params={"number": "Qzxqzx"}).json()
+    assert none["found"] is False

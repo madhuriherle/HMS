@@ -493,6 +493,35 @@ export default function RegisterNewMember() {
     }
   };
 
+  // Is this person already on file? (same mobile, or same name + date of birth)
+  const [dupInfo, setDupInfo] = useState({ same_mobile: [], similar: [] });
+  useEffect(() => {
+    if (isViewMode) return undefined;
+    const digits = String(formData.mobile || '').replace(/\D/g, '');
+    const nameParts = String(formData.name || '').trim().split(/\s+/).filter(Boolean);
+    const dobIso = toISODate(formData.birthDate) || '';
+    const canCheck = digits.length >= 10 || (nameParts.length > 0 && dobIso);
+    if (!canCheck) {
+      setDupInfo({ same_mobile: [], similar: [] });
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      api
+        .get('/members/duplicate-check', {
+          params: {
+            mobile: digits.length >= 10 ? digits : undefined,
+            first_name: nameParts[0] || undefined,
+            last_name: nameParts.length > 1 ? nameParts[nameParts.length - 1] : undefined,
+            dob: dobIso || undefined,
+            exclude_id: params.id ? Number(params.id) : undefined
+          }
+        })
+        .then(({ data }) => setDupInfo(data))
+        .catch(() => {});
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formData.mobile, formData.name, formData.birthDate]);
+
   const handleMobileChange = (val) => {
     // Strip duplicate country dial digits if user pasted with dial code
     let cleanVal = val.replace(/[^\d]/g, '');
@@ -1209,6 +1238,22 @@ export default function RegisterNewMember() {
                       {formErrors.mobile && (
                         <p className="text-[11px] text-red-600 mt-1">{formErrors.mobile}</p>
                       )}
+                      {[...dupInfo.same_mobile.map((d) => ({ ...d, why: 'has this mobile number' })),
+                        ...dupInfo.similar.map((d) => ({ ...d, why: 'has the same name and date of birth' }))].map((d) => (
+                        <div key={`${d.id}${d.why}`} className="mt-1.5 flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-800">
+                          <span>
+                            {d.name} {d.member_code ? `(${d.member_code})` : '(applicant)'} already {d.why}.
+                          </span>
+                          <a
+                            href={`/dashboard/membership/profile/${d.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline text-[#510601]"
+                          >
+                            View profile
+                          </a>
+                        </div>
+                      ))}
                     </div>
 
                     {/* WhatsApp Number */}

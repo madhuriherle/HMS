@@ -945,6 +945,15 @@ export default function MembershipList() {
                           </button>
                           <button
                             type="button"
+                            onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-[#FAF7F2] transition-colors cursor-pointer"
+                            title="Open the full member profile page"
+                          >
+                            <User className="w-3.5 h-3.5" />
+                            <span>Profile</span>
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleOpenEditModal(m)}
                             disabled={!hasPermission('members.list.write')}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"

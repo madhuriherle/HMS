@@ -235,6 +235,22 @@ export default function ReceiptEntry() {
 
   // Renewals due (server)
   const [renewalSearchQuery, setRenewalSearchQuery] = useState('');
+  const sendRenewalReminders = async () => {
+    const ok = await confirmYesNo({
+      title: 'Send renewal reminders?',
+      text: 'Members whose membership expires within 30 days get the renewal message. Anyone reminded in the last 7 days is skipped.',
+      confirmText: 'Send reminders'
+    });
+    if (!ok) return;
+    try {
+      const { data } = await api.post('/notifications/expiry-reminders', null, {
+        params: { days_ahead: 30, reason: 'Renewal reminders from Receipt Entry' }
+      });
+      showToast(data?.queued ? `${data.queued} reminder(s) queued.` : 'No one needs a reminder right now.');
+    } catch (error) {
+      showToast(apiErrorMessage(error, 'Could not send the reminders.'), 'error');
+    }
+  };
 
   // View Member Details Modal State
   const [viewingMember, setViewingMember] = useState(null);
@@ -525,7 +541,7 @@ export default function ReceiptEntry() {
       api
         .get('/receipts/member-lookup', { params: { number } })
         .then(({ data }) => {
-          if (seq === lookupSeq.current) setNumberLookup({ status: 'done', number, matches: data?.matches || [] });
+          if (seq === lookupSeq.current) setNumberLookup({ status: 'done', number, exact: data?.exact !== false, matches: data?.matches || [] });
         })
         .catch(() => {
           if (seq === lookupSeq.current) setNumberLookup({ status: 'error', number, matches: [] });
@@ -819,7 +835,7 @@ export default function ReceiptEntry() {
       const typed = formData.membershipNo.trim();
       const answered = numberLookup.status === 'done' && numberLookup.number === typed;
       // An unknown number is fine: the receipt is saved unassigned and mapped to a member later.
-      if (answered && numberLookup.matches.length > 0) {
+      if (answered && numberLookup.exact && numberLookup.matches.length > 0) {
         errors.membershipNo = `This number belongs to ${numberLookup.matches[0].name}. Click "Use this member" to link the receipt, or clear the box.`;
       }
     }
@@ -1472,7 +1488,7 @@ export default function ReceiptEntry() {
                       {/* Membership No */}
                       <div>
                         <label className="block text-xs font-bold text-[#180200] mb-1">
-                          Membership No.
+                          Membership No. / Name / Mobile
                         </label>
                         <input
                           type="text"
@@ -1572,7 +1588,7 @@ export default function ReceiptEntry() {
                     {/* Membership No */}
                     <div>
                       <label className="block text-xs font-bold text-[#180200] mb-1">
-                        Membership No.
+                        Membership No. / Name / Mobile
                       </label>
                       <input
                         type="text"
@@ -2653,6 +2669,17 @@ export default function ReceiptEntry() {
           <div>
             <h3 className="text-sm font-bold text-[#180200]">Renewals due</h3>
           </div>
+          {hasPermission('notifications.write') && (
+            <button
+              type="button"
+              onClick={sendRenewalReminders}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
+              title="Send the renewal WhatsApp reminder to members whose membership expires within 30 days"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              Send reminders (30 days)
+            </button>
+          )}
           <div className="relative w-full sm:w-72">
             <Search className="w-3.5 h-3.5 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2" />
             <input

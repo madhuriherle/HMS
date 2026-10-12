@@ -2,6 +2,7 @@ from typing import Any, List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks, Request
 import glob
 import os
+import re
 import pydantic
 from pydantic import model_validator, ConfigDict
 from sqlalchemy.orm import Session
@@ -19,7 +20,7 @@ from services.sequences import generate_next_number
 from services.pricing import active_price
 from services.file_upload import IMAGE_TYPES, save_upload
 from services import approval_gate
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 router = APIRouter()
 
@@ -458,6 +459,51 @@ def export_labels(
         media_type="application/pdf", 
         headers={"Content-Disposition": "attachment; filename=labels.pdf"}
     )
+
+@router.get("/duplicate-check")
+def duplicate_check(
+    mobile: Optional[str] = None,
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    dob: Optional[date] = None,
+    exclude_id: Optional[int] = None,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Registration helper: is this person already on file?
+
+    ``same_mobile`` = a live member with that mobile number (the database allows only one);
+    ``similar`` = same first name + last name + date of birth on a different mobile.
+    """
+    live = [Member.is_deleted == False]  # noqa: E712
+    if exclude_id:
+        live.append(Member.id != exclude_id)
+
+    def card(m):
+        return {
+            "id": m.id,
+            "name": " ".join(x for x in (m.first_name_en, m.last_name_en) if x),
+            "member_code": m.member_code,
+            "mobile": m.mobile,
+            "approval_status": m.approval_status,
+        }
+
+    digits = re.sub(r"\D", "", mobile or "")[-10:]
+    same_mobile = []
+    if len(digits) == 10:
+        same_mobile = db.query(Member).filter(*live, Member.mobile == digits).limit(3).all()
+    similar = []
+    if first_name and dob:
+        q = db.query(Member).filter(
+            *live,
+            func.lower(func.trim(Member.first_name_en)) == first_name.strip().lower(),
+            Member.date_of_birth == dob,
+        )
+        if last_name:
+            q = q.filter(func.lower(func.trim(func.coalesce(Member.last_name_en, ""))) == last_name.strip().lower())
+        similar = [m for m in q.limit(3).all() if m.id not in {x.id for x in same_mobile}]
+    return {"same_mobile": [card(m) for m in same_mobile], "similar": [card(m) for m in similar]}
+
 
 @router.get("/lookup")
 def lookup_member(

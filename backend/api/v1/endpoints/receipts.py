@@ -792,7 +792,7 @@ def lookup_member_for_receipt(
 
     Accepts a member code, a membership number (e.g. HMSM-000123), an applicant's registration number
     (REG-2026-0007, as shown on the screens) or a 10-digit mobile number. Matching is exact and ignores case.
-    Returns at most 5 small cards; a mobile number shared by a family can match more than one.
+    Returns at most 5 small cards (8 for a name / partial-mobile search, flagged exact=false); a mobile number shared by a family can match more than one.
     """
     import re
 
@@ -827,11 +827,28 @@ def lookup_member_for_receipt(
     if len(digits) >= 10:
         add(db.query(Member.id).filter(live, Member.mobile.in_({digits, digits[-10:]})).limit(5))
 
-    members = db.query(Member).filter(live, Member.id.in_(ids[:5])).all() if ids else []
+    exact = bool(ids)
+    if not ids and len(raw) >= 3:
+        # Nothing matched as a number: treat the text as a name or the start of a mobile number.
+        like = f"%{raw}%"
+        name_hits = db.query(Member.id).filter(
+            live,
+            or_(
+                Member.first_name_en.ilike(like),
+                Member.last_name_en.ilike(like),
+                Member.full_name_kn.ilike(like),
+                func.concat(Member.first_name_en, " ", func.coalesce(Member.last_name_en, "")).ilike(like),
+            ),
+        )
+        add(name_hits.order_by(Member.first_name_en).limit(8))
+        if len(digits) >= 5:
+            add(db.query(Member.id).filter(live, Member.mobile.like(f"%{digits}%")).limit(8))
+
+    members = db.query(Member).filter(live, Member.id.in_(ids[:8])).all() if ids else []
     members.sort(key=lambda m: ids.index(m.id))
     today = date.today()
     matches = [_member_card(db, m, today) for m in members]
-    return {"number": raw, "found": bool(matches), "matches": matches}
+    return {"number": raw, "found": bool(matches), "exact": exact, "matches": matches}
 
 
 @router.get("/allocations")

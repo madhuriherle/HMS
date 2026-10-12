@@ -95,3 +95,19 @@ def test_starter_gotras_and_qualifications_seed_only_into_empty_masters(client, 
     if added:  # masters were empty: the starter lists are now there
         assert set(GOTRA_VALUES) <= gotras and set(QUALIFICATION_VALUES) <= quals
     assert gotras and quals
+
+
+def test_duplicate_check_flags_same_mobile_and_same_name_dob(client, admin_headers):
+    from test_frontend_contract import API, _sfx
+    h, s = admin_headers, _sfx()
+    mobile = "98" + s.zfill(8)
+    m = client.post(f"{API}/members/", headers=h, json={
+        "first_name_en": "Dupname", "last_name_en": "Check", "mobile": mobile, "date_of_birth": "1980-02-03"}).json()
+    r = client.get(f"{API}/members/duplicate-check", headers=h, params={"mobile": f"+91 {mobile}"}).json()
+    assert [x["id"] for x in r["same_mobile"]] == [m["id"]]
+    r = client.get(f"{API}/members/duplicate-check", headers=h,
+                   params={"first_name": " dupname ", "last_name": "CHECK", "dob": "1980-02-03", "mobile": "9" + s.zfill(9)}).json()
+    assert [x["id"] for x in r["similar"]] == [m["id"]] and r["same_mobile"] == []
+    # editing the same member does not flag itself
+    r = client.get(f"{API}/members/duplicate-check", headers=h, params={"mobile": mobile, "exclude_id": m["id"]}).json()
+    assert r["same_mobile"] == []
