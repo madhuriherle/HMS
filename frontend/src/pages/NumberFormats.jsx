@@ -5,17 +5,16 @@ import { apiErrorMessage } from '../utils/apiError';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
 
-const SEP_LABEL = { '': 'None', '-': 'Dash ( - )', '/': 'Slash ( / )', '.': 'Dot ( . )' };
+const SEP_LABEL = { '': 'None', '-': '-', '/': '/', '.': '.' };
 
-const HELP = {
-  MEMBER_CODE: 'The permanent ID a member gets when approved.',
-  MEMBERSHIP_NO: 'The number printed on the membership, given when the membership is approved.',
-  RECEIPT: 'The receipt number. Receipt Entry pre-fills the next one.',
-};
-
-const labelCls = 'block text-xs font-semibold text-[#863221] mb-1';
+const labelCls = 'block text-[11px] font-semibold text-[#863221] mb-1';
 const fieldCls =
-  'w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#510601]/20 focus:border-[#510601] disabled:bg-[#FAF7F2] disabled:text-stone-400';
+  'w-full px-2.5 py-1.5 text-sm bg-white border border-[#E8DFD8] rounded-lg focus:outline-none focus:border-[#510601] disabled:bg-[#FAF7F2] disabled:text-stone-400';
+
+const toBody = (f) => ({
+  prefix: f.prefix || '', date_part: f.date_part, separator: f.separator, digits: Number(f.digits),
+  start_value: Number(f.start_value), restart: f.restart, suffix: f.suffix || '', allow_manual: f.allow_manual,
+});
 
 function FormatCard({ item, options, canWrite, onSaved }) {
   const [form, setForm] = useState(item);
@@ -25,27 +24,21 @@ function FormatCard({ item, options, canWrite, onSaved }) {
   const timer = useRef(null);
 
   const allowedDates = new Set(options.allowed_dates[form.restart] || []);
-  const dirty = JSON.stringify({ ...form, example: '', next_number: '' }) !== JSON.stringify({ ...item, example: '', next_number: '' });
-
+  const dirty = JSON.stringify(toBody(form)) !== JSON.stringify(toBody(item));
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
-  // Changing "restart" can make the chosen date invalid: move to the first date that is allowed.
+  // A restart rule only allows some dates in the number; move to one that is allowed.
   const setRestart = (restart) => {
     const ok = new Set(options.allowed_dates[restart] || []);
-    const date_part = ok.has(form.date_part) ? form.date_part : options.date_parts.find((d) => ok.has(d.value))?.value;
-    set({ restart, date_part });
+    set({ restart, date_part: ok.has(form.date_part) ? form.date_part : options.date_parts.find((d) => ok.has(d.value))?.value });
   };
 
-  // Live preview from the server (nothing is saved).
+  // Live example from the server (a GET: nothing is saved, nothing to confirm).
   useEffect(() => {
     clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       try {
-        const body = {
-          prefix: form.prefix || '', date_part: form.date_part, separator: form.separator, digits: Number(form.digits),
-          start_value: Number(form.start_value), restart: form.restart, suffix: form.suffix || '', allow_manual: form.allow_manual,
-        };
-        const { data } = await api.post(`/system/number-formats/${item.doc_type}/preview`, body);
+        const { data } = await api.get(`/system/number-formats/${item.doc_type}/preview`, { params: toBody(form) });
         setExample(data.example);
         setError('');
       } catch (e) {
@@ -58,53 +51,37 @@ function FormatCard({ item, options, canWrite, onSaved }) {
   const save = async () => {
     setSaving(true);
     try {
-      const { data } = await api.put(`/system/number-formats/${item.doc_type}`, {
-        prefix: form.prefix || '', date_part: form.date_part, separator: form.separator, digits: Number(form.digits),
-        start_value: Number(form.start_value), restart: form.restart, suffix: form.suffix || '', allow_manual: form.allow_manual,
-      });
+      const { data } = await api.put(`/system/number-formats/${item.doc_type}`, toBody(form));
       if (data?.doc_type) {
-        notify(`${item.label} format saved. New numbers will look like ${data.example}.`);
-        onSaved(data);
+        notify(`${item.label} saved. New numbers look like ${data.example}.`);
+        onSaved();
       } else if (data?.approval_request_id) {
         notify('Sent for approval.');
       }
     } catch (e) {
-      if (e?.isCancelled) return;
-      notify(apiErrorMessage(e, 'Could not save the format.'), 'error');
+      if (!e?.isCancelled) notify(apiErrorMessage(e, 'Could not save.'), 'error');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <section className="bg-white border border-[#E8DFD8] rounded-2xl p-5 space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h3 className="text-base font-bold text-[#180200]">{item.label}</h3>
-          <p className="text-xs text-[#863221] mt-0.5">{HELP[item.doc_type]}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-[11px] uppercase font-semibold text-[#863221]">Example</p>
-          <p className="font-mono text-base font-bold text-[#510601]">{example}</p>
-          <p className="text-[11px] text-stone-500 mt-0.5">
-            Next number now: <span className="font-mono">{item.next_number}</span>
-          </p>
-        </div>
+    <section className="bg-white border border-[#E8DFD8] rounded-2xl px-5 py-4 space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-sm font-bold text-[#180200]">{item.label}</h3>
+        <p className="text-sm text-[#863221]">
+          <span className="font-mono font-bold text-[#510601] text-base">{example}</span>
+          <span className="ml-3 text-xs">next: <span className="font-mono">{item.next_number}</span></span>
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
         <div>
           <label className={labelCls}>Prefix</label>
           <input className={fieldCls} value={form.prefix || ''} maxLength={12} disabled={!canWrite}
-            onChange={(e) => set({ prefix: e.target.value.toUpperCase() })} placeholder="e.g. HMS" />
+            onChange={(e) => set({ prefix: e.target.value.toUpperCase() })} />
         </div>
-        <div>
-          <label className={labelCls}>Restart counter</label>
-          <select className={fieldCls} value={form.restart} disabled={!canWrite} onChange={(e) => setRestart(e.target.value)}>
-            {options.restarts.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
-        </div>
-        <div>
+        <div className="col-span-2">
           <label className={labelCls}>Date in number</label>
           <select className={fieldCls} value={form.date_part} disabled={!canWrite} onChange={(e) => set({ date_part: e.target.value })}>
             {options.date_parts.map((d) => (
@@ -124,41 +101,43 @@ function FormatCard({ item, options, canWrite, onSaved }) {
             {[3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
+        <div className="col-span-2">
+          <label className={labelCls}>Restart</label>
+          <select className={fieldCls} value={form.restart} disabled={!canWrite} onChange={(e) => setRestart(e.target.value)}>
+            {options.restarts.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+          </select>
+        </div>
         <div>
-          <label className={labelCls}>Next number at least</label>
+          <label className={labelCls}>Min. next</label>
           <input type="number" min={1} className={fieldCls} value={form.start_value} disabled={!canWrite}
             onChange={(e) => set({ start_value: Number(e.target.value) })} />
         </div>
         <div>
           <label className={labelCls}>Suffix</label>
           <input className={fieldCls} value={form.suffix || ''} maxLength={12} disabled={!canWrite}
-            onChange={(e) => set({ suffix: e.target.value.toUpperCase() })} placeholder="optional" />
+            onChange={(e) => set({ suffix: e.target.value.toUpperCase() })} />
         </div>
-        {item.doc_type === 'RECEIPT' && (
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 text-sm text-[#180200] pb-2 cursor-pointer">
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-xs">
+          {item.doc_type === 'RECEIPT' && (
+            <label className="inline-flex items-center gap-2 text-[#180200] cursor-pointer">
               <input type="checkbox" className="accent-[#510601]" checked={form.allow_manual} disabled={!canWrite}
                 onChange={(e) => set({ allow_manual: e.target.checked })} />
               Allow typing a number by hand
             </label>
-          </div>
-        )}
-      </div>
-
-      {error && <p className="text-xs font-semibold text-red-700">{error}</p>}
-
-      <div className="flex items-center justify-between gap-3 pt-1">
-        <p className="text-[11px] text-stone-500">
-          Only new numbers use this format. Numbers already issued do not change.
-        </p>
+          )}
+          {error && <span className="font-semibold text-red-700">{error}</span>}
+        </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => setForm(item)} disabled={!dirty || saving}
-            className="px-4 py-2 text-xs font-semibold border border-[#E8DFD8] text-[#863221] rounded-xl hover:bg-[#FAF7F2] disabled:opacity-40 cursor-pointer">
+            className="px-3.5 py-1.5 text-xs font-semibold border border-[#E8DFD8] text-[#863221] rounded-lg hover:bg-[#FAF7F2] disabled:opacity-40 cursor-pointer">
             Reset
           </button>
           <button type="button" onClick={save} disabled={!canWrite || !dirty || saving || Boolean(error)}
-            className="px-5 py-2 text-xs font-bold text-white bg-[#510601] rounded-xl hover:bg-[#3D0400] disabled:opacity-40 cursor-pointer">
-            {saving ? 'Saving...' : 'Save format'}
+            className="px-4 py-1.5 text-xs font-bold text-white bg-[#510601] rounded-lg hover:bg-[#3D0400] disabled:opacity-40 cursor-pointer">
+            {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
@@ -186,23 +165,15 @@ export default function NumberFormats() {
 
   return (
     <PermissionGate required="system.read">
-      <div className="space-y-5">
-        <div>
+      <div className="space-y-4">
+        <div className="flex items-baseline justify-between gap-3">
           <h2 className="text-xl font-bold text-[#180200]">Number Formats</h2>
-          <p className="text-sm text-[#863221] mt-1">
-            Choose how member IDs, membership numbers and receipt numbers look. The example updates as you change the options.
-          </p>
+          <p className="text-xs text-[#863221]">Applies to new numbers only.</p>
         </div>
         {loadError && <p className="text-sm font-semibold text-red-700">{loadError}</p>}
         {!data && !loadError && <p className="text-sm text-[#863221]">Loading...</p>}
         {data?.data.map((item) => (
-          <FormatCard
-            key={item.doc_type}
-            item={item}
-            options={data.options}
-            canWrite={hasPermission('system.write')}
-            onSaved={load}
-          />
+          <FormatCard key={item.doc_type} item={item} options={data.options} canWrite={hasPermission('system.write')} onSaved={load} />
         ))}
       </div>
     </PermissionGate>

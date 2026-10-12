@@ -75,3 +75,12 @@ def test_member_code_uses_the_saved_format(client, admin_headers):
     finally:
         assert _put(client, h, "MEMBER_CODE", prefix="HMS", date_part="DATE_FULL", separator="-", digits=6,
                     start_value=1, restart="NEVER", suffix="", allow_manual=True).status_code == 200
+
+
+def test_preview_is_a_get_and_rejects_a_repeating_format(client, admin_headers):
+    ok = client.get(f"{API}/system/number-formats/RECEIPT/preview", headers=admin_headers,
+                    params={"prefix": "ABC", "date_part": "FY", "separator": "/", "digits": 4, "restart": "FY"})
+    assert ok.status_code == 200 and ok.json()["example"].startswith("ABC/20")
+    bad = client.get(f"{API}/system/number-formats/RECEIPT/preview", headers=admin_headers,
+                     params={"date_part": "NONE", "restart": "DAY"})
+    assert bad.status_code == 400

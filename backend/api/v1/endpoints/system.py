@@ -180,13 +180,15 @@ def read_number_formats(
     }
 
 
-@router.post("/number-formats/{doc_type}/preview")
+@router.get("/number-formats/{doc_type}/preview")
 def preview_number_format(
-    doc_type: str, body: NumberFormatIn,
+    doc_type: str,
+    prefix: str = "", date_part: str = "NONE", separator: str = "-", digits: int = 6, start_value: int = 1,
+    restart: str = "NEVER", suffix: str = "", allow_manual: bool = True,
     db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("system.read")),
 ) -> Any:
-    """Example of what a format would produce (nothing is saved)."""
-    f = numbering.Fmt(doc_type, **body.model_dump())
+    """Example of what a format would produce (nothing is saved). A GET, so it never asks for confirmation."""
+    f = numbering.Fmt(doc_type, prefix, date_part, separator, digits, start_value, restart, suffix, allow_manual)
     numbering.validate(f)
     return {"example": numbering.render(f, _date.today(), f.start_value)}
 

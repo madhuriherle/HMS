@@ -883,131 +883,55 @@ export default function BankDetailsManagement() {
         onClose={() => setViewingItem(null)}
         className="p-4"
       >
-        {viewingItem && (
-          <div className="bg-white rounded-2xl shadow-xl border border-[#E8DFD8] w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-[#180200] font-serif">
-                  Payment Mode Details
-                </h3>
-              </div>
-              <button
-                onClick={() => setViewingItem(null)}
-                className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Content Details */}
-            <div className="p-6 space-y-4">
-              <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-4 flex items-center justify-between">
-                <div>
-                  <span className="text-[11px] font-bold text-[#863221] uppercase tracking-wider block">
-                    Payment Mode
-                  </span>
-                  <span className="text-lg font-black text-[#180200]">
-                    {viewingItem.paymentMode}
-                  </span>
-                </div>
-                <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${(viewingItem.status || 'Active') === 'Active'
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-gray-100 text-gray-600 border-gray-200'
-                    }`}
+        {viewingItem && (() => {
+          const isBank = !['Cash', 'Cheque', 'DD'].includes(viewingItem.paymentMode);
+          const lookup = BANK_DETAILS_LOOKUP[viewingItem.bankAccount] || {};
+          const account = viewingItem.accountNumber || lookup.accountNumber;
+          const rows = [
+            ['Payment mode', viewingItem.paymentMode],
+            ['Status', viewingItem.status || 'Active'],
+            ...(isBank
+              ? [
+                  ['Bank', viewingItem.bankAccount || '-'],
+                  ['Branch', viewingItem.branch || lookup.branch || '-'],
+                  ['IFSC', viewingItem.ifscCode || lookup.ifscCode || '-'],
+                  ['Account no.', account || '-'],
+                ]
+              : []),
+            ['Shown on receipt as', formatPaymentModeLabel(viewingItem)],
+          ];
+          return (
+            <div className="bg-white rounded-2xl shadow-xl border border-[#E8DFD8] w-full max-w-sm p-5 animate-in zoom-in-95 duration-200">
+              <h3 className="text-base font-bold text-[#180200] mb-3">Payment mode details</h3>
+              <dl className="divide-y divide-[#F0E8E2] text-sm">
+                {rows.map(([label, value]) => (
+                  <div key={label} className="flex items-baseline justify-between gap-4 py-2">
+                    <dt className="text-xs text-[#863221] shrink-0">{label}</dt>
+                    <dd className="font-semibold text-[#180200] text-right break-all">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <div className="mt-4 flex justify-end gap-2">
+                {account && (
+                  <button
+                    type="button"
+                    onClick={() => handleCopyText(viewingItem.id, account)}
+                    className="px-3.5 py-2 border border-[#E8DFD8] text-xs font-semibold text-[#863221] hover:bg-[#FAF7F2] rounded-xl cursor-pointer"
+                  >
+                    {copiedId === viewingItem.id ? 'Copied' : 'Copy account no.'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setViewingItem(null)}
+                  className="px-4 py-2 bg-[#510601] hover:bg-[#3D0400] text-white text-xs font-bold rounded-xl cursor-pointer"
                 >
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full ${(viewingItem.status || 'Active') === 'Active'
-                      ? 'bg-emerald-500'
-                      : 'bg-gray-400'
-                      }`}
-                  />
-                  <span>{viewingItem.status || 'Active'}</span>
-                </span>
-              </div>
-
-              {viewingItem.paymentMode !== 'Cash' && viewingItem.paymentMode !== 'Cheque' && viewingItem.paymentMode !== 'DD' && (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 bg-white border border-[#E8DFD8] rounded-xl">
-                      <span className="text-[10px] font-bold text-[#863221] uppercase tracking-wider block mb-0.5">
-                        Bank Identifier
-                      </span>
-                      <span className="text-sm font-mono font-bold text-[#180200] block mt-0.5">
-                        {viewingItem.bankAccount || '-'}
-                      </span>
-                    </div>
-
-                    <div className="p-3 bg-white border border-[#E8DFD8] rounded-xl">
-                      <span className="text-[10px] font-bold text-[#863221] uppercase tracking-wider block mb-0.5">
-                        Branch
-                      </span>
-                      <span className="text-sm font-semibold text-[#180200] block mt-0.5">
-                        {viewingItem.branch || (BANK_DETAILS_LOOKUP[viewingItem.bankAccount]?.branch) || '-'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 bg-white border border-[#E8DFD8] rounded-xl">
-                      <span className="text-[10px] font-bold text-[#863221] uppercase tracking-wider block mb-0.5">
-                        IFSC Code
-                      </span>
-                      <span className="text-sm font-mono font-bold text-[#180200] block mt-0.5">
-                        {viewingItem.ifscCode || (BANK_DETAILS_LOOKUP[viewingItem.bankAccount]?.ifscCode) || '-'}
-                      </span>
-                    </div>
-
-                    <div className="p-3 bg-white border border-[#E8DFD8] rounded-xl">
-                      <span className="text-[10px] font-bold text-[#863221] uppercase tracking-wider block mb-0.5">
-                        Account Number
-                      </span>
-                      <div className="flex items-center justify-between mt-0.5">
-                        <span className="text-xs font-mono font-bold text-[#180200] truncate">
-                          {viewingItem.accountNumber || (BANK_DETAILS_LOOKUP[viewingItem.bankAccount]?.accountNumber) || '-'}
-                        </span>
-                        {(viewingItem.accountNumber || BANK_DETAILS_LOOKUP[viewingItem.bankAccount]?.accountNumber) && (
-                          <button
-                            type="button"
-                            onClick={() => handleCopyText(viewingItem.id, viewingItem.accountNumber || BANK_DETAILS_LOOKUP[viewingItem.bankAccount]?.accountNumber)}
-                            className="p-1 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded transition-colors shrink-0 ml-1"
-                            title="Copy Account Number"
-                          >
-                            {copiedId === viewingItem.id ? (
-                              <Check className="w-3.5 h-3.5 text-green-600" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              <div className="p-3 bg-white border border-[#E8DFD8] rounded-xl">
-                <span className="text-[10px] font-bold text-[#863221] uppercase tracking-wider block mb-0.5">
-                  Receipt Form Option Label
-                </span>
-                <span className="text-base font-bold text-[#510601] block">
-                  {formatPaymentModeLabel(viewingItem)}
-                </span>
+                  Close
+                </button>
               </div>
             </div>
-
-            {/* Read-only footer */}
-            <div className="px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-end gap-2.5">
-              <button
-                onClick={() => setViewingItem(null)}
-                className="px-4 py-2 border border-[#E8DFD8] text-xs font-semibold text-[#863221] hover:bg-white rounded-xl transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
       </Modal>
     </div>
     </PermissionGate>
