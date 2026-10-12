@@ -94,6 +94,7 @@ export default function LocationSetup() {
   const [postalStateFilter, setPostalStateFilter] = useState('ALL');
   const [postalDistrictFilter, setPostalDistrictFilter] = useState('ALL');
   const [postalPrefixFilter, setPostalPrefixFilter] = useState('ALL');
+  const [postalPincodeFilter, setPostalPincodeFilter] = useState('');
   const [postalStatusFilter, setPostalStatusFilter] = useState('ALL');
 
   // Pagination for PIN Directory Table
@@ -172,6 +173,7 @@ export default function LocationSetup() {
           params.append('page', postalCurrentPage);
           params.append('limit', postalPageSize);
           if (postalSearchQuery) params.append('search', postalSearchQuery);
+          if (postalPincodeFilter.trim()) params.append('pincode', postalPincodeFilter.trim());
           if (postalStateFilter !== 'ALL') params.append('state_id', postalStateFilter);
           if (postalDistrictFilter !== 'ALL') params.append('district_id', postalDistrictFilter);
           if (postalPrefixFilter !== 'ALL') params.append('prefix', postalPrefixFilter);
@@ -203,7 +205,7 @@ export default function LocationSetup() {
       };
       fetchPostalCodes();
     }
-  }, [activeTab, postalCurrentPage, postalPageSize, postalSearchQuery, postalStateFilter, postalDistrictFilter, postalPrefixFilter, postalStatusFilter, states]);
+  }, [activeTab, postalCurrentPage, postalPageSize, postalSearchQuery, postalPincodeFilter, postalStateFilter, postalDistrictFilter, postalPrefixFilter, postalStatusFilter, states]);
 
   // Modals Data Fetching
   const [modalDistricts, setModalDistricts] = useState([]);
@@ -495,6 +497,7 @@ export default function LocationSetup() {
   // Clear filters
   const handleClearPostalFilters = () => {
     setPostalSearchQuery('');
+    setPostalPincodeFilter('');
     setPostalStateFilter('ALL');
     setPostalDistrictFilter('ALL');
     setPostalPrefixFilter('ALL');
@@ -615,6 +618,7 @@ export default function LocationSetup() {
         if (postalStateFilter !== 'ALL') params.append('state_id', postalStateFilter);
         if (postalDistrictFilter !== 'ALL') params.append('district_id', postalDistrictFilter);
         if (postalSearchQuery) params.append('search', postalSearchQuery);
+        if (postalPincodeFilter.trim()) params.append('pincode', postalPincodeFilter.trim());
         if (postalPrefixFilter !== 'ALL') params.append('prefix', postalPrefixFilter);
         if (postalStatusFilter !== 'ALL') params.append('status', postalStatusFilter === 'Active' ? 'true' : 'false');
         window.location.href = `${api.defaults.baseURL}/masters/postal-codes/export?${params.toString()}`;
@@ -1439,7 +1443,7 @@ export default function LocationSetup() {
             </div>
 
             {/* Filter Controls Row */}
-            <div className="pt-3 border-t border-[#E8DFD8] grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="pt-3 border-t border-[#E8DFD8] grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {/* State Filter */}
               <div>
                 <label className="block text-[11px] font-semibold text-[#863221] mb-1">State</label>
@@ -1479,6 +1483,26 @@ export default function LocationSetup() {
                     </option>
                   ))}
                 </select>
+              </div>
+
+              {/* PIN Code Search */}
+              <div>
+                <label className="block text-[11px] font-semibold text-[#863221] mb-1">PIN Code</label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-[#863221]/60 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="e.g. 560001"
+                    value={postalPincodeFilter}
+                    onChange={(e) => {
+                      setPostalPincodeFilter(e.target.value.replace(/\D/g, ''));
+                      setPostalCurrentPage(1);
+                    }}
+                    className="w-full pl-8 pr-2 py-1.5 text-xs bg-white border border-[#E8DFD8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#510601] text-[#180200]"
+                  />
+                </div>
               </div>
 
               {/* Prefix Filter */}
