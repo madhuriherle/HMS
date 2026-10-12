@@ -77,6 +77,24 @@ const numberToWords = (num) => {
   return str.trim() + ' Rupees Only';
 };
 
+const STATUS_LOOK = {
+  UNASSIGNED: { label: 'Unassigned', dot: 'bg-[#EE6A00]', text: 'text-[#B34E00]' },
+  ASSIGNED: { label: 'Assigned', dot: 'bg-[#3D705C]', text: 'text-[#3D705C]' },
+  APPROVED: { label: 'Approved', dot: 'bg-[#510601]', text: 'text-[#510601]' },
+  CANCELLED: { label: 'Cancelled', dot: 'bg-[#8C1801]', text: 'text-[#8C1801]' }
+};
+
+function StatusDot({ receipt }) {
+  const key = receipt.receiptStatus || (isReceiptUnmapped(receipt) ? 'UNASSIGNED' : 'ASSIGNED');
+  const look = STATUS_LOOK[key] || STATUS_LOOK.ASSIGNED;
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap ${look.text}`}>
+      <span className={`w-2 h-2 rounded-full ${look.dot}`} />
+      {look.label}
+    </span>
+  );
+}
+
 export default function ReceiptTracking() {
   const { hasPermission } = useAuth();
   // Master Synchronized Stores
@@ -781,10 +799,10 @@ export default function ReceiptTracking() {
                 <th className="py-3.5 px-4 whitespace-nowrap">Receipt Number</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Receipt Date</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Name</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Mobile</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Receipt Type</th>
                 <th className="py-3.5 px-4 text-right whitespace-nowrap">Amount</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Payment Mode</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Status</th>
                 <th className="py-3.5 px-4 text-right whitespace-nowrap min-w-[170px]">Action</th>
               </tr>
             </thead>
@@ -808,11 +826,7 @@ export default function ReceiptTracking() {
                   return (
                     <tr
                       key={receipt.id}
-                      className={`transition-colors ${
-                        isUnmapped
-                          ? 'bg-amber-50/70 hover:bg-amber-100/60 text-[#180200]'
-                          : 'bg-white hover:bg-[#FAF7F2]/60 text-[#180200]'
-                      }`}
+                      className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]"
                     >
                       <td className="py-3.5 pl-4 pr-0 w-8">
                         {isUnmapped && (
@@ -826,13 +840,7 @@ export default function ReceiptTracking() {
                       </td>
                       {/* Column 1: Receipt Number */}
                       <td className="py-3.5 px-4 font-mono font-bold text-xs">
-                        <span className={`px-2 py-0.5 rounded tracking-wider border ${
-                          isUnmapped
-                            ? 'bg-amber-100/80 text-amber-900 border-amber-300'
-                            : 'bg-[#510601]/5 text-[#510601] border-[#510601]/20'
-                        }`}>
-                          #{receipt.receiptNumber}
-                        </span>
+                        <span className="text-[#510601] tracking-wider">#{receipt.receiptNumber}</span>
                       </td>
 
                       {/* Column 2: Receipt Date */}
@@ -844,29 +852,12 @@ export default function ReceiptTracking() {
                       <td className="py-3.5 px-4">
                         <div>
                           <span className="font-bold text-[#180200]">{receipt.name || '—'}</span>
-                          {receipt.receiptStatus === 'CANCELLED' && (
-                            <div className="mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-800 border border-red-300">Cancelled</div>
-                          )}
-                          {isUnmapped ? (
-                            <div className="mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-200/60 text-amber-900 border border-amber-300/80">
-                              <AlertTriangle className="w-3 h-3 text-amber-700 shrink-0" />
-                              <span>Unassigned</span>
+                          {(receipt.mobile || (!isUnmapped && receipt.membershipNo)) && (
+                            <div className="text-[11px] font-mono text-[#863221] mt-0.5">
+                              {[!isUnmapped && receipt.membershipNo ? `#${receipt.membershipNo}` : '', receipt.mobile].filter(Boolean).join(' · ')}
                             </div>
-                          ) : (
-                            receipt.membershipNo && (
-                              <div className="text-[10px] font-mono text-[#863221] mt-0.5">#{receipt.membershipNo}</div>
-                            )
                           )}
                         </div>
-                      </td>
-
-                      {/* Column 4: Mobile */}
-                      <td className="py-3.5 px-4 font-mono text-xs">
-                        {!receipt.mobile ? (
-                          <span className="text-gray-400">—</span>
-                        ) : (
-                          receipt.mobile
-                        )}
                       </td>
 
                       {/* Column 5: Receipt Type */}
@@ -887,15 +878,16 @@ export default function ReceiptTracking() {
                         {formatINR(receipt.amount)}
                       </td>
                       <td className="py-3.5 px-4 text-xs">{receipt.paymentMode || '—'}</td>
+                      <td className="py-3.5 px-4"><StatusDot receipt={receipt} /></td>
 
                       {/* Column 6: Action */}
                       <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-0.5">
                           {/* View Action */}
                           <button
                             type="button"
                             onClick={() => setViewingReceipt(receipt)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer shrink-0"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer shrink-0"
                             title="View Receipt Details"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -906,7 +898,7 @@ export default function ReceiptTracking() {
                           <button
                             type="button"
                             onClick={() => openReceiptPdf(receipt)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-[#FAF7F2] transition-colors cursor-pointer shrink-0"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer shrink-0"
                             title="Print / download the receipt"
                           >
                             <Printer className="w-3.5 h-3.5" />
@@ -918,7 +910,7 @@ export default function ReceiptTracking() {
                             type="button"
                             onClick={() => handleOpenEdit(receipt)}
                             disabled={!hasPermission('receipts.tracking.write')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('receipts.tracking.write') ? 'Requires receipts.tracking.write permission' : 'Edit Receipt'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -930,7 +922,7 @@ export default function ReceiptTracking() {
                             type="button"
                             onClick={() => setDeletingReceipt(receipt)}
                             disabled={!hasPermission('receipts.tracking.delete')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('receipts.tracking.delete') ? 'Requires receipts.tracking.delete permission' : 'Delete Receipt'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
