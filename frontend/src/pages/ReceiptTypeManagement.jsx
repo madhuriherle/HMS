@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
+  GripVertical,
   ChevronLeft,
   CheckCircle2,
   X,
@@ -81,13 +82,20 @@ export default function ReceiptTypeManagement() {
 
 
   const [usage, setUsage] = useState({});
+  const canReorder = hasPermission('masters.particulars.write') && !searchQuery;
 
-  const moveType = async (type, dir) => {
-    const ids = receiptTypes.map((t) => t.id);
-    const i = ids.indexOf(type.id);
-    const j = i + dir;
-    if (i < 0 || j < 0 || j >= ids.length) return;
-    [ids[i], ids[j]] = [ids[j], ids[i]];
+  const [dragId, setDragId] = useState(null);
+  const [overId, setOverId] = useState(null);
+
+  const dropType = async (targetId) => {
+    const fromId = dragId;
+    setDragId(null);
+    setOverId(null);
+    if (fromId == null || fromId === targetId) return;
+    const ids = receiptTypes.map((t) => t.id).filter((id) => id !== fromId);
+    const at = ids.indexOf(targetId);
+    if (at < 0) return;
+    ids.splice(at, 0, fromId);
     try {
       await api.put('/masters/particulars-order', { ids }, { params: { reason: 'Reordered particulars' } });
       await fetchReceiptTypes();
@@ -583,7 +591,25 @@ export default function ReceiptTypeManagement() {
                   return (
                     <React.Fragment key={type.id}>
                       {/* Parent Particular Row */}
-                      <tr className={`hover:bg-[#FAF7F2]/60 transition-colors group ${isExpanded ? 'bg-[#FAF7F2]/30' : ''}`}>
+                      <tr
+                        className={`hover:bg-[#FAF7F2]/60 transition-colors group ${isExpanded ? 'bg-[#FAF7F2]/30' : ''} ${dragId === type.id ? 'opacity-40' : ''} ${overId === type.id && dragId !== type.id ? 'border-t-2 border-t-[#510601]' : ''}`}
+                        draggable={canReorder}
+                        onDragStart={() => canReorder && setDragId(type.id)}
+                        onDragOver={(e) => {
+                          if (dragId != null) {
+                            e.preventDefault();
+                            setOverId(type.id);
+                          }
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          dropType(type.id);
+                        }}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setOverId(null);
+                        }}
+                      >
 
                         {/* Particular Name + Expand Chevron if sub-types exist */}
                         <td className="px-5 py-4 font-bold text-[#180200]">
@@ -604,6 +630,9 @@ export default function ReceiptTypeManagement() {
                             ) : (
                               <div className="w-6 h-4" />
                             )}
+                            {canReorder && (
+                              <GripVertical className="w-4 h-4 text-[#863221]/50 cursor-grab shrink-0" title="Drag to change the order" />
+                            )}
                             <span className="text-sm text-[#180200]">{type.name}</span>
                             {usage[type.id]?.used > 0 && (
                               <span
@@ -611,16 +640,6 @@ export default function ReceiptTypeManagement() {
                                 title={`Used on ${usage[type.id].used} receipt line(s)`}
                               >
                                 used {usage[type.id].used}×
-                              </span>
-                            )}
-                            {hasPermission('masters.particulars.write') && !searchQuery && (
-                              <span className="ml-2 inline-flex flex-col">
-                                <button type="button" onClick={() => moveType(type, -1)} title="Move up" className="text-[#863221] hover:text-[#510601] cursor-pointer leading-none">
-                                  <ChevronUp className="w-3.5 h-3.5" />
-                                </button>
-                                <button type="button" onClick={() => moveType(type, 1)} title="Move down" className="text-[#863221] hover:text-[#510601] cursor-pointer leading-none">
-                                  <ChevronDown className="w-3.5 h-3.5" />
-                                </button>
                               </span>
                             )}
                           </div>
