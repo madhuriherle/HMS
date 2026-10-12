@@ -807,11 +807,11 @@ export default function MembershipList() {
                     title="Select All on page"
                   />
                 </th>
-                <th className="py-3 px-4">Membership No. & Name</th>
-                <th className="py-3 px-4">Contact (Mobile & Email)</th>
-                <th className="py-3 px-4">Membership Type</th>
+                <th className="py-3 px-4">Member</th>
+                <th className="py-3 px-4">Contact</th>
+                <th className="py-3 px-4">Type</th>
                 <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">District / Location</th>
+                <th className="py-3 px-4">Location</th>
                 <th className="py-3 px-4 text-center">Status</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
@@ -940,7 +940,7 @@ export default function MembershipList() {
                           <button
                             type="button"
                             onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer"
+                            className="btn-act"
                             title="View Member Profile"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -950,7 +950,7 @@ export default function MembershipList() {
                             type="button"
                             onClick={() => handleOpenEditModal(m)}
                             disabled={!hasPermission('members.list.write')}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="btn-act"
                             title={!hasPermission('members.list.write') ? 'Requires members.list.write permission' : 'Edit Member'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -960,7 +960,7 @@ export default function MembershipList() {
                             type="button"
                             onClick={() => { setDeleteReason(''); setDeleteDialog(m); }}
                             disabled={!hasPermission('members.list.delete')}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="btn-act btn-act-danger"
                             title={!hasPermission('members.list.delete') ? 'Requires members.list.delete permission' : 'Delete Member'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />

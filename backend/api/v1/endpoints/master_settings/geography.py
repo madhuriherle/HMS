@@ -15,7 +15,15 @@ from models.users import User
 from schemas import masters as schemas_masters
 from schemas.common import PendingApproval
 from services import approval_gate
-from .common import ensure_district, ensure_state, ensure_taluk, get_active
+from .common import (
+    district_ids_of_state,
+    ensure_district,
+    ensure_not_used_by_members,
+    ensure_state,
+    ensure_taluk,
+    get_active,
+    taluk_ids_of_districts,
+)
 
 router = APIRouter()
 
@@ -161,11 +169,18 @@ def delete_state(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
+    force: bool = False,
 ) -> Any:
     obj = crud_masters.state.get(db, id)
     if not obj:
         raise HTTPException(404, "State not found")
-        
+    d_ids = district_ids_of_state(db, id)
+    ensure_not_used_by_members(
+        db, f"State '{obj.name_en}'",
+        force=force,
+        state_ids=[id], district_ids=d_ids, taluk_ids=taluk_ids_of_districts(db, d_ids),
+        pincode_ids=[r[0] for r in db.query(PostalCode.id).filter(PostalCode.state_id == id, PostalCode.is_deleted == False)],  # noqa: E712
+    )
     for pc in db.query(PostalCode).filter(PostalCode.state_id == id, PostalCode.is_deleted == False).all():  # noqa: E712
         crud_masters.postal_code.remove(db, id=pc.id, deleted_by=current_user.id)
     for t in db.query(Taluk).filter(Taluk.district_id.in_(db.query(District.id).filter(District.state_id == id)), Taluk.is_deleted == False).all():  # noqa: E712
@@ -251,7 +266,13 @@ def update_district(
         ).first()
         if dup:
             raise HTTPException(409, f"District '{data['name_en']}' already exists in this state")
-    return crud_masters.district.update(db, db_obj=obj, obj_in=district_in, updated_by=current_user.id)
+    moved = "state_id" in data and data["state_id"] != obj.state_id
+    updated = crud_masters.district.update(db, db_obj=obj, obj_in=district_in, updated_by=current_user.id)
+    if moved:
+        # keep the hierarchy consistent: taluks stay in the district, PIN codes follow the new state
+        db.query(PostalCode).filter(PostalCode.district_id == id).update({"state_id": data["state_id"]}, synchronize_session=False)
+        db.commit()
+    return updated
 
 
 @router.delete("/districts/{id}", response_model=Union[schemas_masters.District, PendingApproval])
@@ -261,11 +282,17 @@ def delete_district(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
+    force: bool = False,
 ) -> Any:
     obj = crud_masters.district.get(db, id)
     if not obj:
         raise HTTPException(404, "District not found")
-        
+    ensure_not_used_by_members(
+        db, f"District '{obj.name_en}'",
+        force=force,
+        district_ids=[id], taluk_ids=taluk_ids_of_districts(db, [id]),
+        pincode_ids=[r[0] for r in db.query(PostalCode.id).filter(PostalCode.district_id == id, PostalCode.is_deleted == False)],  # noqa: E712
+    )
     for pc in db.query(PostalCode).filter(PostalCode.district_id == id, PostalCode.is_deleted == False).all():  # noqa: E712
         crud_masters.postal_code.remove(db, id=pc.id, deleted_by=current_user.id)
     for t in db.query(Taluk).filter(Taluk.district_id == id, Taluk.is_deleted == False).all():  # noqa: E712
@@ -349,7 +376,15 @@ def update_taluk(
         ).first()
         if dup:
             raise HTTPException(409, f"Taluk '{data['name_en']}' already exists in this district")
-    return crud_masters.taluk.update(db, db_obj=obj, obj_in=taluk_in, updated_by=current_user.id)
+    moved = "district_id" in data and data["district_id"] != obj.district_id
+    updated = crud_masters.taluk.update(db, db_obj=obj, obj_in=taluk_in, updated_by=current_user.id)
+    if moved:
+        new_district = get_active(db, District, data["district_id"], "District")
+        db.query(PostalCode).filter(PostalCode.taluk_id == id).update(
+            {"district_id": new_district.id, "state_id": new_district.state_id}, synchronize_session=False
+        )
+        db.commit()
+    return updated
 
 
 @router.delete("/taluks/{id}", response_model=Union[schemas_masters.Taluk, PendingApproval])
@@ -359,11 +394,17 @@ def delete_taluk(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
+    force: bool = False,
 ) -> Any:
     obj = crud_masters.taluk.get(db, id)
     if not obj:
         raise HTTPException(404, "Taluk not found")
-        
+    ensure_not_used_by_members(
+        db, f"Taluk '{obj.name_en}'",
+        force=force,
+        taluk_ids=[id],
+        pincode_ids=[r[0] for r in db.query(PostalCode.id).filter(PostalCode.taluk_id == id, PostalCode.is_deleted == False)],  # noqa: E712
+    )
     for pc in db.query(PostalCode).filter(PostalCode.taluk_id == id, PostalCode.is_deleted == False).all():  # noqa: E712
         crud_masters.postal_code.remove(db, id=pc.id, deleted_by=current_user.id)
         
@@ -550,8 +591,10 @@ def delete_postal_code(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
+    force: bool = False,
 ) -> Any:
     obj = crud_masters.postal_code.get(db, id)
     if not obj:
         raise HTTPException(404, "Postal code not found")
+    ensure_not_used_by_members(db, f"PIN code {obj.pincode}", pincode_ids=[id], force=force)
     return crud_masters.postal_code.remove(db, id=id, deleted_by=current_user.id)

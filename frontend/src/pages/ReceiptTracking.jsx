@@ -774,13 +774,13 @@ export default function ReceiptTracking() {
                     Select
                   </label>
                 )}
-                <button type="button" onClick={() => setViewingReceipt(receipt)} className="px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg cursor-pointer">View</button>
-                <button type="button" onClick={() => openReceiptPdf(receipt)} className="px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg cursor-pointer">Print</button>
+                <button type="button" onClick={() => setViewingReceipt(receipt)} className="btn-act">View</button>
+                <button type="button" onClick={() => openReceiptPdf(receipt)} className="btn-act">Print</button>
                 <button
                   type="button"
                   onClick={() => handleOpenEdit(receipt)}
                   disabled={!hasPermission('receipts.tracking.write')}
-                  className="px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg cursor-pointer disabled:opacity-40"
+                  className="btn-act"
                 >
                   Edit
                 </button>
@@ -806,14 +806,14 @@ export default function ReceiptTracking() {
                     className="cursor-pointer accent-[#510601]"
                   />
                 </th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Receipt Number</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Receipt Date</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Receipt No.</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Date</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Name</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Receipt Type</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Particulars</th>
                 <th className="py-3.5 px-4 text-right whitespace-nowrap">Amount</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Payment Mode</th>
+                <th className="py-3.5 px-4 whitespace-nowrap">Mode</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Status</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap min-w-[170px]">Action</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap min-w-[170px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
@@ -897,7 +897,7 @@ export default function ReceiptTracking() {
                           <button
                             type="button"
                             onClick={() => setViewingReceipt(receipt)}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer shrink-0"
+                            className="btn-act"
                             title="View Receipt Details"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -908,7 +908,7 @@ export default function ReceiptTracking() {
                           <button
                             type="button"
                             onClick={() => openReceiptPdf(receipt)}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer shrink-0"
+                            className="btn-act"
                             title="Print / download the receipt"
                           >
                             <Printer className="w-3.5 h-3.5" />
@@ -920,7 +920,7 @@ export default function ReceiptTracking() {
                             type="button"
                             onClick={() => handleOpenEdit(receipt)}
                             disabled={!hasPermission('receipts.tracking.write')}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="btn-act"
                             title={!hasPermission('receipts.tracking.write') ? 'Requires receipts.tracking.write permission' : 'Edit Receipt'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -932,7 +932,7 @@ export default function ReceiptTracking() {
                             type="button"
                             onClick={() => setDeletingReceipt(receipt)}
                             disabled={!hasPermission('receipts.tracking.delete')}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="btn-act btn-act-danger"
                             title={!hasPermission('receipts.tracking.delete') ? 'Requires receipts.tracking.delete permission' : 'Delete Receipt'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />

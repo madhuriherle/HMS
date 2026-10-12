@@ -381,7 +381,7 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={() => handleOpenMemberView(item)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer"
+                        className="btn-act"
                         title={`View ${item.name}'s Profile`}
                       >
                         <Eye className="w-3.5 h-3.5" />

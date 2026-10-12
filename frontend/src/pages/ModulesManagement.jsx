@@ -545,7 +545,7 @@ export default function ModulesManagement() {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => handleLinkPrivileges(m)}
-                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer"
+                          className="btn-act"
                           title="Link privileges to this module"
                         >
                           <KeyRound className="w-3.5 h-3.5" />
@@ -553,7 +553,7 @@ export default function ModulesManagement() {
                         </button>
                         <button
                           onClick={() => openEditModal(m)}
-                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer"
+                          className="btn-act"
                           title="Edit Module"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -561,7 +561,7 @@ export default function ModulesManagement() {
                         </button>
                         <button
                           onClick={() => setDeleteTarget(m)}
-                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer"
+                          className="btn-act btn-act-danger"
                           title="Delete Module"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

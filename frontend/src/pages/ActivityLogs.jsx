@@ -400,11 +400,11 @@ export default function ActivityLogs() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] text-xs font-bold uppercase tracking-wider">
-                <th className="py-3 px-4 w-5/12">Activity Description</th>
+                <th className="py-3 px-4 w-5/12">Activity</th>
                 <th className="py-3 px-4 w-3/12">User</th>
                 <th className="py-3 px-4 w-2/12">Module</th>
                 <th className="py-3 px-4 w-2/12">Status</th>
-                <th className="py-3 px-4 text-right">Date & Time</th>
+                <th className="py-3 px-4 text-right">When</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DFD8] text-xs">

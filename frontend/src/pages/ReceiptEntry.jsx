@@ -2348,9 +2348,9 @@ export default function ReceiptEntry() {
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-[#E8DFD8] bg-[#FAF7F2] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                      <th className="py-3 px-3.5 whitespace-nowrap">Membership No. & Name</th>
-                      <th className="py-3 px-3.5 whitespace-nowrap">Contact Number</th>
-                      <th className="py-3 px-3.5 whitespace-nowrap">District / Location</th>
+                      <th className="py-3 px-3.5 whitespace-nowrap">Member</th>
+                      <th className="py-3 px-3.5 whitespace-nowrap">Contact</th>
+                      <th className="py-3 px-3.5 whitespace-nowrap">Location</th>
                       <th className="py-3 px-3.5 text-right whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
@@ -2419,7 +2419,7 @@ export default function ReceiptEntry() {
                               <button
                                 type="button"
                                 onClick={() => handleAssignFromMembership(member)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer bg-[#FAF7F2] hover:bg-[#F1E7DE] text-[#510601] border-[#E8DFD8]"
+                                className="btn-act"
                                 title="Assign this member's details into the receipt form"
                               >
                                 <FileText className="w-3.5 h-3.5 shrink-0" />
@@ -2561,9 +2561,9 @@ export default function ReceiptEntry() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#E8DFD8] bg-[#FAF7F2] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                  <th className="py-3.5 px-4 whitespace-nowrap">Applicant Name & MID</th>
-                  <th className="py-3.5 px-4 whitespace-nowrap">Contact Number</th>
-                  <th className="py-3.5 px-4 whitespace-nowrap">District / Location</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Applicant</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Contact</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Location</th>
                   <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
@@ -2630,7 +2630,7 @@ export default function ReceiptEntry() {
                             <button
                               type="button"
                               onClick={() => handleAssignFromUnapproved(member)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer bg-[#FAF7F2] hover:bg-[#F1E7DE] text-[#510601] border-[#E8DFD8]"
+                              className="btn-act"
                               title="Assign to Receipt"
                             >
                               <FileText className="w-3.5 h-3.5 shrink-0" />
@@ -2640,7 +2640,7 @@ export default function ReceiptEntry() {
                             <button
                               type="button"
                               onClick={() => navigate(`/dashboard/membership/profile/${member.id}`)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer"
+                              className="btn-act"
                               title="View full applicant registration profile"
                             >
                               <Eye className="w-3.5 h-3.5 shrink-0 text-[#863221]" />
@@ -2754,7 +2754,7 @@ export default function ReceiptEntry() {
           <table className="w-full text-left border-collapse text-xs">
             <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="py-3 px-3.5">Reg / Member No.</th>
+                <th className="py-3 px-3.5">Member No.</th>
                 <th className="py-3 px-3.5">Name</th>
                 <th className="py-3 px-3.5">Membership No.</th>
                 <th className="py-3 px-3.5">Membership Type</th>
@@ -2781,7 +2781,7 @@ export default function ReceiptEntry() {
                       <button
                         type="button"
                         onClick={() => handleAssignRenewal(r)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer bg-[#FAF7F2] hover:bg-[#F1E7DE] text-[#510601] border-[#E8DFD8]"
+                        className="btn-act"
                       >
                         <FileText className="w-3.5 h-3.5" />
                         <span>Assign to Receipt</span>

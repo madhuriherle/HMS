@@ -140,10 +140,10 @@ export default function AssignedApprovals() {
                     <input type="checkbox" checked={allOnPage} onChange={toggleAll} className="cursor-pointer accent-[#510601]" title="Select all on this page" />
                   </th>
                   <th className="py-3.5 px-4">Applicant</th>
-                  <th className="py-3.5 px-4">Membership Type</th>
+                  <th className="py-3.5 px-4">Type</th>
                   <th className="py-3.5 px-4">Receipt</th>
                   <th className="py-3.5 px-4 text-right">Amount</th>
-                  <th className="py-3.5 px-4">Payment Mode</th>
+                  <th className="py-3.5 px-4">Mode</th>
                   <th className="py-3.5 px-4 text-right">Action</th>
                 </tr>
               </thead>
@@ -183,7 +183,7 @@ export default function AssignedApprovals() {
                         <button
                           type="button"
                           onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
-                          className="px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer"
+                          className="btn-act"
                         >
                           View
                         </button>
@@ -192,7 +192,7 @@ export default function AssignedApprovals() {
                           onClick={() => approve([m])}
                           disabled={!canApprove || busy}
                           title={canApprove ? 'Approve and give the permanent membership number' : 'Requires members.unapproved.write permission'}
-                          className="px-1.5 py-1 text-xs font-semibold text-[#3D705C] rounded-md hover:bg-[#3D705C]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="btn-act btn-act-ok"
                         >
                           Approve
                         </button>

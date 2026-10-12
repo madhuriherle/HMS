@@ -212,7 +212,7 @@ function MasterTable({ title, subtitle, endpoint, fields, columns, withCode, pag
                         type="button"
                         onClick={() => edit(row)}
                         disabled={!hasPermission(`${permBase}.write`)}
-                        className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="btn-act"
                         title={!hasPermission(`${permBase}.write`) ? `Requires ${permBase}.write permission` : 'Edit'}
                       >
                         <Pencil className="w-3.5 h-3.5" />
@@ -222,7 +222,7 @@ function MasterTable({ title, subtitle, endpoint, fields, columns, withCode, pag
                         type="button"
                         onClick={() => remove(row)}
                         disabled={!hasPermission(`${permBase}.delete`)}
-                        className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="btn-act btn-act-danger"
                         title={!hasPermission(`${permBase}.delete`) ? `Requires ${permBase}.delete permission` : 'Delete'}
                       >
                         <Trash2 className="w-3.5 h-3.5" />

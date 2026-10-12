@@ -14,6 +14,7 @@ from services.file_upload import save_upload
 from services.whatsapp import whatsapp_service
 from services.template_renderer import render
 from services import approval_gate
+from core.exceptions import InUseError
 from models.events import Event, EventParticipant, EventAttachment, EventMemberLink
 
 router = APIRouter()
@@ -168,7 +169,10 @@ def update_event(*, db: Session = Depends(deps.get_db), current_user: User = Dep
 
 @router.delete("/{id}", response_model=Union[schemas_events.Event, PendingApproval])
 @approval_gate.gated("events", "DELETE", "Event", "events.delete")
-def delete_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.delete")), id: int) -> Any:
+def delete_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.delete")), id: int, force: bool = False) -> Any:
+    guests = db.query(EventParticipant).filter(EventParticipant.event_id == id, EventParticipant.is_deleted == False).count()  # noqa: E712
+    if guests and not force:
+        raise InUseError(f"This event has {guests} participant(s). Deleting it hides the event and its participant list.")
     return crud_events.event.remove(db, id=id, deleted_by=current_user.id)
 
 

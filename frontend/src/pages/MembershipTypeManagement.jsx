@@ -619,7 +619,7 @@ export default function MembershipTypeManagement() {
                           <button
                             onClick={() => openEditModal(item)}
                             disabled={!hasPermission('masters.membership_types.write')}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="btn-act"
                             title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : 'Edit Membership Type'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -630,7 +630,7 @@ export default function MembershipTypeManagement() {
                           <button
                             onClick={() => handleConfirmDelete(item)}
                             disabled={!hasPermission('masters.membership_types.delete')}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="btn-act btn-act-danger"
                             title={!hasPermission('masters.membership_types.delete') ? 'Requires masters.membership_types.delete permission' : 'Delete Membership Type'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1117,8 +1117,8 @@ export default function MembershipTypeManagement() {
                   <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-semibold uppercase tracking-wider">
                     <tr>
                       <th className="px-4 py-3 text-right">Price</th>
-                      <th className="px-4 py-3">Effective From</th>
-                      <th className="px-4 py-3">Effective To</th>
+                      <th className="px-4 py-3">From</th>
+                      <th className="px-4 py-3">To</th>
                       <th className="px-4 py-3">Changed On</th>
                       <th className="px-4 py-3">Reason</th>
                     </tr>

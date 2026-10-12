@@ -692,7 +692,7 @@ export default function ReceiptTypeManagement() {
                               onClick={() => openAddSubTypeModal(type)}
                               disabled={!hasPermission('masters.particulars.write')}
                               title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : `Add Sub-Type under ${type.name}`}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="btn-act"
                             >
                               <Plus className="w-3.5 h-3.5" />
                               <span>Sub-Type</span>
@@ -702,7 +702,7 @@ export default function ReceiptTypeManagement() {
                             <button
                               onClick={() => openEditTypeModal(type)}
                               disabled={!hasPermission('masters.particulars.write')}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="btn-act"
                               title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : 'Edit Particular'}
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -713,7 +713,7 @@ export default function ReceiptTypeManagement() {
                             <button
                               onClick={() => promptDeleteType(type)}
                               disabled={!hasPermission('masters.particulars.delete')}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="btn-act btn-act-danger"
                               title={!hasPermission('masters.particulars.delete') ? 'Requires masters.particulars.delete permission' : 'Delete Particular'}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -789,7 +789,7 @@ export default function ReceiptTypeManagement() {
                                                 type="button"
                                                 onClick={() => openEditSubTypeModal(type, sub)}
                                                 disabled={!hasPermission('masters.particulars.write')}
-                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="btn-act"
                                                 title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : 'Edit Sub-Type'}
                                               >
                                                 <Pencil className="w-3.5 h-3.5" />
@@ -799,7 +799,7 @@ export default function ReceiptTypeManagement() {
                                                 type="button"
                                                 onClick={() => promptDeleteSubType(type, sub)}
                                                 disabled={!hasPermission('masters.particulars.delete')}
-                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="btn-act btn-act-danger"
                                                 title={!hasPermission('masters.particulars.delete') ? 'Requires masters.particulars.delete permission' : 'Delete Sub-Type'}
                                               >
                                                 <Trash2 className="w-3.5 h-3.5" />

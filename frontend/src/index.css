@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Row actions (View / Edit / Delete / Approve ...) look the same on every screen. */
+@layer components {
+  .btn-act {
+    @apply inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold rounded-md shrink-0 cursor-pointer transition-colors;
+    @apply text-[#510601] hover:bg-[#510601]/10;
+    @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent;
+  }
+  .btn-act-danger {
+    @apply text-[#8C1801] hover:bg-[#8C1801]/10;
+  }
+  .btn-act-ok {
+    @apply text-[#3D705C] hover:bg-[#3D705C]/10;
+  }
+}
+
 @layer base {
   :root {
     /* Brand Core Palette */

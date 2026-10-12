@@ -1,4 +1,4 @@
-from fastapi import Request, status
+from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
@@ -7,6 +7,22 @@ import logging
 import traceback
 
 logger = logging.getLogger("hms.errors")
+
+
+class InUseError(HTTPException):
+    """409: the record is referenced elsewhere. `detail` stays a plain message so any client can
+    show it; the web app also reads `code` / `can_force` to offer "delete anyway"."""
+
+    def __init__(self, message: str, can_force: bool = True):
+        super().__init__(status_code=status.HTTP_409_CONFLICT, detail=message)
+        self.can_force = can_force
+
+
+async def in_use_error_handler(request: Request, exc: InUseError):
+    return JSONResponse(
+        status_code=status.HTTP_409_CONFLICT,
+        content={"detail": exc.detail, "code": "IN_USE", "can_force": exc.can_force},
+    )
 
 async def global_exception_handler(request: Request, exc: Exception):
     """Catch all unhandled exceptions, log to system_error_logs and return clean JSON."""

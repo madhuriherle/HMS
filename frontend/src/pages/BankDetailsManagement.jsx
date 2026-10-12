@@ -84,7 +84,6 @@ export default function BankDetailsManagement() {
   // Status Toggle Confirmation Dialog State
   const [statusDialog, setStatusDialog] = useState(null); // { item, newStatus }
   const [deleteDialog, setDeleteDialog] = useState(null); // payment mode to delete
-  const [blockedDialog, setBlockedDialog] = useState(null); // payment mode that receipts still use
 
   // Toast / Feedback State
   const [toastMessage, setToastMessage] = useState(null);
@@ -405,8 +404,7 @@ export default function BankDetailsManagement() {
   };
 
   const handleDeleteClick = (cfg) => {
-    if (getModeUsageCount(cfg) > 0) setBlockedDialog(cfg);
-    else setDeleteDialog(cfg);
+    setDeleteDialog(cfg); // the server warns (and offers "delete anyway") if receipts use it
   };
 
   const handleToggleStatusClick = (config) => {
@@ -473,23 +471,6 @@ export default function BankDetailsManagement() {
       danger: true,
     }),
     confirmDelete
-  );
-
-  useSwalConfirm(
-    blockedDialog,
-    () => setBlockedDialog(null),
-    (d) => ({
-      title: 'Cannot delete payment mode',
-      text: `"${formatPaymentModeLabel(d)}" is used by ${getModeUsageCount(d)} receipt(s). Deactivate it instead: it disappears from Receipt Entry and the recorded receipts stay unchanged.`,
-      confirmText: 'Deactivate instead',
-      danger: true,
-    }),
-    () => {
-      const cfg = blockedDialog;
-      if (hasPermission('masters.payment_modes.write') && (cfg.status || 'Active') === 'Active') {
-        setStatusDialog({ item: cfg, newStatus: 'Inactive' });
-      }
-    }
   );
 
   return (

@@ -410,12 +410,12 @@ export default function LabelList() {
                     className="h-4 w-4 rounded border-stone-300 text-[#8C1801] focus:ring-[#8C1801]"
                   />
                 </th>
-                <th className="px-4 py-3.5">Member Name</th>
-                <th className="px-4 py-3.5">Membership Number</th>
-                <th className="px-4 py-3.5">Membership Type</th>
-                <th className="px-4 py-3.5">Mobile Number</th>
-                <th className="px-4 py-3.5 min-w-[240px]">Postal Address</th>
-                <th className="px-4 py-3.5">Added Date</th>
+                <th className="px-4 py-3.5">Name</th>
+                <th className="px-4 py-3.5">Member No.</th>
+                <th className="px-4 py-3.5">Type</th>
+                <th className="px-4 py-3.5">Mobile</th>
+                <th className="px-4 py-3.5 min-w-[240px]">Address</th>
+                <th className="px-4 py-3.5">Added On</th>
                 <th className="px-4 py-3.5 text-center">Actions</th>
               </tr>
             </thead>
@@ -508,7 +508,7 @@ export default function LabelList() {
                         <Link
                           to="/dashboard/receipts/tracking"
                           title="Receipts decide who is on the label list"
-                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors"
+                          className="btn-act"
                         >
                           <FileText className="w-3.5 h-3.5" />
                           <span>View receipts</span>

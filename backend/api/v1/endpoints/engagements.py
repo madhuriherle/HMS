@@ -17,6 +17,7 @@ from schemas.common import PendingApproval
 from crud import engagements as crud_engagements
 from core.pagination import paginate
 from services import approval_gate
+from core.exceptions import InUseError
 
 router = APIRouter()
 
@@ -220,9 +221,13 @@ def update_associate(*, db: Session = Depends(deps.get_db), current_user: User =
 
 @router.delete("/associates/{id}")
 @approval_gate.gated("engagements", "DELETE", "Associate", "engagements.delete")
-def delete_associate(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.delete")), id: int) -> Any:
+def delete_associate(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.delete")), id: int, force: bool = False) -> Any:
     obj = db.query(Associate).filter(Associate.id == id).first()
     if not obj: raise HTTPException(404, "Associate not found")
+    from models.receipts import ReceiptAllocation
+    paid = db.query(ReceiptAllocation).filter(ReceiptAllocation.associate_id == id, ReceiptAllocation.is_deleted == False).count()  # noqa: E712
+    if paid and not force:
+        raise InUseError(f"This associate has {paid} receipt payment(s) recorded against them. The receipts stay, but will point at a deleted associate.")
     obj.is_deleted = True; obj.deleted_by = current_user.id
     db.commit()
     return {"message": "Deleted"}

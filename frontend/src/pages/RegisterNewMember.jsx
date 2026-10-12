@@ -949,31 +949,6 @@ export default function RegisterNewMember() {
       {/* BREADCRUMB & HEADER                                  */}
       {/* ---------------------------------------------------- */}
       <div>
-        <nav className="flex items-center gap-2 text-sm text-[#863221] font-medium mb-2">
-          <Link to="/dashboard" className="hover:text-[#510601] transition-colors">
-            Dashboard
-          </Link>
-          <ChevronRight className="w-4 h-4 text-[#863221]/50" />
-          {returnPath.includes('receipt') ? (
-            <>
-              <Link to="/dashboard/receipts/entry" className="hover:text-[#510601] transition-colors">
-                Receipt Entry
-              </Link>
-              <ChevronRight className="w-4 h-4 text-[#863221]/50" />
-              <span className="text-[#180200] font-semibold">View Member Details</span>
-            </>
-          ) : (
-            <>
-              <Link to="/dashboard/membership/list" className="hover:text-[#510601] transition-colors">
-                Membership
-              </Link>
-              <ChevronRight className="w-4 h-4 text-[#863221]/50" />
-              <span className="text-[#180200] font-semibold">
-                {isViewMode ? 'View Member Details' : isEditMode ? 'Edit Member Details' : 'Register New Member'}
-              </span>
-            </>
-          )}
-        </nav>
         <div className="flex items-center justify-between gap-4 w-full">
           <div>
             <h1 className="text-xl sm:text-2xl font-extrabold text-[#180200] tracking-tight flex items-center gap-3">
@@ -990,14 +965,6 @@ export default function RegisterNewMember() {
               )}
             </h1>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate(returnPath)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#FAF7F2] text-[#510601] border border-[#E8DFD8] text-xs sm:text-sm font-semibold rounded-xl transition-all shadow-xs cursor-pointer shrink-0"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            <span>{returnPath.includes('receipt') ? 'Back to Receipt Entry' : returnPath.includes('unapproved') ? 'Back to Unapproved Members' : 'Back to Membership List'}</span>
-          </button>
         </div>
       </div>
 

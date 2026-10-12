@@ -741,7 +741,7 @@ export default function RolesAndPrivileges() {
                           <button
                             disabled={isSys}
                             onClick={() => !isSys && openPrivilegeModal(role)}
-                            className={`inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold rounded-md transition-colors ${isSys ? 'text-gray-300 cursor-not-allowed opacity-40' : 'text-[#510601] hover:bg-[#510601]/10 cursor-pointer'}`}
+                            className={`btn-act ${isSys ? 'opacity-40 cursor-not-allowed' : ''}`}
                             title={isSys ? 'System role privileges are permanent and cannot be modified' : 'Configure Privileges'}
                           >
                             <ShieldCheck className="w-3.5 h-3.5" />
@@ -751,7 +751,7 @@ export default function RolesAndPrivileges() {
                           {/* View details (rank, description, privileges, dates) */}
                           <button
                             onClick={() => setViewingRole(role)}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer"
+                            className="btn-act"
                             title="View Details"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -762,7 +762,7 @@ export default function RolesAndPrivileges() {
                           <button
                             disabled={isLocked || !hasPermission('roles.write')}
                             onClick={() => !isLocked && openEditModal(role)}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${isLocked ? 'text-gray-300 border-transparent cursor-not-allowed opacity-40' : 'text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200 cursor-pointer'}`}
+                            className={`btn-act ${isLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
                             title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? 'System role cannot be edited' : isLocked ? 'Role is at or above your rank' : 'Edit Role'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -774,7 +774,7 @@ export default function RolesAndPrivileges() {
                             <button
                               disabled={isLocked || !hasPermission('roles.delete')}
                               onClick={() => setDeleteTargetRole(role)}
-                              className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="btn-act btn-act-danger"
                               title={!hasPermission('roles.delete') ? 'You need the roles.delete permission' : 'Delete Role'}
                             >
                               <Trash2 className="w-3.5 h-3.5" />

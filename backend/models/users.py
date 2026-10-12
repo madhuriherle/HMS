@@ -20,7 +20,10 @@ class User(AuditMixin, Base):
     mobile_country_code: Mapped[str] = mapped_column(String(5), default="+91")
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     user_type: Mapped[str] = mapped_column(String(30), nullable=False)
-    member_id: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    # use_alter: members.approved_by points back at users, so this side is added after both tables exist
+    member_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("members.id", use_alter=True, name="fk_users_member_id"), nullable=True
+    )
     status: Mapped[bool] = mapped_column(Boolean, default=True)
     last_login_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
     # Login tracking (Mangalya parity: userprofile.logincount / last_login_method).

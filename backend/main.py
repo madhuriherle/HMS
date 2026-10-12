@@ -14,6 +14,8 @@ from core.config import settings, validate_secret_key
 from core.exceptions import (
     global_exception_handler,
     validation_exception_handler,
+    InUseError,
+    in_use_error_handler,
     integrity_error_handler,
 )
 from core.logging import setup_logging
@@ -128,6 +130,7 @@ app.add_middleware(
 # ── Exception Handlers ──────────────────────
 app.add_exception_handler(Exception, global_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(InUseError, in_use_error_handler)
 app.add_exception_handler(IntegrityError, integrity_error_handler)
 
 # NOTE: uploaded files are NOT served statically anymore — /uploads was

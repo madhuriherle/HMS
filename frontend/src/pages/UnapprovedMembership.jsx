@@ -412,12 +412,12 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                     title="Select All on page"
                   />
                 </th>
-                <th className="py-3 px-4">Online Applicant</th>
-                <th className="py-3 px-4">Contact Details</th>
-                <th className="py-3 px-4">Membership Type</th>
-                <th className="py-3 px-4">State & District</th>
-                <th className="py-3 px-4">Reg Date</th>
-                <th className="py-3 px-4 text-center">Receipt Status</th>
+                <th className="py-3 px-4">Applicant</th>
+                <th className="py-3 px-4">Contact</th>
+                <th className="py-3 px-4">Type</th>
+                <th className="py-3 px-4">Location</th>
+                <th className="py-3 px-4">Applied On</th>
+                <th className="py-3 px-4 text-center">Receipt</th>
                 <th className="py-3 px-4 text-right min-w-[220px]">Actions</th>
               </tr>
             </thead>
@@ -506,7 +506,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           <button
                             type="button"
                             onClick={() => navigate('/dashboard/receipts/entry', { state: { selectedMember: m } })}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer shrink-0"
+                            className="btn-act"
                             title={isAssigned ? `Receipt #${m.assignedReceiptNumber} assigned. Click to view or create another receipt.` : 'Open Receipt Entry and assign receipt to this applicant'}
                           >
                             <FileText className="w-3.5 h-3.5 shrink-0" />
@@ -517,7 +517,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           <button
                             type="button"
                             onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer shrink-0"
+                            className="btn-act"
                             title="View Full Application"
                           >
                             <Eye className="w-3.5 h-3.5 shrink-0" />
@@ -529,10 +529,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                             type="button"
                             onClick={() => handleInitiateApprove(m)}
                             disabled={!hasPermission('members.unapproved.write')}
-                            className={`inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold rounded-md transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${isAssigned
-                              ? 'text-[#3D705C] hover:bg-[#3D705C]/10 cursor-pointer'
-                              : 'text-[#863221]/50 cursor-not-allowed'
-                              }`}
+                            className={`btn-act btn-act-ok ${isAssigned ? '' : 'opacity-40 cursor-not-allowed'}`}
                             title={
                               !hasPermission('members.unapproved.write')
                                 ? 'Requires members.unapproved.write permission'
@@ -550,7 +547,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                             type="button"
                             onClick={() => handleReject(m)}
                             disabled={!hasPermission('members.list.delete')}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="btn-act btn-act-danger"
                             title={!hasPermission('members.list.delete') ? 'Requires members.list.delete permission' : 'Reject this application'}
                           >
                             <XCircle className="w-3.5 h-3.5 shrink-0" />

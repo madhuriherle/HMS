@@ -609,7 +609,7 @@ def read_generic_requests(
 async def approve_generic_request(
     *, db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("approvals.write")),
-    id: int, note: Optional[str] = None,
+    id: int, note: Optional[str] = None, force: bool = False,
 ) -> Any:
     """Replay the originally-submitted call, as the original requester, via
     services.approval_registry — the exact function the direct API call
@@ -638,6 +638,9 @@ async def approve_generic_request(
     kwargs = approval_registry.rebuild_kwargs(action, req.payload)
     kwargs["db"] = db
     kwargs["current_user"] = requester
+    # An approver who has seen the "in use" warning can approve a delete anyway.
+    if force and "force" in action.sig.parameters:
+        kwargs["force"] = True
 
     try:
         if _inspect.iscoroutinefunction(action.fn):

@@ -1,4 +1,5 @@
 from typing import Any, Optional, Union
+from core.exceptions import InUseError
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -986,14 +987,23 @@ def delete_receipt(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("receipts.delete")),
     id: int,
+    force: bool = False,
 ) -> Any:
     receipt = crud_receipts.receipt.get(db, id)
     if not receipt:
         raise HTTPException(404, "Receipt not found")
     if allocated_total(db, receipt.id) > 0:
-        raise HTTPException(
-            409, "Receipt has member allocations; remove them before deleting"
-        )
+        if not force:
+            raise InUseError(
+                "This receipt is mapped to member payments. Deleting it also removes those payment records from the members' history."
+            )
+        for alloc in db.query(ReceiptAllocation).filter(
+            ReceiptAllocation.receipt_id == id, ReceiptAllocation.is_deleted == False  # noqa: E712
+        ).all():
+            alloc.is_deleted = True
+            alloc.deleted_by = current_user.id
+        db.flush()
+        receipt_status.refresh(db, receipt)
     return crud_receipts.receipt.remove(db, id=id, deleted_by=current_user.id)
 
 

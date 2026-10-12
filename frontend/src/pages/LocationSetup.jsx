@@ -1063,7 +1063,7 @@ export default function LocationSetup() {
                             e.stopPropagation();
                             handleEditState(st);
                           }}
-                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="btn-act"
                           title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit State'}
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -1076,7 +1076,7 @@ export default function LocationSetup() {
                             e.stopPropagation();
                             handleDeleteState(st);
                           }}
-                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="btn-act btn-act-danger"
                           title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete State'}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1146,7 +1146,7 @@ export default function LocationSetup() {
                 <table className="w-full text-left border-collapse text-xs">
                   <thead className="bg-[#FAF7F2] sticky top-0 z-10 border-b border-[#E8DFD8] text-[#863221] font-semibold">
                     <tr>
-                      <th className="py-2.5 px-3">District Name</th>
+                      <th className="py-2.5 px-3">District</th>
                       <th className="py-2.5 px-3 text-center">Taluks</th>
                       <th className="py-2.5 px-3 text-center">Status</th>
                       <th className="py-2.5 px-3 text-right">Actions</th>
@@ -1212,7 +1212,7 @@ export default function LocationSetup() {
                                   type="button"
                                   onClick={() => handleOpenEditDistrict(dist)}
                                   disabled={!hasPermission('masters.location.write')}
-                                  className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                  className="btn-act"
                                   title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit District'}
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
@@ -1222,7 +1222,7 @@ export default function LocationSetup() {
                                   type="button"
                                   onClick={() => setDeleteDialog({ type: 'district', item: dist })}
                                   disabled={!hasPermission('masters.location.delete')}
-                                  className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                  className="btn-act btn-act-danger"
                                   title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete District'}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -1307,7 +1307,7 @@ export default function LocationSetup() {
                 <table className="w-full text-left border-collapse text-xs">
                   <thead className="bg-[#FAF7F2] sticky top-0 z-10 border-b border-[#E8DFD8] text-[#863221] font-semibold">
                     <tr>
-                      <th className="py-2.5 px-3">Taluk Name</th>
+                      <th className="py-2.5 px-3">Taluk</th>
                       <th className="py-2.5 px-3 text-center">PIN Codes</th>
                       <th className="py-2.5 px-3 text-center">Status</th>
                       <th className="py-2.5 px-3 text-right">Actions</th>
@@ -1361,7 +1361,7 @@ export default function LocationSetup() {
                                   type="button"
                                   onClick={() => handleOpenEditTaluk(tk)}
                                   disabled={!hasPermission('masters.location.write')}
-                                  className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                  className="btn-act"
                                   title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit Taluk'}
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
@@ -1371,7 +1371,7 @@ export default function LocationSetup() {
                                   type="button"
                                   onClick={() => setDeleteDialog({ type: 'taluk', item: tk })}
                                   disabled={!hasPermission('masters.location.delete')}
-                                  className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                  className="btn-act btn-act-danger"
                                   title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete Taluk'}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -1585,7 +1585,7 @@ export default function LocationSetup() {
                 <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-semibold">
                   <tr>
                     <th className="py-3 px-4">PIN Code</th>
-                    <th className="py-3 px-4">Post Office / Area Name</th>
+                    <th className="py-3 px-4">Area</th>
                     <th className="py-3 px-4">Taluk</th>
                     <th className="py-3 px-4">District</th>
                     <th className="py-3 px-4">State</th>
@@ -1652,7 +1652,7 @@ export default function LocationSetup() {
                                 type="button"
                                 onClick={() => handleOpenEditPostal(item)}
                                 disabled={!hasPermission('masters.location.write')}
-                                className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="btn-act"
                                 title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit PIN Code Mapping'}
                               >
                                 <Pencil className="w-3.5 h-3.5" />
@@ -1662,7 +1662,7 @@ export default function LocationSetup() {
                                 type="button"
                                 onClick={() => setDeleteDialog({ type: 'postal', item })}
                                 disabled={!hasPermission('masters.location.delete')}
-                                className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="btn-act btn-act-danger"
                                 title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete PIN Code'}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -2353,7 +2353,7 @@ export default function LocationSetup() {
                           <th className="py-2.5 px-3">#</th>
                           <th className="py-2.5 px-3">PIN Code</th>
                           <th className="py-2.5 px-3">Post Office</th>
-                          <th className="py-2.5 px-3">Location Hierarchy</th>
+                          <th className="py-2.5 px-3">Belongs to</th>
                           <th className="py-2.5 px-3 text-right">Validation</th>
                         </tr>
                       </thead>

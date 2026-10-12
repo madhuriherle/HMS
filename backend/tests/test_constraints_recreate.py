@@ -25,7 +25,7 @@ def test_recreate_after_delete_and_in_use_guards(client, admin_headers):
     pm = P("/masters/payment-modes", json={"payment_mode": "NB" + s, "payment_type": "Online", "bank_id": bk["id"], "status": True})
     assert pm.status_code == 201
     blocked = D(f"/masters/banks/{bk['id']}")
-    assert blocked.status_code == 409 and "payment mode" in blocked.json()["detail"]
+    assert blocked.status_code == 409 and blocked.json()["code"] == "IN_USE"
     assert D(f"/masters/payment-modes/{pm.json()['id']}").status_code == 200
     assert D(f"/masters/banks/{bk['id']}").status_code == 200
 

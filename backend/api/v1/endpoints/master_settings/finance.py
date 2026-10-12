@@ -2,7 +2,7 @@
 from typing import Any, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from api import deps
@@ -14,8 +14,17 @@ from models.users import User
 from schemas import masters as schemas_masters
 from schemas.common import PendingApproval
 from services import approval_gate
+from .common import in_use
 
 router = APIRouter()
+
+
+def _soft_delete(db: Session, item, user_id: int):
+    item.is_deleted = True
+    item.deleted_by = user_id
+    db.commit()
+    db.refresh(item)
+    return item
 
 # ─────────────── BANKS ────────────────
 @router.get("/banks")
@@ -109,13 +118,19 @@ def delete_bank(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
+    force: bool = False,
 ) -> Any:
     obj = crud_masters.bank.get(db, id)
     if not obj:
         raise HTTPException(404, "Bank not found")
-    modes = [m.payment_mode for m in db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.bank_id == id).all()]
-    if modes:
-        raise HTTPException(409, f"Bank is used by payment mode(s) {', '.join(sorted(set(modes)))}; delete those first")
+    live_modes = db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.bank_id == id, models.masters.PaymentMode.is_deleted == False).all()  # noqa: E712
+    if live_modes and not force:
+        names = ', '.join(sorted({m.payment_mode for m in live_modes}))
+        in_use(f"Bank is used by payment mode(s) {names}. Deleting the bank will delete those payment modes too.")
+    for m in live_modes:
+        m.is_deleted = True
+        m.deleted_by = current_user.id
+    db.flush()
     return crud_masters.bank.remove(db, id=id, deleted_by=current_user.id)
 
 
@@ -226,7 +241,7 @@ def read_payment_mode(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user)
 ) -> Any:
-    item = db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.id == id).first()
+    item = db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.id == id, models.masters.PaymentMode.is_deleted == False).first()  # noqa: E712
     if not item:
         raise HTTPException(status_code=404, detail="Payment mode not found")
     return item
@@ -256,10 +271,20 @@ def update_payment_mode(
     item_in: schemas_masters.PaymentModeUpdate,
     current_user: User = Depends(deps.require_permission("masters.write")),
 ) -> Any:
-    item = db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.id == id).first()
+    item = db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.id == id, models.masters.PaymentMode.is_deleted == False).first()  # noqa: E712
     if not item:
         raise HTTPException(status_code=404, detail="Payment mode not found")
-    for k, v in item_in.model_dump(exclude_unset=True).items():
+    data = item_in.model_dump(exclude_unset=True)
+    new_name = data.get("payment_mode", item.payment_mode)
+    new_bank = data.get("bank_id", item.bank_id)
+    if ("payment_mode" in data or "bank_id" in data) and db.query(models.masters.PaymentMode).filter(
+        func.lower(models.masters.PaymentMode.payment_mode) == str(new_name).strip().lower(),
+        models.masters.PaymentMode.bank_id == new_bank if new_bank is not None else models.masters.PaymentMode.bank_id.is_(None),
+        models.masters.PaymentMode.is_deleted == False,  # noqa: E712
+        models.masters.PaymentMode.id != id,
+    ).first():
+        raise HTTPException(409, f"Payment mode '{new_name}' already exists")
+    for k, v in data.items():
         setattr(item, k, v)
     item.updated_by = current_user.id
     db.commit()
@@ -272,16 +297,21 @@ def delete_payment_mode(
     *,
     db: Session = Depends(deps.get_db),
     id: int,
+    force: bool = False,
     current_user: User = Depends(deps.require_permission("masters.delete")),
 ) -> Any:
-    item = db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.id == id).first()
+    item = db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.id == id, models.masters.PaymentMode.is_deleted == False).first()  # noqa: E712
     if not item:
         raise HTTPException(status_code=404, detail="Payment mode not found")
-    # Snapshot before the row is gone: reading a deleted instance after the commit raises.
-    snapshot = schemas_masters.PaymentMode.model_validate(item)
-    db.delete(item)
-    db.commit()
-    return snapshot
+    from models.receipts import Receipt
+    label = item.payment_mode.strip().lower()
+    used = db.query(Receipt).filter(
+        Receipt.is_deleted == False,  # noqa: E712
+        or_(func.lower(Receipt.payment_mode) == label, func.lower(Receipt.bank_account) == label),
+    ).count()
+    if used and not force:
+        in_use(f"Payment mode '{item.payment_mode}' is used by {used} receipt(s). Those receipts keep their recorded mode. Deactivating it instead is safer.")
+    return _soft_delete(db, item, current_user.id)
 
 
 # ─────────────── PARTICULARS ────────────────
@@ -322,6 +352,19 @@ def update_particular(
     obj = crud_masters.particular.get(db, id)
     if not obj:
         raise HTTPException(404, "Particular not found")
+    data = obj_in.model_dump(exclude_unset=True)
+    if "parent_id" in data and data["parent_id"] == id:
+        raise HTTPException(400, "A particular cannot be its own parent")
+    for field in ("code", "name_en"):
+        if field in data and data[field] != getattr(obj, field):
+            dup = db.query(Particular).filter(
+                getattr(Particular, field) == data[field],
+                Particular.parent_id == data.get("parent_id", obj.parent_id),
+                Particular.is_deleted == False,  # noqa: E712
+                Particular.id != id,
+            ).first()
+            if dup:
+                raise HTTPException(409, f"Particular {field.replace('_en', '')} '{data[field]}' already exists")
     return crud_masters.particular.update(db, db_obj=obj, obj_in=obj_in, updated_by=current_user.id)
 
 @router.delete("/particulars/{id}", response_model=Union[schemas_masters.Particular, PendingApproval])
@@ -331,10 +374,21 @@ def delete_particular(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
+    force: bool = False,
 ) -> Any:
     obj = crud_masters.particular.get(db, id)
     if not obj:
         raise HTTPException(404, "Particular not found")
+    from models.receipts import Receipt, ReceiptItem
+    ids = [id] + [r[0] for r in db.query(Particular.id).filter(Particular.parent_id == id, Particular.is_deleted == False)]  # noqa: E712
+    used = (
+        db.query(ReceiptItem.receipt_id)
+        .join(Receipt, Receipt.id == ReceiptItem.receipt_id)
+        .filter(ReceiptItem.particular_id.in_(ids), ReceiptItem.is_deleted == False, Receipt.is_deleted == False)  # noqa: E712
+        .distinct().count()
+    )
+    if used and not force:
+        in_use(f"'{obj.name_en}' is used on {used} receipt(s). Those receipts keep the particular name. Deactivating it instead is safer.")
     # Deleting a particular takes its sub-types with it.
     for sub in db.query(Particular).filter(Particular.parent_id == id, Particular.is_deleted == False).all():  # noqa: E712
         crud_masters.particular.remove(db, id=sub.id, deleted_by=current_user.id)

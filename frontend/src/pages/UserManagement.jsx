@@ -601,12 +601,12 @@ export default function UserManagement() {
           <table className="w-full text-left border-collapse min-w-[840px]">
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-semibold text-[#863221] uppercase tracking-wider">
-                <th className="px-6 py-3.5">User Name</th>
+                <th className="px-6 py-3.5">User</th>
                 <th className="px-6 py-3.5">Email</th>
-                <th className="px-6 py-3.5">Mobile Number</th>
+                <th className="px-6 py-3.5">Mobile</th>
                 <th className="px-6 py-3.5">Role</th>
                 <th className="px-6 py-3.5">Status</th>
-                <th className="px-6 py-3.5">Last Login</th>
+                <th className="px-6 py-3.5">Last Seen</th>
                 <th className="px-6 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
@@ -632,9 +632,6 @@ export default function UserManagement() {
                       {/* User Name & Avatar */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#510601]/10 text-[#510601] flex items-center justify-center text-xs font-bold shrink-0">
-                            {initials}
-                          </div>
                           <div>
                             <p className="font-bold text-[#180200] leading-tight flex items-center gap-1.5">
                               <span>{displayName}</span>
@@ -708,7 +705,7 @@ export default function UserManagement() {
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setViewingUser(user)}
-                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer"
+                            className="btn-act"
                             title="View User Details"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -717,11 +714,7 @@ export default function UserManagement() {
                           <button
                             disabled={isRankLocked || !hasPermission('users.management.write')}
                             onClick={() => !isRankLocked && openEditModal(user)}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
-                              isRankLocked
-                                ? 'text-gray-300 border-transparent cursor-not-allowed opacity-40'
-                                : 'text-amber-700 bg-amber-50 hover:bg-amber-100 border-amber-200 cursor-pointer'
-                            }`}
+                            className={`btn-act ${isRankLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
                             title={!hasPermission('users.management.write') ? 'You need the users.management.write permission' : isRankLocked ? 'User is at or above your rank' : 'Edit User'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -731,7 +724,7 @@ export default function UserManagement() {
                             <button
                               disabled={isRankLocked || !hasPermission('users.management.delete')}
                               onClick={() => setDeleteTargetUser(user)}
-                              className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="btn-act btn-act-danger"
                               title={!hasPermission('users.management.delete') ? 'You need the users.management.delete permission' : 'Delete User'}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
