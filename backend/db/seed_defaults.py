@@ -142,7 +142,7 @@ MODULE_CATALOG = [
     ("events", "Events", None, "/events", "calendar", 90, None),
     ("engagements", "Affiliation, Associates & Press", None, "/engagements", "link", 100, None),
     ("imports", "Imports", None, "/imports", "upload", 110, None),
-    ("system", "System", None, None, "settings", 120, 1),  # holds Organisation Settings (a Masters page) and future screens
+    ("system", "Settings", None, None, "settings", 120, 1),  # holds Organisation Settings (a Masters page) and future screens
 ]
 MODULE_CATALOG += [  # sub-modules of Affiliation, Associates & Press (no menu page yet, so no route)
     (code, label, parent, route, icon, order, rank)
@@ -302,6 +302,7 @@ MENU_PAGE_CATALOG = [
     ("masters.location", "Location Setup", "masters", "/dashboard/master/location-setup", "map-pin", 1, "masters.location.read", None),
     ("masters.membership_types", "Membership Types", "masters", "/dashboard/master/membership-type", "badge", 2, "masters.membership_types.read", None),
     ("masters.particulars", "Particulars Master", "masters", "/dashboard/master/receipt-type", "list-checks", 3, "masters.particulars.read", None),
+    ("system.number_formats", "Number Formats", "system", "/dashboard/system/number-formats", "list-checks", 3, "system.read", None),
     ("masters.organisation", "Organisation Settings", "masters", "/dashboard/master/organisation-settings", "building", 4, "system.read", None),
     ("masters.payment_modes", "Payment Mode Setup", "masters", "/dashboard/master/payment-modes", "credit-card", 5, "masters.payment_modes.read", None),
     ("masters.banks", "Bank Master", "masters", "/dashboard/master/banks", "building", 6, "masters.banks.read", None),
@@ -318,6 +319,7 @@ MENU_PAGE_CATALOG = [
 # code -> (old name, new name)
 MENU_NAME_FIXES = {
     "members.unapproved": ("Unapproved Membership", "Unapproved Members"),
+    "system": ("System", "Settings"),
 }
 
 MENU_ROUTE_FIXES = {

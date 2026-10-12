@@ -38,8 +38,10 @@ import {
   settingsToApi
 } from '../utils/organisationStore';
 import { loadLocations, findLocationByPin } from '../utils/serverData';
+import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
 
 export default function OrganisationSettings() {
+  const rules = useRules(); // formats and limits from the server
   const { hasPermission } = useAuth();
 
   // Tab state: 'profile' | 'print' | 'notifications' | 'contact'
@@ -229,16 +231,16 @@ export default function OrganisationSettings() {
       errs['profile_organisationName'] = 'Organisation Name is mandatory.';
     }
 
-    if (settings.profile.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.profile.email.trim())) {
+    if (settings.profile.email?.trim() && !matchesPattern(settings.profile.email.trim(), rules?.email?.pattern)) {
       errs['profile_email'] = 'Please enter a valid email address.';
     }
 
-    if (settings.profile.mobile?.trim() && !/^\d{10}$/.test(settings.profile.mobile.trim())) {
-      errs['profile_mobile'] = 'Mobile number must be a 10-digit number.';
+    if (settings.profile.mobile?.trim() && mobileProblem(rules, settings.profile.mobile.trim())) {
+      errs['profile_mobile'] = mobileProblem(rules, settings.profile.mobile.trim());
     }
 
-    if (settings.profile.postalCode?.trim() && !/^\d{6}$/.test(settings.profile.postalCode.trim())) {
-      errs['profile_postalCode'] = 'PIN Code must be 6 numeric digits.';
+    if (settings.profile.postalCode?.trim() && !hasDigits(settings.profile.postalCode.trim(), rules?.pincode?.digits)) {
+      errs['profile_postalCode'] = `PIN Code must be ${rules?.pincode?.digits} numeric digits.`;
     }
 
     // 2. Contact Validation
@@ -248,17 +250,17 @@ export default function OrganisationSettings() {
 
     if (!settings.contact.contactNumber?.trim()) {
       errs['contact_contactNumber'] = 'Contact Number is mandatory.';
-    } else if (!/^\d{10}$/.test(settings.contact.contactNumber.trim())) {
-      errs['contact_contactNumber'] = 'Contact Number must be a valid 10-digit mobile number.';
+    } else if (mobileProblem(rules, settings.contact.contactNumber.trim())) {
+      errs['contact_contactNumber'] = mobileProblem(rules, settings.contact.contactNumber.trim());
     }
 
     if (!settings.contact.email?.trim()) {
       errs['contact_email'] = 'Primary Contact Email is mandatory.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.contact.email.trim())) {
+    } else if (!matchesPattern(settings.contact.email.trim(), rules?.email?.pattern)) {
       errs['contact_email'] = 'Please enter a valid email address.';
     }
 
-    if (settings.contact.alternateEmail?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(settings.contact.alternateEmail.trim())) {
+    if (settings.contact.alternateEmail?.trim() && !matchesPattern(settings.contact.alternateEmail.trim(), rules?.email?.pattern)) {
       errs['contact_alternateEmail'] = 'Please enter a valid alternate email address.';
     }
 

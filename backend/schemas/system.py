@@ -1,6 +1,9 @@
 from typing import Optional
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+import re
+from pydantic import BaseModel, ConfigDict, field_validator
+
+from core import rules
 
 class FileAttachmentBase(BaseModel):
     entity_type: str
@@ -55,6 +58,26 @@ class OrganisationSettingsUpdate(BaseModel):
     phone: Optional[str] = None
     mobile: Optional[str] = None
     email: Optional[str] = None
+
+    @field_validator("mobile")
+    @classmethod
+    def _org_mobile(cls, v):
+        if v is None or v == "":
+            return v
+        digits = re.sub(r"[\s\-+()]", "", v)  # '91484 59191' and '+91-...' are fine
+        if not digits.isdigit() or not (rules.MOBILE_MIN_DIGITS <= len(digits) <= rules.MOBILE_MAX_DIGITS):
+            raise ValueError("mobile must be 10-12 digits")
+        return v.strip()
+
+    @field_validator("email")
+    @classmethod
+    def _org_email(cls, v):
+        if v is None or v == "":
+            return v
+        if not re.fullmatch(rules.EMAIL_PATTERN, v.strip()):
+            raise ValueError("email is not a valid email address")
+        return v.strip()
+
     # Print-header settings
     print_header_enabled: Optional[bool] = None
     receipt_footer_note_en: Optional[str] = None

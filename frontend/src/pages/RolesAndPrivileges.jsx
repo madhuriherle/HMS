@@ -340,10 +340,8 @@ export default function RolesAndPrivileges() {
         : (formData.status === 'Active' || formData.status === 'true');
 
       if (modalMode === 'add') {
-        const slug = formData.name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 16);
         const res = await api.post('/users/roles', {
           name: formData.name.trim(),
-          code: `${slug || 'ROLE'}_${Date.now().toString().slice(-4)}`,
           description: formData.description.trim(),
           status: statusActive,
           rank_level: Number(formData.rank_level)

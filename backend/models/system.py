@@ -52,6 +52,21 @@ class NumberSequence(AuditMixin, Base):
     prefix: Mapped[str] = mapped_column(String(20), nullable=True)
     current_value: Mapped[int] = mapped_column(BigInteger, default=0)
 
+class NumberFormat(AuditMixin, Base):
+    """How a generated number looks (member code, membership number, receipt number).
+    See services/numbering.py for the meaning of each field and the rules between them."""
+    __tablename__ = "number_formats"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    doc_type: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
+    prefix: Mapped[str] = mapped_column(String(20), nullable=True)
+    date_part: Mapped[str] = mapped_column(String(20), nullable=False, default="NONE")
+    separator: Mapped[str] = mapped_column(String(2), nullable=True)
+    digits: Mapped[int] = mapped_column(BigInteger, nullable=False, default=6)
+    start_value: Mapped[int] = mapped_column(BigInteger, nullable=False, default=1)
+    restart: Mapped[str] = mapped_column(String(10), nullable=False, default="NEVER")
+    suffix: Mapped[str] = mapped_column(String(20), nullable=True)
+    allow_manual: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
 class SystemErrorLog(AuditMixin, Base):
     __tablename__ = "system_error_logs"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)

@@ -54,13 +54,15 @@ import {
   memberToApiPayload,
   normalizeMember,
 } from '../utils/apiAdapters';
+import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
 
 const toId = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? v : Number(v));
 
-const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
-const MEMBER_CATEGORIES = ['Individual', 'Family', 'Institutional', 'Senior Citizen', 'Corporate', 'General'];
 
 export default function MembershipList() {
+  const rules = useRules(); // formats and limits from the server
+  const BLOOD_GROUPS = rules?.blood_groups || [];
+  const MEMBER_CATEGORIES = rules?.member_categories || [];
   const location = useLocation();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
@@ -403,11 +405,12 @@ export default function MembershipList() {
       showToast(`Location auto-resolved: ${lookup.area}, ${lookup.talukName ? lookup.talukName + ', ' : ''}${lookup.districtName}, ${lookup.stateName}`);
     } else {
       try {
-        const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data[0] && data[0].Status === 'Success') {
-            const postOffice = data[0].PostOffice[0];
+        // looked up by the server, so the browser does not depend on the public postal service
+        const res = await api.get(`/meta/pincode/${pin}`);
+        if (res.data) {
+          const data = res.data;
+          if (data.found) {
+            const postOffice = { Name: data.area, Block: data.taluk, District: data.district, State: data.state };
             setFormData((prev) => ({
               ...prev,
               postalCode: pin,
@@ -476,8 +479,8 @@ export default function MembershipList() {
 
     if (!cleanMobile) {
       errors.mobile = 'Mobile number is required';
-    } else if (!/^\d{10}$/.test(cleanMobile)) {
-      errors.mobile = 'Mobile must be a valid 10-digit number';
+    } else if (mobileProblem(rules, cleanMobile)) {
+      errors.mobile = mobileProblem(rules, cleanMobile);
     }
 
     if (!cleanAddress) {
@@ -488,11 +491,11 @@ export default function MembershipList() {
       errors.membershipTypeId = 'Please select a Membership Type';
     }
 
-    if (formData.postalCode && !/^\d{6}$/.test(formData.postalCode.trim())) {
-      errors.postalCode = 'PIN Code must be 6 numeric digits';
+    if (formData.postalCode && !hasDigits(formData.postalCode.trim(), rules?.pincode?.digits)) {
+      errors.postalCode = `PIN Code must be ${rules?.pincode?.digits} numeric digits`;
     }
 
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+    if (formData.email && !matchesPattern(formData.email.trim(), rules?.email?.pattern)) {
       errors.email = 'Please enter a valid email address';
     }
 
@@ -520,7 +523,7 @@ export default function MembershipList() {
       }
     } else {
       try {
-        const { data } = await api.put(`/members/${editingMember.id}`, memberToApiPayload(formData));
+        const { data } = await api.put(`/members/${editingMember.id}`, memberToApiPayload(formData, { isUpdate: true }));
         const updatedMember = normalizeMember(data);
         setMembers((prev) => prev.map((m) => (m.id === editingMember.id ? updatedMember : m)));
         showToast(`Member "${formData.name}" updated successfully.`);

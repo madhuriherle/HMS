@@ -359,8 +359,7 @@ export default function BankDetailsManagement() {
         let bank = banks.find((b) => norm(b.name_en) === norm(effectiveBank));
 
         if (!bank) {
-          const bankCode = effectiveBank.substring(0,3).toUpperCase() + Date.now().toString().slice(-4);
-          const newBankRes = await api.post('/masters/banks', { code: bankCode, name_en: effectiveBank });
+          const newBankRes = await api.post('/masters/banks', { name_en: effectiveBank });
           finalBankId = newBankRes.data.id;
         } else {
           finalBankId = bank.id;

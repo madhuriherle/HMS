@@ -8,7 +8,6 @@ import useAuth from '../hooks/useAuth';
 import { askForm, confirmYesNo, showError, showSuccess } from '../utils/dialogs';
 
 const isPending = (d) => Boolean(d && (d.approval_request_id || d.status === 'PENDING'));
-const makeCode = (name) => `${String(name).replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase() || 'ITEM'}${Date.now().toString().slice(-5)}`;
 
 // One list screen for a simple master: search, add, edit, active/inactive, delete.
 // Everything is read from and written to the server.
@@ -75,7 +74,6 @@ function MasterTable({ title, subtitle, endpoint, fields, columns, withCode, pag
     if (!values) return;
     try {
       const body = toBody(values);
-      if (withCode) body.code = makeCode(values.name_en);
       const { data } = await api.post(endpoint, body);
       await done(data, 'Added.', 'Submitted for approval.');
     } catch (err) {

@@ -21,18 +21,23 @@ def duplicate_message(number: str, fy: str) -> str:
     )
 
 
-def next_receipt_number(db: Session, fy: str) -> str:
-    """Highest ``<fy>/NNNN`` in the year + 1. Numbers typed in another shape are ignored."""
-    pattern = re.compile(rf"^{re.escape(fy)}/(\d+)$")
-    highest = 0
-    rows = db.query(Receipt.receipt_number).filter(
-        Receipt.financial_year == fy, Receipt.is_deleted == False  # noqa: E712
-    )
-    for (number,) in rows:
-        m = pattern.match(number or "")
-        if m:
-            highest = max(highest, int(m.group(1)))
-    return f"{fy}/{highest + 1:04d}"
+def _free_check(db: Session, fy: str):
+    def exists(number: str) -> bool:
+        return db.query(Receipt.id).filter(
+            Receipt.financial_year == fy, Receipt.receipt_number == number, Receipt.is_deleted == False  # noqa: E712
+        ).first() is not None
+    return exists
+
+
+def next_receipt_number(db: Session, on: date, *, consume: bool = True) -> str:
+    """Next number in the configured receipt format (Settings > Number Formats) for a receipt dated ``on``.
+    consume=False only shows it (Receipt Entry's pre-filled number); consume=True uses it up."""
+    from services import numbering
+
+    exists = _free_check(db, financial_year_for(on))
+    if consume:
+        return numbering.next_number(db, "RECEIPT", on, exists=exists)
+    return numbering.peek_number(db, "RECEIPT", on, exists=exists)
 
 
 def assert_number_free(db: Session, fy: str, number: str, exclude_id: int | None = None) -> None:

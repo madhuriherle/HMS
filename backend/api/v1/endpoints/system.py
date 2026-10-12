@@ -129,3 +129,75 @@ async def upload_organisation_logo(
         except OSError:
             pass  # best-effort cleanup of the superseded file
     return row
+
+
+# ── Number formats (member ID, membership number, receipt number) ──────────
+from datetime import date as _date  # noqa: E402
+from typing import Optional as _Optional  # noqa: E402
+
+from pydantic import BaseModel  # noqa: E402
+
+from services import numbering  # noqa: E402
+
+
+class NumberFormatIn(BaseModel):
+    prefix: str = ""
+    date_part: str = "NONE"
+    separator: str = "-"
+    digits: int = 6
+    start_value: int = 1
+    restart: str = "NEVER"
+    suffix: str = ""
+    allow_manual: bool = True
+
+
+def _format_view(f: "numbering.Fmt", db: Session, with_next: bool = True) -> dict:
+    today = _date.today()
+    data = {
+        "doc_type": f.doc_type,
+        "label": numbering.DOC_LABELS[f.doc_type],
+        "prefix": f.prefix, "date_part": f.date_part, "separator": f.separator, "digits": f.digits,
+        "start_value": f.start_value, "restart": f.restart, "suffix": f.suffix, "allow_manual": f.allow_manual,
+        "example": numbering.render(f, today, f.start_value),
+    }
+    if with_next:
+        data["next_number"] = numbering.peek_number(db, f.doc_type, today)
+    return data
+
+
+@router.get("/number-formats")
+def read_number_formats(
+    *, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("system.read")),
+) -> Any:
+    return {
+        "data": [_format_view(numbering.get_format(db, d), db) for d in numbering.DOC_LABELS],
+        "options": {
+            "date_parts": [{"value": k, "label": v} for k, v in numbering.DATE_PARTS.items()],
+            "restarts": [{"value": k, "label": v} for k, v in numbering.RESTARTS.items()],
+            "separators": numbering.SEPARATORS,
+            "allowed_dates": {k: sorted(v) for k, v in numbering.ALLOWED_DATE_PARTS.items()},
+        },
+    }
+
+
+@router.post("/number-formats/{doc_type}/preview")
+def preview_number_format(
+    doc_type: str, body: NumberFormatIn,
+    db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("system.read")),
+) -> Any:
+    """Example of what a format would produce (nothing is saved)."""
+    f = numbering.Fmt(doc_type, **body.model_dump())
+    numbering.validate(f)
+    return {"example": numbering.render(f, _date.today(), f.start_value)}
+
+
+@router.put("/number-formats/{doc_type}")
+@approval_gate.gated("system", "UPDATE", "NumberFormat", "system.write", id_param=None)
+def update_number_format(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("system.write")),
+    doc_type: str, body: NumberFormatIn,
+) -> Any:
+    """Change how new numbers look. Numbers already issued are never touched."""
+    f = numbering.save_format(db, numbering.Fmt(doc_type, **body.model_dump()), current_user.id)
+    return _format_view(f, db)

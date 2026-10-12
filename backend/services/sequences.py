@@ -9,12 +9,18 @@ from models.system import NumberSequence
 def generate_next_number(db: Session, sequence_type: str, prefix: str = None) -> str:
     """
     Thread-safe sequence number generator using DB row locking.
-    e.g. generate_next_number(db, "RECEIPT", "REC") => "REC-20260921-000001"
+    MEMBER_CODE / MEMBERSHIP_NO / RECEIPT follow the format set in Settings > Number Formats
+    (services/numbering.py); any other sequence keeps the original PREFIX-YYYYMMDD-000001 shape.
 
     The first-ever call for a sequence_type creates the row inside a savepoint,
     so two concurrent requests racing to insert it resolve to one winner and one
     retry instead of a 500 (the loser rolls back only its own INSERT).
     """
+
+    from services import numbering
+
+    if sequence_type in numbering.DEFAULTS:
+        return numbering.next_number(db, sequence_type, commit=True)
 
     def _locked_row():
         return (

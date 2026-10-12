@@ -38,13 +38,16 @@ import { apiErrorMessage } from '../utils/apiError';
 import { askForm, askReason, confirmYesNo } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import { fetchReceipts, normalizeReceipt, receiptToApiPayload } from '../utils/apiAdapters';
+import useRules, { currentRules } from '../hooks/useRules';
 
 // Financial year (April-March) of an ISO date: 2026-10-12 -> 2026-27
 const fyOf = (iso) => {
   if (!iso || String(iso).length < 7) return '';
   const y = Number(String(iso).slice(0, 4));
   const m = Number(String(iso).slice(5, 7));
-  const start = m >= 4 ? y : y - 1;
+  const startMonth = currentRules()?.financial_year?.start_month;
+  if (!startMonth) return '';
+  const start = m >= startMonth ? y : y - 1;
   return `${start}-${String(start + 1).slice(-2)}`;
 };
 
@@ -94,6 +97,7 @@ function StatusDot({ receipt }) {
 }
 
 export default function ReceiptTracking() {
+  const rules = useRules(); // formats and limits from the server
   const { hasPermission } = useAuth();
   // Master Synchronized Stores
   const [receipts, setReceipts] = useState([]);

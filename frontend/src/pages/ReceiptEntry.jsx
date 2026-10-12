@@ -51,6 +51,7 @@ import {
   loadLocations,
   findLocationByPin
 } from '../utils/serverData';
+import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
 
 // ----------------------------------------------------
 // Server member -> the shape this screen draws
@@ -152,6 +153,7 @@ const numberToWords = (num) => {
 const isOthersName = (name) => /^others?$/i.test(String(name || '').trim());
 
 export default function ReceiptEntry() {
+  const rules = useRules(); // formats and limits from the server
   const location = useLocation();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
@@ -726,7 +728,7 @@ export default function ReceiptEntry() {
         if (!d || d.length < 7) return '';
         const y = Number(d.slice(0, 4));
         const m = Number(d.slice(5, 7));
-        const start = m >= 4 ? y : y - 1;
+        const start = m >= (rules?.financial_year?.start_month ?? 99) ? y : y - 1;
         return `${start}-${String(start + 1).slice(-2)}`;
       };
       const wantedFy = fyOf(formData.receiptDate);
@@ -793,7 +795,7 @@ export default function ReceiptEntry() {
       errors.amount = 'Please enter a valid amount greater than 0.';
     } else if (!/^\d+(\.\d{1,2})?$/.test(String(formData.amount).trim())) {
       errors.amount = 'Amount can have at most 2 decimal places.';
-    } else if (Number(formData.amount) > 9999999999.99) {
+    } else if (rules && Number(formData.amount) > rules.amount.max) {
       errors.amount = 'Amount is too large.';
     }
 
@@ -808,10 +810,8 @@ export default function ReceiptEntry() {
     }
 
     // 9. Mobile (If entered, validate 10 digits)
-    if (formData.mobile && !/^\d{10}$/.test(formData.mobile)) {
-      errors.mobile = 'Mobile number must be exactly 10 digits.';
-    } else if (formData.mobile && !/^[6-9]/.test(formData.mobile)) {
-      errors.mobile = 'Mobile number must start with 6, 7, 8 or 9.';
+    if (formData.mobile && mobileProblem(rules, formData.mobile)) {
+      errors.mobile = mobileProblem(rules, formData.mobile);
     }
 
     // Extra particular lines: each needs a particular, an amount, and its sub-type / description
@@ -837,7 +837,7 @@ export default function ReceiptEntry() {
 
     // 10. PAN (If entered, validate standard format)
 
-    if (formData.panNo && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.panNo)) {
+    if (formData.panNo && !matchesPattern(formData.panNo, rules?.pan?.pattern)) {
       errors.panNo = 'Enter a valid 10-character PAN (e.g. ABCDE1234F).';
     }
 

@@ -38,10 +38,8 @@ import CountryCodeSelect from '../components/CountryCodeSelect';
 import PermissionGate from '../components/PermissionGate';
 import SearchableFormSelect from '../components/SearchableFormSelect';
 import useAuth from '../hooks/useAuth';
+import useRules, { hasDigits } from '../hooks/useRules';
 
-const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
-const BEHALF_OPTIONS = ['Self', 'Family', 'Father', 'Mother', 'Son', 'Daughter', 'Spouse', 'Relative', 'Others'];
-const NAME_TITLES = ['SRI.', 'MS.'];
 const DEFAULT_CATEGORY = 'Only Havyaka Mahasabha Membership';
 
 const titleCase = (v) => (v ? String(v).charAt(0).toUpperCase() + String(v).slice(1).toLowerCase() : '');
@@ -51,6 +49,13 @@ export default function RegisterNewMember() {
   const location = useLocation();
   const params = useParams();
   const { hasPermission } = useAuth();
+  // formats, limits and fixed lists come from the server (GET /meta/rules); null until loaded
+  const rules = useRules();
+  const BLOOD_GROUPS = rules?.blood_groups || [];
+  const BEHALF_OPTIONS = rules?.applied_on_behalf_of || [];
+  const NAME_TITLES = rules?.name_titles || [];
+  const CATEGORY_OPTIONS = rules?.membership_type_categories || [];
+  const minAge = rules?.member?.min_age ?? 0;
 
   // Mode: add (/register), edit (/edit/:id), view (/view/:id)
   const isEditMode = location.pathname.includes('/edit');
@@ -423,8 +428,8 @@ export default function RegisterNewMember() {
       return;
     }
 
-    if (isNaN(numAge) || numAge < 18) {
-      setFormErrors((prev) => ({ ...prev, birthDate: 'Member must be at least 18 years old.' }));
+    if (isNaN(numAge) || numAge < minAge) {
+      setFormErrors((prev) => ({ ...prev, birthDate: `Member must be at least ${minAge} years old.` }));
       return;
     }
 
@@ -599,11 +604,12 @@ export default function RegisterNewMember() {
       } else {
         // 2. If not found locally, use free public API
         try {
-          const res = await fetch(`https://api.postalpincode.in/pincode/${cleanVal}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data[0] && data[0].Status === 'Success') {
-              const postOffice = data[0].PostOffice[0];
+          // looked up by the server, so the browser does not depend on the public postal service
+          const res = await api.get(`/meta/pincode/${cleanVal}`);
+          if (res.data) {
+            const data = res.data;
+            if (data.found) {
+              const postOffice = { Name: data.area, Block: data.taluk, District: data.district, State: data.state };
               setFormData((prev) => ({
                 ...prev,
                 locality: prev.locality || postOffice.Name || '',
@@ -693,8 +699,8 @@ export default function RegisterNewMember() {
           errors.birthDate = 'Date of Birth cannot be in the future';
         } else {
           const exactAge = parseInt(calculateAge(formData.birthDate), 10);
-          if (isNaN(exactAge) || exactAge < 18) {
-            errors.birthDate = 'Member must be at least 18 years old.';
+          if (isNaN(exactAge) || exactAge < minAge) {
+            errors.birthDate = `Member must be at least ${minAge} years old.`;
           }
         }
       }
@@ -710,8 +716,8 @@ export default function RegisterNewMember() {
 
     if (!cleanAadhar) {
       errors.aadharNumber = 'Aadhar Number is required';
-    } else if (!/^\d{12}$/.test(cleanAadhar.replace(/\s/g, ''))) {
-      errors.aadharNumber = 'Aadhar must be a 12-digit number';
+    } else if (!hasDigits(cleanAadhar, rules?.aadhaar?.digits)) {
+      errors.aadharNumber = `Aadhar must be a ${rules?.aadhaar?.digits}-digit number`;
     }
 
     if (!cleanAddress) {
@@ -720,8 +726,8 @@ export default function RegisterNewMember() {
 
     if (!cleanPin) {
       errors.postalCode = 'PIN Code is required';
-    } else if (!/^\d{6}$/.test(cleanPin)) {
-      errors.postalCode = 'PIN Code must be 6 numeric digits';
+    } else if (!hasDigits(cleanPin, rules?.pincode?.digits)) {
+      errors.postalCode = `PIN Code must be ${rules?.pincode?.digits} numeric digits`;
     }
 
     if (!formData.appliedOnBehalfOf) {
@@ -886,7 +892,8 @@ export default function RegisterNewMember() {
         transaction_date: toISODate(formData.transactionDate) || null,
         remarks: formData.paymentRemarks.trim() || null
       },
-      registration_source: 'OFFLINE'
+      // where the record came from is set once, when it is created; editing never changes it
+      ...(isEditMode ? {} : { registration_source: 'OFFLINE' })
     };
   };
 
@@ -1042,12 +1049,11 @@ export default function RegisterNewMember() {
                       }
                       className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 transition-all cursor-pointer shadow-2xs"
                     >
-                      <option value="Only Havyaka Mahasabha Membership">
-                        Only Havyaka Mahasabha Membership
-                      </option>
-                      <option value="Havyaka Mahasabha Membership & Mangalya Registration">
-                        Havyaka Mahasabha Membership & Mangalya Registration
-                      </option>
+                      {CATEGORY_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>
+                          {opt}
+                        </option>
+                      ))}
                     </select>
 
                   </div>

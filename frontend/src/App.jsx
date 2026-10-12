@@ -18,6 +18,7 @@ import MembershipList from './pages/MembershipList';
 import UnapprovedMembership from './pages/UnapprovedMembership';
 import AssignedApprovals from './pages/AssignedApprovals';
 import OrganisationSettings from './pages/OrganisationSettings';
+import NumberFormats from './pages/NumberFormats';
 import BankDetailsManagement from './pages/BankDetailsManagement';
 import Approvals from './pages/Approvals';
 import RegisterNewMember from './pages/RegisterNewMember';
@@ -84,6 +85,7 @@ function App() {
           <Route path="master/particulars-master" element={<ReceiptTypeManagement />} />
           <Route path="masters/particulars-master" element={<ReceiptTypeManagement />} />
           <Route path="master/organisation-settings" element={<OrganisationSettings />} />
+          <Route path="system/number-formats" element={<NumberFormats />} />
           <Route path="master/organisation" element={<OrganisationSettings />} />
           <Route path="settings/organisation" element={<OrganisationSettings />} />
           <Route path="settings" element={<OrganisationSettings />} />

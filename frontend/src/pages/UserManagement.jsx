@@ -35,11 +35,13 @@ import api from '../api';
 import { formatDate, formatDateTime } from '../utils/dateUtils';
 import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
+import useRules, { matchesPattern, mobileProblem, passwordProblem } from '../hooks/useRules';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 
 export default function UserManagement() {
   const { myRank, hasPermission } = useAuth();
+  const rules = useRules(); // formats and limits from the server
   // Roles weaker than mine, or my own rank (not Rank 1) can be assigned — mirrors the backend rule.
   const sameRankOk = (rank) => rank > myRank || (rank === myRank && myRank !== 1);
   const availableRoles = roles => roles.filter(r => sameRankOk(r.rank_level ?? 99));
@@ -252,7 +254,7 @@ export default function UserManagement() {
   const handleFormChange = (e) => {
     const { name, value } = e.target;
     if (name === 'mobile') {
-      const cleaned = value.replace(/\D/g, '').slice(0, 10);
+      const cleaned = value.replace(/\D/g, '').slice(0, rules?.mobile?.max_digits ?? 15);
       setFormData(prev => ({ ...prev, mobile: cleaned }));
     } else if (name === 'username') {
       const cleaned = value.replace(/[^a-zA-Z0-9._]/g, '').toLowerCase();
@@ -285,8 +287,10 @@ export default function UserManagement() {
 
     if (!username) {
       errors.username = 'Username is required';
-    } else if (username.length < 3) {
-      errors.username = 'Username must be at least 3 characters';
+    } else if (rules && username.length < rules.username.min_length) {
+      errors.username = `Username must be at least ${rules.username.min_length} characters`;
+    } else if (rules && !matchesPattern(username, rules.username.pattern)) {
+      errors.username = 'Username can only contain letters, numbers, dots and underscores';
     } else {
       const isDuplicateUsername = users.some(
         u => (u.id !== editingUser?.id && String(u.id) !== String(editingUser?.id)) &&
@@ -299,7 +303,7 @@ export default function UserManagement() {
 
     if (!email) {
       errors.email = 'Email Address is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    } else if (!matchesPattern(email, rules?.email?.pattern)) {
       errors.email = 'Please enter a valid email address';
     } else {
       const isDuplicateEmail = users.some(
@@ -313,8 +317,8 @@ export default function UserManagement() {
 
     if (!mobile) {
       errors.mobile = 'Mobile Number is required';
-    } else if (!/^[6-9]\d{9}$/.test(mobile)) {
-      errors.mobile = 'Please enter a valid 10-digit Indian mobile number';
+    } else if (mobileProblem(rules, mobile)) {
+      errors.mobile = mobileProblem(rules, mobile);
     }
 
     if (formData.roleId === '' || formData.roleId === undefined || formData.roleId === null) {
@@ -324,8 +328,8 @@ export default function UserManagement() {
     if (modalMode === 'add') {
       if (!formData.password) {
         errors.password = 'Password is required';
-      } else if (formData.password.length < 6) {
-        errors.password = 'Password must be at least 6 characters';
+      } else if (passwordProblem(rules, formData.password)) {
+        errors.password = passwordProblem(rules, formData.password);
       }
 
       if (!formData.confirmPassword) {
@@ -336,8 +340,8 @@ export default function UserManagement() {
     } else {
       // Edit mode: password is optional (only validated if entered)
       if (formData.password) {
-        if (formData.password.length < 6) {
-          errors.password = 'Password must be at least 6 characters';
+        if (passwordProblem(rules, formData.password)) {
+          errors.password = passwordProblem(rules, formData.password);
         }
         if (formData.password !== formData.confirmPassword) {
           errors.confirmPassword = 'Passwords do not match';

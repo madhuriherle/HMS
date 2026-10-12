@@ -375,7 +375,7 @@ def approve_type_change(
                 f" -> {new_type.code if new_type else req.requested_type_id}"
             )
             receipt = Receipt(
-                receipt_number=receipt_numbers.next_receipt_number(db, receipt_numbers.financial_year_for(date.today())),
+                receipt_number=receipt_numbers.next_receipt_number(db, date.today()),
                 receipt_date=date.today(),
                 receipt_type="TYPE_CHANGE",
                 payer_name=payer,

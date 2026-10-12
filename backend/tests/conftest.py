@@ -88,3 +88,17 @@ def admin_headers(client):
     )
     assert response.status_code == 200, response.text
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+@pytest.fixture(autouse=True)
+def _approval_checklist_off_by_default(request, monkeypatch):
+    """Most tests approve members created with only a name; the approval checklist (name, mobile, date of
+    birth, address, PIN code) is switched off for them. Tests of the checklist itself use
+    @pytest.mark.approval_checklist to keep it on."""
+    if not request.node.get_closest_marker("approval_checklist"):
+        from services import member_activation
+        monkeypatch.setattr(member_activation, "REQUIRED_FOR_APPROVAL", ())
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "approval_checklist: run with the real member-approval checklist switched on")

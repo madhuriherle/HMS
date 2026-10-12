@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 from datetime import datetime, date, time
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Receipts are entered at the counter (OFFLINE) or from the website/app (ONLINE).
 ReceiptSource = Literal["ONLINE", "OFFLINE"]
@@ -64,6 +64,9 @@ class ReceiptBase(BaseModel):
     transaction_reference: Optional[str] = None
     bank_account: Optional[str] = None
     transaction_date: Optional[date] = None
+    payer_pan: Optional[str] = Field(None, max_length=10)
+    payer_mobile: Optional[str] = Field(None, max_length=20)
+    payer_membership_no: Optional[str] = Field(None, max_length=30)
     gross_amount: float
     discount_amount: float = 0.0
     net_amount: float
@@ -169,6 +172,11 @@ class ReceiptUpdate(BaseModel):
     payer_name: Optional[str] = None
     payment_mode: Optional[str] = None
     transaction_reference: Optional[str] = None
+    bank_account: Optional[str] = None
+    transaction_date: Optional[date] = None
+    payer_pan: Optional[str] = Field(None, max_length=10)
+    payer_mobile: Optional[str] = Field(None, max_length=20)
+    payer_membership_no: Optional[str] = Field(None, max_length=30)
     items: Optional[List[ReceiptItemBase]] = None
     gross_amount: Optional[float] = None
     discount_amount: Optional[float] = None

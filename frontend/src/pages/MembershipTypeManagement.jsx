@@ -251,9 +251,7 @@ export default function MembershipTypeManagement() {
       const isActive = formData.status === 'Active';
 
       if (modalMode === 'add') {
-        const typeCode = formData.name.substring(0, 3).toUpperCase() + Date.now().toString().slice(-4);
         const res = await api.post('/masters/membership-types', {
-          code: typeCode,
           name_en: formData.name,
           status: isActive
         });

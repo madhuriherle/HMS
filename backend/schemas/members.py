@@ -2,6 +2,8 @@ from typing import List, Optional, Set
 from datetime import datetime, date
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from core import rules
+
 # Fields a member may propose changing themselves (profile/KYC flows).
 # Anything outside this set (approval_status, member_code, is_deleted, …)
 # must never be updatable through a change request.
@@ -109,9 +111,19 @@ class MemberBase(BaseModel):
         if v is None or v == "":
             return None
         v = v.strip()
-        if not v.isdigit() or not (10 <= len(v) <= 12):
+        if not v.isdigit() or not (rules.MOBILE_MIN_DIGITS <= len(v) <= rules.MOBILE_MAX_DIGITS):
             raise ValueError("whatsapp_number must be 10-12 digits")
         return v
+
+    @field_validator("aadhaar_number")
+    @classmethod
+    def _validate_aadhaar(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or str(v).strip() == "":
+            return None
+        digits = "".join(str(v).split())
+        if not digits.isdigit() or len(digits) != rules.AADHAAR_DIGITS:
+            raise ValueError("aadhaar_number must be exactly 12 digits")
+        return digits
 
     @field_validator("gender")
     @classmethod
@@ -129,8 +141,8 @@ class MemberBase(BaseModel):
         if v:
             today = date.today()
             age = today.year - v.year - ((today.month, today.day) < (v.month, v.day))
-            if age < 18:
-                raise ValueError("Member must be at least 18 years old")
+            if age < rules.MIN_MEMBER_AGE:
+                raise ValueError(f"Member must be at least {rules.MIN_MEMBER_AGE} years old")
         return v
 
     @field_validator("mobile", "alternate_mobile")
@@ -139,7 +151,7 @@ class MemberBase(BaseModel):
         if v is None or v == "":
             return None
         v = v.strip()
-        if not v.isdigit() or not (10 <= len(v) <= 12):
+        if not v.isdigit() or not (rules.MOBILE_MIN_DIGITS <= len(v) <= rules.MOBILE_MAX_DIGITS):
             raise ValueError("mobile must be 10-12 digits")
         return v
 
@@ -232,6 +244,16 @@ class MemberUpdate(BaseModel):
             raise ValueError("member_status must be ACTIVE or INACTIVE")
         return v
 
+    @field_validator("aadhaar_number")
+    @classmethod
+    def _validate_aadhaar(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or str(v).strip() == "":
+            return None
+        digits = "".join(str(v).split())
+        if not digits.isdigit() or len(digits) != rules.AADHAAR_DIGITS:
+            raise ValueError("aadhaar_number must be exactly 12 digits")
+        return digits
+
     @field_validator("gender")
     @classmethod
     def _validate_gender(cls, v: Optional[str]) -> Optional[str]:
@@ -248,8 +270,8 @@ class MemberUpdate(BaseModel):
         if v:
             today = date.today()
             age = today.year - v.year - ((today.month, today.day) < (v.month, v.day))
-            if age < 18:
-                raise ValueError("Member must be at least 18 years old")
+            if age < rules.MIN_MEMBER_AGE:
+                raise ValueError(f"Member must be at least {rules.MIN_MEMBER_AGE} years old")
         return v
 
     @field_validator("mobile", "alternate_mobile")
@@ -258,7 +280,7 @@ class MemberUpdate(BaseModel):
         if v is None or v == "":
             return None
         v = v.strip()
-        if not v.isdigit() or not (10 <= len(v) <= 12):
+        if not v.isdigit() or not (rules.MOBILE_MIN_DIGITS <= len(v) <= rules.MOBILE_MAX_DIGITS):
             raise ValueError("mobile must be 10-12 digits")
         return v
 

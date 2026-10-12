@@ -48,7 +48,7 @@ def test_super_admin_sidebar_has_only_real_screens(client, admin_headers):
         ok = route == "/dashboard" or (route.startswith("/dashboard/") and route[len("/dashboard/"):] in real)
         assert ok, f"sidebar item '{item['name']}' ({item['code']}) opens nothing: route={route!r}"
     names = {n["name"] for n in _walk(menu)}
-    assert "System" not in names and "Privileges" not in names and "Magazine" not in names, "modules without a screen are not shown"
+    assert "Settings" in names and "Privileges" not in names and "Magazine" not in names, "modules without a screen are not shown"
     assert {"Dashboard", "Masters", "Users", "Membership", "Approvals", "Receipts"} <= names
 
 

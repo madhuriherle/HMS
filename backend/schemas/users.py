@@ -1,6 +1,9 @@
+import re
 from typing import Optional, List
+
+from core import rules
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
 class RoleBrief(BaseModel):
@@ -14,6 +17,35 @@ class RoleBrief(BaseModel):
 
 
 # ── Users ────────────────────────────────────────────────────
+
+def _check_email(v: Optional[str]) -> Optional[str]:
+    if v is None or v == "":
+        return None
+    v = v.strip()
+    if not re.fullmatch(rules.EMAIL_PATTERN, v):
+        raise ValueError("email is not a valid email address")
+    return v
+
+
+def _check_mobile(v: Optional[str]) -> Optional[str]:
+    if v is None or v == "":
+        return None
+    v = v.strip()
+    if not v.isdigit() or not (rules.MOBILE_MIN_DIGITS <= len(v) <= rules.MOBILE_MAX_DIGITS):
+        raise ValueError("mobile must be 10-12 digits")
+    return v
+
+
+def _check_username(v: Optional[str]) -> Optional[str]:
+    if v is None:
+        return v
+    v = v.strip()
+    if len(v) < rules.USERNAME_MIN_LENGTH:
+        raise ValueError(f"username must be at least {rules.USERNAME_MIN_LENGTH} characters")
+    if not re.fullmatch(rules.USERNAME_PATTERN, v):
+        raise ValueError("username can only contain letters, numbers, dots and underscores")
+    return v
+
 class UserBase(BaseModel):
     name: str
     username: str
@@ -21,6 +53,21 @@ class UserBase(BaseModel):
     mobile: Optional[str] = None
     mobile_country_code: str = "+91"
     status: bool = True
+
+    @field_validator("username")
+    @classmethod
+    def _v_username(cls, v):
+        return _check_username(v)
+
+    @field_validator("email")
+    @classmethod
+    def _v_email(cls, v):
+        return _check_email(v)
+
+    @field_validator("mobile")
+    @classmethod
+    def _v_mobile(cls, v):
+        return _check_mobile(v)
 
 
 class UserCreate(UserBase):
@@ -37,6 +84,21 @@ class UserUpdate(BaseModel):
     status: Optional[bool] = None
     role_id: Optional[int] = None
     password: Optional[str] = None  # admin reset; hashed before storage, never returned
+
+    @field_validator("username")
+    @classmethod
+    def _v_username(cls, v):
+        return _check_username(v)
+
+    @field_validator("email")
+    @classmethod
+    def _v_email(cls, v):
+        return _check_email(v)
+
+    @field_validator("mobile")
+    @classmethod
+    def _v_mobile(cls, v):
+        return _check_mobile(v)
 
 
 class ProfileUpdate(BaseModel):
@@ -112,7 +174,7 @@ class ModuleWithPermissionCount(Module):
 # ── Roles ────────────────────────────────────────────────────
 class RoleBase(BaseModel):
     name: str
-    code: str
+    code: Optional[str] = None
     description: Optional[str] = None
     status: bool = True
     rank_level: int = 99
@@ -126,7 +188,12 @@ class RoleBase(BaseModel):
 
 
 class RoleCreate(RoleBase):
-    pass
+    @model_validator(mode="before")
+    @classmethod
+    def _make_code(cls, data):
+        if isinstance(data, dict) and not str(data.get("code") or "").strip() and data.get("name"):
+            data = {**data, "code": rules.make_code(data["name"]).replace(" ", "_")}
+        return data
 
 
 class RoleUpdate(BaseModel):

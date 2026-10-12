@@ -39,7 +39,7 @@ def test_particular_edit_rejects_duplicate_code(client, admin_headers):
 
 
 def test_payment_mode_in_use_needs_force(client, admin_headers):
-    pm = _post(client, admin_headers, "/masters/payment-modes", {"payment_mode": "GuardUPI", "payment_type": "ONLINE"})
+    pm = _post(client, admin_headers, "/masters/payment-modes", {"payment_mode": "GuardUPI", "payment_type": "CASH"})
     from db.session import SessionLocal
     from models.masters import PaymentMode
     from models.receipts import Receipt
@@ -133,7 +133,7 @@ def test_gated_delete_warns_at_request_time_and_approver_sees_it(client, admin_h
         client, h, "guarddel_clerk", "GuardDelClerk", "GUARDDEL_CLERK",
         permission_grants=[("masters.delete", True), ("approvals.write", False)],
     )
-    pm = _post(client, h, "/masters/payment-modes", {"payment_mode": "GuardGated", "payment_type": "ONLINE"})
+    pm = _post(client, h, "/masters/payment-modes", {"payment_mode": "GuardGated", "payment_type": "CASH"})
     import datetime
     from db.session import SessionLocal
     from models.receipts import Receipt

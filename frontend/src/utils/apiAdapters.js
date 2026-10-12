@@ -108,7 +108,7 @@ export const normalizeMember = (member) => {
   };
 };
 
-export const memberToApiPayload = (formData) => {
+export const memberToApiPayload = (formData, { isUpdate = false } = {}) => {
   const parts = formData.name.trim().split(/\s+/);
   return {
     first_name_en: parts[0] || formData.name.trim(),
@@ -136,7 +136,8 @@ export const memberToApiPayload = (formData) => {
     remarks: formData.remarks.trim() || null,
     address_remarks: formData.magazineRemarks.trim() || null,
     native_place_text: formData.nativeDetails.trim() || null,
-    registration_source: 'OFFLINE',
+    // where the record came from is set once, when it is created; editing never changes it
+    ...(isUpdate ? {} : { registration_source: 'OFFLINE' }),
     state_id: Number(formData.stateId) || null,
     district_id: Number(formData.districtId) || null,
     taluk_id: Number(formData.talukId) || null,
@@ -175,10 +176,10 @@ export const normalizeReceipt = (receipt) => ({
   receiptNumber: firstDefined(receipt.receipt_number, receipt.receiptNumber, ''),
   receiptDate: firstDefined(receipt.receipt_date, receipt.receiptDate, ''),
   name: firstDefined(receipt.member_name, receipt.payee_name, receipt.payer_name, receipt.name, ''),
-  panNo: firstDefined(receipt.pan_no, receipt.panNo, ''),
-  membershipNo: firstDefined(receipt.membership_number, receipt.member_code, receipt.membershipNo, ''),
+  panNo: firstDefined(receipt.payer_pan, receipt.pan_no, receipt.panNo, ''),
+  membershipNo: firstDefined(receipt.membership_number, receipt.member_code, receipt.payer_membership_no, receipt.membershipNo, ''),
   memberId: firstDefined(receipt.member_id, receipt.memberId, null),
-  mobile: firstDefined(receipt.mobile, ''),
+  mobile: firstDefined(receipt.payer_mobile, receipt.mobile, ''),
   particulars: receiptTypeFromApi(firstDefined(receipt.receipt_type, receipt.particulars, 'MEMBERSHIP')),
   amount: Number(firstDefined(receipt.amount, receipt.net_amount, receipt.gross_amount, 0)),
   paymentMode: paymentModeFromApi(firstDefined(receipt.payment_mode, receipt.paymentMode, 'OTHER')),
@@ -212,14 +213,6 @@ export const receiptToApiPayload = (formData, selectedMember = null) => {
   const headType = (creditLines[0] || lines[0]).type;
   const allocationMemberId = Number(selectedMember?.memberId || selectedMember?.member_id || selectedMember?.id);
   const baseNotes = (formData.description || '').trim() || (formData.paymentReceivedDetails || '').trim();
-  // Not linked to a member yet: keep what was typed so the receipt can be mapped later.
-  const unlinkedNote = allocationMemberId
-    ? ''
-    : [
-        formData.membershipNo?.trim() && `Membership No. entered: ${formData.membershipNo.trim()}`,
-        formData.mobile?.trim() && `Mobile: ${formData.mobile.trim()}`,
-        formData.panNo?.trim() && `PAN: ${formData.panNo.trim()}`,
-      ].filter(Boolean).join('; ');
   return {
     receipt_number: formData.receiptNumber.trim() || null,
     receipt_date: formData.receiptDate,
@@ -235,7 +228,10 @@ export const receiptToApiPayload = (formData, selectedMember = null) => {
     source: 'OFFLINE',
     is_renewal: Boolean(formData.isRenewal),
     is_cancelled: Boolean(formData.isCancelled),
-    notes: [baseNotes, unlinkedNote].filter(Boolean).join(' | ') || null,
+    payer_pan: (formData.panNo || '').trim() || null,
+    payer_mobile: (formData.mobile || '').trim() || null,
+    payer_membership_no: (formData.membershipNo || '').trim() || null,
+    notes: baseNotes || null,
     period_from_date: formData.periodFromDate || null,
     period_to_date: formData.periodToDate || null,
     period_from_time: formData.periodFromTime || null,

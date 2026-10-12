@@ -241,9 +241,7 @@ export default function ReceiptTypeManagement() {
 
     try {
       if (typeModalMode === 'add') {
-        const typeCode = trimmedName.substring(0,3).toUpperCase() + Date.now().toString().slice(-4);
         await api.post('/masters/particulars', {
-          code: typeCode,
           name_en: trimmedName,
           status: isActive
         });
@@ -331,9 +329,7 @@ export default function ReceiptTypeManagement() {
     try {
       let data;
       if (subTypeModalMode === 'add') {
-        const code = trimmedName.substring(0, 3).toUpperCase() + Date.now().toString().slice(-4);
         ({ data } = await api.post('/masters/particulars', {
-          code,
           name_en: trimmedName,
           parent_id: parent.id,
           status: isActive

@@ -29,12 +29,14 @@ import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
+import useRules, { hasDigits } from '../hooks/useRules';
 
 // <select> values are always strings; API ids are numbers, so convert back
 // before comparing with `===` or sending to the API.
 const toId = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? v : Number(v));
 
 export default function LocationSetup() {
+  const rules = useRules(); // formats and limits from the server
   const { hasPermission } = useAuth();
 
   // ----------------------------------------------------
@@ -547,8 +549,8 @@ export default function LocationSetup() {
 
     if (!cleanPin) {
       errors.postalCode = 'PIN Code is required';
-    } else if (!/^\d{6}$/.test(cleanPin)) {
-      errors.postalCode = 'PIN Code must be exactly 6 numeric digits (0-9)';
+    } else if (!hasDigits(cleanPin, rules?.pincode?.digits)) {
+      errors.postalCode = `PIN Code must be exactly ${rules?.pincode?.digits} numeric digits (0-9)`;
     }
 
     if (!cleanArea) {
@@ -713,7 +715,7 @@ export default function LocationSetup() {
       };
 
       // 1. Validate PIN code (exact 6 numeric digits)
-      if (!rowData.pinCode || !/^\d{6}$/.test(rowData.pinCode)) {
+      if (!rowData.pinCode || !hasDigits(rowData.pinCode, rules?.pincode?.digits)) {
         rowData.isValid = false;
         rowData.errorType = 'INVALID_PIN';
         rowData.errorMsg = 'PIN must be exactly 6 numeric digits';

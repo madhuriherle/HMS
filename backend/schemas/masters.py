@@ -1,6 +1,19 @@
 from typing import Optional, List
 from datetime import date as date_type, datetime
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+
+from core import rules
+
+class _AutoCode(BaseModel):
+    """Create schemas that fill in a code from the name when the client sends none."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _fill_code(cls, data):
+        if isinstance(data, dict) and not str(data.get("code") or "").strip() and data.get("name_en"):
+            data = {**data, "code": rules.make_code(data["name_en"])}
+        return data
+
 
 class StateBase(BaseModel):
     name_en: str
@@ -111,14 +124,14 @@ class PostalCode(PostalCodeBase):
 
 
 class MembershipTypeBase(BaseModel):
-    code: str
+    code: Optional[str] = None
     name_en: str
     name_kn: Optional[str] = None
     description: Optional[str] = None
     status: bool = True
 
 
-class MembershipTypeCreate(MembershipTypeBase):
+class MembershipTypeCreate(_AutoCode, MembershipTypeBase):
     pass
 
 
@@ -173,14 +186,14 @@ class MembershipTypeWithPrice(MembershipType):
 
 
 class DocumentTypeBase(BaseModel):
-    code: str
+    code: Optional[str] = None
     name_en: str
     name_kn: Optional[str] = None
     is_required: bool = False
     status: bool = True
 
 
-class DocumentTypeCreate(DocumentTypeBase):
+class DocumentTypeCreate(_AutoCode, DocumentTypeBase):
     pass
 
 
@@ -200,13 +213,13 @@ class DocumentType(DocumentTypeBase):
 
 
 class ParticularBase(BaseModel):
-    code: str
+    code: Optional[str] = None
     name_en: str
     name_kn: Optional[str] = None
     parent_id: Optional[int] = None
     status: bool = True
 
-class ParticularCreate(ParticularBase):
+class ParticularCreate(_AutoCode, ParticularBase):
     pass
 
 class ParticularUpdate(BaseModel):
@@ -222,7 +235,7 @@ class Particular(ParticularBase):
     model_config = ConfigDict(from_attributes=True)
 
 class ServiceTypeBase(BaseModel):
-    code: str
+    code: Optional[str] = None
     name_en: str
     name_kn: Optional[str] = None
     description: Optional[str] = None
@@ -230,7 +243,7 @@ class ServiceTypeBase(BaseModel):
     status: bool = True
 
 
-class ServiceTypeCreate(ServiceTypeBase):
+class ServiceTypeCreate(_AutoCode, ServiceTypeBase):
     pass
 
 
@@ -250,7 +263,7 @@ class ServiceType(ServiceTypeBase):
 
 
 class BankBase(BaseModel):
-    code: str
+    code: Optional[str] = None
     name_en: str
     name_kn: Optional[str] = None
     account_number: Optional[str] = None
@@ -260,7 +273,7 @@ class BankBase(BaseModel):
     status: bool = True
 
 
-class BankCreate(BankBase):
+class BankCreate(_AutoCode, BankBase):
     pass
 
 

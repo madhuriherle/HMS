@@ -235,11 +235,13 @@ def create_receipt(
 
     fy = receipt_numbers.financial_year_for(receipt_in.receipt_date)
     typed = (receipt_in.receipt_number or "").strip()
-    if typed:
+    from services import numbering
+    if typed and numbering.get_format(db, "RECEIPT").allow_manual:
         receipt_numbers.assert_number_free(db, fy, typed)
         receipt_no = typed
-    else:
-        receipt_no = receipt_numbers.next_receipt_number(db, fy)
+        numbering.note_used(db, "RECEIPT", typed, receipt_in.receipt_date)
+    else:  # no number typed, or typing is switched off in Number Formats: use the next one in the format
+        receipt_no = receipt_numbers.next_receipt_number(db, receipt_in.receipt_date)
     try:
         created = crud_receipts.receipt.create_with_items(
             db=db, obj_in=receipt_in, created_by=current_user.id, receipt_number=receipt_no
@@ -679,6 +681,7 @@ def next_receipt_number(
 ) -> Any:
     """Receipt Entry defaults: the date to start with (last receipt entered, else
     today) and the next free ``YYYY-YY/NNNN`` number for that date's financial year."""
+    from services import numbering
     default_date = receipt_numbers.default_entry_date(db)
     on = date or default_date
     fy = receipt_numbers.financial_year_for(on)
@@ -686,7 +689,8 @@ def next_receipt_number(
         "default_date": default_date,
         "receipt_date": on,
         "financial_year": fy,
-        "receipt_number": receipt_numbers.next_receipt_number(db, fy),
+        "receipt_number": receipt_numbers.next_receipt_number(db, on, consume=False),
+        "allow_manual": numbering.get_format(db, "RECEIPT").allow_manual,
     }
 
 

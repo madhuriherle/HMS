@@ -257,6 +257,8 @@ def create_payment_mode(
     current_user: User = Depends(deps.require_permission("masters.write")),
     item_in: schemas_masters.PaymentModeCreate,
 ) -> Any:
+    if str(item_in.payment_type or "").strip().lower() == "online" and not item_in.bank_id:
+        raise HTTPException(400, "An online payment mode needs a bank")
     item = models.masters.PaymentMode(**item_in.model_dump())
     item.created_by = current_user.id
     item.updated_by = current_user.id
@@ -280,6 +282,8 @@ def update_payment_mode(
     data = item_in.model_dump(exclude_unset=True)
     new_name = data.get("payment_mode", item.payment_mode)
     new_bank = data.get("bank_id", item.bank_id)
+    if ("payment_type" in data or "bank_id" in data) and str(data.get("payment_type", item.payment_type) or "").strip().lower() == "online" and not new_bank:
+        raise HTTPException(400, "An online payment mode needs a bank")
     if ("payment_mode" in data or "bank_id" in data) and db.query(models.masters.PaymentMode).filter(
         func.lower(models.masters.PaymentMode.payment_mode) == str(new_name).strip().lower(),
         models.masters.PaymentMode.bank_id == new_bank if new_bank is not None else models.masters.PaymentMode.bank_id.is_(None),

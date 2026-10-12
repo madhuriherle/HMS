@@ -3,7 +3,7 @@ from api.deps import read_guard
 from api.v1.endpoints import (
     auth, masters, users, members, receipts,
     magazines, events, engagements, notifications,
-    system, activity, reports, approvals, imports, dashboard, kyc
+    system, activity, reports, approvals, imports, dashboard, kyc, meta
 )
 
 api_router = APIRouter()
@@ -28,6 +28,9 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 api_router.include_router(approvals.router, prefix="/approvals", tags=["approvals"], dependencies=[Depends(read_guard("approvals"))])
 api_router.include_router(imports.router, prefix="/imports", tags=["imports"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+
+# Data rules the screens use (formats, limits, fixed lists)
+api_router.include_router(meta.router, prefix="/meta", tags=["meta"])
 
 # Reports
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"], dependencies=[Depends(read_guard("reports"))])

@@ -18,16 +18,36 @@ members with a 409 rather than double-numbering.
 
 from datetime import datetime, timezone
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from models.members import Member, MemberApprovalHistory, MemberMembership
 from services.sequences import generate_next_number
 
 
+# What a member must have on file before becoming a permanent member.
+REQUIRED_FOR_APPROVAL = (
+    ("first_name_en", "name"),
+    ("mobile", "mobile"),
+    ("date_of_birth", "date of birth"),
+    ("address_line1", "address"),
+    ("pincode_id", "PIN code"),
+)
+
+
+def approval_gaps(member: Member) -> list:
+    """The details still missing before this member can be approved (empty = ready)."""
+    return [label for attr, label in REQUIRED_FOR_APPROVAL if not str(getattr(member, attr, None) or "").strip()]
+
+
 def activate_member(db: Session, member: Member, *, activated_by: int) -> Member:
     """Apply the activation mutations. Does NOT commit — the caller owns the
     transaction (and, for the WhatsApp activation message, the background
     task queue)."""
+    gaps = approval_gaps(member)
+    if gaps:
+        name = " ".join(p for p in (member.first_name_en, member.last_name_en) if p) or f"Member {member.id}"
+        raise HTTPException(400, f"Cannot approve {name}: missing {', '.join(gaps)}")
     now = datetime.now(timezone.utc)
     old_status = member.approval_status
 
