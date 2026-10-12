@@ -184,12 +184,11 @@ export default function ReceiptTracking() {
       if (fromDate && String(r.receiptDate || '') < fromDate) return false;
       if (toDate && String(r.receiptDate || '') > toDate) return false;
 
-      if (statusFilter === 'Assigned' && isUnmapped) {
-        return false;
-      }
-      if (statusFilter === 'Unassigned' && !isUnmapped) {
-        return false;
-      }
+      const rs = r.receiptStatus || (isUnmapped ? 'UNASSIGNED' : 'ASSIGNED');
+      if (statusFilter === 'Assigned' && rs !== 'ASSIGNED' && rs !== 'APPROVED') return false;
+      if (statusFilter === 'Unassigned' && rs !== 'UNASSIGNED') return false;
+      if (statusFilter === 'Approved' && rs !== 'APPROVED') return false;
+      if (statusFilter === 'Cancelled' && rs !== 'CANCELLED') return false;
 
       return true;
     });
@@ -232,7 +231,7 @@ export default function ReceiptTracking() {
       r.amount,
       r.paymentMode,
       r.transactionId,
-      isReceiptUnmapped(r) ? 'Unassigned' : 'Assigned'
+      r.receiptStatus === 'CANCELLED' ? 'Cancelled' : isReceiptUnmapped(r) ? 'Unassigned' : 'Assigned'
     ]);
     const csv = [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
@@ -263,7 +262,7 @@ export default function ReceiptTracking() {
   const handleBulkMap = async () => {
     const chosen = receipts.filter((r) => selectedIds.has(r.id));
     if (!chosen.length) return;
-    const total = chosen.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+    const total = chosen.filter((r) => r.receiptStatus !== 'CANCELLED').reduce((sum, r) => sum + Number(r.amount || 0), 0);
     const v = await askForm({
       title: `Map ${chosen.length} receipt(s) (${formatINR(total)}) to one member`,
       confirmText: 'Map receipts',
@@ -676,7 +675,9 @@ export default function ReceiptTracking() {
           options={[
             { value: 'ALL', label: 'All Statuses' },
             { value: 'Assigned', label: 'Assigned' },
-            { value: 'Unassigned', label: 'Unassigned' }
+            { value: 'Unassigned', label: 'Unassigned' },
+            { value: 'Approved', label: 'Approved' },
+            { value: 'Cancelled', label: 'Cancelled' }
           ]}
           widthClass="w-full sm:w-48"
         />
@@ -730,6 +731,7 @@ export default function ReceiptTracking() {
                 <div className="text-right shrink-0">
                   <div className="font-mono font-bold text-sm">{formatINR(receipt.amount)}</div>
                   {unmapped && <div className="text-[10px] font-bold text-amber-700">Unassigned</div>}
+                  {receipt.receiptStatus === 'CANCELLED' && <div className="text-[10px] font-bold text-red-700">Cancelled</div>}
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
@@ -842,6 +844,9 @@ export default function ReceiptTracking() {
                       <td className="py-3.5 px-4">
                         <div>
                           <span className="font-bold text-[#180200]">{receipt.name || '—'}</span>
+                          {receipt.receiptStatus === 'CANCELLED' && (
+                            <div className="mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-800 border border-red-300">Cancelled</div>
+                          )}
                           {isUnmapped ? (
                             <div className="mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-200/60 text-amber-900 border border-amber-300/80">
                               <AlertTriangle className="w-3 h-3 text-amber-700 shrink-0" />

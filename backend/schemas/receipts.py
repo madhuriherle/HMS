@@ -131,6 +131,21 @@ class ReceiptBase(BaseModel):
 
 class ReceiptCreate(ReceiptBase):
     receipt_number: Optional[str] = None
+    # Spoiled / void paper receipt: saved under its number with status CANCELLED, no money.
+    is_cancelled: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def cancelled_needs_only_number_and_date(cls, data):
+        if isinstance(data, dict) and data.get("is_cancelled"):
+            data = {
+                **data,
+                "receipt_type": data.get("receipt_type") or "OTHER",
+                "payment_mode": data.get("payment_mode") or "CASH",
+                "gross_amount": 0, "discount_amount": 0, "net_amount": 0,
+                "items": [], "allocations": [],
+            }
+        return data
 
     @field_validator("receipt_number")
     @classmethod
@@ -190,6 +205,7 @@ class ReceiptInDBBase(ReceiptBase):
     id: int
     receipt_number: str
     payment_status: str
+    receipt_status: str = "UNASSIGNED"
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)

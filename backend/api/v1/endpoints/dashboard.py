@@ -56,7 +56,7 @@ def get_dashboard(
     from datetime import datetime, timedelta, timezone
     from models.receipts import ReceiptAllocation
 
-    live_receipts = [Receipt.is_deleted == False, Receipt.payment_status != "CANCELLED"]  # noqa: E712
+    live_receipts = [Receipt.is_deleted == False, Receipt.receipt_status != "CANCELLED"]  # noqa: E712
     today = date.today()
     first_this = today.replace(day=1)
     first_last = (first_this - timedelta(days=1)).replace(day=1)
@@ -67,8 +67,7 @@ def get_dashboard(
             q = q.filter(Receipt.receipt_date < end)
         return float(q.scalar() or 0)
 
-    mapped_ids = db.query(ReceiptAllocation.receipt_id).filter(ReceiptAllocation.is_deleted == False)  # noqa: E712
-    unassigned = db.query(Receipt).filter(*live_receipts, ~Receipt.id.in_(mapped_ids)).count()
+    unassigned = db.query(Receipt).filter(*live_receipts, Receipt.receipt_status == "UNASSIGNED").count()
     now = datetime.now(timezone.utc)
     renewals_due = db.query(MemberMembership).filter(
         MemberMembership.is_deleted == False,  # noqa: E712

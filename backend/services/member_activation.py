@@ -63,4 +63,9 @@ def activate_member(db: Session, member: Member, *, activated_by: int) -> Member
         membership.activated_at = now
         membership.updated_by = activated_by
 
+    # receipts mapped to this member now read APPROVED
+    from services import receipt_status
+    db.flush()
+    receipt_status.refresh_for_members(db, [member.id])
+
     return member

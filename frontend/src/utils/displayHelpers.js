@@ -17,7 +17,7 @@ export const formatPaymentModeLabel = (config) => {
 };
 
 export const isReceiptUnmapped = (receipt) => {
-  if (!receipt) return false;
+  if (!receipt || receipt.receiptStatus === 'CANCELLED') return false;
   // a receipt is assigned when the server has linked it to a member
   return !(receipt.memberId || (receipt.membershipNo && String(receipt.membershipNo).trim() !== ''));
 };

@@ -22,8 +22,9 @@ class CRUDReceipt(CRUDBase[Receipt, ReceiptCreate, ReceiptUpdate]):
         """
         # receipt_number is minted by the endpoint and passed explicitly;
         # drop any client-supplied value so it can't collide as a duplicate kwarg.
-        receipt_data = obj_in.model_dump(exclude={"items", "allocations", "receipt_number"})
+        receipt_data = obj_in.model_dump(exclude={"items", "allocations", "receipt_number", "is_cancelled"})
         db_obj = self.model(**receipt_data, receipt_number=receipt_number, created_by=created_by)
+        db_obj.receipt_status = "CANCELLED" if getattr(obj_in, "is_cancelled", False) else "UNASSIGNED"
 
         db.add(db_obj)
         db.flush()  # mint the receipt id before dependants reference it
@@ -55,6 +56,8 @@ class CRUDReceipt(CRUDBase[Receipt, ReceiptCreate, ReceiptUpdate]):
                 created_by=created_by,
             ))
 
+        from services import receipt_status
+        receipt_status.refresh(db, db_obj)
         db.commit()
         db.refresh(db_obj)
         return db_obj

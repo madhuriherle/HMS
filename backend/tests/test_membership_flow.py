@@ -58,10 +58,11 @@ def test_full_membership_flow(client, admin_headers):
     row = next(x for x in _tracking(client, h) if x["id"] == rec["id"])
     assert row["approval_status"] == "APPROVED" and row["member_code"]
 
-    # 7. a cancelled receipt disappears from Tracking; the others stay
+    # 7. a cancelled receipt stays listed in Tracking, marked CANCELLED; the others keep their status
     assert client.post(f"{API}/receipts/{free['id']}/cancel", headers=h, json={"reason": "typo"}).status_code == 200
-    ids = {x["id"] for x in _tracking(client, h)}
-    assert free["id"] not in ids and rec["id"] in ids
+    by_id = {x["id"]: x for x in _tracking(client, h)}
+    assert by_id[free["id"]]["receipt_status"] == "CANCELLED"
+    assert by_id[rec["id"]]["receipt_status"] == "APPROVED"
 
 
 def test_membership_list_default_includes_unapproved_members(client, admin_headers):

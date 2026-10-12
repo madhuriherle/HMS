@@ -27,7 +27,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import func, or_
 from models.masters import MembershipType, Particular
 
-from services import membership_credit
+from services import membership_credit, receipt_status
 
 router = APIRouter()
 
@@ -141,6 +141,7 @@ def read_receipts(
     current_user: User = Depends(deps.get_current_user),
     page: int = 1, limit: int = 20,
     payment_status: Optional[str] = None,
+    receipt_status: Optional[str] = None,
     payment_mode: Optional[str] = None,
     receipt_type: Optional[str] = None,
     source: Optional[str] = None,
@@ -156,6 +157,7 @@ def read_receipts(
     name (member or associate)."""
     q = db.query(Receipt).filter(Receipt.is_deleted == False)
     if payment_status: q = q.filter(Receipt.payment_status == payment_status)
+    if receipt_status: q = q.filter(Receipt.receipt_status == receipt_status.upper())
     if payment_mode: q = q.filter(Receipt.payment_mode == payment_mode)
     if receipt_type: q = q.filter(Receipt.receipt_type == receipt_type)
     if is_renewal is not None: q = q.filter(Receipt.is_renewal == is_renewal)
@@ -214,7 +216,8 @@ def create_receipt(
     _validate_enum(receipt_in.receipt_type, VALID_RECEIPT_TYPES, "receipt_type")
     _validate_enum(receipt_in.payment_mode, VALID_PAYMENT_MODES, "payment_mode")
 
-    _validate_lines(db, receipt_in.items, receipt_in.net_amount)
+    if not receipt_in.is_cancelled:
+        _validate_lines(db, receipt_in.items, receipt_in.net_amount)
 
     # Pre-validate payee mappings so the whole entry fails before anything is written.
     inline_total = 0.0
@@ -263,6 +266,7 @@ def read_receipt_tracking(
     receipt_type: Optional[str] = None,
     is_renewal: Optional[bool] = None,
     member_id: Optional[int] = None,
+    receipt_status: Optional[str] = None,  # UNASSIGNED | ASSIGNED | APPROVED | CANCELLED
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
     search: Optional[str] = None,
@@ -279,10 +283,10 @@ def read_receipt_tracking(
     membership's expiry date — plus a per-payment-mode summary across the
     whole (filtered) register, so the totals bar needs no extra request.
     """
-    filters = [
-        Receipt.is_deleted == False,            # noqa: E712
-        Receipt.payment_status != "CANCELLED",  # cancelled money is not revenue
-    ]
+    # Cancelled (spoiled) receipts stay listed, with a Cancelled status, but add nothing to the totals.
+    filters = [Receipt.is_deleted == False]  # noqa: E712
+    if receipt_status:
+        filters.append(Receipt.receipt_status == receipt_status.upper())
     if year:
         filters.append(func.extract("year", Receipt.receipt_date) == year)
     if month:
@@ -333,7 +337,7 @@ def read_receipt_tracking(
     # Per-mode summary over the SAME filter set, before pagination narrows it.
     mode_summary = dict(
         db.query(Receipt.payment_mode, func.count())
-        .filter(*filters)
+        .filter(*filters, Receipt.receipt_status != "CANCELLED")
         .group_by(Receipt.payment_mode)
         .all()
     )
@@ -400,6 +404,7 @@ def read_receipt_tracking(
             "transaction_reference": r.transaction_reference,
             "bank_account": r.bank_account,
             "notes": r.notes,
+            "receipt_status": r.receipt_status,
             "period_from_date": r.period_from_date,
             "period_to_date": r.period_to_date,
             "period_from_time": r.period_from_time.strftime("%H:%M") if r.period_from_time else None,
@@ -627,7 +632,7 @@ def _member_card(db: Session, member: Member, today: date) -> dict:
         .join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id)
         .filter(
             ReceiptAllocation.member_id == member.id, ReceiptAllocation.is_deleted == False,  # noqa: E712
-            Receipt.is_deleted == False, Receipt.payment_status != "CANCELLED",  # noqa: E712
+            Receipt.is_deleted == False, Receipt.receipt_status != "CANCELLED",  # noqa: E712
         )
         .order_by(Receipt.receipt_date.desc(), Receipt.id.desc())
         .first()
@@ -697,7 +702,7 @@ def duplicate_check(
         db.query(Receipt)
         .filter(
             Receipt.is_deleted == False,  # noqa: E712
-            Receipt.payment_status != "CANCELLED",
+            Receipt.receipt_status != "CANCELLED",
             func.lower(func.trim(Receipt.payer_name)) == payer_name.strip().lower(),
             Receipt.net_amount == net_amount,
             Receipt.receipt_date == date,
@@ -721,7 +726,7 @@ def day_book(
     end = to_date or start
     base = [
         Receipt.is_deleted == False,  # noqa: E712
-        Receipt.payment_status != "CANCELLED",
+        Receipt.receipt_status != "CANCELLED",
         Receipt.receipt_date >= start,
         Receipt.receipt_date <= end,
     ]
@@ -909,7 +914,7 @@ def update_receipt(
     receipt = crud_receipts.receipt.get(db, id)
     if not receipt:
         raise HTTPException(404, "Receipt not found")
-    if receipt.payment_status == "CANCELLED":
+    if receipt_status.is_cancelled(receipt):
         raise HTTPException(400, "Cancelled receipts cannot be edited")
 
     data = receipt_in.model_dump(exclude_unset=True)
@@ -1007,7 +1012,7 @@ def allocate_receipt(
     receipt = crud_receipts.receipt.get(db, id)
     if not receipt:
         raise HTTPException(404, "Receipt not found")
-    if receipt.payment_status == "CANCELLED":
+    if receipt_status.is_cancelled(receipt):
         raise HTTPException(400, "Cannot allocate a cancelled receipt")
 
     _validate_payee(db, payload.member_id, payload.associate_id)
@@ -1028,6 +1033,7 @@ def allocate_receipt(
     db.flush()
     # Payments add up: reaching a membership type's price upgrades the member.
     membership_credit.recompute_members(db, [alloc.member_id], current_user.id)
+    receipt_status.refresh(db, receipt)
     db.commit()
     db.refresh(alloc)
     return alloc
@@ -1093,6 +1099,8 @@ def remove_allocation(
         raise HTTPException(404, "Allocation not found")
     alloc.is_deleted = True
     alloc.deleted_by = current_user.id
+    db.flush()
+    receipt_status.refresh(db, receipt)
     db.commit()
     db.refresh(alloc)
     return alloc
@@ -1110,10 +1118,11 @@ def cancel_receipt(
     receipt = crud_receipts.receipt.get(db, id)
     if not receipt:
         raise HTTPException(404, "Receipt not found")
-    if receipt.payment_status == "CANCELLED":
+    if receipt_status.is_cancelled(receipt):
         raise HTTPException(400, "Receipt is already cancelled")
 
     receipt.payment_status = "CANCELLED"
+    receipt.receipt_status = "CANCELLED"
     receipt.updated_by = current_user.id
     cancellation = ReceiptCancellation(
         receipt_id=id,

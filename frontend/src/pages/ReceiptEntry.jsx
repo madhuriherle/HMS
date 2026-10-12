@@ -275,6 +275,7 @@ export default function ReceiptEntry() {
     transactionDate: '',
     paymentReceivedDetails: '',
     description: '',
+    isCancelled: false,
     periodFromDate: '',
     periodToDate: '',
     periodFromTime: '',
@@ -751,6 +752,12 @@ export default function ReceiptEntry() {
       errors.receiptDate = 'Receipt Date looks wrong. Please check the year.';
     }
 
+    // A cancelled (spoiled) paper receipt only needs its number and date.
+    if (formData.isCancelled) {
+      setFormErrors(errors);
+      return Object.keys(errors).length === 0;
+    }
+
     // 3. Name (Mandatory)
     if (!formData.name.trim()) {
       errors.name = 'Applicant / Payee Name is mandatory.';
@@ -863,6 +870,31 @@ export default function ReceiptEntry() {
 
     if (!validateForm()) {
       showToast('Please correct the validation errors before saving.', 'error');
+      return;
+    }
+
+    if (formData.isCancelled) {
+      setSaving(true);
+      try {
+        const { data } = await api.post('/receipts/', {
+          receipt_number: formData.receiptNumber.trim(),
+          receipt_date: formData.receiptDate,
+          is_cancelled: true
+        });
+        showToast(`Receipt #${data?.receipt_number || formData.receiptNumber.trim()} saved as Cancelled.`, 'success');
+        const keepDate = formData.receiptDate;
+        handleClearForm();
+        setFormData((prev) => ({ ...prev, receiptDate: keepDate }));
+        loadReceiptDefaults(keepDate, { keepDate: true });
+        await reloadData();
+      } catch (error) {
+        if (error.response?.status === 409 && /Receipt number/i.test(error.response?.data?.detail || '')) {
+          setFormErrors((prev) => ({ ...prev, receiptNumber: error.response.data.detail }));
+        }
+        showToast(apiErrorMessage(error, 'Failed to save the cancelled receipt.'), 'error');
+      } finally {
+        setSaving(false);
+      }
       return;
     }
 
@@ -1441,6 +1473,16 @@ export default function ReceiptEntry() {
                     )}
                   </div>
                 </div>
+
+                <label className="flex items-center gap-2 text-xs font-semibold text-[#863221] cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={formData.isCancelled}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, isCancelled: e.target.checked }))}
+                    className="w-4 h-4 accent-[#510601] cursor-pointer"
+                  />
+                  Cancelled (spoiled paper receipt: keep the number, no other details needed)
+                </label>
 
                 {/* Row 2: Payee Name & Mobile */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

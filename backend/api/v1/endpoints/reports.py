@@ -749,12 +749,13 @@ def report_receipts(
         "source": r.source,
         "net_amount": float(r.net_amount),
         "payment_status": r.payment_status,
+        "receipt_status": r.receipt_status,
     } for r in receipts]
 
     summary = {
         "count": len(data),
         "total_amount": sum(r["net_amount"] for r in data),
-        "cancelled": sum(1 for r in data if r["payment_status"] == "CANCELLED"),
+        "cancelled": sum(1 for r in data if r["payment_status"] == "CANCELLED" or r["receipt_status"] == "CANCELLED"),
     }
 
     export_filters = {

@@ -162,3 +162,54 @@ def test_receipt_period_is_saved_validated_and_printed(client, admin_headers):
 
     plain = client.post(f"{API}/receipts/", headers=admin_headers, json={**base, "receipt_number": "2026-27/S" + _sfx()})
     assert plain.status_code in (200, 201), plain.text
+
+
+def test_receipt_status_unassigned_assigned_approved_cancelled(client, admin_headers):
+    from test_frontend_contract import API, _sfx
+    s = _sfx()
+    item = [{"item_type": "DONATION", "particular_name": "Seva", "amount": 100}]
+    base = {"receipt_date": "2026-04-10", "receipt_type": "DONATION", "payment_mode": "CASH",
+            "gross_amount": 100, "net_amount": 100, "source": "OFFLINE", "items": item}
+
+    def status_of(rid):
+        rows = client.get(f"{API}/receipts/tracking", headers=admin_headers, params={"limit": 500}).json()
+        rows = rows["data"] if isinstance(rows, dict) else rows
+        return next(x for x in rows if x["id"] == rid)["receipt_status"]
+
+    r = client.post(f"{API}/receipts/", headers=admin_headers, json={**base, "receipt_number": "2026-27/T" + s})
+    assert r.status_code == 201, r.text
+    rid = r.json()["id"]
+    assert r.json()["receipt_status"] == "UNASSIGNED" and status_of(rid) == "UNASSIGNED"
+
+    m = client.post(f"{API}/members/", headers=admin_headers, json={"first_name_en": "Status", "mobile": "95" + s.zfill(8)}).json()
+    a = client.post(f"{API}/receipts/{rid}/allocate", headers=admin_headers, json={"member_id": m["id"], "allocated_amount": 100})
+    assert a.status_code == 201, a.text
+    assert status_of(rid) == "ASSIGNED"
+
+    act = client.post(f"{API}/receipts/{rid}/activate-member", headers=admin_headers)
+    if act.status_code == 200:
+        assert status_of(rid) == "APPROVED"
+
+    # un-mapping a not-yet-approved receipt goes back to UNASSIGNED
+    r2 = client.post(f"{API}/receipts/", headers=admin_headers, json={**base, "receipt_number": "2026-27/U" + s}).json()
+    m2 = client.post(f"{API}/members/", headers=admin_headers, json={"first_name_en": "Status2", "mobile": "94" + s.zfill(8)}).json()
+    a2 = client.post(f"{API}/receipts/{r2['id']}/allocate", headers=admin_headers, json={"member_id": m2["id"], "allocated_amount": 100}).json()
+    assert status_of(r2["id"]) == "ASSIGNED"
+    client.delete(f"{API}/receipts/{r2['id']}/allocations/{a2['id']}", headers=admin_headers)
+    assert status_of(r2["id"]) == "UNASSIGNED"
+
+    # a spoiled paper receipt: only number + date, saved CANCELLED, keeps its number, no money
+    c = client.post(f"{API}/receipts/", headers=admin_headers, json={"receipt_date": "2026-04-11", "receipt_number": "2026-27/V" + s, "is_cancelled": True})
+    assert c.status_code == 201, c.text
+    cid = c.json()["id"]
+    assert c.json()["receipt_status"] == "CANCELLED" and float(c.json()["net_amount"]) == 0
+    assert status_of(cid) == "CANCELLED"
+    dup = client.post(f"{API}/receipts/", headers=admin_headers, json={**base, "receipt_number": "2026-27/V" + s})
+    assert dup.status_code == 409
+    assert client.post(f"{API}/receipts/{cid}/allocate", headers=admin_headers, json={"member_id": m["id"], "allocated_amount": 1}).status_code == 400
+    assert client.put(f"{API}/receipts/{cid}", headers=admin_headers, json={"payer_name": "x"}).status_code == 400
+    pdf = client.get(f"{API}/receipts/{cid}/pdf", headers=admin_headers)
+    assert pdf.status_code == 200
+    only = client.get(f"{API}/receipts/tracking", headers=admin_headers, params={"receipt_status": "cancelled", "limit": 500}).json()
+    only = only["data"] if isinstance(only, dict) else only
+    assert cid in [x["id"] for x in only] and all(x["receipt_status"] == "CANCELLED" for x in only)

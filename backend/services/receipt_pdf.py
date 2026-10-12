@@ -146,7 +146,7 @@ def build_receipt_pdf(receipt, lines, org, payee_lines) -> bytes:
     c.setFont("Helvetica", 8)
     c.drawRightString(w - margin, 34, "Authorised signatory")
     c.line(w - margin - 110, 46, w - margin, 46)
-    if receipt.payment_status == "CANCELLED":
+    if receipt.receipt_status == "CANCELLED" or receipt.payment_status == "CANCELLED":
         c.saveState()
         c.setFont("Helvetica-Bold", 48)
         c.setFillColor(colors.Color(0.8, 0.1, 0.1, alpha=0.25))
