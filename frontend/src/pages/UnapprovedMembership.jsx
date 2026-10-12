@@ -312,18 +312,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           (receiptStatusFilter !== 'ALL' ? 1 : 0)
         }
         onResetFilters={handleClearFilters}
-        rightSlot={
-          <div className="flex items-center gap-2">
-            <span className="px-3 py-1.5 rounded-xl bg-white border border-[#E8DFD8] text-xs font-semibold text-[#863221] shadow-2xs flex items-center gap-1.5 shrink-0">
-              <Clock className="w-3.5 h-3.5 text-amber-600" />
-              <span>{countTotal} Online</span>
-            </span>
-            <span className="px-3 py-1.5 rounded-xl bg-[#FAF7F2] border border-[#510601]/20 text-xs font-bold text-[#510601] shadow-2xs flex items-center gap-1.5 shrink-0">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#3D705C]" />
-              <span>{countAssigned} Ready</span>
-            </span>
-          </div>
-        }
       >
         {/* 1. Membership Type */}
         <FilterSelect
@@ -431,7 +419,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                   return (
                     <tr
                       key={m.id}
-                      className={`transition-colors ${isSelected ? 'bg-[#FAF7F2]/80' : 'hover:bg-[#FAF7F2]/40'
+                      className={`transition-colors ${isSelected ? 'bg-[#FAF7F2]' : 'bg-white hover:bg-[#FAF7F2]'
                         }`}
                     >
                       {/* Checkbox */}
@@ -446,38 +434,20 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
                       {/* Name & Source */}
                       <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-[#180200] text-sm">{m.fullName || m.name}</span>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                            {m.registrationSource || 'Online'}
-                          </span>
-                        </div>
+                        <span className="font-bold text-[#180200] text-sm">{m.fullName || m.name}</span>
                         <div className="text-[11px] text-[#863221] mt-0.5 font-mono">
-                          ID: {m.id}
+                          ID: {m.id} · {m.registrationSource || 'Online'}
                         </div>
                       </td>
 
                       {/* Contact Info */}
                       <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-1.5 font-mono font-medium text-xs text-[#180200]">
-                          <Phone className="w-3 h-3 text-[#863221]/70 shrink-0" />
-                          <span>{m.mobile || m.mobileNumber || '—'}</span>
-                        </div>
-                        {m.email && (
-                          <div className="flex items-center gap-1.5 text-[11px] text-[#863221] mt-0.5 truncate max-w-[160px]">
-                            <Mail className="w-3 h-3 text-[#863221]/70 shrink-0" />
-                            <span className="truncate">{m.email}</span>
-                          </div>
-                        )}
+                        <div className="font-mono font-medium text-xs text-[#180200]">{m.mobile || m.mobileNumber || '—'}</div>
+                        {m.email && <div className="text-[11px] text-[#863221] mt-0.5 truncate max-w-[160px]">{m.email}</div>}
                       </td>
 
                       {/* Membership Type */}
-                      <td className="py-3.5 px-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#510601]/10 text-[#510601] border border-[#510601]/20">
-                          <Award className="w-3.5 h-3.5" />
-                          <span>{m.membershipType || 'Standard'}</span>
-                        </span>
-                      </td>
+                      <td className="py-3.5 px-4 text-xs font-semibold text-[#510601]">{m.membershipType || 'Standard'}</td>
 
                       {/* State & District */}
                       <td className="py-3.5 px-4 text-[#863221]">
@@ -496,17 +466,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
                       {/* Receipt Status Badge */}
                       <td className="py-3.5 px-4 text-center">
-                        <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${isAssigned
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-amber-50 text-amber-800 border border-amber-200'
-                            }`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${isAssigned ? 'bg-emerald-600' : 'bg-amber-500'
-                              }`}
-                          />
-                          <span>{(m.receiptStatus || 'Pending') === 'Pending' ? 'Unassigned' : m.receiptStatus}</span>
+                        <span className={`text-xs font-semibold ${isAssigned ? 'text-[#3D705C]' : 'text-[#B34E00]'}`}>
+                          {(m.receiptStatus || 'Pending') === 'Pending' ? 'Unassigned' : m.receiptStatus}
                         </span>
                         {m.assignedReceiptNumber && (
                           <div className="text-[10px] font-mono text-[#510601] font-bold mt-0.5">
@@ -517,27 +478,23 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
                       {/* Actions: Assign to Receipt, View & Approve */}
                       <td className="py-3.5 px-4 text-right">
-                        <div className="flex items-center justify-end gap-2 flex-wrap sm:flex-nowrap">
+                        <div className="flex items-center justify-end gap-0.5 flex-wrap sm:flex-nowrap">
                           {/* 1. Assign to Receipt Action */}
                           <button
                             type="button"
                             onClick={() => navigate('/dashboard/receipts/entry', { state: { selectedMember: m } })}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer shrink-0 ${
-                              isAssigned
-                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                                : 'bg-[#FAF7F2] hover:bg-[#F1E7DE] text-[#510601] border-[#E8DFD8]'
-                            }`}
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer shrink-0"
                             title={isAssigned ? `Receipt #${m.assignedReceiptNumber} assigned. Click to view or create another receipt.` : 'Open Receipt Entry and assign receipt to this applicant'}
                           >
                             <FileText className="w-3.5 h-3.5 shrink-0" />
-                            <span>{isAssigned ? 'Assigned' : 'Assign to Receipt'}</span>
+                            <span>{isAssigned ? 'Receipt' : 'Assign Receipt'}</span>
                           </button>
 
                           {/* 2. View Action */}
                           <button
                             type="button"
                             onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer shrink-0"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer shrink-0"
                             title="View Full Application"
                           >
                             <Eye className="w-3.5 h-3.5 shrink-0" />
@@ -549,9 +506,9 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                             type="button"
                             onClick={() => handleInitiateApprove(m)}
                             disabled={!hasPermission('members.unapproved.write')}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${isAssigned
-                              ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                              : 'bg-stone-100 text-stone-500 border-stone-200'
+                            className={`inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold rounded-md transition-colors shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${isAssigned
+                              ? 'text-[#3D705C] hover:bg-[#3D705C]/10 cursor-pointer'
+                              : 'text-[#863221]/50 cursor-not-allowed'
                               }`}
                             title={
                               !hasPermission('members.unapproved.write')
@@ -570,7 +527,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                             type="button"
                             onClick={() => handleReject(m)}
                             disabled={!hasPermission('members.list.delete')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('members.list.delete') ? 'Requires members.list.delete permission' : 'Reject this application'}
                           >
                             <XCircle className="w-3.5 h-3.5 shrink-0" />

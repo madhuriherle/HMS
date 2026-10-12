@@ -44,6 +44,7 @@ import {
 } from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
+import useSwalConfirm from '../hooks/useSwalConfirm';
 import api from '../api';
 import MemberApplicationDetails from '../components/MemberApplicationDetails';
 import { askForm } from '../utils/dialogs';
@@ -637,6 +638,30 @@ export default function MembershipList() {
     setDeleteReason('');
   };
 
+  useSwalConfirm(
+    statusDialog,
+    () => setStatusDialog(null),
+    ({ member, nextStatus }) => ({
+      title: `${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} member?`,
+      text: `Are you sure you want to mark ${member.fullName || member.name} as ${nextStatus}?`,
+      confirmText: nextStatus === 'Inactive' ? 'Yes, deactivate' : 'Yes, activate',
+      danger: nextStatus === 'Inactive',
+    }),
+    handleConfirmStatusToggle
+  );
+
+  useSwalConfirm(
+    deleteDialog,
+    () => setDeleteDialog(null),
+    (m) => ({
+      title: 'Delete membership?',
+      text: `Are you sure you want to delete ${m.fullName || m.name} (#${m.membershipNumber || m.id})?`,
+      confirmText: 'Yes, delete',
+      danger: true,
+    }),
+    handleConfirmDelete
+  );
+
   // ----------------------------------------------------
   // LABEL PREVIEW ITEMS & PRINT TRIGGER
   // ----------------------------------------------------
@@ -812,7 +837,7 @@ export default function MembershipList() {
                   return (
                     <tr
                       key={m.id}
-                      className={`transition-colors ${isSelected ? 'bg-[#FAF7F2]/80' : 'hover:bg-[#FAF7F2]/40'
+                      className={`transition-colors ${isSelected ? 'bg-[#FAF7F2]' : 'bg-white hover:bg-[#FAF7F2]'
                         }`}
                     >
                       {/* Checkbox */}
@@ -829,7 +854,7 @@ export default function MembershipList() {
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           {m.membershipNumber && (
-                            <span className="font-mono font-bold text-xs text-[#510601] bg-[#FAF7F2] px-1.5 py-0.5 rounded border border-[#E8DFD8]">
+                            <span className="font-mono font-bold text-xs text-[#510601]">
                               #{m.membershipNumber}
                             </span>
                           )}
@@ -846,18 +871,8 @@ export default function MembershipList() {
 
                       {/* Contact Info (Mobile & Email) */}
                       <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5 font-mono font-medium text-xs text-[#180200]">
-                          <Phone className="w-3 h-3 text-[#863221]/70 shrink-0" />
-                          <span>{m.mobile || m.mobileNumber || '—'}</span>
-                        </div>
-                        {m.email ? (
-                          <div className="flex items-center gap-1.5 text-[11px] text-[#863221] mt-0.5 truncate max-w-[180px]">
-                            <Mail className="w-3 h-3 text-[#863221]/70 shrink-0" />
-                            <span className="truncate">{m.email}</span>
-                          </div>
-                        ) : (
-                          <div className="text-[11px] text-stone-400 mt-0.5">No email</div>
-                        )}
+                        <div className="font-mono font-medium text-xs text-[#180200]">{m.mobile || m.mobileNumber || '—'}</div>
+                        {m.email && <div className="text-[11px] text-[#863221] mt-0.5 truncate max-w-[180px]">{m.email}</div>}
                       </td>
 
                       {/* Membership Type (Dynamically Calculated from Cumulative Receipts & Master) */}
@@ -867,10 +882,7 @@ export default function MembershipList() {
                           if (memStatus.isMilestoneReached) {
                             return (
                               <div className="space-y-0.5">
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#510601]/10 text-[#510601] border border-[#510601]/20">
-                                  <Award className="w-3.5 h-3.5 shrink-0" />
-                                  <span>{memStatus.currentMembershipType}</span>
-                                </span>
+                                <span className="text-xs font-semibold text-[#510601]">{memStatus.currentMembershipType}</span>
                                 <div className="text-[10px] text-[#863221] font-mono font-medium">
                                   Paid: ₹{memStatus.totalMembershipPaid.toLocaleString('en-IN')}
                                 </div>
@@ -879,9 +891,7 @@ export default function MembershipList() {
                           }
                           return (
                             <div className="space-y-0.5">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                                <span>Not Yet Reached</span>
-                              </span>
+                              <span className="text-xs font-semibold text-[#B34E00]">Not Yet Reached</span>
                               <div className="text-[10px] text-[#863221] font-mono">
                                 Paid: ₹{memStatus.totalMembershipPaid.toLocaleString('en-IN')}
                               </div>
@@ -892,7 +902,7 @@ export default function MembershipList() {
 
                       {/* Category */}
                       <td className="py-3 px-4">
-                        <span className="px-2 py-0.5 rounded-md text-xs font-medium bg-[#FAF7F2] text-[#863221] border border-[#E8DFD8]">
+                        <span className="text-xs font-medium text-[#863221]">
                           {m.category || 'Individual'}
                         </span>
                       </td>
@@ -917,27 +927,20 @@ export default function MembershipList() {
                               nextStatus: displayStatus === 'Active' ? 'Inactive' : 'Active'
                             })
                           }
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${displayStatus === 'Active'
-                            ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
-                            }`}
+                          className={`text-xs font-semibold cursor-pointer hover:underline ${displayStatus === 'Active' ? 'text-[#3D705C]' : 'text-[#863221]/70'}`}
                           title={`Click to ${displayStatus === 'Active' ? 'deactivate' : 'activate'}`}
                         >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${displayStatus === 'Active' ? 'bg-[#3D705C]' : 'bg-gray-400'
-                              }`}
-                          />
                           <span>{displayStatus}</span>
                         </button>
                       </td>
 
                       {/* Action Buttons: View, Edit, Delete */}
                       <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                        <div className="flex items-center justify-end gap-0.5">
                           <button
                             type="button"
                             onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer"
                             title="View Member Profile"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -947,7 +950,7 @@ export default function MembershipList() {
                             type="button"
                             onClick={() => handleOpenEditModal(m)}
                             disabled={!hasPermission('members.list.write')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('members.list.write') ? 'Requires members.list.write permission' : 'Edit Member'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -957,7 +960,7 @@ export default function MembershipList() {
                             type="button"
                             onClick={() => { setDeleteReason(''); setDeleteDialog(m); }}
                             disabled={!hasPermission('members.list.delete')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('members.list.delete') ? 'Requires members.list.delete permission' : 'Delete Member'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1542,113 +1545,6 @@ export default function MembershipList() {
             </div>
           </div>
         </div>
-      </Modal>
-
-      {/* ==================================================== */}
-      {/* MODAL 4: STATUS TOGGLE CONFIRMATION                  */}
-      {/* ==================================================== */}
-      <Modal isOpen={Boolean(statusDialog)} onClose={() => setStatusDialog(null)}>
-        {statusDialog && (
-          <div
-            className="bg-white rounded-2xl max-w-sm w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3.5 ${statusDialog.nextStatus === 'Inactive'
-                ? 'bg-red-100 text-[#ED4636]'
-                : 'bg-[#3D705C]/10 text-[#3D705C]'
-                }`}
-            >
-              {statusDialog.nextStatus === 'Inactive' ? (
-                <AlertTriangle className="w-7 h-7" />
-              ) : (
-                <CheckCircle2 className="w-7 h-7" />
-              )}
-            </div>
-
-            <h3 className="text-base font-bold text-[#180200]">
-              {statusDialog.nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} Member?
-            </h3>
-            <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
-              Are you sure you want to mark{' '}
-              <strong className="text-[#180200]">
-                {statusDialog.member.fullName || statusDialog.member.name}
-              </strong>{' '}
-              as <span className="font-bold">{statusDialog.nextStatus}</span>?
-            </p>
-
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setStatusDialog(null)}
-                className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmStatusToggle}
-                className={`w-full py-2.5 px-4 text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer ${statusDialog.nextStatus === 'Inactive'
-                  ? 'bg-[#ED4636] hover:bg-[#C93324]'
-                  : 'bg-[#3D705C] hover:bg-[#2F5747]'
-                  }`}
-              >
-                {statusDialog.nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'}
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* ==================================================== */}
-      {/* MODAL 5: DELETE CONFIRMATION                         */}
-      {/* ==================================================== */}
-      <Modal isOpen={Boolean(deleteDialog)} onClose={() => setDeleteDialog(null)}>
-        {deleteDialog && (
-          <div
-            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-14 h-14 rounded-full bg-red-100 text-[#ED4636] flex items-center justify-center mx-auto mb-3.5">
-              <Trash2 className="w-7 h-7" />
-            </div>
-
-            <h3 className="text-lg font-bold text-[#180200]">Delete Membership</h3>
-            <p className="text-sm font-semibold text-[#510601] mt-2">
-              Are you sure you want to delete this membership?
-            </p>
-            <p className="text-xs text-[#863221] mt-1.5 leading-relaxed bg-[#FAF7F2] p-2.5 rounded-xl border border-[#E8DFD8]">
-              <strong className="text-[#180200]">
-                {deleteDialog.fullName || deleteDialog.name}
-              </strong>{' '}
-              <span className="font-mono text-[#510601] font-bold">
-                (#{deleteDialog.membershipNumber || deleteDialog.id})
-              </span>
-            </p>
-
-            
-
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteDialog(null)}
-                className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                No / Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                disabled={!hasPermission('members.list.delete')}
-                title={!hasPermission('members.list.delete') ? 'Requires members.list.delete permission' : undefined}
-                className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Yes / Delete</span>
-              </button>
-            </div>
-          </div>
-        )}
       </Modal>
 
       {/* ==================================================== */}

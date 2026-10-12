@@ -88,10 +88,7 @@ function StatusDot({ receipt }) {
   const key = receipt.receiptStatus || (isReceiptUnmapped(receipt) ? 'UNASSIGNED' : 'ASSIGNED');
   const look = STATUS_LOOK[key] || STATUS_LOOK.ASSIGNED;
   return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap ${look.text}`}>
-      <span className={`w-2 h-2 rounded-full ${look.dot}`} />
-      {look.label}
-    </span>
+    <span className={`text-xs font-semibold whitespace-nowrap ${look.text}`}>{look.label}</span>
   );
 }
 
