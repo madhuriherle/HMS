@@ -23,6 +23,7 @@ import { notify } from '../utils/notify';
 import { formatPaymentModeLabel } from '../utils/displayHelpers';
 import { loadReceipts } from '../utils/serverData';
 import useAuth from '../hooks/useAuth';
+import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 
 export default function BankDetailsManagement() {
@@ -449,6 +450,47 @@ export default function BankDetailsManagement() {
     }
     setStatusDialog(null);
   };
+
+  useSwalConfirm(
+    statusDialog,
+    () => setStatusDialog(null),
+    (d) => ({
+      title: `${d.newStatus === 'Inactive' ? 'Deactivate' : 'Activate'} payment mode?`,
+      text: `Are you sure you want to mark ${formatPaymentModeLabel(d.item)} as ${d.newStatus}?`,
+      confirmText: d.newStatus === 'Inactive' ? 'Yes, deactivate' : 'Yes, activate',
+      danger: d.newStatus === 'Inactive',
+    }),
+    confirmStatusToggle
+  );
+
+  useSwalConfirm(
+    deleteDialog,
+    () => setDeleteDialog(null),
+    (d) => ({
+      title: 'Delete payment mode?',
+      text: `"${formatPaymentModeLabel(d)}" will be removed from the Payment Mode dropdown. Receipts already recorded with it are not changed.`,
+      confirmText: 'Yes, delete',
+      danger: true,
+    }),
+    confirmDelete
+  );
+
+  useSwalConfirm(
+    blockedDialog,
+    () => setBlockedDialog(null),
+    (d) => ({
+      title: 'Cannot delete payment mode',
+      text: `"${formatPaymentModeLabel(d)}" is used by ${getModeUsageCount(d)} receipt(s). Deactivate it instead: it disappears from Receipt Entry and the recorded receipts stay unchanged.`,
+      confirmText: 'Deactivate instead',
+      danger: true,
+    }),
+    () => {
+      const cfg = blockedDialog;
+      if (hasPermission('masters.payment_modes.write') && (cfg.status || 'Active') === 'Active') {
+        setStatusDialog({ item: cfg, newStatus: 'Inactive' });
+      }
+    }
+  );
 
   return (
     <PermissionGate required="masters.payment_modes.read">
@@ -982,135 +1024,6 @@ export default function BankDetailsManagement() {
                 className="px-4 py-2 border border-[#E8DFD8] text-xs font-semibold text-[#863221] hover:bg-white rounded-xl transition-colors cursor-pointer"
               >
                 Close
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* ====================================================================== */}
-      {/* MODAL 3: STATUS TOGGLE CONFIRMATION */}
-      {/* ====================================================================== */}
-      <Modal
-        isOpen={!!statusDialog}
-        onClose={() => setStatusDialog(null)}
-        className="p-4"
-      >
-        {statusDialog && (
-          <div className="bg-white rounded-2xl shadow-xl border border-[#E8DFD8] w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-5 text-center">
-              <div
-                className={`w-12 h-12 rounded-full mx-auto flex items-center justify-center mb-3 ${statusDialog.newStatus === 'Active'
-                  ? 'bg-emerald-50 text-emerald-600'
-                  : 'bg-amber-50 text-amber-600'
-                  }`}
-              >
-                {statusDialog.newStatus === 'Active' ? (
-                  <CheckCircle2 className="w-6 h-6" />
-                ) : (
-                  <AlertTriangle className="w-6 h-6" />
-                )}
-              </div>
-              <h4 className="text-base font-bold text-[#180200] font-serif mb-1">
-                Change Status to {statusDialog.newStatus}?
-              </h4>
-              <p className="text-xs text-[#863221] leading-relaxed">
-                {statusDialog.newStatus === 'Inactive'
-                  ? `Setting "${formatPaymentModeLabel(statusDialog.item)}" to Inactive will hide it from the Payment Mode dropdown for new receipts. All existing historical receipts with this mode remain intact.`
-                  : `Setting "${formatPaymentModeLabel(statusDialog.item)}" to Active will make it immediately available for selection in new receipts.`}
-              </p>
-            </div>
-            <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => setStatusDialog(null)}
-                className="px-4 py-2 border border-[#E8DFD8] text-xs font-semibold text-[#863221] hover:bg-white rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!hasPermission('masters.payment_modes.write')}
-                title={!hasPermission('masters.payment_modes.write') ? 'Requires masters.payment_modes.write permission' : undefined}
-                onClick={confirmStatusToggle}
-                className={`px-5 py-2 text-xs font-bold text-white rounded-xl shadow-sm transition-colors cursor-pointer ${statusDialog.newStatus === 'Active'
-                  ? 'bg-emerald-700 hover:bg-emerald-800'
-                  : 'bg-[#510601] hover:bg-[#3D0400]'
-                  }`}
-              >
-                Confirm {statusDialog.newStatus}
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Cannot delete: receipts still use this mode */}
-      <Modal isOpen={!!blockedDialog} onClose={() => setBlockedDialog(null)} className="p-4">
-        {blockedDialog && (
-          <div className="bg-white rounded-2xl shadow-xl border border-[#E8DFD8] w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-5 text-center">
-              <div className="w-12 h-12 rounded-full mx-auto flex items-center justify-center mb-3 bg-amber-50 text-amber-600">
-                <AlertTriangle className="w-6 h-6" />
-              </div>
-              <h4 className="text-base font-bold text-[#180200] font-serif mb-1">Cannot Delete Payment Mode</h4>
-              <p className="text-xs text-[#863221] leading-relaxed">
-                {`"${formatPaymentModeLabel(blockedDialog)}" is used by ${getModeUsageCount(blockedDialog)} receipt(s). Deactivate it instead: it disappears from Receipt Entry and the recorded receipts stay unchanged.`}
-              </p>
-            </div>
-            <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => setBlockedDialog(null)}
-                className="px-4 py-2 border border-[#E8DFD8] text-xs font-semibold text-[#863221] hover:bg-white rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!hasPermission('masters.payment_modes.write') || (blockedDialog.status || 'Active') !== 'Active'}
-                onClick={() => {
-                  const cfg = blockedDialog;
-                  setBlockedDialog(null);
-                  setStatusDialog({ item: cfg, newStatus: 'Inactive' });
-                }}
-                className="px-5 py-2 text-xs font-bold text-white rounded-xl shadow-sm transition-colors cursor-pointer bg-[#510601] hover:bg-[#3D0400] disabled:opacity-40"
-              >
-                Deactivate Instead
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Delete confirmation */}
-      <Modal isOpen={!!deleteDialog} onClose={() => setDeleteDialog(null)} className="p-4">
-        {deleteDialog && (
-          <div className="bg-white rounded-2xl shadow-xl border border-[#E8DFD8] w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-5 text-center">
-              <div className="w-12 h-12 rounded-full mx-auto flex items-center justify-center mb-3 bg-red-50 text-[#ED4636]">
-                <Trash2 className="w-6 h-6" />
-              </div>
-              <h4 className="text-base font-bold text-[#180200] font-serif mb-1">Delete Payment Mode?</h4>
-              <p className="text-xs text-[#863221] leading-relaxed">
-                {`"${formatPaymentModeLabel(deleteDialog)}" will be removed from the Payment Mode dropdown. Receipts already recorded with it are not changed.`}
-              </p>
-            </div>
-            <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => setDeleteDialog(null)}
-                className="px-4 py-2 border border-[#E8DFD8] text-xs font-semibold text-[#863221] hover:bg-white rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!hasPermission('masters.payment_modes.delete')}
-                onClick={confirmDelete}
-                className="px-5 py-2 text-xs font-bold text-white rounded-xl shadow-sm transition-colors cursor-pointer bg-[#ED4636] hover:bg-[#C93324] disabled:opacity-40"
-              >
-                Confirm Delete
               </button>
             </div>
           </div>

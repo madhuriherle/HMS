@@ -35,6 +35,7 @@ import api from '../api';
 import { formatDate } from '../utils/dateUtils';
 import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
+import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 
 export default function RolesAndPrivileges() {
@@ -522,6 +523,49 @@ export default function RolesAndPrivileges() {
       setSavingPrivileges(false);
     }
   };
+
+  useSwalConfirm(
+    deleteTargetRole,
+    () => setDeleteTargetRole(null),
+    (d) => {
+      if (d.usersCount > 0 || isSystemRole(d)) {
+        const system = d.isSystem || d.is_all_access || d.rank_level === 1;
+        return {
+          title: 'Cannot delete role',
+          text: system
+            ? `${d.name} is a core system role with all-access permissions and cannot be deleted.`
+            : `This role is assigned to ${d.usersCount} users and cannot be deleted. Reassign those users first.`,
+          confirmText: 'OK',
+          info: true,
+        };
+      }
+      return {
+        title: 'Delete role?',
+        text: `Are you sure you want to delete role ${d.name}? This action cannot be undone.`,
+        confirmText: 'Yes, delete',
+        danger: true,
+      };
+    },
+    async () => {
+      const d = deleteTargetRole;
+      if (d.usersCount > 0 || isSystemRole(d)) return;
+      await confirmDeleteRole();
+    }
+  );
+
+  useSwalConfirm(
+    statusDialog,
+    () => setStatusDialog(null),
+    (d) => ({
+      title: `${d.newStatus === 'Inactive' ? 'Deactivate' : 'Activate'} role?`,
+      text: d.newStatus === 'Inactive'
+        ? `Deactivate ${d.role.name}? Inactive roles cannot be assigned to new user accounts.`
+        : `Activate ${d.role.name}? It will become available for assignment to user accounts.`,
+      confirmText: d.newStatus === 'Inactive' ? 'Yes, deactivate' : 'Yes, activate',
+      danger: d.newStatus === 'Inactive',
+    }),
+    handleConfirmStatusToggle
+  );
 
   return (
     <PermissionGate required="roles.read">
@@ -1390,148 +1434,6 @@ export default function RolesAndPrivileges() {
             </div>
           </div>
         )}
-      </Modal>
-
-      {/* ============================================================ */}
-      {/* DELETE CONFIRMATION MODAL WITH PROTECTION                    */}
-      {/* ============================================================ */}
-      <Modal
-        isOpen={Boolean(deleteTargetRole)}
-        onClose={() => setDeleteTargetRole(null)}
-      >
-        {deleteTargetRole && (
-          <div
-            className="bg-white rounded-2xl max-w-sm w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {deleteTargetRole.usersCount > 0 || isSystemRole(deleteTargetRole) ? (
-              <>
-                <div className="w-14 h-14 rounded-full bg-amber-100 text-[#EE6A00] flex items-center justify-center mx-auto mb-3.5">
-                  <Lock className="w-7 h-7" />
-                </div>
-
-                <h3 className="text-lg font-bold text-[#180200]">
-                  Cannot Delete Role
-                </h3>
-                <p className="text-xs text-[#863221] mt-2 leading-relaxed">
-                  {(deleteTargetRole.isSystem || deleteTargetRole.is_all_access || deleteTargetRole.rank_level === 1) ? (
-                    <>
-                      <strong>{deleteTargetRole.name}</strong> is a core system role with all-access permissions and cannot be deleted.
-                    </>
-                  ) : (
-                    <>
-                      This role is currently assigned to <strong className="text-[#180200]">{deleteTargetRole.usersCount} users</strong> and cannot be deleted. Please reassign those users before deleting the role.
-                    </>
-                  )}
-                </p>
-
-                <div className="mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTargetRole(null)}
-                    className="w-full py-2.5 px-4 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
-                  >
-                    Understood
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="w-14 h-14 rounded-full bg-red-100 text-[#ED4636] flex items-center justify-center mx-auto mb-3.5">
-                  <Trash2 className="w-7 h-7" />
-                </div>
-
-                <h3 className="text-lg font-bold text-[#180200]">
-                  Delete Role?
-                </h3>
-                <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
-                  Are you sure you want to delete role <strong className="text-[#180200]">{deleteTargetRole.name}</strong>? This action cannot be undone.
-                </p>
-
-                <div className="mt-6 flex items-center justify-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTargetRole(null)}
-                    className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={confirmDeleteRole}
-                    className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
-                  >
-                    Delete Role
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </Modal>
-
-      {/* ============================================================ */}
-      {/* ACTIVATE / DEACTIVATE CONFIRMATION MODAL                     */}
-      {/* ============================================================ */}
-      <Modal
-        isOpen={Boolean(statusDialog)}
-        onClose={() => setStatusDialog(null)}
-      >
-        {statusDialog && (() => {
-          const isTargetDeactivate = statusDialog.newStatus === false || statusDialog.newStatus === 'Inactive';
-          return (
-            <div
-              className="bg-white rounded-2xl max-w-sm w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3.5 ${
-                isTargetDeactivate ? 'bg-red-100 text-[#ED4636]' : 'bg-[#3D705C]/10 text-[#3D705C]'
-              }`}>
-                {isTargetDeactivate ? (
-                  <AlertTriangle className="w-7 h-7" />
-                ) : (
-                  <CheckCircle2 className="w-7 h-7" />
-                )}
-              </div>
-
-              <h3 className="text-lg font-bold text-[#180200]">
-                {isTargetDeactivate ? 'Deactivate Role?' : 'Activate Role?'}
-              </h3>
-              <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
-                {isTargetDeactivate ? (
-                  <>
-                    Are you sure you want to deactivate <strong className="text-[#180200]">{statusDialog.role.name}</strong>? Inactive roles cannot be assigned to new user accounts.
-                  </>
-                ) : (
-                  <>
-                    Are you sure you want to activate <strong className="text-[#180200]">{statusDialog.role.name}</strong>? It will become available for assignment to user accounts.
-                  </>
-                )}
-              </p>
-
-              <div className="mt-6 flex items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStatusDialog(null)}
-                  className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmStatusToggle}
-                  className={`w-full py-2.5 px-4 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer ${
-                    isTargetDeactivate
-                      ? 'bg-[#ED4636] hover:bg-[#C93324]'
-                      : 'bg-[#3D705C] hover:bg-[#2F5647]'
-                  }`}
-                >
-                  {isTargetDeactivate ? 'Deactivate' : 'Activate'}
-                </button>
-              </div>
-            </div>
-          );
-        })()}
       </Modal>
 
     </div>

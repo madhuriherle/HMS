@@ -30,6 +30,7 @@ import { isReceiptUnmapped } from '../utils/displayHelpers';
 import { loadParticulars, loadMembers, loadPaymentModeConfigs } from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
+import useSwalConfirm from '../hooks/useSwalConfirm';
 import api from '../api';
 import { formatDate } from '../utils/dateUtils';
 import DateInput from '../components/DateInput';
@@ -572,6 +573,18 @@ export default function ReceiptTracking() {
 
     setDeletingReceipt(null);
   };
+
+  useSwalConfirm(
+    deletingReceipt,
+    () => setDeletingReceipt(null),
+    (d) => ({
+      title: 'Delete receipt?',
+      text: `Are you sure you want to delete receipt #${d.receiptNumber}? This will permanently remove the record.`,
+      confirmText: 'Yes, delete',
+      danger: true,
+    }),
+    handleConfirmDelete
+  );
 
   return (
     <PermissionGate required="receipts.tracking.read">
@@ -1383,43 +1396,6 @@ export default function ReceiptTracking() {
             >
               Close
             </button>
-          </div>
-        )}
-      </Modal>
-
-      {/* ============================================================ */}
-      {/* MODAL 4: DELETE CONFIRMATION MODAL                           */}
-      {/* ============================================================ */}
-      <Modal isOpen={Boolean(deletingReceipt)} onClose={() => setDeletingReceipt(null)}>
-        {deletingReceipt && (
-          <div className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
-            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-3">
-              <Trash2 className="w-6 h-6" />
-            </div>
-
-            <h3 className="text-lg font-bold text-[#180200]">Delete Receipt</h3>
-            <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
-              Are you sure you want to delete receipt <strong>#{deletingReceipt.receiptNumber}</strong>? This will permanently remove the record.
-            </p>
-
-            <div className="mt-5 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setDeletingReceipt(null)}
-                className="w-full py-2.5 px-4 bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#863221] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDelete}
-                disabled={!hasPermission('receipts.tracking.delete')}
-                title={!hasPermission('receipts.tracking.delete') ? 'Requires receipts.tracking.delete permission' : undefined}
-                className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Yes, Delete
-              </button>
-            </div>
           </div>
         )}
       </Modal>

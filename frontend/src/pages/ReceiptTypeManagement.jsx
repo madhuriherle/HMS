@@ -21,6 +21,7 @@ import {
 import api from '../api';
 import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
+import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 import RecentlyDeleted from '../components/RecentlyDeleted';
 
@@ -431,6 +432,18 @@ export default function ReceiptTypeManagement() {
     }
     setDeletingItem(null);
   };
+
+  useSwalConfirm(
+    statusDialog,
+    () => setStatusDialog(null),
+    (d) => ({
+      title: `${d.newStatus === 'Inactive' ? 'Deactivate' : 'Activate'} ${d.targetType === 'receiptType' ? 'particular' : 'sub-type'}?`,
+      text: `Are you sure you want to mark ${d.item.name} as ${d.newStatus}?`,
+      confirmText: d.newStatus === 'Inactive' ? 'Yes, deactivate' : 'Yes, activate',
+      danger: d.newStatus === 'Inactive',
+    }),
+    handleConfirmStatusToggle
+  );
 
   return (
     <PermissionGate required="masters.particulars.read">
@@ -1180,62 +1193,6 @@ export default function ReceiptTypeManagement() {
                 className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Yes, Delete
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* ============================================================ */}
-      {/* STATUS TOGGLE CONFIRMATION DIALOG                            */}
-      {/* ============================================================ */}
-      <Modal
-        isOpen={Boolean(statusDialog)}
-        onClose={() => setStatusDialog(null)}
-      >
-        {statusDialog && (
-          <div
-            className="bg-white rounded-2xl max-w-sm w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3.5 ${statusDialog.newStatus === 'Inactive' ? 'bg-red-100 text-[#ED4636]' : 'bg-[#3D705C]/10 text-[#3D705C]'
-              }`}>
-              {statusDialog.newStatus === 'Inactive' ? (
-                <AlertTriangle className="w-7 h-7" />
-              ) : (
-                <CheckCircle2 className="w-7 h-7" />
-              )}
-            </div>
-
-            <h3 className="text-base font-bold text-[#180200]">
-              {statusDialog.newStatus === 'Inactive' ? 'Deactivate' : 'Activate'} {statusDialog.targetType === 'receiptType' ? 'Particular' : 'Sub-Type'}?
-            </h3>
-            <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
-              Are you sure you want to mark <strong className="text-[#180200]">{statusDialog.item.name}</strong> as <span className="font-bold">{statusDialog.newStatus}</span>?
-              {statusDialog.newStatus === 'Inactive'
-                ? ' Inactive particulars will no longer appear when creating new receipts, but historical receipts are preserved.'
-                : ' Active particulars will be immediately available in the Receipt Entry form.'}
-            </p>
-
-            <div className="mt-5 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setStatusDialog(null)}
-                className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!hasPermission('masters.particulars.write')}
-                title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : undefined}
-                onClick={handleConfirmStatusToggle}
-                className={`w-full py-2.5 px-4 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer ${statusDialog.newStatus === 'Inactive'
-                  ? 'bg-[#ED4636] hover:bg-[#C93324]'
-                  : 'bg-[#3D705C] hover:bg-[#2F5647]'
-                  }`}
-              >
-                {statusDialog.newStatus === 'Inactive' ? 'Deactivate' : 'Activate'}
               </button>
             </div>
           </div>

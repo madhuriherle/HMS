@@ -43,6 +43,7 @@ import {
 } from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
+import useSwalConfirm from '../hooks/useSwalConfirm';
 
 // assignedOnly: the final-approval queue (members whose receipt is already assigned)
 export default function UnapprovedMembership({ assignedOnly = false }) {
@@ -290,6 +291,28 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const countTotal = unapprovedMembers.length;
   const countPendingReceipt = unapprovedMembers.filter((m) => m.receiptStatus === 'Pending').length;
   const countAssigned = unapprovedMembers.filter((m) => m.receiptStatus === 'Assigned').length;
+
+  useSwalConfirm(
+    validationBlockDialog,
+    () => setValidationBlockDialog(null),
+    (d) => ({
+      title: 'Receipt assignment required',
+      text: `${d.fullName} cannot be approved until an official receipt is assigned (receipt status: ${d.receiptStatus || 'Pending'}).`,
+      confirmText: 'Assign a receipt',
+    }),
+    () => goToReceiptEntry(validationBlockDialog)
+  );
+
+  useSwalConfirm(
+    approveDialog,
+    () => setApproveDialog(null),
+    (d) => ({
+      title: 'Approve membership?',
+      text: `Approve ${d.fullName || d.name} (${d.membershipType})? The member moves to the Membership List.`,
+      confirmText: 'Yes, approve',
+    }),
+    handleConfirmApproval
+  );
 
   return (
     <PermissionGate required="members.unapproved.read">
@@ -811,122 +834,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
             </div>
           </div>
       )}
-
-      {/* ==================================================== */}
-      {/* MODAL 2: RECEIPT VALIDATION BLOCK ALERT MODAL        */}
-      {/* ==================================================== */}
-      <Modal isOpen={Boolean(validationBlockDialog)} onClose={() => setValidationBlockDialog(null)}>
-        {validationBlockDialog && (
-          <div
-            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-14 h-14 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center mx-auto mb-3.5">
-              <ShieldAlert className="w-7 h-7" />
-            </div>
-
-            <h3 className="text-lg font-bold text-[#180200]">Receipt Assignment Required</h3>
-
-            <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-200 text-left space-y-1.5">
-              <p className="text-xs font-bold text-amber-950">
-                This membership cannot be approved until an official receipt is assigned.
-              </p>
-              <p className="text-[11px] text-amber-800">
-                Applicant: <strong>{validationBlockDialog.fullName}</strong>
-                <br />
-                Receipt Status: <span className="font-semibold text-red-600">{validationBlockDialog.receiptStatus || 'Pending'}</span>
-              </p>
-            </div>
-
-            <p className="text-xs text-[#863221] mt-3 leading-relaxed">
-              According to the HMS membership workflow, all online registrations must have an official receipt assigned before final approval into the permanent Membership List.
-            </p>
-
-            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setValidationBlockDialog(null)}
-                className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Understood / Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const member = validationBlockDialog;
-                  setValidationBlockDialog(null);
-                  goToReceiptEntry(member);
-                }}
-                className="w-full py-2.5 px-4 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Assign a Receipt</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* ==================================================== */}
-      {/* MODAL 3: APPROVAL CONFIRMATION DIALOG                */}
-      {/* ==================================================== */}
-      <Modal isOpen={Boolean(approveDialog)} onClose={() => setApproveDialog(null)}>
-        {approveDialog && (
-          <div
-            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto mb-3.5">
-              <CheckCircle2 className="w-7 h-7" />
-            </div>
-
-            <h3 className="text-lg font-bold text-[#180200]">Approve Membership</h3>
-            <p className="text-sm font-semibold text-[#510601] mt-2">
-              Are you sure you want to approve this membership?
-            </p>
-
-            <div className="mt-3 p-3.5 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8] text-xs text-left space-y-1">
-              <div>
-                <span className="text-[#863221]">Member Name: </span>
-                <strong className="text-[#180200]">{approveDialog.fullName || approveDialog.name}</strong>
-              </div>
-              <div>
-                <span className="text-[#863221]">Membership Type: </span>
-                <strong className="text-[#510601]">{approveDialog.membershipType}</strong>
-              </div>
-              <div>
-                <span className="text-[#863221]">Assigned Receipt: </span>
-                <span className="font-mono font-bold text-emerald-700">
-                  {approveDialog.assignedReceiptNumber || 'Assigned & Mapped'}
-                </span>
-              </div>
-              <div className="pt-2 border-t border-[#E8DFD8] text-[11px] text-[#863221]">
-                ✓ Member will be removed from Unapproved Membership and moved into the <strong>Membership List</strong>.
-              </div>
-            </div>
-
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setApproveDialog(null)}
-                className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmApproval}
-                disabled={!hasPermission('members.unapproved.write')}
-                title={!hasPermission('members.unapproved.write') ? 'Requires members.unapproved.write permission' : undefined}
-                className="w-full py-2.5 px-4 bg-[#3D705C] hover:bg-[#2F5747] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>Approve</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
 
       {/* ==================================================== */}
       {/* FLOATING TOAST NOTIFICATION                          */}

@@ -35,6 +35,7 @@ import api from '../api';
 import { formatDate, formatDateTime } from '../utils/dateUtils';
 import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
+import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 
 export default function UserManagement() {
@@ -445,6 +446,50 @@ export default function UserManagement() {
     }
     setDeleteTargetUser(null);
   };
+
+  useSwalConfirm(
+    deleteTargetUser,
+    () => setDeleteTargetUser(null),
+    (d) => {
+      const name = d.name || d.fullName;
+      if (d.isCurrentAdmin || d.username === 'admin') {
+        return {
+          title: 'Cannot delete user',
+          text: `${name} is the active Super Administrator account and cannot be deleted.`,
+          confirmText: 'OK',
+          info: true,
+        };
+      }
+      return {
+        title: 'Delete user?',
+        text: `Are you sure you want to delete user ${name} (${d.username})? This action cannot be undone.`,
+        confirmText: 'Yes, delete',
+        danger: true,
+      };
+    },
+    async () => {
+      const d = deleteTargetUser;
+      if (d.isCurrentAdmin || d.username === 'admin') return;
+      await confirmDeleteUser();
+    }
+  );
+
+  useSwalConfirm(
+    statusDialog,
+    () => setStatusDialog(null),
+    (d) => {
+      const name = d.user?.name || d.user?.fullName || d.user?.username;
+      return {
+        title: `${d.newStatus === 'Inactive' ? 'Deactivate' : 'Activate'} user?`,
+        text: d.newStatus === 'Inactive'
+          ? `Deactivate ${name}? Deactivated users will not be able to log in.`
+          : `Activate ${name}? The user will be permitted to log in.`,
+        confirmText: d.newStatus === 'Inactive' ? 'Yes, deactivate' : 'Yes, activate',
+        danger: d.newStatus === 'Inactive',
+      };
+    },
+    handleConfirmStatusToggle
+  );
 
   return (
     <PermissionGate required="users.management.read">
@@ -1308,139 +1353,6 @@ export default function UserManagement() {
             </div>
           </div>
         )}
-      </Modal>
-
-      {/* ============================================================ */}
-      {/* DELETE CONFIRMATION MODAL WITH ADMIN PROTECTION              */}
-      {/* ============================================================ */}
-      <Modal
-        isOpen={Boolean(deleteTargetUser)}
-        onClose={() => setDeleteTargetUser(null)}
-      >
-        {deleteTargetUser && (
-          <div
-            className="bg-white rounded-2xl max-w-sm w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {deleteTargetUser.isCurrentAdmin || deleteTargetUser.username === 'admin' ? (
-              <>
-                <div className="w-14 h-14 rounded-full bg-amber-100 text-[#EE6A00] flex items-center justify-center mx-auto mb-3.5">
-                  <Lock className="w-7 h-7" />
-                </div>
-
-                <h3 className="text-lg font-bold text-[#180200]">
-                  Cannot Delete User
-                </h3>
-                <p className="text-xs text-[#863221] mt-2 leading-relaxed">
-                  <strong className="text-[#180200]">{deleteTargetUser.name || deleteTargetUser.fullName}</strong> is the active Super Administrator account and cannot be deleted from the system.
-                </p>
-
-                <div className="mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTargetUser(null)}
-                    className="w-full py-2.5 px-4 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
-                  >
-                    Understood
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="w-14 h-14 rounded-full bg-red-100 text-[#ED4636] flex items-center justify-center mx-auto mb-3.5">
-                  <Trash2 className="w-7 h-7" />
-                </div>
-
-                <h3 className="text-lg font-bold text-[#180200]">
-                  Delete User?
-                </h3>
-                <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
-                  Are you sure you want to delete user <strong className="text-[#180200]">{deleteTargetUser.name || deleteTargetUser.fullName}</strong> ({deleteTargetUser.username})? This action cannot be undone.
-                </p>
-
-                <div className="mt-6 flex items-center justify-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTargetUser(null)}
-                    className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={confirmDeleteUser}
-                    className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
-                  >
-                    Delete User
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-      </Modal>
-
-      {/* ============================================================ */}
-      {/* ACTIVATE / DEACTIVATE CONFIRMATION MODAL                     */}
-      {/* ============================================================ */}
-      <Modal
-        isOpen={Boolean(statusDialog)}
-        onClose={() => setStatusDialog(null)}
-      >
-        {statusDialog && (() => {
-          const isTargetDeactivate = statusDialog.newStatus === false || statusDialog.newStatus === 'Inactive';
-          const targetName = statusDialog.user.name || statusDialog.user.fullName;
-          return (
-            <div
-              className="bg-white rounded-2xl max-w-sm w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3.5 ${isTargetDeactivate ? 'bg-red-100 text-[#ED4636]' : 'bg-[#3D705C]/10 text-[#3D705C]'
-                }`}>
-                {isTargetDeactivate ? (
-                  <AlertTriangle className="w-7 h-7" />
-                ) : (
-                  <CheckCircle2 className="w-7 h-7" />
-                )}
-              </div>
-
-              <h3 className="text-lg font-bold text-[#180200]">
-                {isTargetDeactivate ? 'Deactivate User?' : 'Activate User?'}
-              </h3>
-              <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
-                {isTargetDeactivate ? (
-                  <>
-                    Are you sure you want to deactivate <strong className="text-[#180200]">{targetName}</strong>? Deactivated users will not be able to log in to the system.
-                  </>
-                ) : (
-                  <>
-                    Are you sure you want to activate <strong className="text-[#180200]">{targetName}</strong>? The user will be permitted to log in.
-                  </>
-                )}
-              </p>
-
-              <div className="mt-6 flex items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStatusDialog(null)}
-                  className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmStatusToggle}
-                  className={`w-full py-2.5 px-4 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer ${isTargetDeactivate
-                      ? 'bg-[#ED4636] hover:bg-[#C93324]'
-                      : 'bg-[#3D705C] hover:bg-[#2F5647]'
-                    }`}
-                >
-                  {isTargetDeactivate ? 'Deactivate' : 'Activate'}
-                </button>
-              </div>
-            </div>
-          );
-        })()}
       </Modal>
 
     </div>

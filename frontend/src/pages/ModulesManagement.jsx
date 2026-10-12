@@ -26,6 +26,7 @@ import api from '../api';
 import { notify } from '../utils/notify';
 import { askChecklist } from '../utils/dialogs';
 import useAuth from '../hooks/useAuth';
+import useSwalConfirm from '../hooks/useSwalConfirm';
 
 const emptyForm = {
   type: 'page', // 'page' (opens a screen) or 'section' (a side-menu heading that groups pages)
@@ -360,6 +361,18 @@ export default function ModulesManagement() {
       </div>
     );
   }
+
+  useSwalConfirm(
+    deleteTarget,
+    () => setDeleteTarget(null),
+    (d) => ({
+      title: 'Delete module?',
+      text: `You are about to remove ${d.name_en} (${d.code}).`,
+      confirmText: 'Yes, delete',
+      danger: true,
+    }),
+    confirmDelete
+  );
 
   return (
     <div className="space-y-6">
@@ -867,41 +880,6 @@ export default function ModulesManagement() {
             </div>
           </form>
         </div>
-      </Modal>
-
-      {/* DELETE CONFIRM MODAL */}
-      <Modal isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)}>
-        {deleteTarget && (
-          <div
-            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-14 h-14 rounded-full bg-red-100 text-[#ED4636] flex items-center justify-center mx-auto mb-3.5">
-              <Trash2 className="w-7 h-7" />
-            </div>
-            <h3 className="text-lg font-bold text-[#180200]">Delete Module?</h3>
-            <p className="text-xs text-[#863221] mt-2 leading-relaxed">
-              You are about to remove <span className="font-bold text-[#180200]">{deleteTarget.name_en}</span> ({deleteTarget.code}).
-              Modules with submodules or assigned privileges cannot be deleted.
-            </p>
-            <div className="flex gap-3 mt-5">
-              <button
-                type="button"
-                onClick={() => setDeleteTarget(null)}
-                className="flex-1 py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={confirmDelete}
-                className="flex-1 py-2.5 px-4 bg-[#ED4636] hover:bg-[#c93a2c] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
-              >
-                Delete Module
-              </button>
-            </div>
-          </div>
-        )}
       </Modal>
     </div>
   );

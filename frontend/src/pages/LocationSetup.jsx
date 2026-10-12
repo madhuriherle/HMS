@@ -27,6 +27,7 @@ import api from '../api';
 import { askForm, confirmYesNo } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
+import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 
 // <select> values are always strings; API ids are numbers, so convert back
@@ -919,6 +920,30 @@ export default function LocationSetup() {
     }
     setDeleteDialog(null);
   };
+
+  useSwalConfirm(
+    statusDialog,
+    () => setStatusDialog(null),
+    (d) => ({
+      title: `${d.nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} location?`,
+      text: `Are you sure you want to mark ${d.item.name || `${d.item.postalCode} (${d.item.area})`} as ${d.nextStatus}?`,
+      confirmText: d.nextStatus === 'Inactive' ? 'Yes, deactivate' : 'Yes, activate',
+      danger: d.nextStatus === 'Inactive',
+    }),
+    handleConfirmStatusToggle
+  );
+
+  useSwalConfirm(
+    deleteDialog,
+    () => setDeleteDialog(null),
+    (d) => ({
+      title: 'Delete?',
+      text: `Are you sure you want to delete ${d.item?.name || `${d.item?.postalCode} (${d.item?.area})`}?`,
+      confirmText: 'Yes, delete',
+      danger: true,
+    }),
+    handleConfirmDelete
+  );
 
   return (
     <PermissionGate required="masters.location.read">
@@ -2394,131 +2419,6 @@ export default function LocationSetup() {
             </div>
           </div>
         </div>
-      </Modal>
-
-      {/* ==================================================== */}
-      {/* MODAL 5: STATUS TOGGLE CONFIRMATION                  */}
-      {/* ==================================================== */}
-      <Modal
-        isOpen={Boolean(statusDialog)}
-        onClose={() => setStatusDialog(null)}
-      >
-        {statusDialog && (
-          <div
-            className="bg-white rounded-2xl max-w-sm w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3.5 ${
-                statusDialog.nextStatus === 'Inactive'
-                  ? 'bg-red-100 text-[#ED4636]'
-                  : 'bg-[#3D705C]/10 text-[#3D705C]'
-              }`}
-            >
-              {statusDialog.nextStatus === 'Inactive' ? (
-                <AlertTriangle className="w-7 h-7" />
-              ) : (
-                <CheckCircle2 className="w-7 h-7" />
-              )}
-            </div>
-
-            <h3 className="text-base font-bold text-[#180200]">
-              {statusDialog.nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'}{' '}
-              {statusDialog.type === 'state'
-                ? 'State'
-                : statusDialog.type === 'district'
-                ? 'District'
-                : statusDialog.type === 'taluk'
-                ? 'Taluk'
-                : 'PIN Code'}?
-            </h3>
-            <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
-              Are you sure you want to mark{' '}
-              <strong className="text-[#180200]">
-                {statusDialog.item.name || `${statusDialog.item.postalCode} (${statusDialog.item.area})`}
-              </strong>{' '}
-              as <span className="font-bold">{statusDialog.nextStatus}</span>?
-            </p>
-
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setStatusDialog(null)}
-                className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!hasPermission('masters.location.write')}
-                title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
-                onClick={handleConfirmStatusToggle}
-                className={`w-full py-2.5 px-4 text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer ${
-                  statusDialog.nextStatus === 'Inactive'
-                    ? 'bg-[#ED4636] hover:bg-[#C93324]'
-                    : 'bg-[#3D705C] hover:bg-[#2F5747]'
-                }`}
-              >
-                {statusDialog.nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'}
-              </button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* ==================================================== */}
-      {/* MODAL 6: DELETE CONFIRMATION                         */}
-      {/* ==================================================== */}
-      <Modal
-        isOpen={Boolean(deleteDialog)}
-        onClose={() => setDeleteDialog(null)}
-      >
-        {deleteDialog && (
-          <div
-            className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-14 h-14 rounded-full bg-red-100 text-[#ED4636] flex items-center justify-center mx-auto mb-3.5">
-              <Trash2 className="w-7 h-7" />
-            </div>
-
-            <h3 className="text-lg font-bold text-[#180200]">
-              Delete{' '}
-              {deleteDialog.type === 'district'
-                ? 'District'
-                : deleteDialog.type === 'taluk'
-                ? 'Taluk'
-                : 'PIN Code'}?
-            </h3>
-            <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
-              Are you sure you want to delete{' '}
-              <strong className="text-[#180200]">
-                {deleteDialog?.item?.name || `${deleteDialog?.item?.postalCode} (${deleteDialog?.item?.area})`}
-              </strong>
-              ? This action cannot be undone.
-            </p>
-
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setDeleteDialog(null)}
-                className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!hasPermission('masters.location.delete')}
-                title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : undefined}
-                onClick={handleConfirmDelete}
-                className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Confirm Delete</span>
-              </button>
-            </div>
-          </div>
-        )}
       </Modal>
 
       {/* ==================================================== */}

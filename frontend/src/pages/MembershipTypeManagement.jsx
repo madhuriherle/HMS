@@ -32,6 +32,7 @@ import DateInput from '../components/DateInput';
 const formatDate = (v) => (v === 'Present' ? v : formatDateShared(v));
 import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
+import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 import RecentlyDeleted from '../components/RecentlyDeleted';
 
@@ -403,6 +404,20 @@ export default function MembershipTypeManagement() {
     }
     setStatusDialog(null);
   };
+
+  useSwalConfirm(
+    statusDialog,
+    () => setStatusDialog(null),
+    (d) => ({
+      title: `${d.newStatus === 'Inactive' ? 'Deactivate' : 'Activate'} membership type?`,
+      text: d.newStatus === 'Inactive'
+        ? `Deactivate ${d.item.name}? Inactive membership types will not be available for new registrations.`
+        : `Activate ${d.item.name}? It will become available for member registrations.`,
+      confirmText: d.newStatus === 'Inactive' ? 'Yes, deactivate' : 'Yes, activate',
+      danger: d.newStatus === 'Inactive',
+    }),
+    handleConfirmStatusToggle
+  );
 
   return (
     <PermissionGate required="masters.membership_types.read">
@@ -1256,67 +1271,6 @@ export default function MembershipTypeManagement() {
                 </button>
               </div>
 
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* ============================================================ */}
-      {/* ACTIVATE / DEACTIVATE CONFIRMATION MODAL                     */}
-      {/* ============================================================ */}
-      <Modal
-        isOpen={Boolean(statusDialog)}
-        onClose={() => setStatusDialog(null)}
-      >
-        {statusDialog && (
-          <div
-            className="bg-white rounded-2xl max-w-sm w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3.5 ${statusDialog.newStatus === 'Inactive' ? 'bg-red-100 text-[#ED4636]' : 'bg-[#3D705C]/10 text-[#3D705C]'
-              }`}>
-              {statusDialog.newStatus === 'Inactive' ? (
-                <AlertTriangle className="w-7 h-7" />
-              ) : (
-                <CheckCircle2 className="w-7 h-7" />
-              )}
-            </div>
-
-            <h3 className="text-lg font-bold text-[#180200]">
-              {statusDialog.newStatus === 'Inactive' ? 'Deactivate Membership Type?' : 'Activate Membership Type?'}
-            </h3>
-            <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
-              {statusDialog.newStatus === 'Inactive' ? (
-                <>
-                  Are you sure you want to deactivate <strong className="text-[#180200]">{statusDialog.item.name}</strong>? Inactive membership types will not be available for new registrations.
-                </>
-              ) : (
-                <>
-                  Are you sure you want to activate <strong className="text-[#180200]">{statusDialog.item.name}</strong>? It will become available for member registrations.
-                </>
-              )}
-            </p>
-
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setStatusDialog(null)}
-                className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!hasPermission('masters.membership_types.write')}
-                title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : undefined}
-                onClick={handleConfirmStatusToggle}
-                className={`w-full py-2.5 px-4 text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer ${statusDialog.newStatus === 'Inactive'
-                  ? 'bg-[#ED4636] hover:bg-[#C93324]'
-                  : 'bg-[#3D705C] hover:bg-[#2F5647]'
-                  }`}
-              >
-                {statusDialog.newStatus === 'Inactive' ? 'Deactivate' : 'Activate'}
-              </button>
             </div>
           </div>
         )}
