@@ -91,7 +91,7 @@ AREA_ACTIONS = {
 }
 
 # Modules whose screens are not built yet: switched off (status = false) by migration 0032
-NOT_BUILT_YET = ("magazines", "reports", "notifications", "activity", "events", "engagements", "imports")
+NOT_BUILT_YET = ("magazines", "reports", "notifications", "events", "engagements", "imports")
 
 # sub-modules that are not menu pages need a module row of their own (menu pages already have one)
 _ENGAGEMENT_SUBS = [
@@ -138,7 +138,7 @@ MODULE_CATALOG = [
     ("receipts", "Receipts", None, "/receipts", "receipt", 50, None),
     ("reports", "Reports", None, "/reports", "bar-chart", 60, None),
     ("notifications", "Notifications", None, "/notifications", "bell", 70, None),
-    ("activity", "Activity Logs", None, "/activity", "activity", 80, None),
+    ("activity", "Activity Logs", "users", "/dashboard/users/activity", "activity", 5, None),
     ("events", "Events", None, "/events", "calendar", 90, None),
     ("engagements", "Affiliation, Associates & Press", None, "/engagements", "link", 100, None),
     ("imports", "Imports", None, "/imports", "upload", 110, None),

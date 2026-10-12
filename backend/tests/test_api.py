@@ -2069,7 +2069,7 @@ def test_menu_and_privilege_tree_come_from_module_table(client, admin_headers):
     assert {"masters", "users", "members", "approvals"} <= _menu_codes(full_menu)
     users_node = next(m for m in full_menu if m["code"] == "users")
     # Privileges has no page of its own (edited inside Role Management), so it has no route and no menu entry
-    assert {"users.management", "roles", "users.modules"} == {c["code"] for c in users_node["submodules"]}
+    assert {"users.management", "roles", "users.modules", "activity"} == {c["code"] for c in users_node["submodules"]}
 
     # a brand-new module row appears with no code change; privileges can be linked to it
     created = client.post("/api/v1/users/modules", headers=admin_headers,

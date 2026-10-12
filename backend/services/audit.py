@@ -66,6 +66,27 @@ def setup_audit_listeners(engine):
                 }
             return history_map or None
 
+        def _name_hint(obj, table):
+            """A person-readable name for the row; services/memberships/mappings look theirs up."""
+            from services import activity_text
+
+            try:
+                if table == "member_service_optins" and getattr(obj, "service_type_id", None):
+                    from models.masters import ServiceType
+                    st = session.get(ServiceType, obj.service_type_id)
+                    return st.name_en if st else None
+                if table == "member_memberships" and getattr(obj, "membership_type_id", None):
+                    from models.masters import MembershipType
+                    mt = session.get(MembershipType, obj.membership_type_id)
+                    return mt.name_en if mt else None
+                if table in ("receipt_allocations", "receipt_items") and getattr(obj, "receipt_id", None):
+                    from models.receipts import Receipt
+                    r = session.get(Receipt, obj.receipt_id)
+                    return f"for receipt {r.receipt_number}" if r else None
+            except Exception:
+                return None
+            return activity_text.name_hint(obj)
+
         def record(action: str, obj) -> None:
             table = getattr(obj, "__tablename__", None)
             if not table or table in _AUDIT_TABLES:
@@ -73,13 +94,29 @@ def setup_audit_listeners(engine):
             entity_id = getattr(obj, "id", None)
             reason = getattr(session, "_action_reason", None)
 
+            # Plain-words description for the Activity Logs screens and the member timeline.
+            from services import activity_text
+
+            changes = _change_details(obj) if action == "UPDATE" else None
+            hint = _name_hint(obj, table)
+            description = activity_text.describe(action, table, hint, entity_id, changes)
+            user_details = {}
+            if reason:
+                user_details["reason"] = reason
+            if changes:
+                user_details["changes"] = changes
+
             session.add(
                 UserActivityLog(
                     user_id=current_user_id,
                     action=action,
                     entity_type=table,
                     entity_id=entity_id,
-                    details={"reason": reason} if reason else None,
+                    details=user_details or None,
+                    description=description,
+                    module=activity_text.module_for(table),
+                    activity_type="DATA",
+                    status="SUCCESS",
                     created_at=now,
                 )
             )
@@ -93,11 +130,15 @@ def setup_audit_listeners(engine):
             else:
                 member_id = obj.id if table == "members" else getattr(obj, "member_id", None)
             if member_id is not None:
-                details = {"entity_type": table, "entity_id": entity_id}
+                details = {
+                    "entity_type": table,
+                    "entity_id": entity_id,
+                    "description": description,
+                    "module": activity_text.module_for(table),
+                }
                 if reason:
                     details["reason"] = reason
                 if action == "UPDATE":
-                    changes = _change_details(obj)
                     if changes:
                         details["changes"] = changes
                 elif action == "CREATE":
@@ -141,6 +182,8 @@ def record_activity(
     """
     from models.activity import UserActivityLog
 
+    # Sign-in / sign-out bracket everything else a user did, so they read as plain sentences.
+    auth_text = {"LOGIN": "Logged in", "LOGOUT": "Logged out", "LOGIN_FAILED": "Failed sign-in attempt"}
     db.add(
         UserActivityLog(
             user_id=user_id,
@@ -149,5 +192,9 @@ def record_activity(
             entity_id=entity_id,
             details=details,
             ip_address=ip_address,
+            description=auth_text.get(action),
+            module="Authentication" if action in auth_text else None,
+            activity_type="AUTH" if action in auth_text else "ACTION",
+            status="FAILED" if action == "LOGIN_FAILED" else "SUCCESS",
         )
     )

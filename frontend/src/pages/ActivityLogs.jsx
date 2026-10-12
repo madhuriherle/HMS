@@ -1,0 +1,549 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Activity,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Calendar,
+  User as UserIcon,
+  RefreshCw,
+  Eye,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  Shield,
+  Clock,
+  Laptop
+} from 'lucide-react';
+import api from '../api';
+import { notify } from '../utils/notify';
+import { apiErrorMessage } from '../utils/apiError';
+
+export default function ActivityLogs() {
+  // Preset tabs: 'today' | 'yesterday' | 'week' | 'month' | 'custom'
+  const [activeDateTab, setActiveDateTab] = useState('custom');
+
+  // Filters
+  const [fromDate, setFromDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    return d.toISOString().split('T')[0];
+  });
+  const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedUser, setSelectedUser] = useState('');
+  const [selectedActivityType, setSelectedActivityType] = useState('All');
+  const [selectedStatus, setSelectedStatus] = useState('All Status');
+  const [selectedClient, setSelectedClient] = useState('All Clients');
+  const [showNavigation, setShowNavigation] = useState(true);
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Data
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    total_logs: 0,
+    success: 0,
+    failed: 0,
+    important: 0,
+  });
+
+  // User list for dropdown
+  const [usersList, setUsersList] = useState([]);
+
+  // Load user options
+  useEffect(() => {
+    api.get('/users/', { params: { limit: 500 } })
+      .then((res) => {
+        const uData = res.data?.data || res.data || [];
+        setUsersList(Array.isArray(uData) ? uData : []);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Quick Date Preset handler
+  const handleDatePreset = (preset) => {
+    setActiveDateTab(preset);
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    if (preset === 'today') {
+      setFromDate(todayStr);
+      setToDate(todayStr);
+    } else if (preset === 'yesterday') {
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      const yStr = y.toISOString().split('T')[0];
+      setFromDate(yStr);
+      setToDate(yStr);
+    } else if (preset === 'week') {
+      const w = new Date();
+      w.setDate(w.getDate() - 7);
+      setFromDate(w.toISOString().split('T')[0]);
+      setToDate(todayStr);
+    } else if (preset === 'month') {
+      const m = new Date();
+      m.setDate(m.getDate() - 30);
+      setFromDate(m.toISOString().split('T')[0]);
+      setToDate(todayStr);
+    }
+    setPage(1);
+  };
+
+  // Fetch stats and logs
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = {
+        page,
+        limit,
+        from_date: fromDate || undefined,
+        to_date: toDate || undefined,
+        user_id: selectedUser || undefined,
+        activity_type: selectedActivityType !== 'All' ? selectedActivityType : undefined,
+        status: selectedStatus !== 'All Status' ? selectedStatus : undefined,
+        client_type: selectedClient !== 'All Clients' ? selectedClient : undefined,
+        show_navigation: showNavigation,
+      };
+
+      const [logsRes, statsRes] = await Promise.all([
+        api.get('/activity/users', { params }),
+        api.get('/activity/stats', {
+          params: {
+            from_date: fromDate || undefined,
+            to_date: toDate || undefined,
+            user_id: selectedUser || undefined,
+          },
+        }),
+      ]);
+
+      const logData = logsRes.data?.data || [];
+      setLogs(Array.isArray(logData) ? logData : []);
+      setTotalCount(logsRes.data?.total || 0);
+
+      if (statsRes.data) {
+        setStats(statsRes.data);
+      }
+    } catch (err) {
+      notify(apiErrorMessage(err, 'Failed to load activity logs'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, limit, fromDate, toDate, selectedUser, selectedActivityType, selectedStatus, selectedClient, showNavigation]);
+
+  useEffect(() => {
+    fetchLogs();
+  }, [fetchLogs]);
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / limit));
+
+  // Format timestamp: 12/10/2026 4:08:59 pm
+  const formatLogDate = (isoStr) => {
+    if (!isoStr) return '—';
+    try {
+      const d = new Date(isoStr);
+      return d.toLocaleString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true,
+      });
+    } catch (_) {
+      return isoStr;
+    }
+  };
+
+  return (
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* Page Title & Quick Date Presets */}
+      <div>
+        <h1 className="text-2xl font-bold text-[#3D140C] tracking-tight">User Activity Logs</h1>
+        <p className="text-xs text-[#863221] mt-1 font-medium">
+          Comprehensive real-time audit trail of all API calls, navigation, and user actions
+        </p>
+
+        {/* Quick Date Tabs */}
+        <div className="flex flex-wrap items-center gap-2 mt-4">
+          {[
+            { id: 'today', label: 'Today' },
+            { id: 'yesterday', label: 'Yesterday' },
+            { id: 'week', label: 'This Week' },
+            { id: 'month', label: 'This Month' },
+            { id: 'custom', label: 'Custom' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleDatePreset(tab.id)}
+              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
+                activeDateTab === tab.id
+                  ? 'bg-[#C85A32] text-white shadow-xs'
+                  : 'bg-white hover:bg-[#FAF7F2] text-[#3D140C] border border-[#E8DFD8]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Top 4 Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* TOTAL LOGS */}
+        <div className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold tracking-wider text-[#863221] uppercase">Total Logs</span>
+            <div className="text-2xl font-black text-[#C85A32] mt-1">
+              {Number(stats.total_logs || 0).toLocaleString()}
+            </div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#C85A32]">
+            <Activity className="w-5 h-5 stroke-[2.2]" />
+          </div>
+        </div>
+
+        {/* SUCCESS */}
+        <div className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold tracking-wider text-[#863221] uppercase">Success</span>
+            <div className="text-2xl font-black text-emerald-600 mt-1">
+              {Number(stats.success || 0).toLocaleString()}
+            </div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
+            <CheckCircle2 className="w-5 h-5 stroke-[2.2]" />
+          </div>
+        </div>
+
+        {/* FAILED */}
+        <div className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold tracking-wider text-[#863221] uppercase">Failed</span>
+            <div className="text-2xl font-black text-rose-600 mt-1">
+              {Number(stats.failed || 0).toLocaleString()}
+            </div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+            <XCircle className="w-5 h-5 stroke-[2.2]" />
+          </div>
+        </div>
+
+        {/* IMPORTANT */}
+        <div className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-2xs flex items-center justify-between">
+          <div>
+            <span className="text-[11px] font-bold tracking-wider text-[#863221] uppercase">Important</span>
+            <div className="text-2xl font-black text-amber-600 mt-1">
+              {Number(stats.important || 0).toLocaleString()}
+            </div>
+          </div>
+          <div className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+            <AlertTriangle className="w-5 h-5 stroke-[2.2]" />
+          </div>
+        </div>
+      </div>
+
+      {/* Advanced Filter Card */}
+      <div className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-2xs space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
+          {/* FROM DATE */}
+          <div>
+            <label className="block text-[11px] font-bold text-[#3D140C] uppercase tracking-wider mb-1">
+              From Date
+            </label>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => {
+                setFromDate(e.target.value);
+                setActiveDateTab('custom');
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20 shadow-2xs cursor-pointer"
+            />
+          </div>
+
+          {/* TO DATE */}
+          <div>
+            <label className="block text-[11px] font-bold text-[#3D140C] uppercase tracking-wider mb-1">
+              To Date
+            </label>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => {
+                setToDate(e.target.value);
+                setActiveDateTab('custom');
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20 shadow-2xs cursor-pointer"
+            />
+          </div>
+
+          {/* USER */}
+          <div>
+            <label className="block text-[11px] font-bold text-[#3D140C] uppercase tracking-wider mb-1">
+              User
+            </label>
+            <select
+              value={selectedUser}
+              onChange={(e) => {
+                setSelectedUser(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20 shadow-2xs cursor-pointer"
+            >
+              <option value="">All Users</option>
+              {usersList.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name || u.username} ({u.username})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* ACTIVITY TYPE */}
+          <div>
+            <label className="block text-[11px] font-bold text-[#3D140C] uppercase tracking-wider mb-1">
+              Activity Type
+            </label>
+            <select
+              value={selectedActivityType}
+              onChange={(e) => {
+                setSelectedActivityType(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20 shadow-2xs cursor-pointer"
+            >
+              <option value="All">All Actions</option>
+              <option value="IMPORTANT">Important Actions</option>
+              <option value="CRUD">CRUD Actions</option>
+              <option value="AUTH">Authentication / Logins</option>
+              <option value="NAVIGATION">Navigation Activity</option>
+            </select>
+          </div>
+
+          {/* STATUS */}
+          <div>
+            <label className="block text-[11px] font-bold text-[#3D140C] uppercase tracking-wider mb-1">
+              Status
+            </label>
+            <select
+              value={selectedStatus}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20 shadow-2xs cursor-pointer"
+            >
+              <option value="All Status">All Status</option>
+              <option value="SUCCESS">Success</option>
+              <option value="FAILED">Failed</option>
+            </select>
+          </div>
+
+          {/* CLIENT */}
+          <div>
+            <label className="block text-[11px] font-bold text-[#3D140C] uppercase tracking-wider mb-1">
+              Client
+            </label>
+            <select
+              value={selectedClient}
+              onChange={(e) => {
+                setSelectedClient(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20 shadow-2xs cursor-pointer"
+            >
+              <option value="All Clients">All Clients</option>
+              <option value="Web Admin">Web Admin</option>
+              <option value="Mobile App">Mobile App</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Bottom row: Checkbox & Refresh Button */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#E8DFD8]">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showNavigation}
+              onChange={(e) => {
+                setShowNavigation(e.target.checked);
+                setPage(1);
+              }}
+              className="w-4 h-4 rounded text-[#C85A32] focus:ring-[#C85A32] border-[#DFD5CC] accent-[#C85A32] cursor-pointer"
+            />
+            <span className="text-xs font-semibold text-[#3D140C]">
+              Show Navigation Activity
+            </span>
+          </label>
+
+          <button
+            type="button"
+            onClick={fetchLogs}
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-[#DFD5CC] bg-white hover:bg-[#FAF7F2] text-xs font-semibold text-[#3D140C] transition-colors shadow-2xs cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#C85A32]' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Main Table Card */}
+      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-2xs overflow-hidden">
+        {/* Table Header Row (Terracotta Background like screenshot) */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#C85A32] text-white text-xs font-bold uppercase tracking-wider">
+                <th className="py-3 px-4 w-5/12">Activity Description</th>
+                <th className="py-3 px-4 w-3/12">User</th>
+                <th className="py-3 px-4 w-2/12">Module</th>
+                <th className="py-3 px-4 w-2/12">Status</th>
+                <th className="py-3 px-4 text-right">Date & Time</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#F0EBE6] text-xs">
+              {loading && logs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-stone-500 font-medium">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto text-[#C85A32] mb-2" />
+                    Loading activity logs...
+                  </td>
+                </tr>
+              ) : logs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-12 text-center text-stone-500 font-medium">
+                    No activity logs match the selected filter criteria.
+                  </td>
+                </tr>
+              ) : (
+                logs.map((log) => {
+                  const isSuccess = (log.status || 'SUCCESS') === 'SUCCESS';
+                  return (
+                    <tr
+                      key={log.id}
+                      className="hover:bg-[#FAF7F2] transition-colors font-medium text-[#180200]"
+                    >
+                      {/* Activity Description */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2.5">
+                          <Eye className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                          <span className="font-semibold text-[#3D140C] capitalize">
+                            {log.activity_description || log.description || log.action}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* User */}
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-orange-100 text-[#C85A32] flex items-center justify-center font-bold text-[10px] shrink-0">
+                            {(log.user_name || 'U').charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-bold text-[#180200] block truncate">
+                              {log.user_name}
+                            </span>
+                            <span className="text-[10px] text-stone-500 block">
+                              {log.role_name || 'User'}
+                            </span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Module Pill Badge */}
+                      <td className="py-3 px-4">
+                        <span className="inline-block px-2.5 py-0.5 rounded-md bg-[#FAF7F2] border border-[#DFD5CC] text-[11px] font-semibold text-stone-700">
+                          {log.module || 'System'}
+                        </span>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3 px-4">
+                        {isSuccess ? (
+                          <span className="inline-flex items-center gap-1 font-bold text-emerald-600 text-[11px]">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>SUCCESS</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 font-bold text-rose-600 text-[11px]">
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>FAILED</span>
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Date & Time */}
+                      <td className="py-3 px-4 text-right whitespace-nowrap text-stone-600 font-mono text-[11px]">
+                        {formatLogDate(log.created_at)}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Table Footer: Pagination controls */}
+        <div className="p-4 bg-[#FAF7F2] border-t border-[#E8DFD8] flex flex-wrap items-center justify-between gap-4 text-xs font-medium text-stone-700">
+          <div>
+            Showing {totalCount > 0 ? (page - 1) * limit + 1 : 0} to{' '}
+            {Math.min(page * limit, totalCount)} of {totalCount.toLocaleString()} results
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span>Rows per page:</span>
+              <select
+                value={limit}
+                onChange={(e) => {
+                  setLimit(Number(e.target.value));
+                  setPage(1);
+                }}
+                className="px-2 py-1 bg-white border border-[#DFD5CC] rounded-md text-xs font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+
+            <div className="font-semibold">
+              Page {page} of {totalPages}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="p-1.5 rounded-md border border-[#DFD5CC] bg-white hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                title="Previous page"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                className="p-1.5 rounded-md border border-[#DFD5CC] bg-white hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                title="Next page"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

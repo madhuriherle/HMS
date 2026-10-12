@@ -14,6 +14,16 @@ class UserActivityLog(AuditMixin, Base):
     details: Mapped[dict] = mapped_column(JSON, nullable=True)
     ip_address: Mapped[str] = mapped_column(String(45), nullable=True)
 
+    # Activity Logging fields (AIMS Activity Logs parity)
+    description: Mapped[str] = mapped_column(String(255), nullable=True)
+    module: Mapped[str] = mapped_column(String(80), nullable=True)
+    activity_type: Mapped[str] = mapped_column(String(50), default="ACTION")  # NAVIGATION, IMPORTANT, CRUD, AUTH
+    status: Mapped[str] = mapped_column(String(20), default="SUCCESS")  # SUCCESS, FAILED
+    status_code: Mapped[int] = mapped_column(BigInteger, nullable=True)
+    http_method: Mapped[str] = mapped_column(String(10), nullable=True)
+    endpoint_path: Mapped[str] = mapped_column(String(255), nullable=True)
+    client_type: Mapped[str] = mapped_column(String(50), default="Web Admin")
+
 class MemberActivityLog(AuditMixin, Base):
     __tablename__ = "member_activity_logs"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)

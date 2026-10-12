@@ -22,22 +22,134 @@ def read_user_activity(
     current_user: User = Depends(deps.get_current_user),
     user_id: Optional[int] = None,
     action: Optional[str] = None,
+    activity_type: Optional[str] = None,
+    status: Optional[str] = None,
+    module: Optional[str] = None,
+    client_type: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    show_navigation: bool = False,
+    search: Optional[str] = None,
     entity_type: Optional[str] = None,
     entity_id: Optional[int] = None,
     page: int = 1,
     limit: int = 50,
 ) -> Any:
-    """User activity trail: login → logout and every entity touched."""
+    """User activity trail matching AIMS User Activity Logs screen."""
+    from datetime import datetime, time
+
     q = db.query(UserActivityLog).filter(UserActivityLog.is_deleted == False)
+
     if user_id:
         q = q.filter(UserActivityLog.user_id == user_id)
     if action:
         q = q.filter(UserActivityLog.action == action.upper())
+    if activity_type and activity_type != "All":
+        q = q.filter(UserActivityLog.activity_type == activity_type)
+    elif not show_navigation and not activity_type:
+        # By default, hide navigation activity (e.g. viewed menu, viewed list)
+        q = q.filter(UserActivityLog.activity_type != "NAVIGATION")
+
+    if status and status != "All Status":
+        q = q.filter(UserActivityLog.status == status.upper())
+    if module:
+        q = q.filter(UserActivityLog.module == module)
+    if client_type and client_type != "All Clients":
+        q = q.filter(UserActivityLog.client_type == client_type)
     if entity_type:
         q = q.filter(UserActivityLog.entity_type == entity_type)
     if entity_id:
         q = q.filter(UserActivityLog.entity_id == entity_id)
-    return paginate(q.order_by(UserActivityLog.created_at.desc()), page, limit)
+
+    if from_date:
+        try:
+            fd = datetime.strptime(from_date, "%Y-%m-%d")
+            q = q.filter(UserActivityLog.created_at >= fd)
+        except ValueError:
+            pass
+    if to_date:
+        try:
+            td = datetime.strptime(to_date, "%Y-%m-%d")
+            # end of the day
+            td_end = datetime.combine(td.date(), time(23, 59, 59))
+            q = q.filter(UserActivityLog.created_at <= td_end)
+        except ValueError:
+            pass
+
+    if search:
+        s = f"%{search.strip()}%"
+        q = q.filter(UserActivityLog.description.ilike(s))
+
+    page_data = paginate(q.order_by(UserActivityLog.created_at.desc(), UserActivityLog.id.desc()), page, limit)
+
+    # Attach user display names and roles
+    user_ids = {row["user_id"] for row in page_data["data"] if row.get("user_id")}
+    users_map = {}
+    if user_ids:
+        from models.users import User as UserModel, Role
+        user_rows = (
+            db.query(UserModel.id, UserModel.name, UserModel.username, Role.name.label("role_name"))
+            .outerjoin(Role, Role.id == UserModel.role_id)
+            .filter(UserModel.id.in_(user_ids))
+            .all()
+        )
+        for uid, name, uname, rname in user_rows:
+            users_map[uid] = {
+                "name": name or uname or f"User #{uid}",
+                "role_name": rname or "User",
+            }
+
+    for row in page_data["data"]:
+        u_info = users_map.get(row.get("user_id"))
+        row["user_name"] = u_info["name"] if u_info else "System / Anonymous"
+        row["role_name"] = u_info["role_name"] if u_info else "System"
+        row["activity_description"] = row.get("description") or f"{row.get('action')} {row.get('entity_type') or ''}".strip()
+        row["module"] = row.get("module") or "System"
+        row["status"] = row.get("status") or "SUCCESS"
+        row["activity_type"] = row.get("activity_type") or "ACTION"
+
+    return page_data
+
+
+@router.get("/stats")
+def read_activity_stats(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    user_id: Optional[int] = None,
+) -> Any:
+    """Card counters: Total Logs, Success, Failed, Important."""
+    from datetime import datetime, time
+
+    q = db.query(UserActivityLog).filter(UserActivityLog.is_deleted == False)
+    if user_id:
+        q = q.filter(UserActivityLog.user_id == user_id)
+    if from_date:
+        try:
+            fd = datetime.strptime(from_date, "%Y-%m-%d")
+            q = q.filter(UserActivityLog.created_at >= fd)
+        except ValueError:
+            pass
+    if to_date:
+        try:
+            td = datetime.strptime(to_date, "%Y-%m-%d")
+            td_end = datetime.combine(td.date(), time(23, 59, 59))
+            q = q.filter(UserActivityLog.created_at <= td_end)
+        except ValueError:
+            pass
+
+    total = q.count()
+    success = q.filter(UserActivityLog.status == "SUCCESS").count()
+    failed = q.filter(UserActivityLog.status == "FAILED").count()
+    important = q.filter(UserActivityLog.activity_type.in_(("IMPORTANT", "CRUD"))).count()
+
+    return {
+        "total_logs": total,
+        "success": success,
+        "failed": failed,
+        "important": important,
+    }
 
 
 @router.get("/users/summary")
@@ -115,8 +227,20 @@ def read_member_timeline(
         from models.users import User as UserModel
         for u in db.query(UserModel).filter(UserModel.id.in_(user_ids)).all():
             names[u.id] = u.name or u.username
+    # Rows written before descriptions existed get theirs worked out from what they recorded.
+    from services import activity_text
+
     for row in page_data["data"]:
         row["acted_by_name"] = names.get(row.get("user_id"))
+        d = row.get("details") or {}
+        if not d.get("description"):
+            table = d.get("entity_type")
+            d = {**d, "description": activity_text.describe(
+                row.get("action") or "", table, None, d.get("entity_id"), d.get("changes")
+            ), "module": activity_text.module_for(table)}
+            row["details"] = d
+        row["description"] = d.get("description")
+        row["module"] = d.get("module")
 
     return {
         "member_id": member_id,

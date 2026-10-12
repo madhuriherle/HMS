@@ -90,6 +90,23 @@ async def request_context(request: Request, call_next):
         elapsed_ms,
         request_id,
     )
+    # Record in activity logs (non-blocking)
+    if request.url.path.startswith(settings.API_V1_STR):
+        try:
+            from services.activity_logger import record_http_activity
+            ip_addr = request.client.host if request.client else None
+            user_agent = request.headers.get("user-agent")
+            auth_header = request.headers.get("authorization")
+            record_http_activity(
+                method=request.method,
+                path=request.url.path,
+                status_code=response.status_code,
+                ip_address=ip_addr,
+                user_agent=user_agent,
+                auth_header=auth_header,
+            )
+        except Exception:
+            pass
     return response
 
 

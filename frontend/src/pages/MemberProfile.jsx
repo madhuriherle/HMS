@@ -4,7 +4,7 @@ import { ArrowLeft, Pencil, User, Users, CreditCard, FileText, BookOpen, History
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
-import { formatDate } from '../utils/dateUtils';
+import { formatDate, formatDateTime } from '../utils/dateUtils';
 import { apiErrorMessage } from '../utils/apiError';
 import { notify } from '../utils/notify';
 
@@ -63,6 +63,7 @@ export default function MemberProfile() {
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState('');
   const [links, setLinks] = useState({}); // membership number -> member id
+  const [timeline, setTimeline] = useState([]);
 
   useEffect(() => {
     let alive = true;
@@ -79,6 +80,15 @@ export default function MemberProfile() {
   }, [id]);
 
   const p = profile?.personal;
+
+  // every recorded action on this member: who did it, when, and what changed
+  useEffect(() => {
+    setTimeline([]);
+    api
+      .get(`/activity/members/${id}/timeline`, { params: { limit: 100 } })
+      .then(({ data }) => setTimeline(data?.data || []))
+      .catch(() => {});
+  }, [id]);
 
   // photo (a protected file: fetched as an image)
   useEffect(() => {
@@ -294,6 +304,40 @@ export default function MemberProfile() {
                       </tbody>
                     </table>
                   </div>
+                )}
+              </Card>
+
+              <Card icon={History} title="Activity timeline" className="lg:col-span-2">
+                {timeline.length === 0 ? (
+                  <Empty>No activity recorded yet.</Empty>
+                ) : (
+                  <ol className="relative border-l border-[#E8DFD8] ml-2 space-y-3">
+                    {timeline.map((e) => {
+                      const changes = Object.entries(e.details?.changes || {}).filter(
+                        ([k]) => !['updated_at', 'updated_by', 'created_at', 'created_by', 'is_deleted'].includes(k)
+                      );
+                      return (
+                        <li key={e.id} className="ml-4">
+                          <span className="absolute -left-1.5 mt-1.5 w-3 h-3 rounded-full bg-[#510601] border-2 border-white" />
+                          <div className="text-xs font-semibold text-[#180200]">{e.description || e.action}</div>
+                          <div className="text-[11px] text-[#863221]">
+                            {e.acted_by_name || 'System'} · {e.created_at ? formatDateTime(e.created_at) : ''}
+                            {e.module ? ` · ${e.module}` : ''}
+                          </div>
+                          {changes.length > 0 && (
+                            <ul className="mt-1 text-[11px] text-[#180200] space-y-0.5">
+                              {changes.slice(0, 6).map(([field, v]) => (
+                                <li key={field}>
+                                  <b>{field.replace(/_/g, ' ')}</b>: {String(v.from ?? '—')} → {String(v.to ?? '—')}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {e.details?.reason && <div className="text-[11px] italic text-[#863221]">Reason: {e.details.reason}</div>}
+                        </li>
+                      );
+                    })}
+                  </ol>
                 )}
               </Card>
 

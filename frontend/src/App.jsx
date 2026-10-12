@@ -21,6 +21,7 @@ import BankDetailsManagement from './pages/BankDetailsManagement';
 import Approvals from './pages/Approvals';
 import RegisterNewMember from './pages/RegisterNewMember';
 import MemberProfile from './pages/MemberProfile';
+import ActivityLogs from './pages/ActivityLogs';
 import FormModalHost from './components/FormModalHost';
 import { BankMaster } from './pages/MasterLists';
 // Personal Masters (gotra / qualification / native place) screen is switched off for now:
@@ -61,8 +62,8 @@ function App() {
           <Route path="membership/add" element={<RegisterNewMember />} />
           <Route path="membership/edit/:id" element={<RegisterNewMember />} />
           <Route path="membership/view/:id" element={<RegisterNewMember />} />
-          <Route path="membership" element={<Navigate to="/dashboard/membership/list" replace />} />
           <Route path="membership/profile/:id" element={<MemberProfile />} />
+          <Route path="membership" element={<Navigate to="/dashboard/membership/list" replace />} />
           <Route path="members" element={<Navigate to="/dashboard/membership/list" replace />} />
           <Route path="members/list" element={<Navigate to="/dashboard/membership/list" replace />} />
 
@@ -103,6 +104,9 @@ function App() {
           <Route path="users/management" element={<UserManagement />} />
           <Route path="users/user-management" element={<UserManagement />} />
           <Route path="users/modules" element={<PermissionGate minRank={1} title="Super Admin only" message="Module management is reserved for the Super Admin."><ModulesManagement /></PermissionGate>} />
+          <Route path="users/activity" element={<ActivityLogs />} />
+          <Route path="activity/logs" element={<ActivityLogs />} />
+          <Route path="activity" element={<ActivityLogs />} />
           <Route path="master/modules" element={<PermissionGate minRank={1} title="Super Admin only" message="Module management is reserved for the Super Admin."><ModulesManagement /></PermissionGate>} />
           <Route path="masters/modules" element={<PermissionGate minRank={1} title="Super Admin only" message="Module management is reserved for the Super Admin."><ModulesManagement /></PermissionGate>} />
           <Route path="settings/modules" element={<PermissionGate minRank={1} title="Super Admin only" message="Module management is reserved for the Super Admin."><ModulesManagement /></PermissionGate>} />
