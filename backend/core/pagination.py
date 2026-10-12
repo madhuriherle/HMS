@@ -43,18 +43,28 @@ def _to_plain(obj, exclude: Set[str]):
 
 MAX_PAGE_SIZE = 25000
 
-def paginate(query, page: int = 1, limit: int = 20, exclude: Optional[Set[str]] = None) -> dict:
-    """Helper to paginate a SQLAlchemy query (limit is clamped)."""
+def paginate(query, page: int = 1, limit: int = 20, exclude: Optional[Set[str]] = None,
+             serializer=None) -> dict:
+    """Helper to paginate a SQLAlchemy query (limit is clamped).
+
+    ``serializer`` optionally maps each raw row to a JSON-safe value (used for
+    queries that select extra labelled columns alongside the ORM entity); when
+    omitted, ORM instances are flattened to their own column values.
+    """
     page = max(1, int(page))
     limit = max(1, min(int(limit), MAX_PAGE_SIZE))
     excluded = set(exclude or ())
     total = query.count()
     items = query.offset((page - 1) * limit).limit(limit).all()
     pages = (total + limit - 1) // limit
+    if serializer is not None:
+        data = [serializer(item) for item in items]
+    else:
+        data = [_to_plain(item, excluded) for item in items]
     return {
         "total": total,
         "page": page,
         "limit": limit,
         "pages": pages,
-        "data": [_to_plain(item, excluded) for item in items]
+        "data": data
     }

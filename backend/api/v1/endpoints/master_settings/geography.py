@@ -383,7 +383,18 @@ def read_postal_codes(
     page: int = 1,
     limit: int = 100,
 ) -> Any:
-    q = db.query(PostalCode).filter(PostalCode.is_deleted == False)  # noqa: E712
+    q = (
+        db.query(
+            PostalCode,
+            State.name_en.label("state_name"),
+            District.name_en.label("district_name"),
+            Taluk.name_en.label("taluk_name"),
+        )
+        .outerjoin(State, PostalCode.state_id == State.id)
+        .outerjoin(District, PostalCode.district_id == District.id)
+        .outerjoin(Taluk, PostalCode.taluk_id == Taluk.id)
+        .filter(PostalCode.is_deleted == False)  # noqa: E712
+    )
     if pincode:
         q = q.filter(PostalCode.pincode.ilike(f"%{pincode}%"))
     if state_id:
@@ -394,7 +405,23 @@ def read_postal_codes(
         q = q.filter(PostalCode.taluk_id == taluk_id)
     if search:
         q = q.filter(PostalCode.post_office_name.ilike(f"%{search}%"))
-    return paginate(q, page, limit)
+
+    def _serialize(row):
+        pc, state_name, district_name, taluk_name = row
+        return {
+            "id": pc.id,
+            "pincode": pc.pincode,
+            "post_office_name": pc.post_office_name,
+            "state_id": pc.state_id,
+            "district_id": pc.district_id,
+            "taluk_id": pc.taluk_id,
+            "status": pc.status,
+            "state_name": state_name,
+            "district_name": district_name,
+            "taluk_name": taluk_name,
+        }
+
+    return paginate(q, page, limit, serializer=_serialize)
 
 
 
