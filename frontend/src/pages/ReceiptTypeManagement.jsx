@@ -566,11 +566,9 @@ export default function ReceiptTypeManagement() {
           <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-semibold text-[#863221] uppercase tracking-wider">
-                <th className="px-5 py-3.5 w-12 text-center"></th>
                 <th className="px-5 py-3.5">Particular</th>
-                <th className="px-5 py-3.5">Sub-Types</th>
                 <th className="px-5 py-3.5 text-center">Status</th>
-                <th className="px-5 py-3.5 text-right min-w-[220px]">Actions</th>
+                <th className="px-5 py-3.5 text-right min-w-[140px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DFD8] text-sm">
@@ -583,239 +581,106 @@ export default function ReceiptTypeManagement() {
 
                   return (
                     <React.Fragment key={type.id}>
-                      {/* Parent Particular Row */}
-                      <tr className={`hover:bg-[#FAF7F2]/60 transition-colors group ${isExpanded ? 'bg-[#FAF7F2]/30' : ''}`}>
-
-                        {/* Number Index */}
-                        <td className="px-5 py-4 text-xs font-bold text-[#863221]/70 text-center">
-                          {(currentPage - 1) * pageSize + index + 1}
-                        </td>
-
-                        {/* Particular Name + Expand Chevron if sub-types exist */}
-                        <td className="px-5 py-4 font-bold text-[#180200]">
-                          <div className="flex items-center gap-2.5">
-                            {hasSubTypes ? (
-                              <button
-                                type="button"
-                                onClick={() => toggleRowExpansion(type.id)}
-                                className="p-1 rounded-md text-[#863221] hover:bg-[#510601]/10 transition-colors cursor-pointer"
-                                title={isExpanded ? "Collapse sub-types" : "Expand sub-types"}
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="w-4 h-4 text-[#510601]" />
-                                ) : (
-                                  <ChevronRight className="w-4 h-4 text-[#863221]" />
-                                )}
-                              </button>
-                            ) : (
-                              <div className="w-6 h-4" />
-                            )}
-                            <span className="text-sm text-[#180200]">{type.name}</span>
-                            {usage[type.id]?.used > 0 && (
-                              <span
-                                className="ml-2 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-semibold text-[#863221]"
-                                title={`Used on ${usage[type.id].used} receipt line(s)`}
-                              >
-                                used {usage[type.id].used}×
-                              </span>
-                            )}
+                      <tr className="bg-white hover:bg-[#FAF7F2] transition-colors align-top">
+                        {/* Name, usage, order arrows and the sub-types as chips */}
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-[#180200]">{type.name}</span>
                             {hasPermission('masters.particulars.write') && !searchQuery && (
-                              <span className="ml-2 inline-flex flex-col">
-                                <button type="button" onClick={() => moveType(type, -1)} title="Move up" className="text-[#863221] hover:text-[#510601] cursor-pointer leading-none">
+                              <span className="inline-flex flex-col">
+                                <button type="button" onClick={() => moveType(type, -1)} title="Move up" className="text-[#863221]/60 hover:text-[#510601] cursor-pointer leading-none">
                                   <ChevronUp className="w-3.5 h-3.5" />
                                 </button>
-                                <button type="button" onClick={() => moveType(type, 1)} title="Move down" className="text-[#863221] hover:text-[#510601] cursor-pointer leading-none">
+                                <button type="button" onClick={() => moveType(type, 1)} title="Move down" className="text-[#863221]/60 hover:text-[#510601] cursor-pointer leading-none">
                                   <ChevronDown className="w-3.5 h-3.5" />
                                 </button>
                               </span>
                             )}
                           </div>
-                        </td>
-
-                        {/* Sub-Types Summary Pill */}
-                        <td className="px-5 py-4">
-                          {hasSubTypes ? (
+                          {usage[type.id]?.used > 0 && (
+                            <div className="text-[11px] text-[#863221]/80 mt-0.5">used {usage[type.id].used} {usage[type.id].used === 1 ? 'time' : 'times'}</div>
+                          )}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            {(type.subTypes || []).map((sub, sIdx) => (
+                              <span
+                                key={sub.id || sIdx}
+                                className={`inline-flex items-center rounded-full border text-xs font-medium ${sub.status === 'Active'
+                                  ? 'bg-[#FAF7F2] border-[#E8DFD8] text-[#180200]'
+                                  : 'bg-white border-dashed border-[#E8DFD8] text-[#863221]/60 line-through'
+                                  }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => openEditSubTypeModal(type, sub)}
+                                  disabled={!hasPermission('masters.particulars.write')}
+                                  title={`Edit "${sub.name}"${sub.status === 'Active' ? '' : ' (inactive)'}`}
+                                  className="pl-2.5 pr-1.5 py-1 cursor-pointer hover:text-[#510601] disabled:cursor-default"
+                                >
+                                  {sub.name}
+                                </button>
+                                {hasPermission('masters.particulars.delete') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => promptDeleteSubType(type, sub)}
+                                    title={`Delete "${sub.name}"`}
+                                    className="pr-2 pl-0.5 py-1 text-[#863221]/50 hover:text-[#8C1801] cursor-pointer"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </span>
+                            ))}
                             <button
                               type="button"
-                              onClick={() => toggleRowExpansion(type.id)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-full text-xs font-medium cursor-pointer transition-colors"
-                              title="Click to view/hide sub-types"
+                              onClick={() => openAddSubTypeModal(type)}
+                              disabled={!hasPermission('masters.particulars.write')}
+                              title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : `Add a sub-type under ${type.name}`}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-[#510601]/40 text-xs font-semibold text-[#510601] hover:bg-[#510601]/5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >
-                              <Layers className="w-3.5 h-3.5 text-amber-700" />
-                              <span>
-                                {type.subTypes.length} {type.subTypes.length === 1 ? 'Sub-Type' : 'Sub-Types'} ({activeSubTypesCount} Active)
-                              </span>
+                              <Plus className="w-3 h-3" />
+                              <span>Sub-type</span>
                             </button>
-                          ) : (
-                            <span className="text-xs text-[#863221]/50 italic">
-                              No Sub-Types
-                            </span>
-                          )}
+                          </div>
                         </td>
 
-                        {/* Status (Active / Inactive Toggle) */}
+                        {/* Status: coloured word, click to switch */}
                         <td className="px-5 py-4 text-center">
                           <button
                             type="button"
                             disabled={!hasPermission('masters.particulars.write')}
                             onClick={() => promptToggleTypeStatus(type)}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${isActive
-                              ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
-                              }`}
+                            className={`text-xs font-semibold cursor-pointer hover:underline disabled:cursor-default disabled:no-underline ${isActive ? 'text-[#3D705C]' : 'text-[#863221]/70'}`}
                             title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : `Click to set as ${isActive ? 'Inactive' : 'Active'}`}
                           >
-                            <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
-                            <span>{type.status}</span>
+                            {type.status}
                           </button>
                         </td>
 
-                        {/* Action Buttons */}
-                        <td className="px-5 py-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5 flex-nowrap">
-
-                            {/* Add Sub-Type Button */}
-                            <button
-                              onClick={() => openAddSubTypeModal(type)}
-                              disabled={!hasPermission('masters.particulars.write')}
-                              title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : `Add Sub-Type under ${type.name}`}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>Sub-Type</span>
-                            </button>
-
-                            {/* Edit Button */}
-                            <button
-                              onClick={() => openEditTypeModal(type)}
-                              disabled={!hasPermission('masters.particulars.write')}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                              title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : 'Edit Particular'}
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                              <span>Edit</span>
-                            </button>
-
-                            {/* Delete Button */}
-                            <button
-                              onClick={() => promptDeleteType(type)}
-                              disabled={!hasPermission('masters.particulars.delete')}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                              title={!hasPermission('masters.particulars.delete') ? 'Requires masters.particulars.delete permission' : 'Delete Particular'}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Delete</span>
-                            </button>
-                          </div>
+                        <td className="px-5 py-4 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => openEditTypeModal(type)}
+                            disabled={!hasPermission('masters.particulars.write')}
+                            className="px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : 'Edit Particular'}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => promptDeleteType(type)}
+                            disabled={!hasPermission('masters.particulars.delete')}
+                            className="px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={!hasPermission('masters.particulars.delete') ? 'Requires masters.particulars.delete permission' : 'Delete Particular'}
+                          >
+                            Delete
+                          </button>
                         </td>
                       </tr>
-
-                      {/* Expanded Sub-Types Tree View */}
-                      {isExpanded && hasSubTypes && (
-                        <tr className="bg-[#FAF7F2]/40 border-b border-[#E8DFD8]">
-                          <td colSpan="5" className="p-0">
-                            <div className="py-3 px-6 sm:px-12 bg-[#FAF7F2]/60 border-y border-[#E8DFD8]/70">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2 text-xs font-bold text-[#863221] uppercase tracking-wider">
-                                  <Layers className="w-4 h-4 text-[#510601]" />
-                                  <span>Sub-Types under {type.name}</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => openAddSubTypeModal(type)}
-                                  disabled={!hasPermission('masters.particulars.write')}
-                                  title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : undefined}
-                                  className="text-xs font-semibold text-[#510601] hover:text-[#8C1801] inline-flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                  <span>Add New Sub-Type</span>
-                                </button>
-                              </div>
-
-                              <div className="border border-[#E8DFD8] rounded-xl overflow-hidden bg-white shadow-2xs">
-                                <table className="w-full text-left text-xs border-collapse">
-                                  <thead>
-                                    <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[11px] font-semibold text-[#863221] uppercase tracking-wider">
-                                      <th className="px-4 py-2.5 w-12 text-center"></th>
-                                      <th className="px-4 py-2.5">Sub-Type Name</th>
-                                      <th className="px-4 py-2.5 text-center">Status</th>
-                                      <th className="px-4 py-2.5 text-right min-w-[140px]">Actions</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-[#E8DFD8]">
-                                    {type.subTypes.map((sub, sIdx) => {
-                                      const isSubActive = sub.status === 'Active';
-                                      return (
-                                        <tr key={sub.id || sIdx} className="hover:bg-[#FAF7F2]/50 transition-colors">
-
-                                          {/* Sub-Type Number */}
-                                          <td className="px-4 py-3 text-center text-[#863221]/70 font-mono">
-                                            {sIdx + 1}
-                                          </td>
-
-                                          {/* Sub-Type Name */}
-                                          <td className="px-4 py-3 font-semibold text-[#180200]">
-                                            <span>{sub.name}</span>
-                                          </td>
-
-                                          {/* Sub-Type Status Toggle */}
-                                          <td className="px-4 py-3 text-center">
-                                            <button
-                                              type="button"
-                                              disabled={!hasPermission('masters.particulars.write')}
-                                              onClick={() => promptToggleSubTypeStatus(type, sub)}
-                                              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${isSubActive
-                                                ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
-                                                }`}
-                                              title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : 'Click to toggle status'}
-                                            >
-                                              <span className={`w-1.5 h-1.5 rounded-full ${isSubActive ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
-                                              <span>{sub.status}</span>
-                                            </button>
-                                          </td>
-
-                                          {/* Sub-Type Actions */}
-                                          <td className="px-4 py-3 text-right">
-                                            <div className="flex items-center justify-end gap-1.5">
-                                              <button
-                                                type="button"
-                                                onClick={() => openEditSubTypeModal(type, sub)}
-                                                disabled={!hasPermission('masters.particulars.write')}
-                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                                title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : 'Edit Sub-Type'}
-                                              >
-                                                <Pencil className="w-3.5 h-3.5" />
-                                                <span>Edit</span>
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => promptDeleteSubType(type, sub)}
-                                                disabled={!hasPermission('masters.particulars.delete')}
-                                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                                                title={!hasPermission('masters.particulars.delete') ? 'Requires masters.particulars.delete permission' : 'Delete Sub-Type'}
-                                              >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                                <span>Delete</span>
-                                              </button>
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
                     </React.Fragment>
                   );
                 })
               ) : (
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-[#863221]">
+                  <td colSpan="3" className="px-6 py-12 text-center text-[#863221]">
                     <div className="w-12 h-12 rounded-full bg-[#FAF7F2] text-[#863221]/60 flex items-center justify-center mx-auto mb-3">
                       <FileText className="w-6 h-6" />
                     </div>
