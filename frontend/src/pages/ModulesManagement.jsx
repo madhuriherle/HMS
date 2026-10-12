@@ -538,7 +538,6 @@ export default function ModulesManagement() {
                         }`}
                         title={m.status ? 'Click to disable module' : 'Click to enable module'}
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full ${m.status ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                         {m.status ? 'Active' : 'Inactive'}
                       </button>
                     </td>
@@ -546,7 +545,7 @@ export default function ModulesManagement() {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => handleLinkPrivileges(m)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer"
                           title="Link privileges to this module"
                         >
                           <KeyRound className="w-3.5 h-3.5" />
@@ -554,7 +553,7 @@ export default function ModulesManagement() {
                         </button>
                         <button
                           onClick={() => openEditModal(m)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer"
                           title="Edit Module"
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -562,7 +561,7 @@ export default function ModulesManagement() {
                         </button>
                         <button
                           onClick={() => setDeleteTarget(m)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer"
                           title="Delete Module"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

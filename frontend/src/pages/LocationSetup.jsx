@@ -1044,14 +1044,13 @@ export default function LocationSetup() {
                               nextStatus: st.status === 'Active' ? 'Inactive' : 'Active'
                             });
                           }}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                          className={`text-xs font-semibold cursor-pointer ${
                             st.status === 'Active'
-                              ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+                              ? 'text-[#3D705C] hover:underline'
+                              : 'text-[#863221]/70 hover:underline'
                           }`}
                           title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : `Click to ${st.status === 'Active' ? 'deactivate' : 'activate'}`}
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${st.status === 'Active' ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                           <span>{st.status}</span>
                         </button>
                         {/* Edit / Delete of a state are switched off for now (Karnataka and Kerala are the only states).
@@ -1064,7 +1063,7 @@ export default function LocationSetup() {
                             e.stopPropagation();
                             handleEditState(st);
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                           title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit State'}
                         >
                           <Pencil className="w-3.5 h-3.5" />
@@ -1077,7 +1076,7 @@ export default function LocationSetup() {
                             e.stopPropagation();
                             handleDeleteState(st);
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                           title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete State'}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1197,14 +1196,13 @@ export default function LocationSetup() {
                                     nextStatus: dist.status === 'Active' ? 'Inactive' : 'Active'
                                   })
                                 }
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                                className={`text-xs font-semibold cursor-pointer ${
                                   dist.status === 'Active'
-                                    ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+                                    ? 'text-[#3D705C] hover:underline'
+                                    : 'text-[#863221]/70 hover:underline'
                                 }`}
                                 title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : `Click to ${dist.status === 'Active' ? 'deactivate' : 'activate'}`}
                               >
-                                <span className={`w-1.5 h-1.5 rounded-full ${dist.status === 'Active' ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                                 <span>{dist.status}</span>
                               </button>
                             </td>
@@ -1214,7 +1212,7 @@ export default function LocationSetup() {
                                   type="button"
                                   onClick={() => handleOpenEditDistrict(dist)}
                                   disabled={!hasPermission('masters.location.write')}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                  className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                   title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit District'}
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
@@ -1224,7 +1222,7 @@ export default function LocationSetup() {
                                   type="button"
                                   onClick={() => setDeleteDialog({ type: 'district', item: dist })}
                                   disabled={!hasPermission('masters.location.delete')}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                  className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                   title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete District'}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -1347,14 +1345,13 @@ export default function LocationSetup() {
                                     nextStatus: tk.status === 'Active' ? 'Inactive' : 'Active'
                                   })
                                 }
-                                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer ${
+                                className={`text-xs font-semibold cursor-pointer ${
                                   tk.status === 'Active'
-                                    ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+                                    ? 'text-[#3D705C] hover:underline'
+                                    : 'text-[#863221]/70 hover:underline'
                                 }`}
                                 title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : `Click to ${tk.status === 'Active' ? 'deactivate' : 'activate'}`}
                               >
-                                <span className={`w-1.5 h-1.5 rounded-full ${tk.status === 'Active' ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                                 <span>{tk.status}</span>
                               </button>
                             </td>
@@ -1364,7 +1361,7 @@ export default function LocationSetup() {
                                   type="button"
                                   onClick={() => handleOpenEditTaluk(tk)}
                                   disabled={!hasPermission('masters.location.write')}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                  className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                   title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit Taluk'}
                                 >
                                   <Pencil className="w-3.5 h-3.5" />
@@ -1374,7 +1371,7 @@ export default function LocationSetup() {
                                   type="button"
                                   onClick={() => setDeleteDialog({ type: 'taluk', item: tk })}
                                   disabled={!hasPermission('masters.location.delete')}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                  className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                   title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete Taluk'}
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -1639,14 +1636,13 @@ export default function LocationSetup() {
                                   nextStatus: displayStatus === 'Active' ? 'Inactive' : 'Active'
                                 })
                               }
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+                              className={`text-xs font-semibold cursor-pointer ${
                                 displayStatus === 'Active'
-                                  ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+                                  ? 'text-[#3D705C] hover:underline'
+                                  : 'text-[#863221]/70 hover:underline'
                               }`}
                               title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : `Click to ${displayStatus === 'Active' ? 'deactivate' : 'activate'}`}
                             >
-                              <span className={`w-1.5 h-1.5 rounded-full ${displayStatus === 'Active' ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                               <span>{displayStatus}</span>
                             </button>
                           </td>
@@ -1656,7 +1652,7 @@ export default function LocationSetup() {
                                 type="button"
                                 onClick={() => handleOpenEditPostal(item)}
                                 disabled={!hasPermission('masters.location.write')}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                 title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit PIN Code Mapping'}
                               >
                                 <Pencil className="w-3.5 h-3.5" />
@@ -1666,7 +1662,7 @@ export default function LocationSetup() {
                                 type="button"
                                 onClick={() => setDeleteDialog({ type: 'postal', item })}
                                 disabled={!hasPermission('masters.location.delete')}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                 title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete PIN Code'}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />

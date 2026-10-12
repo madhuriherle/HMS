@@ -588,13 +588,12 @@ export default function MembershipTypeManagement() {
                           type="button"
                           disabled={!hasPermission('masters.membership_types.write')}
                           onClick={() => promptToggleStatus(item)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer ${isActive
-                            ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 border border-[#3D705C]/20'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
+                          className={`text-xs font-semibold cursor-pointer ${isActive
+                            ? 'text-[#3D705C] hover:underline'
+                            : 'text-[#863221]/70 hover:underline'
                             }`}
                           title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : `Click to set as ${isActive ? 'Inactive' : 'Active'}`}
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                           <span>{item.status}</span>
                         </button>
                       </td>
@@ -620,7 +619,7 @@ export default function MembershipTypeManagement() {
                           <button
                             onClick={() => openEditModal(item)}
                             disabled={!hasPermission('masters.membership_types.write')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : 'Edit Membership Type'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -631,7 +630,7 @@ export default function MembershipTypeManagement() {
                           <button
                             onClick={() => handleConfirmDelete(item)}
                             disabled={!hasPermission('masters.membership_types.delete')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             title={!hasPermission('masters.membership_types.delete') ? 'Requires masters.membership_types.delete permission' : 'Delete Membership Type'}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1228,7 +1227,6 @@ export default function MembershipTypeManagement() {
                   ? 'bg-[#3D705C]/10 text-[#3D705C] border border-[#3D705C]/20'
                   : 'bg-gray-100 text-gray-600 border border-gray-200'
                   }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${viewingItem.status === 'Active' ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                   {viewingItem.status}
                 </span>
               </div>

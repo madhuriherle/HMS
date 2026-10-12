@@ -632,14 +632,14 @@ export default function UserManagement() {
                       {/* User Name & Avatar */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-[#510601]/10 text-[#510601] border border-[#510601]/20 flex items-center justify-center text-xs font-bold shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-[#510601]/10 text-[#510601] flex items-center justify-center text-xs font-bold shrink-0">
                             {initials}
                           </div>
                           <div>
                             <p className="font-bold text-[#180200] leading-tight flex items-center gap-1.5">
                               <span>{displayName}</span>
                               {user.isCurrentAdmin && (
-                                <span className="px-1.5 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[9px] font-bold rounded">
+                                <span className="text-[10px] font-semibold text-[#863221]/70">
                                   You
                                 </span>
                               )}
@@ -661,16 +661,10 @@ export default function UserManagement() {
 
                       {/* Role */}
                       <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#510601]/5 text-[#510601] border border-[#510601]/20 rounded-lg text-xs font-semibold">
-                          <Shield className="w-3 h-3 text-[#863221]" />
-                          {roleObj ? roleObj.name : 'Unassigned'}
-                        </span>
+                        <span className="text-xs font-semibold text-[#510601]">{roleObj ? roleObj.name : 'Unassigned'}</span>
                         {rowRank != null && (
                           <span
-                            className={`ml-1.5 inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded border ${rowRank === 1
-                              ? 'bg-[#FFC107]/15 border-[#FFC107]/40 text-[#863221]'
-                              : 'bg-[#FAF7F2] border-[#E8DFD8] text-[#863221]'
-                            }`}
+                            className="ml-1.5 text-[10px] font-semibold text-[#863221]/70"
                             title={`Role rank ${rowRank} (1 = highest authority)`}
                           >
                             R{rowRank}
@@ -684,11 +678,11 @@ export default function UserManagement() {
                           type="button"
                           disabled={isRowLocked || !hasPermission('users.management.write')}
                           onClick={() => !isRowLocked && promptToggleStatus(user)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold transition-all ${isRowLocked
-                              ? 'bg-[#3D705C]/10 text-[#3D705C] border border-[#3D705C]/20 cursor-not-allowed opacity-80'
+                          className={`text-xs font-semibold ${isRowLocked
+                              ? 'text-[#3D705C] cursor-not-allowed opacity-80'
                               : isActive
-                                ? 'bg-[#3D705C]/10 text-[#3D705C] border border-[#3D705C]/20 hover:bg-[#3D705C]/20 cursor-pointer hover:opacity-80 active:scale-95'
-                                : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200 cursor-pointer hover:opacity-80 active:scale-95'
+                                ? 'text-[#3D705C] hover:underline cursor-pointer'
+                                : 'text-[#863221]/70 hover:underline cursor-pointer'
                             }`}
                           title={
                             !hasPermission('users.management.write')
@@ -700,7 +694,6 @@ export default function UserManagement() {
                                   : (isActive ? 'Click to deactivate user' : 'Click to activate user')
                           }
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                           {isActive ? 'Active' : 'Inactive'}
                         </button>
                       </td>
@@ -715,7 +708,7 @@ export default function UserManagement() {
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => setViewingUser(user)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer"
                             title="View User Details"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -738,7 +731,7 @@ export default function UserManagement() {
                             <button
                               disabled={isRankLocked || !hasPermission('users.management.delete')}
                               onClick={() => setDeleteTargetUser(user)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                               title={!hasPermission('users.management.delete') ? 'You need the users.management.delete permission' : 'Delete User'}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1259,7 +1252,6 @@ export default function UserManagement() {
                     ? 'bg-[#3D705C]/10 text-[#3D705C] border border-[#3D705C]/20'
                     : 'bg-gray-100 text-gray-600 border border-gray-200'
                   }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${isUserActive(viewingUser) ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                   {isUserActive(viewingUser) ? 'Active' : 'Inactive'}
                 </span>
               </div>

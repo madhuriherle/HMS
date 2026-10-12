@@ -188,7 +188,7 @@ export default function Approvals() {
                               onClick={() => approve(r)}
                               disabled={!hasPermission('approvals.write')}
                               title={!hasPermission('approvals.write') ? 'Requires approvals.write permission' : 'Approve'}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#3D705C] rounded-md hover:bg-[#3D705C]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
                               <span>Approve</span>
@@ -198,7 +198,7 @@ export default function Approvals() {
                               onClick={() => reject(r)}
                               disabled={!hasPermission('approvals.write')}
                               title={!hasPermission('approvals.write') ? 'Requires approvals.write permission' : 'Reject'}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <XCircle className="w-3.5 h-3.5" />
                               <span>Reject</span>

@@ -723,16 +723,15 @@ export default function RolesAndPrivileges() {
                           type="button"
                           disabled={isLocked || !hasPermission('roles.write')}
                           onClick={() => !isLocked && promptToggleStatus(role)}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold transition-all ${
+                          className={`text-xs font-semibold ${
                             isLocked
-                              ? 'bg-[#3D705C]/10 text-[#3D705C] cursor-not-allowed opacity-80'
+                              ? 'text-[#3D705C] cursor-not-allowed opacity-80'
                               : isActive
-                                ? 'bg-[#3D705C]/10 text-[#3D705C] hover:bg-[#3D705C]/20 cursor-pointer hover:opacity-80 active:scale-95'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 cursor-pointer hover:opacity-80 active:scale-95'
+                                ? 'text-[#3D705C] hover:underline cursor-pointer'
+                                : 'text-[#863221]/70 hover:underline cursor-pointer'
                           }`}
                           title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? 'System role is permanently Active' : isLocked ? 'Role is at or above your rank' : (isActive ? 'Click to deactivate role' : 'Click to activate role')}
                         >
-                          <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                           {isActive ? 'Active' : 'Inactive'}
                         </button>
                       </td>
@@ -742,7 +741,7 @@ export default function RolesAndPrivileges() {
                           <button
                             disabled={isSys}
                             onClick={() => !isSys && openPrivilegeModal(role)}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all ${isSys ? 'text-gray-300 border-transparent cursor-not-allowed opacity-40' : 'text-[#510601] bg-[#FAF7F2] hover:bg-[#F1E7DE] border-[#E8DFD8] cursor-pointer'}`}
+                            className={`inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold rounded-md transition-colors ${isSys ? 'text-gray-300 cursor-not-allowed opacity-40' : 'text-[#510601] hover:bg-[#510601]/10 cursor-pointer'}`}
                             title={isSys ? 'System role privileges are permanent and cannot be modified' : 'Configure Privileges'}
                           >
                             <ShieldCheck className="w-3.5 h-3.5" />
@@ -752,7 +751,7 @@ export default function RolesAndPrivileges() {
                           {/* View details (rank, description, privileges, dates) */}
                           <button
                             onClick={() => setViewingRole(role)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#510601] rounded-md hover:bg-[#510601]/10 transition-colors cursor-pointer"
                             title="View Details"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -775,7 +774,7 @@ export default function RolesAndPrivileges() {
                             <button
                               disabled={isLocked || !hasPermission('roles.delete')}
                               onClick={() => setDeleteTargetRole(role)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                              className="inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold text-[#8C1801] rounded-md hover:bg-[#8C1801]/10 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                               title={!hasPermission('roles.delete') ? 'You need the roles.delete permission' : 'Delete Role'}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -1373,7 +1372,6 @@ export default function RolesAndPrivileges() {
                   ? 'bg-[#3D705C]/10 text-[#3D705C] border border-[#3D705C]/20'
                   : 'bg-gray-100 text-gray-600 border border-gray-200'
                   }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${isRoleActive(viewingRole) ? 'bg-[#3D705C]' : 'bg-gray-400'}`} />
                   {isRoleActive(viewingRole) ? 'Active' : 'Inactive'}
                 </span>
               </div>
