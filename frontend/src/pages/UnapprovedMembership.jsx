@@ -44,7 +44,8 @@ import {
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 
-export default function UnapprovedMembership() {
+// assignedOnly: the final-approval queue (members whose receipt is already assigned)
+export default function UnapprovedMembership({ assignedOnly = false }) {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
 
@@ -90,7 +91,7 @@ export default function UnapprovedMembership() {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [stateFilter, setStateFilter] = useState('ALL');
   const [districtFilter, setDistrictFilter] = useState('ALL');
-  const [receiptStatusFilter, setReceiptStatusFilter] = useState('ALL');
+  const [receiptStatusFilter, setReceiptStatusFilter] = useState(assignedOnly ? 'Assigned' : 'ALL');
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -298,7 +299,7 @@ export default function UnapprovedMembership() {
       {/* ---------------------------------------------------- */}
       <SearchFilterBar
         
-        title={<h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Unapproved Membership</h1>}
+        title={<h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">{assignedOnly ? 'Assigned for Approval' : 'Unapproved Membership'}</h1>}
         searchQuery={searchQuery}
         onSearchChange={(val) => {
           setSearchQuery(val);
@@ -338,8 +339,8 @@ export default function UnapprovedMembership() {
           widthClass="w-full sm:w-48"
         />
 
-        {/* 2. Receipt Status */}
-        <FilterSelect
+        {/* 2. Receipt Status (the Assigned queue is already limited to assigned receipts) */}
+        {!assignedOnly && <FilterSelect
           value={receiptStatusFilter}
           onChange={(val) => {
             setReceiptStatusFilter(val);
@@ -351,7 +352,7 @@ export default function UnapprovedMembership() {
             { value: 'Assigned', label: 'Assigned' }
           ]}
           widthClass="w-full sm:w-40"
-        />
+        />}
 
         {/* 3. State */}
         <FilterSelect
@@ -535,7 +536,7 @@ export default function UnapprovedMembership() {
                           {/* 2. View Action */}
                           <button
                             type="button"
-                            onClick={() => setViewingMember(m)}
+                            onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer shrink-0"
                             title="View Full Application"
                           >
@@ -645,11 +646,8 @@ export default function UnapprovedMembership() {
         )}
       </div>
 
-      {/* ==================================================== */}
-      {/* MODAL 1: VIEW UNAPPROVED MEMBER DETAILS MODAL        */}
-      {/* ==================================================== */}
-      <Modal isOpen={Boolean(viewingMember)} onClose={() => setViewingMember(null)}>
-        {viewingMember && (
+      {/* View Application is rendered on dedicated full-screen page /dashboard/membership/profile/:id */}
+      {false && viewingMember && (
           <div
             className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
@@ -855,8 +853,7 @@ export default function UnapprovedMembership() {
               </div>
             </div>
           </div>
-        )}
-      </Modal>
+      )}
 
       {/* ==================================================== */}
       {/* MODAL 2: RECEIPT VALIDATION BLOCK ALERT MODAL        */}

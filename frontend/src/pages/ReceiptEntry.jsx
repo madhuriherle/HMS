@@ -79,7 +79,7 @@ const toEntryMember = (m, loc) => {
   const created = m.created_at ? String(m.created_at) : '';
   return {
     id: m.id,
-    registrationNumber: `REG-${new Date(created || Date.now()).getFullYear()}-${String(m.id).padStart(4, '0')}`,
+    registrationNumber: String(m.id),
     membershipNumber: m.member_code || '',
     fullName,
     name: fullName,
@@ -1118,9 +1118,8 @@ export default function ReceiptEntry() {
     <PermissionGate required="receipts.entry.read">
     <div className="space-y-6 pb-16 font-sans">
 
-      {/* View Member Profile Details Modal */}
-      <Modal isOpen={Boolean(viewingMember)} onClose={() => setViewingMember(null)}>
-        {viewingMember && (() => {
+      {/* Member Profile is viewed on dedicated full-screen page /dashboard/membership/profile/:id */}
+      {false && viewingMember && (() => {
           const matchedReceipt = findMatchingReceiptForMember(viewingMember);
           const receiptNo = matchedReceipt?.receiptNumber || viewingMember.assignedReceiptNumber || viewingMember.receiptNumber || viewingMember.transactionId || '—';
           const receiptDate = matchedReceipt?.receiptDate ? formatDate(matchedReceipt.receiptDate) : (viewingMember.receiptDate ? formatDate(viewingMember.receiptDate) : (viewingMember.transactionDate ? formatDate(viewingMember.transactionDate) : '—'));
@@ -1321,7 +1320,6 @@ export default function ReceiptEntry() {
             </div>
           );
         })()}
-      </Modal>
 
 
       {/* ------------------------------------------------------------ */}
@@ -2582,7 +2580,7 @@ export default function ReceiptEntry() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#E8DFD8] bg-[#FAF7F2] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                  <th className="py-3.5 px-4 whitespace-nowrap">Applicant Name & Reg No.</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Applicant Name & MID</th>
                   <th className="py-3.5 px-4 whitespace-nowrap">Contact Number</th>
                   <th className="py-3.5 px-4 whitespace-nowrap">District / Location</th>
                   <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
@@ -2623,7 +2621,7 @@ export default function ReceiptEntry() {
                             {member.fullName || member.name}
                           </div>
                           <div className="font-mono text-[11px] text-[#510601] mt-0.5">
-                            Reg No: #{member.registrationNumber || member.id || '—'}
+                            MID: #{member.registrationNumber || member.id || '—'}
                           </div>
                         </td>
 
@@ -2660,7 +2658,7 @@ export default function ReceiptEntry() {
 
                             <button
                               type="button"
-                              onClick={() => setViewingMember(member)}
+                              onClick={() => navigate(`/dashboard/membership/profile/${member.id}`)}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer"
                               title="View full applicant registration profile"
                             >

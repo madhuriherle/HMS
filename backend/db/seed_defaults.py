@@ -294,6 +294,8 @@ MENU_PAGE_CATALOG = [
     ("members.list", "Membership List", "members", "/dashboard/membership/list", "list", 1, "members.list.read", None),
     ("members.unapproved", "Unapproved Members", "members", "/dashboard/membership/unapproved", "user-check", 2, "members.unapproved.read", None),
     ("members.register", "Register New Member", "members", "/dashboard/membership/register", "user-plus", 3, "members.register.write", None),
+    # Final-approval queue: unapproved members who already have a receipt assigned (same privilege as Unapproved Members).
+    ("members.assigned", "Assigned for Approval", "members", "/dashboard/membership/assigned", "check-circle", 4, "members.unapproved.read", None),
     ("receipts.entry", "Receipt Entry", "receipts", "/dashboard/receipts/entry", "file-plus", 1, "receipts.entry.read", None),
     ("receipts.tracking", "Receipt Tracking", "receipts", "/dashboard/receipts/tracking", "search", 2, "receipts.tracking.read", None),
     ("users.modules", "Modules", "users", "/dashboard/users/modules", "layout-grid", 4, None, 1),

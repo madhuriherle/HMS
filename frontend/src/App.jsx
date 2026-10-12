@@ -58,10 +58,11 @@ function App() {
           {/* Membership Module Routes */}
           <Route path="membership/list" element={<MembershipList />} />
           <Route path="membership/unapproved" element={<UnapprovedMembership />} />
+          <Route path="membership/assigned" element={<UnapprovedMembership assignedOnly />} />
           <Route path="membership/register" element={<RegisterNewMember />} />
           <Route path="membership/add" element={<RegisterNewMember />} />
           <Route path="membership/edit/:id" element={<RegisterNewMember />} />
-          <Route path="membership/view/:id" element={<RegisterNewMember />} />
+          <Route path="membership/view/:id" element={<MemberProfile />} />
           <Route path="membership/profile/:id" element={<MemberProfile />} />
           <Route path="membership" element={<Navigate to="/dashboard/membership/list" replace />} />
           <Route path="members" element={<Navigate to="/dashboard/membership/list" replace />} />

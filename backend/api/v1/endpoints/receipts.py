@@ -654,7 +654,7 @@ def _member_card(db: Session, member: Member, today: date) -> dict:
         "name": " ".join(p for p in (member.name_title, member.first_name_en, member.middle_name_en, member.last_name_en) if p),
         "member_code": member.member_code,
         "membership_number": membership.membership_number if membership else None,
-        "registration_number": f"REG-{year}-{member.id:04d}",
+        "registration_number": str(member.id),
         "membership_type": mtype.name_en if mtype else None,
         "mobile": member.mobile,
         "district": district,
@@ -806,7 +806,7 @@ def lookup_member_for_receipt(
     import re
 
     raw = (number or "").strip()
-    if len(raw) < 3:
+    if len(raw) < 3 and not raw.isdigit():
         return {"number": raw, "found": False, "matches": []}
 
     ids: list = []
@@ -825,6 +825,8 @@ def lookup_member_for_receipt(
         .filter(live, MemberMembership.is_deleted == False, func.upper(MemberMembership.membership_number) == upper)  # noqa: E712
         .limit(5)
     )
+    if raw.isdigit() and len(raw) <= 9:  # the plain MID (the member's id)
+        add(db.query(Member.id).filter(live, Member.id == int(raw)).limit(1))
     reg = re.fullmatch(r"REG-(\d{4})-(\d+)", raw, flags=re.IGNORECASE)
     if reg:
         add(

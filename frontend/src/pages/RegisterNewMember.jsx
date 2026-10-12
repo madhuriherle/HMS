@@ -256,7 +256,7 @@ export default function RegisterNewMember() {
         setTargetMember({
           id: m.id,
           fullName: [m.name_title, m.first_name_en, m.middle_name_en, m.last_name_en].filter(Boolean).join(' '),
-          registrationNumber: `REG-${new Date(m.created_at || Date.now()).getFullYear()}-${String(m.id).padStart(4, '0')}`,
+          registrationNumber: String(m.id),
           membershipNumber: m.member_code || membership?.membership_number || '',
           approvalStatus: approved ? 'Approved' : 'Unapproved',
           status: approved ? 'Approved' : 'Unapproved',
@@ -979,8 +979,8 @@ export default function RegisterNewMember() {
             <h1 className="text-xl sm:text-2xl font-extrabold text-[#180200] tracking-tight flex items-center gap-3">
               <span>{isViewMode ? 'View Member Details' : isEditMode ? 'Edit Member Details' : 'Register New Member'}</span>
               {(isViewMode || isEditMode) && targetMember?.registrationNumber && (
-                <span className="font-mono text-sm font-bold bg-[#FAF7F2] text-[#510601] px-3 py-1 rounded-xl border border-[#E8DFD8]" title="Registration Number">
-                  {targetMember.registrationNumber}
+                <span className="font-mono text-sm font-bold bg-[#FAF7F2] text-[#510601] px-3 py-1 rounded-xl border border-[#E8DFD8]" title="MID (member id)">
+                  MID {targetMember.registrationNumber}
                 </span>
               )}
               {(isViewMode || isEditMode) && targetMember?.membershipNumber && targetMember.membershipNumber !== 'Not Assigned' && targetMember.approvalStatus === 'Approved' && (

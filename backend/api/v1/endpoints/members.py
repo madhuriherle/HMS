@@ -514,7 +514,7 @@ def lookup_member(
     """Lookup a member by code, membership number, registration number, or mobile number."""
     import re
     raw = (number or "").strip()
-    if len(raw) < 3:
+    if len(raw) < 3 and not raw.isdigit():
         return {"number": raw, "found": False, "matches": [], "member": None}
 
     ids: list = []
@@ -533,6 +533,8 @@ def lookup_member(
         .filter(live, MemberMembership.is_deleted == False, func.upper(MemberMembership.membership_number) == upper)  # noqa: E712
         .limit(5)
     )
+    if raw.isdigit() and len(raw) <= 9:  # the plain MID (the member's id)
+        add(db.query(Member.id).filter(live, Member.id == int(raw)).limit(1))
     reg = re.fullmatch(r"REG-(\d{4})-(\d+)", raw, flags=re.IGNORECASE)
     if reg:
         add(

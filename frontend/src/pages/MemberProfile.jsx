@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Pencil, User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin } from 'lucide-react';
+import { ArrowLeft, Pencil, User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Award, TrendingUp } from 'lucide-react';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
@@ -201,15 +201,97 @@ export default function MemberProfile() {
               </div>
             </div>
 
+            {/* Milestone & Credit Banner if applicable */}
+            {profile.membership_credit && (
+              <div className="bg-gradient-to-br from-[#FAF7F2] to-white rounded-2xl p-5 border border-[#510601]/20 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-[#510601] text-white">
+                      <TrendingUp className="w-4 h-4" />
+                    </div>
+                    <span className="font-bold text-xs uppercase tracking-wider text-[#510601]">
+                      Cumulative Membership Milestone & Credit
+                    </span>
+                  </div>
+                  {profile.membership_credit.upgrade_pending && (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                      Eligible for Upgrade
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                  <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
+                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Total Credit</span>
+                    <p className="font-mono font-bold text-base text-[#510601] mt-0.5">
+                      {inr(profile.membership_credit.credit_total)}
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
+                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Current / Qualified Tier</span>
+                    <p className="font-bold text-sm text-[#180200] mt-0.5 flex items-center gap-1">
+                      <Award className="w-3.5 h-3.5 text-[#510601] shrink-0" />
+                      <span>{profile.membership_credit.qualified_type?.name_en || profile.membership_credit.current_type?.name_en || 'Basic'}</span>
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
+                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Next Milestone</span>
+                    <p className="font-bold text-xs text-[#180200] mt-0.5">
+                      {profile.membership_credit.next_type ? (
+                        <span>{profile.membership_credit.next_type.name_en} ({inr(profile.membership_credit.next_type.price)})</span>
+                      ) : (
+                        <span className="text-emerald-700 font-semibold">Highest Tier Achieved</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
+                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Remaining to Next</span>
+                    <p className="font-mono font-bold text-sm text-[#863221] mt-0.5">
+                      {profile.membership_credit.amount_to_next_type ? inr(profile.membership_credit.amount_to_next_type) : '₹0'}
+                    </p>
+                  </div>
+                </div>
+
+                {profile.membership_credit.next_type && (
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between text-[10px] text-[#863221]">
+                      <span>Progress to {profile.membership_credit.next_type.name_en}</span>
+                      <span className="font-mono font-semibold">
+                        {Math.min(100, Math.round((profile.membership_credit.credit_total / profile.membership_credit.next_type.price) * 100))}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-[#510601] h-1.5 rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(100, (profile.membership_credit.credit_total / profile.membership_credit.next_type.price) * 100)}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <Card icon={User} title="Personal details">
                 <div className="grid grid-cols-2 gap-4">
                   <Field label="Gender" value={p.gender} />
                   <Field label="Date of birth" value={p.date_of_birth ? formatDate(p.date_of_birth) : ''} />
                   <Field label="Blood group" value={p.blood_group} />
-                  <Field label="Email" value={p.email} />
+                  <Field label="Gothra" value={p.gothra} />
+                  <Field label="Marital Status" value={p.marital_status} />
+                  <Field label="Qualification" value={p.qualification} />
                   <Field label="Occupation" value={p.occupation} />
-                  <Field label="Address" value={[p.address_line1, p.address_line2, p.locality, p.city, p.post, p.pincode].filter(Boolean).join(', ')} />
+                  <Field label="Native Place" value={p.native_place} />
+                  <Field label="Mobile" value={p.mobile} />
+                  <Field label="Alternate Phone" value={p.phone} />
+                  <Field label="Email" value={p.email} />
+                  <Field label="PAN Number" value={p.pan_number} />
+                  <Field label="Aadhaar Number" value={p.aadhaar_number} />
+                  <div className="col-span-2">
+                    <Field label="Address" value={[p.address_line1, p.address_line2, p.locality, p.city, p.post, p.pincode].filter(Boolean).join(', ')} />
+                  </div>
                 </div>
               </Card>
 

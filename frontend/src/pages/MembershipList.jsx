@@ -936,21 +936,12 @@ export default function MembershipList() {
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
-                            onClick={() => setViewingMember(m)}
+                            onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg hover:bg-[#F1E7DE] transition-colors cursor-pointer"
-                            title="View Full Profile"
+                            title="View Member Profile"
                           >
                             <Eye className="w-3.5 h-3.5" />
                             <span>View</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-[#FAF7F2] transition-colors cursor-pointer"
-                            title="Open the full member profile page"
-                          >
-                            <User className="w-3.5 h-3.5" />
-                            <span>Profile</span>
                           </button>
                           <button
                             type="button"
@@ -1043,11 +1034,8 @@ export default function MembershipList() {
         )}
       </div>
 
-      {/* ==================================================== */}
-      {/* MODAL 2: VIEW MEMBER PROFILE MODAL                   */}
-      {/* ==================================================== */}
-      <Modal isOpen={Boolean(viewingMember)} onClose={() => setViewingMember(null)}>
-        {viewingMember && (
+      {/* View Member Profile is handled on dedicated full-screen page /dashboard/membership/profile/:id */}
+      {false && viewingMember && (
           <div
             className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
@@ -1432,8 +1420,7 @@ export default function MembershipList() {
               </div>
             </div>
           </div>
-        )}
-      </Modal>
+      )}
 
       {/* ==================================================== */}
       {/* MODAL 3: LABEL PREVIEW & PRINT INTERFACE             */}

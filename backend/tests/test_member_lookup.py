@@ -119,3 +119,12 @@ def test_lookup_falls_back_to_name_and_partial_mobile(client, admin_headers):
     assert mid in [m["id"] for m in fuzzy["matches"]]
     none = client.get(f"{API}/receipts/member-lookup", headers=h, params={"number": "Qzxqzx"}).json()
     assert none["found"] is False
+
+
+def test_lookup_by_plain_member_id(client, admin_headers):
+    h = admin_headers
+    m = client.post(f"{API}/members/", headers=h, json=_payload(_sfx())).json()
+    for typed in (str(m["id"]), f" {m['id']} "):
+        r = _lookup(client, h, typed)
+        assert r["found"] and r["matches"][0]["id"] == m["id"], typed
+        assert r["matches"][0]["registration_number"] == str(m["id"])
