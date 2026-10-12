@@ -76,3 +76,26 @@ def test_one_receipt_many_particular_lines(client, admin_headers):
     row = next(x for x in client.get(f"{API}/receipts/tracking", headers=h, params={"limit": 500}).json()["data"]
                if x["id"] == ok.json()["id"])
     assert row["items_count"] == 2
+
+
+def test_pdf_day_book_and_duplicate_check(client, admin_headers):
+    h = admin_headers
+    r = client.post(f"{API}/receipts/", headers=h, json=_entry_payload(None, "Pdf Payer", receipt_date="2018-05-05", net_amount=730, gross_amount=730,
+                                                                    items=[{"item_type": "OTHER", "particular_name": "Hostel deposit", "amount": 500},
+                                                                           {"item_type": "DONATION", "particular_name": "Building donation", "amount": 230}]))
+    assert r.status_code == 201, r.text
+    pdf = client.get(f"{API}/receipts/{r.json()['id']}/pdf", headers=h)
+    assert pdf.status_code == 200 and pdf.headers["content-type"] == "application/pdf" and pdf.content[:5] == b"%PDF-"
+
+    book = client.get(f"{API}/receipts/day-book", headers=h, params={"from_date": "2018-05-05"}).json()
+    assert book["total"] == 730 and book["receipt_count"] == 1
+    assert {p["particular"]: p["amount"] for p in book["by_particular"]} == {"Hostel deposit": 500, "Building donation": 230}
+
+    dup = client.get(f"{API}/receipts/duplicate-check", headers=h, params={"payer_name": " pdf payer ", "net_amount": 730, "date": "2018-05-05"}).json()
+    assert len(dup["matches"]) == 1
+    none = client.get(f"{API}/receipts/duplicate-check", headers=h, params={"payer_name": "Pdf Payer", "net_amount": 731, "date": "2018-05-05"}).json()
+    assert none["matches"] == []
+
+    from services.receipt_pdf import amount_in_words
+    assert amount_in_words(8230) == "Eight Thousand Two Hundred and Thirty Rupees Only"
+    assert amount_in_words(100000) == "One Lakh Rupees Only"

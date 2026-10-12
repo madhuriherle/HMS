@@ -37,6 +37,7 @@ import useAuth from '../hooks/useAuth';
 import api from '../api';
 import { notify } from '../utils/notify';
 import { apiErrorMessage } from '../utils/apiError';
+import { confirmYesNo } from '../utils/dialogs';
 import { formatDate, formatDateTime, getTodayISODate } from '../utils/dateUtils';
 import { receiptToApiPayload } from '../utils/apiAdapters';
 import { formatPaymentModeLabel } from '../utils/displayHelpers';
@@ -165,6 +166,7 @@ export default function ReceiptEntry() {
   const [paymentModeConfigs, setPaymentModeConfigs] = useState([]);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [], postalCodes: [] });
   const [saving, setSaving] = useState(false);
+  const saveMode = useRef('go'); // 'go' (to Receipt Tracking) | 'new' (stay for the next receipt) | 'print'
 
   const lookupLocationByPin = (pin) => findLocationByPin(locations.postalCodes, pin);
 
@@ -887,6 +889,26 @@ export default function ReceiptEntry() {
 
     setSaving(true);
     try {
+      // Same payee + amount + date already on file? Ask before saving a likely repeat.
+      try {
+        const { data: dup } = await api.get('/receipts/duplicate-check', {
+          params: { payer_name: payload.name, net_amount: receiptTotal, date: payload.receiptDate }
+        });
+        if (dup?.matches?.length) {
+          const ok = await confirmYesNo({
+            title: 'Looks like a repeat',
+            text: `Receipt ${dup.matches.map((m) => m.receipt_number).join(', ')} already has the same name, amount and date. Save this one too?`,
+            confirmText: 'Yes, save anyway',
+            danger: true
+          });
+          if (!ok) {
+            setSaving(false);
+            return;
+          }
+        }
+      } catch (_) {
+        /* the check is only a helper; the server still validates on save */
+      }
       const { data } = await api.post('/receipts/', receiptToApiPayload(payload, linked));
       const receiptNo = data?.receipt_number || payload.receiptNumber;
       const memberDisplayName = linked ? linked.fullName || linked.name : formData.name;
@@ -898,6 +920,22 @@ export default function ReceiptEntry() {
       } else if (entrySource === 'membership-assignment') {
         showToast(`Receipt #${receiptNo} successfully linked to member "${memberDisplayName}"!`, 'success');
         handleClearForm();
+        await reloadData();
+      } else if (saveMode.current === 'new' || saveMode.current === 'print') {
+        if (saveMode.current === 'print' && data?.id) {
+          try {
+            const pdf = await api.get(`/receipts/${data.id}/pdf`, { responseType: 'blob' });
+            window.open(URL.createObjectURL(pdf.data), '_blank');
+          } catch (_) {
+            showToast('Saved, but the receipt PDF could not be opened.', 'error');
+          }
+        }
+        showToast(`Receipt #${receiptNo} saved. Ready for the next one.`, 'success');
+        // keep the date and payment details for the next receipt of the batch
+        const keep = { receiptDate: formData.receiptDate, paymentMode: formData.paymentMode, bankAccount: formData.bankAccount };
+        handleClearForm();
+        setFormData((prev) => ({ ...prev, ...keep }));
+        loadReceiptDefaults(keep.receiptDate, { keepDate: true });
         await reloadData();
       } else {
         showToast(`Receipt #${receiptNo} saved successfully! Navigating to Receipt Tracking...`, 'success');
@@ -1262,7 +1300,25 @@ export default function ReceiptEntry() {
             </div>
 
             {/* Form Fields */}
-            <form onSubmit={handleSaveReceipt} className="p-4 sm:p-5 space-y-3.5">
+            <form
+              onSubmit={handleSaveReceipt}
+              onKeyDown={(e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                  e.preventDefault();
+                  saveMode.current = 'new';
+                  e.currentTarget.requestSubmit();
+                  return;
+                }
+                const t = e.target;
+                if (e.key === 'Enter' && t.tagName === 'INPUT' && t.type !== 'submit' && t.type !== 'checkbox') {
+                  e.preventDefault();
+                  const fields = [...e.currentTarget.querySelectorAll('input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled])')];
+                  const next = fields[fields.indexOf(t) + 1];
+                  if (next) next.focus();
+                }
+              }}
+              className="p-4 sm:p-5 space-y-3.5"
+            >
 
               {/* FLOW 2 MEMBERSHIP DETAILS SECTION INSIDE FORM (When selected from Right Membership List) */}
               {entrySource === 'membership-assignment' && selectedMember && (
@@ -1886,8 +1942,32 @@ export default function ReceiptEntry() {
                   <span>Clear</span>
                 </button>
 
+                {entrySource === 'normal' && (
+                  <>
+                    <button
+                      type="submit"
+                      onClick={() => { saveMode.current = 'print'; }}
+                      disabled={saving || !hasPermission('receipts.entry.write')}
+                      title="Save, open the printable receipt, and start the next one (Ctrl+S saves and starts the next)"
+                      className="disabled:opacity-50 px-4 py-2 rounded-xl border border-[#510601] text-[#510601] bg-white hover:bg-[#FAF7F2] text-xs sm:text-sm font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Save &amp; Print</span>
+                    </button>
+                    <button
+                      type="submit"
+                      onClick={() => { saveMode.current = 'new'; }}
+                      disabled={saving || !hasPermission('receipts.entry.write')}
+                      title="Save and stay here for the next receipt, keeping the date and payment mode"
+                      className="disabled:opacity-50 px-4 py-2 rounded-xl border border-[#510601] text-[#510601] bg-white hover:bg-[#FAF7F2] text-xs sm:text-sm font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <span>Save &amp; New</span>
+                    </button>
+                  </>
+                )}
                 <button
                   type="submit"
+                  onClick={() => { saveMode.current = 'go'; }}
                   disabled={saving || !hasPermission('receipts.entry.write')}
                   title={!hasPermission('receipts.entry.write') ? 'Requires receipts.entry.write permission' : undefined}
                   className="disabled:opacity-50 px-5 py-2 rounded-xl bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"

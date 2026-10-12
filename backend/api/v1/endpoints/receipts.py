@@ -680,6 +680,108 @@ def next_receipt_number(
     }
 
 
+@router.get("/duplicate-check")
+def duplicate_check(
+    payer_name: str,
+    net_amount: float,
+    date: date,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Receipt Entry asks this before saving: same payee + amount + date already on file?"""
+    rows = (
+        db.query(Receipt)
+        .filter(
+            Receipt.is_deleted == False,  # noqa: E712
+            Receipt.payment_status != "CANCELLED",
+            func.lower(func.trim(Receipt.payer_name)) == payer_name.strip().lower(),
+            Receipt.net_amount == net_amount,
+            Receipt.receipt_date == date,
+        )
+        .order_by(Receipt.id.desc())
+        .limit(5)
+        .all()
+    )
+    return {"matches": [{"id": r.id, "receipt_number": r.receipt_number, "payment_mode": r.payment_mode} for r in rows]}
+
+
+@router.get("/day-book")
+def day_book(
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Collection summary for a day (default today) or a range: by payment mode and by particular."""
+    start = from_date or date.today()
+    end = to_date or start
+    base = [
+        Receipt.is_deleted == False,  # noqa: E712
+        Receipt.payment_status != "CANCELLED",
+        Receipt.receipt_date >= start,
+        Receipt.receipt_date <= end,
+    ]
+    by_mode = [
+        {"payment_mode": m, "count": c, "amount": float(a or 0)}
+        for m, c, a in db.query(Receipt.payment_mode, func.count(), func.sum(Receipt.net_amount))
+        .filter(*base).group_by(Receipt.payment_mode).order_by(Receipt.payment_mode)
+    ]
+    label = func.coalesce(ReceiptItem.particular_name, ReceiptItem.item_type)
+    by_particular = [
+        {"particular": name or "Other", "amount": float(a or 0)}
+        for name, a in db.query(label, func.sum(ReceiptItem.amount))
+        .join(Receipt, Receipt.id == ReceiptItem.receipt_id)
+        .filter(*base, ReceiptItem.is_deleted == False)  # noqa: E712
+        .group_by(label)
+        .order_by(func.sum(ReceiptItem.amount).desc())
+    ]
+    return {
+        "from_date": start, "to_date": end,
+        "receipt_count": sum(m["count"] for m in by_mode),
+        "total": round(sum(m["amount"] for m in by_mode), 2),
+        "by_payment_mode": by_mode,
+        "by_particular": by_particular,
+    }
+
+
+@router.get("/{id}/pdf")
+def receipt_pdf(
+    id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Printable receipt as a PDF (organisation header, particular lines, amount in words)."""
+    from fastapi.responses import Response
+    from models.system import OrganisationSettings
+    from services.receipt_pdf import build_receipt_pdf
+
+    receipt = crud_receipts.receipt.get(db, id)
+    if not receipt:
+        raise HTTPException(404, "Receipt not found")
+    items = (
+        db.query(ReceiptItem)
+        .filter(ReceiptItem.receipt_id == id, ReceiptItem.is_deleted == False)  # noqa: E712
+        .order_by(ReceiptItem.line_no, ReceiptItem.id).all()
+    )
+    lines = [
+        {"particular": i.particular_name or i.item_type.replace("_", " ").title(), "description": i.description, "amount": float(i.amount)}
+        for i in items
+    ] or [{"particular": receipt.receipt_type.replace("_", " ").title(), "description": None, "amount": float(receipt.net_amount)}]
+    payee = []
+    alloc = (
+        db.query(ReceiptAllocation, Member)
+        .join(Member, Member.id == ReceiptAllocation.member_id)
+        .filter(ReceiptAllocation.receipt_id == id, ReceiptAllocation.is_deleted == False)  # noqa: E712
+        .first()
+    )
+    if alloc and alloc[1].member_code:
+        payee.append(f"Member ID: {alloc[1].member_code}")
+    org = db.query(OrganisationSettings).first()
+    pdf = build_receipt_pdf(receipt, lines, org, payee)
+    safe = receipt.receipt_number.replace("/", "-")
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="receipt-{safe}.pdf"'})
+
+
 @router.get("/member-lookup")
 def lookup_member_for_receipt(
     number: str,

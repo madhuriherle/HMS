@@ -38,6 +38,17 @@ import { askForm, askReason, confirmYesNo } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import { fetchReceipts, normalizeReceipt, receiptToApiPayload } from '../utils/apiAdapters';
 
+// Financial year (April-March) of an ISO date: 2026-10-12 -> 2026-27
+const fyOf = (iso) => {
+  if (!iso || String(iso).length < 7) return '';
+  const y = Number(String(iso).slice(0, 4));
+  const m = Number(String(iso).slice(5, 7));
+  const start = m >= 4 ? y : y - 1;
+  return `${start}-${String(start + 1).slice(-2)}`;
+};
+
+const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+
 // Helper to format currency in Indian Rupees
 const formatINR = (amount) => {
   return new Intl.NumberFormat('en-IN', {
@@ -77,6 +88,12 @@ export default function ReceiptTracking() {
   const [searchQuery, setSearchQuery] = useState('');
   const [particularsFilter, setParticularsFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, Assigned, Unassigned
+  const [fyFilter, setFyFilter] = useState('ALL');
+  const [modeFilter, setModeFilter] = useState('ALL');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [dayBook, setDayBook] = useState(null); // { date, data }
 
   // Modals State
   const [viewingReceipt, setViewingReceipt] = useState(null);
@@ -162,6 +179,11 @@ export default function ReceiptTracking() {
       }
 
       // 3. Status Filter (Assigned vs Unassigned)
+      if (fyFilter !== 'ALL' && fyOf(r.receiptDate) !== fyFilter) return false;
+      if (modeFilter !== 'ALL' && (r.paymentMode || '').toLowerCase() !== modeFilter.toLowerCase()) return false;
+      if (fromDate && String(r.receiptDate || '') < fromDate) return false;
+      if (toDate && String(r.receiptDate || '') > toDate) return false;
+
       if (statusFilter === 'Assigned' && isUnmapped) {
         return false;
       }
@@ -171,7 +193,113 @@ export default function ReceiptTracking() {
 
       return true;
     });
-  }, [receipts, searchQuery, particularsFilter, statusFilter]);
+  }, [receipts, searchQuery, particularsFilter, statusFilter, fyFilter, modeFilter, fromDate, toDate]);
+
+  const fyOptions = useMemo(
+    () => [...new Set(receipts.map((r) => fyOf(r.receiptDate)).filter(Boolean))].sort().reverse(),
+    [receipts]
+  );
+  const modeOptions = useMemo(
+    () => [...new Set(receipts.map((r) => r.paymentMode).filter(Boolean))].sort(),
+    [receipts]
+  );
+  const unassignedVisible = useMemo(
+    () => filteredReceipts.filter((r) => isReceiptUnmapped(r)),
+    [filteredReceipts]
+  );
+
+  // ----------------------------------------------------
+  // PRINT, EXPORT, DAY BOOK, BULK MAP
+  // ----------------------------------------------------
+  const openReceiptPdf = async (receipt) => {
+    try {
+      const { data } = await api.get(`/receipts/${receipt.id}/pdf`, { responseType: 'blob' });
+      window.open(URL.createObjectURL(data), '_blank');
+    } catch (error) {
+      showToast(apiErrorMessage(error, 'Could not open the receipt PDF.'), 'error');
+    }
+  };
+
+  const exportVisibleReceipts = () => {
+    const head = ['Receipt No', 'Date', 'Financial Year', 'Name', 'Mobile', 'Particulars', 'Amount', 'Payment Mode', 'Reference', 'Status'];
+    const rows = filteredReceipts.map((r) => [
+      r.receiptNumber,
+      r.receiptDate,
+      fyOf(r.receiptDate),
+      r.name,
+      r.mobile,
+      r.items?.length > 1 ? r.items.map((i) => `${i.particular} ${i.amount}`).join('; ') : r.particulars,
+      r.amount,
+      r.paymentMode,
+      r.transactionId,
+      isReceiptUnmapped(r) ? 'Unassigned' : 'Assigned'
+    ]);
+    const csv = [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `receipts-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    showToast(`Exported ${rows.length} receipt(s).`);
+  };
+
+  const loadDayBook = async (date) => {
+    try {
+      const { data } = await api.get('/receipts/day-book', { params: { from_date: date, to_date: date } });
+      setDayBook({ date, data });
+    } catch (error) {
+      showToast(apiErrorMessage(error, 'Could not load the day book.'), 'error');
+    }
+  };
+
+  const toggleSelected = (id) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const handleBulkMap = async () => {
+    const chosen = receipts.filter((r) => selectedIds.has(r.id));
+    if (!chosen.length) return;
+    const total = chosen.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+    const v = await askForm({
+      title: `Map ${chosen.length} receipt(s) (${formatINR(total)}) to one member`,
+      confirmText: 'Map receipts',
+      fields: [
+        {
+          name: 'memberId',
+          label: 'Member',
+          type: 'select',
+          required: true,
+          options: members.map((m) => ({
+            value: m.id,
+            label: `${m.name || m.first_name_en || ''} (${m.member_code || `#${m.id}`})`
+          }))
+        }
+      ]
+    });
+    if (!v) return;
+    let done = 0;
+    const failed = [];
+    for (const r of chosen) {
+      try {
+        await api.post(
+          `/receipts/${r.id}/allocate`,
+          { member_id: Number(v.memberId), allocated_amount: r.amount },
+          { params: { reason: 'Bulk mapping from Receipt Tracking' } }
+        );
+        done += 1;
+      } catch (error) {
+        failed.push(`#${r.receiptNumber}: ${apiErrorMessage(error, 'failed')}`);
+      }
+    }
+    setSelectedIds(new Set());
+    await reloadData();
+    if (failed.length) showToast(`Mapped ${done}. Failed: ${failed.join(' | ')}`, 'error');
+    else showToast(`Mapped ${done} receipt(s) to the member.`);
+  };
 
   // ----------------------------------------------------
   // ACTION HANDLERS
@@ -466,14 +594,70 @@ export default function ReceiptTracking() {
         onSearchChange={(val) => setSearchQuery(val)}
         activeFiltersCount={
           (particularsFilter !== 'ALL' ? 1 : 0) +
-          (statusFilter !== 'ALL' ? 1 : 0)
+          (statusFilter !== 'ALL' ? 1 : 0) +
+          (fyFilter !== 'ALL' ? 1 : 0) +
+          (modeFilter !== 'ALL' ? 1 : 0) +
+          (fromDate || toDate ? 1 : 0)
         }
         onResetFilters={() => {
           setSearchQuery('');
           setParticularsFilter('ALL');
           setStatusFilter('ALL');
+          setFyFilter('ALL');
+          setModeFilter('ALL');
+          setFromDate('');
+          setToDate('');
         }}
+        rightSlot={
+          <>
+            <button
+              type="button"
+              onClick={() => loadDayBook(new Date().toISOString().slice(0, 10))}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
+            >
+              <Calendar className="w-4 h-4" />
+              Day Book
+            </button>
+            <button
+              type="button"
+              onClick={exportVisibleReceipts}
+              disabled={filteredReceipts.length === 0}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-xl hover:bg-[#3D0400] cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              Export
+            </button>
+          </>
+        }
       >
+        {/* Financial Year / Payment Mode / Date range */}
+        <FilterSelect
+          value={fyFilter}
+          onChange={(val) => setFyFilter(val)}
+          options={[{ value: 'ALL', label: 'All Financial Years' }, ...fyOptions.map((f) => ({ value: f, label: `FY ${f}` }))]}
+          widthClass="w-full sm:w-44"
+        />
+        <FilterSelect
+          value={modeFilter}
+          onChange={(val) => setModeFilter(val)}
+          options={[{ value: 'ALL', label: 'All Payment Modes' }, ...modeOptions.map((m) => ({ value: m, label: m }))]}
+          widthClass="w-full sm:w-48"
+        />
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          title="From date"
+          className="px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601]"
+        />
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          title="To date"
+          className="px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601]"
+        />
+
         {/* Receipt Type Filter */}
         <FilterSelect
           value={particularsFilter}
@@ -498,12 +682,46 @@ export default function ReceiptTracking() {
         />
       </SearchFilterBar>
 
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50 text-xs">
+          <span className="font-semibold text-[#180200]">{selectedIds.size} unassigned receipt(s) selected</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="px-3 py-1.5 font-semibold text-[#863221] border border-[#E8DFD8] bg-white rounded-lg cursor-pointer"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkMap}
+              disabled={!hasPermission('receipts.tracking.write')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 font-bold text-white bg-[#510601] rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <LinkIcon className="w-3.5 h-3.5" />
+              Map to a member
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Table Card (EXACTLY 6 Columns) */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
+                <th className="py-3.5 pl-4 pr-0 w-8">
+                  <input
+                    type="checkbox"
+                    title="Select all unassigned receipts shown"
+                    checked={unassignedVisible.length > 0 && unassignedVisible.every((r) => selectedIds.has(r.id))}
+                    disabled={unassignedVisible.length === 0}
+                    onChange={(e) => setSelectedIds(e.target.checked ? new Set(unassignedVisible.map((r) => r.id)) : new Set())}
+                    className="cursor-pointer accent-[#510601]"
+                  />
+                </th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Receipt Number</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Receipt Date</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Name</th>
@@ -517,7 +735,7 @@ export default function ReceiptTracking() {
             <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
               {filteredReceipts.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-14 text-center text-[#863221]">
+                  <td colSpan="9" className="py-14 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <FileSpreadsheet className="w-10 h-10 text-[#863221]/40" />
                       <p className="text-base font-bold text-[#180200]">No receipts found</p>
@@ -540,6 +758,16 @@ export default function ReceiptTracking() {
                           : 'bg-white hover:bg-[#FAF7F2]/60 text-[#180200]'
                       }`}
                     >
+                      <td className="py-3.5 pl-4 pr-0 w-8">
+                        {isUnmapped && (
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(receipt.id)}
+                            onChange={() => toggleSelected(receipt.id)}
+                            className="cursor-pointer accent-[#510601]"
+                          />
+                        )}
+                      </td>
                       {/* Column 1: Receipt Number */}
                       <td className="py-3.5 px-4 font-mono font-bold text-xs">
                         <span className={`px-2 py-0.5 rounded tracking-wider border ${
@@ -613,6 +841,17 @@ export default function ReceiptTracking() {
                           >
                             <Eye className="w-3.5 h-3.5" />
                             <span>View</span>
+                          </button>
+
+                          {/* Print Action */}
+                          <button
+                            type="button"
+                            onClick={() => openReceiptPdf(receipt)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-[#FAF7F2] transition-colors cursor-pointer shrink-0"
+                            title="Print / download the receipt"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>Print</span>
                           </button>
 
                           {/* Edit Action */}
@@ -1032,6 +1271,58 @@ export default function ReceiptTracking() {
                 </button>
               </div>
             </form>
+          </div>
+        )}
+      </Modal>
+
+      {/* ============================================================ */}
+      {/* DAY BOOK                                                     */}
+      {/* ============================================================ */}
+      <Modal isOpen={Boolean(dayBook)} onClose={() => setDayBook(null)}>
+        {dayBook && (
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-base font-bold text-[#180200]">Day Book</h3>
+              <input
+                type="date"
+                value={dayBook.date}
+                onChange={(e) => e.target.value && loadDayBook(e.target.value)}
+                className="px-3 py-1.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]"
+              />
+            </div>
+            <div className="mt-4 flex items-baseline justify-between">
+              <span className="text-xs text-[#863221]">{dayBook.data.receipt_count} receipt(s)</span>
+              <span className="text-2xl font-bold font-mono text-[#510601]">{formatINR(dayBook.data.total)}</span>
+            </div>
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <p className="font-bold text-[#863221] uppercase tracking-wider text-[10px] mb-1.5">By payment mode</p>
+                {dayBook.data.by_payment_mode.length === 0 && <p className="text-[#863221]/70">No receipts.</p>}
+                {dayBook.data.by_payment_mode.map((m) => (
+                  <div key={m.payment_mode} className="flex justify-between py-1 border-b border-[#E8DFD8]/60">
+                    <span>{m.payment_mode} <span className="text-[#863221]/70">({m.count})</span></span>
+                    <span className="font-mono font-bold">{formatINR(m.amount)}</span>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <p className="font-bold text-[#863221] uppercase tracking-wider text-[10px] mb-1.5">By particular</p>
+                {dayBook.data.by_particular.length === 0 && <p className="text-[#863221]/70">No receipts.</p>}
+                {dayBook.data.by_particular.map((p) => (
+                  <div key={p.particular} className="flex justify-between py-1 border-b border-[#E8DFD8]/60">
+                    <span>{p.particular}</span>
+                    <span className="font-mono font-bold">{formatINR(p.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDayBook(null)}
+              className="mt-5 w-full py-2.5 border border-[#E8DFD8] text-xs font-semibold text-[#863221] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
+            >
+              Close
+            </button>
           </div>
         )}
       </Modal>
