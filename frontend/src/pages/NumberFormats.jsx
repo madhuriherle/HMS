@@ -163,7 +163,7 @@ export default function NumberFormats() {
   const current = data?.data.find((d) => d.doc_type === selected);
 
   return (
-    <PermissionGate required="system.read">
+    <PermissionGate required="system.number_formats.read">
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-[#180200]">Number Formats</h2>
         {loadError && <p className="text-sm font-semibold text-red-700">{loadError}</p>}
@@ -190,7 +190,7 @@ export default function NumberFormats() {
               ))}
             </div>
             {current && (
-              <FormatCard key={current.doc_type} item={current} options={data.options} canWrite={hasPermission('system.write')} onSaved={load} />
+              <FormatCard key={current.doc_type} item={current} options={data.options} canWrite={hasPermission('system.number_formats.write')} onSaved={load} />
             )}
           </div>
         )}

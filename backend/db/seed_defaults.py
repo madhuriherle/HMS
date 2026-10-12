@@ -76,6 +76,9 @@ SUB_MODULE_AREAS = {
             ("DELETE", r"^/receipts/\d+/allocations/\d+/?$"),
         ]),
     ],
+    "system": [
+        ("system.number_formats", "Number Formats", ["/system/number-formats"]),
+    ],
     "engagements": [
         ("engagements.affiliations", "Affiliations", ["/engagements/affiliations"]),
         ("engagements.associates", "Associates", ["/engagements/associates"]),
@@ -88,6 +91,7 @@ AREA_ACTIONS = {
     "members.unapproved": ("read", "write"),
     "members.register": ("write",),
     "receipts.entry": ("read", "write"),
+    "system.number_formats": ("read", "write"),
 }
 
 # Modules whose screens are not built yet: switched off (status = false) by migration 0032
@@ -120,8 +124,8 @@ PLANNED_SCREENS = [
     ("events.list", "Events", "events", None, None, 1, None),
     ("events.guests", "Guests & Honourees", "events", None, None, 2, None),
     ("imports.postal_codes", "Postal Code Import", "imports", None, None, 1, None),
-    ("system.files", "Files & Attachments", "system", None, None, 1, None),
-    ("system.error_logs", "Error Logs", "system", None, None, 2, None),
+    ("system.files", "Files & Attachments", "system", None, None, 3, None),
+    ("system.error_logs", "Error Logs", "system", None, None, 4, None),
 ]
 
 # ── modules ──────────────────────────────────────────────────
@@ -295,15 +299,15 @@ MENU_PAGE_CATALOG = [
     ("members.unapproved", "Unapproved Members", "members", "/dashboard/membership/unapproved", "user-check", 2, "members.unapproved.read", None),
     ("members.register", "Register New Member", "members", "/dashboard/membership/register", "user-plus", 3, "members.register.write", None),
     # Final-approval queue: unapproved members who already have a receipt assigned (same privilege as Unapproved Members).
-    ("members.assigned", "Assigned for Approval", "members", "/dashboard/membership/assigned", "check-circle", 4, "members.unapproved.read", None),
+    ("members.assigned", "Assigned for Approval", "approvals", "/dashboard/membership/assigned", "check-circle", 2, "members.unapproved.read", None),
     ("receipts.entry", "Receipt Entry", "receipts", "/dashboard/receipts/entry", "file-plus", 1, "receipts.entry.read", None),
     ("receipts.tracking", "Receipt Tracking", "receipts", "/dashboard/receipts/tracking", "search", 2, "receipts.tracking.read", None),
     ("users.modules", "Modules", "users", "/dashboard/users/modules", "layout-grid", 4, None, 1),
     ("masters.location", "Location Setup", "masters", "/dashboard/master/location-setup", "map-pin", 1, "masters.location.read", None),
     ("masters.membership_types", "Membership Types", "masters", "/dashboard/master/membership-type", "badge", 2, "masters.membership_types.read", None),
     ("masters.particulars", "Particulars Master", "masters", "/dashboard/master/receipt-type", "list-checks", 3, "masters.particulars.read", None),
-    ("system.number_formats", "Number Formats", "system", "/dashboard/system/number-formats", "list-checks", 3, "system.read", None),
-    ("masters.organisation", "Organisation Settings", "masters", "/dashboard/master/organisation-settings", "building", 4, "system.read", None),
+    ("system.number_formats", "Number Formats", "system", "/dashboard/system/number-formats", "list-checks", 2, "system.number_formats.read", None),
+    ("masters.organisation", "Organisation Settings", "system", "/dashboard/master/organisation-settings", "building", 1, "system.read", None),
     ("masters.payment_modes", "Payment Mode Setup", "masters", "/dashboard/master/payment-modes", "credit-card", 5, "masters.payment_modes.read", None),
     ("masters.banks", "Bank Master", "masters", "/dashboard/master/banks", "building", 6, "masters.banks.read", None),
     # Personal Masters screen is switched off for now (also switched off in migration 0025):
@@ -320,6 +324,23 @@ MENU_PAGE_CATALOG = [
 MENU_NAME_FIXES = {
     "members.unapproved": ("Unapproved Membership", "Unapproved Members"),
     "system": ("System", "Settings"),
+}
+
+# Pages moved to a new group: code -> (old parent, new parent, new order). Applied only while the row is
+# still under the old parent, so a move an admin made by hand is kept.
+MENU_MOVES = {
+    "masters.organisation": ("masters", "system", 1),
+    "members.assigned": ("members", "approvals", 2),
+}
+# Order changes, applied only while the row still has the old order: code -> (old, new)
+MENU_ORDER_FIXES = {
+    "system.number_formats": (3, 2),
+    "system.files": (1, 3),  # make room: Organisation Settings 1, Number Formats 2
+    "system.error_logs": (2, 4),
+}
+# Page privilege changes, applied only while the row still has the old one: code -> (old, new)
+MENU_PERMISSION_FIXES = {
+    "system.number_formats": ("system.read", "system.number_formats.read"),
 }
 
 MENU_ROUTE_FIXES = {
@@ -359,6 +380,18 @@ def seed_menu_pages(db) -> int:
         m = rows.get(code)
         if m is not None and m.name_en == old:
             m.name_en = new
+    for code, (old_parent, new_parent, order) in MENU_MOVES.items():
+        m, old_row, new_row = rows.get(code), rows.get(old_parent), rows.get(new_parent)
+        if m is not None and old_row is not None and new_row is not None and m.parent_id == old_row.id:
+            m.parent_id, m.display_order = new_row.id, order
+    for code, (old, new) in MENU_ORDER_FIXES.items():
+        m = rows.get(code)
+        if m is not None and m.display_order == old:
+            m.display_order = new
+    for code, (old, new) in MENU_PERMISSION_FIXES.items():
+        m = rows.get(code)
+        if m is not None and m.permission_code == old:
+            m.permission_code = new
     db.commit()
     return created
 
