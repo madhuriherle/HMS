@@ -65,6 +65,7 @@ export default function Dashboard() {
     pending: null,
     magazineCount: null
   });
+  const [money, setMoney] = useState(null); // today / month / unassigned / renewals (null when not allowed)
   
   const [recentActivity, setRecentActivity] = useState([]);
   const [membershipTypeData, setMembershipTypeData] = useState([]);
@@ -89,6 +90,8 @@ export default function Dashboard() {
           magazineCount: dData.magazines ? dData.magazines.active_subscriptions || 0 : null
         });
         
+        setMoney(dData.receipts && dData.receipts.today_amount !== undefined ? dData.receipts : null);
+
         const rData = reportRes.status === 'fulfilled' ? reportRes.value.data : {};
         if (rData.memberships?.by_type) {
           setMembershipTypeData(rData.memberships.by_type.map(item => ({
@@ -122,6 +125,27 @@ export default function Dashboard() {
     { id: 4, title: 'This Month Magazine Count', value: stats.magazineCount === null ? '—' : stats.magazineCount.toLocaleString(), icon: 'book-open', color: '#8C1801', trend: '' },
   ];
 
+
+  const inr = (v) => `₹${Number(v || 0).toLocaleString('en-IN')}`;
+  const monthChange =
+    money && money.last_month_amount > 0
+      ? Math.round(((money.month_amount - money.last_month_amount) / money.last_month_amount) * 100)
+      : null;
+  const moneyCards = money
+    ? [
+        { id: 'today', title: "Today's Collection", value: inr(money.today_amount), icon: 'activity', color: '#510601', to: '/dashboard/receipts/tracking' },
+        {
+          id: 'month',
+          title: monthChange === null ? 'This Month' : `This Month (${monthChange >= 0 ? '+' : ''}${monthChange}% vs last)`,
+          value: inr(money.month_amount),
+          icon: 'tag',
+          color: '#3D705C',
+          to: '/dashboard/receipts/tracking'
+        },
+        { id: 'unassigned', title: 'Unassigned Receipts', value: money.unassigned_count.toLocaleString(), icon: 'clock', color: '#EE6A00', to: '/dashboard/receipts/tracking' },
+        { id: 'renewals', title: 'Renewals Due (30 days)', value: money.renewals_due.toLocaleString(), icon: 'user-x', color: '#8C1801', to: '/dashboard/receipts/entry' }
+      ]
+    : [];
 
   const currentDate = `${new Date().toLocaleDateString('en-US', { weekday: 'long' })}, ${getTodayDisplayDate()}`;
 
@@ -189,6 +213,16 @@ export default function Dashboard() {
           <StatCard key={stat.id} {...stat} />
         ))}
       </div>
+
+      {moneyCards.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mt-6">
+          {moneyCards.map(({ to, ...card }) => (
+            <Link key={card.id} to={to} className="block">
+              <StatCard {...card} />
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div>

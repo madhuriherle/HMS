@@ -293,7 +293,12 @@ def read_particulars(
     limit: int = 1000,
 ) -> Any:
     q = db.query(Particular).filter(Particular.is_deleted == False)
-    return paginate(q, page, limit)
+    page_data = paginate(q.order_by(Particular.id), page, limit)
+    # top-level particulars follow the order saved on the Particulars screen; the rest keep id order
+    from api.v1.endpoints.master_settings.extras import particular_order
+    rank = {pid: i for i, pid in enumerate(particular_order(db))}
+    page_data["data"].sort(key=lambda r: (rank.get(r["id"], len(rank)) if not r.get("parent_id") else len(rank) + 1, r["id"]))
+    return page_data
 
 @router.post("/particulars", response_model=Union[schemas_masters.Particular, PendingApproval])
 @approval_gate.gated("masters", "CREATE", "Particular", "masters.write")

@@ -33,6 +33,7 @@ const formatDate = (v) => (v === 'Present' ? v : formatDateShared(v));
 import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
+import RecentlyDeleted from '../components/RecentlyDeleted';
 
 // Helper to format currency in Indian Rupee format
 const formatINR = (amount) => {
@@ -49,7 +50,10 @@ export default function MembershipTypeManagement() {
   // Master state
   const [membershipTypes, setMembershipTypes] = useState([]);
 
+  const [usage, setUsage] = useState({});
+
   const fetchMembershipTypes = async () => {
+    api.get('/masters/usage/membership-types').then(({ data }) => setUsage(data?.counts || {})).catch(() => {});
     try {
       const res = await api.get('/masters/membership-types?limit=1000');
       const mapped = (res.data?.data || []).map(m => ({
@@ -452,6 +456,8 @@ export default function MembershipTypeManagement() {
             </h1>
           </div>
 
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <RecentlyDeleted kind="membership-types" label="membership types" onRestored={fetchMembershipTypes} disabled={!hasPermission('masters.membership_types.delete')} />
           <button
             onClick={openAddModal}
             disabled={!hasPermission('masters.membership_types.write')}
@@ -461,6 +467,7 @@ export default function MembershipTypeManagement() {
             <Plus className="w-4 h-4" />
             <span>Add Membership Type</span>
           </button>
+          </div>
         </div>
       </div>
 
@@ -545,6 +552,14 @@ export default function MembershipTypeManagement() {
                       {/* Type Name */}
                       <td className="px-5 py-4 font-bold text-[#180200]">
                         <span className="text-sm">{item.name}</span>
+                        {usage[item.id]?.used > 0 && (
+                          <span
+                            className="ml-2 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-semibold text-[#863221]"
+                            title={`${usage[item.id].used} membership(s) of this type`}
+                          >
+                            {usage[item.id].used} member(s)
+                          </span>
+                        )}
                       </td>
 
                       {/* Amount */}

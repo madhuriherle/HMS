@@ -9,6 +9,7 @@ import {
   Trash2,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   ChevronLeft,
   CheckCircle2,
   X,
@@ -21,6 +22,7 @@ import api from '../api';
 import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
+import RecentlyDeleted from '../components/RecentlyDeleted';
 
 export default function ReceiptTypeManagement() {
   const { hasPermission } = useAuth();
@@ -77,7 +79,24 @@ export default function ReceiptTypeManagement() {
   };
 
 
+  const [usage, setUsage] = useState({});
+
+  const moveType = async (type, dir) => {
+    const ids = receiptTypes.map((t) => t.id);
+    const i = ids.indexOf(type.id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    try {
+      await api.put('/masters/particulars-order', { ids }, { params: { reason: 'Reordered particulars' } });
+      await fetchReceiptTypes();
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Could not save the new order.', 'error');
+    }
+  };
+
   const fetchReceiptTypes = async () => {
+    api.get('/masters/usage/particulars').then(({ data }) => setUsage(data?.counts || {})).catch(() => {});
     try {
       const res = await api.get('/masters/particulars?limit=2000');
       const allItems = res.data?.data || [];
@@ -462,6 +481,8 @@ export default function ReceiptTypeManagement() {
             </h1>
           </div>
 
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <RecentlyDeleted kind="particulars" label="particulars" onRestored={fetchReceiptTypes} disabled={!hasPermission('masters.particulars.delete')} />
           <button
             onClick={openAddTypeModal}
             disabled={!hasPermission('masters.particulars.write')}
@@ -471,6 +492,7 @@ export default function ReceiptTypeManagement() {
             <Plus className="w-4 h-4" />
             <span>Add Particular</span>
           </button>
+          </div>
         </div>
       </div>
 
@@ -576,6 +598,24 @@ export default function ReceiptTypeManagement() {
                               <div className="w-6 h-4" />
                             )}
                             <span className="text-sm text-[#180200]">{type.name}</span>
+                            {usage[type.id]?.used > 0 && (
+                              <span
+                                className="ml-2 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-semibold text-[#863221]"
+                                title={`Used on ${usage[type.id].used} receipt line(s)`}
+                              >
+                                used {usage[type.id].used}×
+                              </span>
+                            )}
+                            {hasPermission('masters.particulars.write') && !searchQuery && (
+                              <span className="ml-2 inline-flex flex-col">
+                                <button type="button" onClick={() => moveType(type, -1)} title="Move up" className="text-[#863221] hover:text-[#510601] cursor-pointer leading-none">
+                                  <ChevronUp className="w-3.5 h-3.5" />
+                                </button>
+                                <button type="button" onClick={() => moveType(type, 1)} title="Move down" className="text-[#863221] hover:text-[#510601] cursor-pointer leading-none">
+                                  <ChevronDown className="w-3.5 h-3.5" />
+                                </button>
+                              </span>
+                            )}
                           </div>
                         </td>
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Menu, User, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
+import GlobalSearch from './GlobalSearch';
 
 export default function Navbar({ onToggleSidebar }) {
   const [profileOpen, setProfileOpen] = useState(false);
@@ -88,6 +89,7 @@ export default function Navbar({ onToggleSidebar }) {
         >
           <Menu className="h-6 w-6" />
         </button>
+        <GlobalSearch />
       </div>
 
       <div className="flex items-center gap-4 sm:gap-6">

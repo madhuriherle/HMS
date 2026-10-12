@@ -85,7 +85,7 @@ export default function ReceiptTracking() {
   const [unapprovedMembers, setUnapprovedMembers] = useState([]);
 
   // Search & Filter State
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
   const [particularsFilter, setParticularsFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, Assigned, Unassigned
   const [fyFilter, setFyFilter] = useState('ALL');
@@ -706,8 +706,62 @@ export default function ReceiptTracking() {
         </div>
       )}
 
+      {/* Phone layout: one card per receipt */}
+      <div className="sm:hidden space-y-2.5">
+        {filteredReceipts.length === 0 && (
+          <p className="py-10 text-center text-sm text-[#863221]">No receipts found</p>
+        )}
+        {filteredReceipts.map((receipt) => {
+          const unmapped = isReceiptUnmapped(receipt);
+          return (
+            <div
+              key={receipt.id}
+              className={`rounded-2xl border p-3.5 ${unmapped ? 'bg-amber-50/70 border-amber-200' : 'bg-white border-[#E8DFD8]'}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="font-mono font-bold text-xs text-[#510601]">#{receipt.receiptNumber}</div>
+                  <div className="text-sm font-bold text-[#180200] truncate">{receipt.name || '—'}</div>
+                  <div className="text-[11px] text-[#863221]">
+                    {formatDate(receipt.receiptDate)} · {receipt.paymentMode || '—'}
+                    {receipt.items?.length > 1 ? ` · ${receipt.items.length} particulars` : ` · ${receipt.particulars || ''}`}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="font-mono font-bold text-sm">{formatINR(receipt.amount)}</div>
+                  {unmapped && <div className="text-[10px] font-bold text-amber-700">Unassigned</div>}
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                {unmapped && (
+                  <label className="mr-auto inline-flex items-center gap-1.5 text-[11px] text-[#863221]">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(receipt.id)}
+                      onChange={() => toggleSelected(receipt.id)}
+                      className="accent-[#510601]"
+                    />
+                    Select
+                  </label>
+                )}
+                <button type="button" onClick={() => setViewingReceipt(receipt)} className="px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg cursor-pointer">View</button>
+                <button type="button" onClick={() => openReceiptPdf(receipt)} className="px-2.5 py-1.5 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg cursor-pointer">Print</button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenEdit(receipt)}
+                  disabled={!hasPermission('receipts.tracking.write')}
+                  className="px-2.5 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg cursor-pointer disabled:opacity-40"
+                >
+                  Edit
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Main Table Card (EXACTLY 6 Columns) */}
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
+      <div className="hidden sm:block bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
