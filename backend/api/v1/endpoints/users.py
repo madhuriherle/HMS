@@ -3,10 +3,11 @@
 Rules (same as the Anegudde inventory system):
 
 * one role per user (users.role_id);
-* rank_level: 1 is the top, larger is weaker. A user can only see, create,
-  edit or delete users — and a role holder can only see, create, edit,
-  delete or re-privilege roles — that are strictly weaker than their own
-  role (``target.rank_level > my.rank_level``);
+* rank_level: 1 is the top, larger is weaker. A user can see, create, edit or
+  delete users of their own rank or weaker (an Admin can manage another
+  Admin); Rank 1 (Super Admin) stays strictly above everyone. Roles — seeing,
+  editing, re-privileging — still need a role strictly weaker than yours, so
+  nobody can raise their own role's power;
 * privileges are ``<module>.read|write|delete``; a role with ``is_all_access``
   bypasses privilege checks (never the rank rules);
 * a module can be disabled or limited with ``min_rank_level``; both are
@@ -62,12 +63,12 @@ def read_users(
     status: Optional[bool] = None,
     role_id: Optional[int] = None,
 ) -> Any:
-    """Only users with a strictly weaker role than yours are listed."""
+    """Users of your own rank (not Rank 1) and weaker are listed."""
     my_rank = deps.user_rank(db, current_user)
     q = (
         db.query(User)
         .join(Role, Role.id == User.role_id)
-        .filter(User.is_deleted == False, Role.rank_level > my_rank)  # noqa: E712
+        .filter(User.is_deleted == False, Role.rank_level >= my_rank if my_rank > 1 else Role.rank_level > 1)  # noqa: E712
     )
     if search:
         like = f"%{search}%"
@@ -99,8 +100,8 @@ def create_user(
     role = db.query(Role).filter(Role.id == user_in.role_id, Role.is_deleted == False, Role.status == True).first()  # noqa: E712
     if not role:
         raise HTTPException(400, "Invalid role_id")
-    if role.rank_level <= deps.user_rank(db, current_user):
-        raise HTTPException(403, "Cannot create a user with a rank equal or higher than yours")
+    if not can_manage_rank(deps.user_rank(db, current_user), role.rank_level):
+        raise HTTPException(403, "Cannot create a user with a rank higher than yours")
     _check_password(user_in.password)
     data = user_in.model_dump()
     data["password_hash"] = get_password_hash(data.pop("password"))
@@ -396,16 +397,43 @@ def _manageable_role(db: Session, me: User, role: Optional[Role]) -> Role:
 _ROLE_READERS = ("roles.read", "users.management.read", "users.privileges.read")
 
 
+def can_manage_rank(my_rank: int, target_rank: int) -> bool:
+    """Users: weaker, or the same rank (except Rank 1, which stays above everyone)."""
+    return target_rank > my_rank or (target_rank == my_rank and my_rank != 1)
+
+
+_TOP_RANKS = 2  # Super Admin / Admin: never leave the system without one active holder
+
+
+def _protect_user(db: Session, me: User, user: User, what: str) -> None:
+    """Guards for deleting / deactivating / re-roling a user."""
+    if user.username == "admin" and deps.user_rank(db, me) != 1:
+        raise HTTPException(403, "The built-in admin account can only be changed by the Super Admin")
+    role = deps.get_user_role(db, user)
+    if role and role.rank_level <= _TOP_RANKS:
+        others = (
+            db.query(User)
+            .filter(User.role_id == role.id, User.id != user.id, User.is_deleted == False, User.status == True)  # noqa: E712
+            .count()
+        )
+        if others == 0:
+            raise HTTPException(400, f"Cannot {what} the last active {role.name}")
+
+
 @router.get("/roles")
 def read_roles(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_any_permission(*_ROLE_READERS)),
     page: int = 1, limit: int = 50,
+    assignable: bool = False,
 ) -> Any:
-    """Roles weaker than yours (Rank 1 sees every role)."""
+    """Roles weaker than yours (Rank 1 sees every role). ``assignable=true`` lists the roles you may
+    give to a user: weaker than yours, plus your own (except Rank 1)."""
     my_rank = deps.user_rank(db, current_user)
     q = db.query(Role).filter(Role.is_deleted == False)  # noqa: E712
-    if my_rank > 1:
+    if assignable:
+        q = q.filter(Role.rank_level >= my_rank) if my_rank > 1 else q.filter(Role.rank_level > 1)
+    elif my_rank > 1:
         q = q.filter(Role.rank_level > my_rank)
     page_data = paginate(q.order_by(Role.rank_level, Role.id), page, limit)
     for role in page_data["data"]:
@@ -652,15 +680,15 @@ def read_permissions(
 
 # ═════════════════════════ USER BY ID ═════════════════════════
 def _visible_user(db: Session, me: User, user: Optional[User]) -> User:
-    """A user is only reachable if their role is strictly weaker than mine
-    (you can always reach yourself)."""
+    """A user is only reachable if their role is mine or weaker (Rank 1: strictly weaker);
+    you can always reach yourself."""
     if not user or user.is_deleted:
         raise HTTPException(404, "User not found")
     if user.id == me.id:
         return user
     target = deps.get_user_role(db, user)
-    if (target.rank_level if target else 99) <= deps.user_rank(db, me):
-        raise HTTPException(403, "Unauthorized to access a user with the same or higher rank")
+    if not can_manage_rank(deps.user_rank(db, me), target.rank_level if target else 99):
+        raise HTTPException(403, "Unauthorized to access a user with a higher rank")
     return user
 
 
@@ -709,8 +737,9 @@ def update_user(*, db: Session = Depends(deps.get_db), current_user: User = Depe
         new_role = db.query(Role).filter(Role.id == data["role_id"], Role.is_deleted == False, Role.status == True).first()  # noqa: E712
         if not new_role:
             raise HTTPException(400, "Invalid role_id")
-        if new_role.rank_level <= deps.user_rank(db, current_user):
-            raise HTTPException(403, "Cannot assign a rank equal or higher than yours")
+        if not can_manage_rank(deps.user_rank(db, current_user), new_role.rank_level):
+            raise HTTPException(403, "Cannot assign a rank higher than yours")
+        _protect_user(db, current_user, user, "change the role of")
         data["user_type"] = _user_type_for(new_role)
         changed = True
     else:
@@ -719,6 +748,8 @@ def update_user(*, db: Session = Depends(deps.get_db), current_user: User = Depe
     # An admin cannot lock themselves out.
     if "status" in data and data["status"] is False and is_self:
         raise HTTPException(400, "You cannot deactivate your own account")
+    if "status" in data and data["status"] is False and user.status:
+        _protect_user(db, current_user, user, "deactivate")
 
     # Admin-initiated password reset goes through the same strength policy.
     new_password = data.pop("password", None)
@@ -749,4 +780,5 @@ def delete_user(*, db: Session = Depends(deps.get_db), current_user: User = Depe
     if id == current_user.id:
         raise HTTPException(400, "Cannot delete your own account")
     user = _visible_user(db, current_user, crud_users.user.get(db, id))
+    _protect_user(db, current_user, user, "delete")
     return crud_users.user.remove(db, id=id, deleted_by=current_user.id)

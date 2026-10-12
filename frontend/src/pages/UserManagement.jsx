@@ -40,18 +40,19 @@ import PermissionGate from '../components/PermissionGate';
 
 export default function UserManagement() {
   const { myRank, hasPermission } = useAuth();
-  // Only roles strictly weaker (higher rank number) than mine can be assigned — mirrors the backend rule.
-  const availableRoles = roles => roles.filter(r => (r.rank_level ?? 99) > myRank);
+  // Roles weaker than mine, or my own rank (not Rank 1) can be assigned — mirrors the backend rule.
+  const sameRankOk = (rank) => rank > myRank || (rank === myRank && myRank !== 1);
+  const availableRoles = roles => roles.filter(r => sameRankOk(r.rank_level ?? 99));
   const getUserRank = (user) => {
     const direct = user?.role_rank_level;
     if (direct != null) return Number(direct);
     const roleObj = roles.find(r => r.id === (user?.role_id ?? user?.roleId) || String(r.id) === String(user?.role_id ?? user?.roleId));
     return roleObj?.rank_level ?? null;
   };
-  // A user at or above my rank is protected: never editable/deletable from this screen.
+  // A user stronger than me is protected: never editable/deletable from this screen.
   const canManageUser = (user) => {
     const r = getUserRank(user);
-    return r == null || r > myRank;
+    return r == null || sameRankOk(r);
   };
   // Master state
   const [users, setUsers] = useState([]);
@@ -70,7 +71,7 @@ export default function UserManagement() {
           : (usersResponse.data?.data || usersResponse.data?.items || []);
         setUsers(userRows);
 
-        const rolesResponse = await api.get('/users/roles', { params: { limit: 500 } });
+        const rolesResponse = await api.get('/users/roles', { params: { limit: 500, assignable: true } });
         const roleRows = Array.isArray(rolesResponse.data)
           ? rolesResponse.data
           : (rolesResponse.data?.data || rolesResponse.data?.items || []);
@@ -226,7 +227,7 @@ export default function UserManagement() {
 
   const openEditModal = (user) => {
     if (!canManageUser(user)) {
-      showToast('This user is at or above your rank and cannot be edited.', 'error');
+      showToast('This user has a higher rank than you and cannot be edited.', 'error');
       return;
     }
     setModalMode('edit');
@@ -388,7 +389,7 @@ export default function UserManagement() {
       return;
     }
     if (!canManageUser(user)) {
-      showToast('This user is at or above your rank and cannot be changed.', 'error');
+      showToast('This user has a higher rank than you and cannot be changed.', 'error');
       return;
     }
     const active = isUserActive(user);
@@ -426,7 +427,7 @@ export default function UserManagement() {
     if (!deleteTargetUser) return;
     if (deleteTargetUser.isCurrentAdmin || deleteTargetUser.username === 'admin') return;
     if (!canManageUser(deleteTargetUser)) {
-      showToast('This user is at or above your rank and cannot be deleted.', 'error');
+      showToast('This user has a higher rank than you and cannot be deleted.', 'error');
       setDeleteTargetUser(null);
       return;
     }
@@ -624,7 +625,7 @@ export default function UserManagement() {
                     .slice(0, 2) || 'U';
                   const isActive = isUserActive(user);
                   const rowRank = user.role_rank_level ?? roleObj?.rank_level;
-                  const isRankLocked = rowRank != null && rowRank <= myRank;
+                  const isRankLocked = rowRank != null && !sameRankOk(rowRank);
                   const isRowLocked = (user.isCurrentAdmin || user.username === 'admin' || user.id === 1) || isRankLocked;
 
                   return (
@@ -687,7 +688,7 @@ export default function UserManagement() {
                               : user.isCurrentAdmin || user.username === 'admin' || user.id === 1
                                 ? 'Super Administrator account is permanently Active'
                                 : isRankLocked
-                                  ? 'User is at or above your rank'
+                                  ? 'User has a higher rank than you'
                                   : (isActive ? 'Click to deactivate user' : 'Click to activate user')
                           }
                         >
@@ -715,7 +716,7 @@ export default function UserManagement() {
                             disabled={isRankLocked || !hasPermission('users.management.write')}
                             onClick={() => !isRankLocked && openEditModal(user)}
                             className={`btn-act ${isRankLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
-                            title={!hasPermission('users.management.write') ? 'You need the users.management.write permission' : isRankLocked ? 'User is at or above your rank' : 'Edit User'}
+                            title={!hasPermission('users.management.write') ? 'You need the users.management.write permission' : isRankLocked ? 'User has a higher rank than you' : 'Edit User'}
                           >
                             <Pencil className="w-3.5 h-3.5" />
                             <span>Edit</span>

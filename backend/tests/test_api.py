@@ -1960,8 +1960,8 @@ def test_user_update_password_reset_and_guards(client, admin_headers):
 
 
 def test_rank_hierarchy_rules(client, admin_headers):
-    """Anegudde rule: you only see / create / edit / delete users and roles
-    that are strictly weaker than your own role."""
+    """You see / create / edit / delete users of your own rank or weaker (not stronger); roles must
+    be strictly weaker than your own."""
     # a rank-3 'manager' role that can manage users, roles and privileges
     mgr_uid, mgr_role, mgr = _staff_with_role(
         client, admin_headers, "rank3_mgr", "Rank Three Manager", "RANK3_MGR",
@@ -1986,20 +1986,20 @@ def test_rank_hierarchy_rules(client, admin_headers):
     listed = {r["code"] for r in client.get("/api/v1/users/roles", headers=mgr, params={"limit": 200}).json()["data"]}
     assert "SUB_ROLE" in listed and "RANK3_MGR" not in listed and "SUPERADMIN" not in listed and "ADMIN" not in listed
 
-    # users: can create below, not at/above own rank; peers are invisible
+    # users: can create below or at own rank, never above
     ok = client.post("/api/v1/users/", headers=mgr,
                      json={"name": "Sub", "username": "sub_user", "password": "Subuser@123", "role_id": sub.json()["id"]})
     assert ok.status_code == 200, ok.text
     assert client.post("/api/v1/users/", headers=mgr,
                        json={"name": "Up", "username": "up_user", "password": "Upuser@1234", "role_id": _role_id(client, admin_headers, "ADMIN")}).status_code == 403
     users = {u["username"] for u in client.get("/api/v1/users/", headers=mgr, params={"limit": 200}).json()["data"]}
-    assert "sub_user" in users and "admin" not in users and "rank3_mgr" not in users
+    assert "sub_user" in users and "admin" not in users and "rank3_mgr" in users
     assert client.get("/api/v1/users/1", headers=mgr).status_code == 403
     assert client.put("/api/v1/users/1", headers=mgr, json={"name": "Hacked"}).status_code == 403
     assert client.delete("/api/v1/users/1", headers=mgr).status_code == 403
-    # cannot hand someone a role at or above own rank
+    # a role stronger than your own can never be handed out; your own rank can
     assert client.put(f"/api/v1/users/{ok.json()['id']}", headers=mgr,
-                      json={"role_id": mgr_role}).status_code == 403
+                      json={"role_id": _role_id(client, admin_headers, "ADMIN")}).status_code == 403
     # cannot change own role
     assert client.put(f"/api/v1/users/{mgr_uid}", headers=mgr, json={"role_id": sub.json()["id"]}).status_code in (400, 401, 403)
 
@@ -6490,3 +6490,40 @@ def test_every_foreign_key_and_filter_column_is_indexed(client):
             if t == table and c not in first_cols:
                 missing.append(f"{table}.{c}")
     assert not missing, f"unindexed: {missing}"
+
+
+def test_equal_rank_users_can_manage_each_other_with_safeguards(client, admin_headers):
+    mgr_uid, mgr_role, mgr = _staff_with_role(
+        client, admin_headers, "peer_mgr", "Peer Manager", "PEER_MGR",
+        permission_grants=[("users.management.write", False), ("users.management.delete", False)],
+        rank_level=3,
+    )
+    # create another user at the same rank, see them, edit them, delete them
+    peer = client.post("/api/v1/users/", headers=mgr,
+                       json={"name": "Peer", "username": "peer_two", "password": "Peertwo@123", "role_id": mgr_role})
+    assert peer.status_code == 200, peer.text
+    listed = {u["username"] for u in client.get("/api/v1/users/", headers=mgr, params={"limit": 200}).json()["data"]}
+    assert "peer_two" in listed
+    assert client.put(f"/api/v1/users/{peer.json()['id']}", headers=mgr, json={"name": "Peer Renamed"}).status_code == 200
+    assignable = {r["code"] for r in client.get("/api/v1/users/roles", headers=mgr, params={"assignable": True, "limit": 200}).json()["data"]}
+    assert "PEER_MGR" in assignable and "ADMIN" not in assignable
+    assert client.delete(f"/api/v1/users/{peer.json()['id']}", headers=mgr).status_code == 200
+    # never your own account, never someone stronger
+    assert client.delete(f"/api/v1/users/{mgr_uid}", headers=mgr).status_code == 400
+    assert client.delete("/api/v1/users/1", headers=mgr).status_code == 403
+
+    # Rank 1 stays above everyone: no second Super Admin
+    sa = _role_id(client, admin_headers, "SUPERADMIN")
+    assert client.post("/api/v1/users/", headers=admin_headers,
+                       json={"name": "Boss2", "username": "boss_two", "password": "Bosstwo@123", "role_id": sa}).status_code == 403
+
+    # the last active holder of a top-two rank role cannot be deleted or deactivated
+    top = client.post("/api/v1/users/roles", headers=admin_headers, json={"name": "Top Two", "code": "TOP_TWO", "rank_level": 2}).json()
+    first = client.post("/api/v1/users/", headers=admin_headers,
+                        json={"name": "Top A", "username": "top_a", "password": "Topaaaa@123", "role_id": top["id"]}).json()
+    assert client.delete(f"/api/v1/users/{first['id']}", headers=admin_headers).status_code == 400
+    assert client.put(f"/api/v1/users/{first['id']}", headers=admin_headers, json={"status": False}).status_code == 400
+    second = client.post("/api/v1/users/", headers=admin_headers,
+                         json={"name": "Top B", "username": "top_b", "password": "Topbbbb@123", "role_id": top["id"]}).json()
+    assert client.delete(f"/api/v1/users/{first['id']}", headers=admin_headers).status_code == 200
+    assert client.delete(f"/api/v1/users/{second['id']}", headers=admin_headers).status_code == 400
