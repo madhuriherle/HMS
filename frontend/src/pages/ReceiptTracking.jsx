@@ -267,7 +267,6 @@ export default function ReceiptTracking() {
 
     try {
       const apiPayload = receiptToApiPayload(uiPayload);
-      delete apiPayload.receipt_number;
       delete apiPayload.items;
       delete apiPayload.allocations;
       const editId = editingReceipt.id;
@@ -462,7 +461,7 @@ export default function ReceiptTracking() {
       {/* Header, Filter & Search Toolbar */}
       <SearchFilterBar
         
-        title={<h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Receipt Tracking</h1>}
+        title={<h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Receipt Tracking</h1>}
         searchQuery={searchQuery}
         onSearchChange={(val) => setSearchQuery(val)}
         activeFiltersCount={
@@ -585,7 +584,15 @@ export default function ReceiptTracking() {
 
                       {/* Column 5: Receipt Type */}
                       <td className="py-3.5 px-4 font-semibold text-[#510601] text-xs">
-                        {receipt.particulars || 'Membership'}
+                        {receipt.items?.length > 1 ? receipt.items[0].particular : receipt.particulars || 'Membership'}
+                        {receipt.items?.length > 1 && (
+                          <span
+                            className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-bold text-[#863221]"
+                            title={receipt.items.map((i) => `${i.particular}${i.description && i.description !== i.particular ? ` (${i.description})` : ''}: ${formatINR(i.amount)}`).join(', ')}
+                          >
+                            +{receipt.items.length - 1} more
+                          </span>
+                        )}
                       </td>
 
                       {/* Column 5b/5c: Amount and Payment Mode */}
@@ -757,6 +764,28 @@ export default function ReceiptTracking() {
                     <span className="text-[10px] uppercase font-bold text-[#863221]">Receipt Type</span>
                     <p className="font-bold text-[#510601] mt-0.5">{viewingReceipt.particulars || 'Membership'}</p>
                   </div>
+                  {viewingReceipt.items?.length > 1 && (
+                    <div className="col-span-2 sm:col-span-3">
+                      <span className="text-[10px] uppercase font-bold text-[#863221]">Particulars</span>
+                      <div className="mt-1 rounded-xl border border-[#E8DFD8] overflow-hidden">
+                        {viewingReceipt.items.map((it, i) => (
+                          <div key={it.id || i} className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs border-b last:border-b-0 border-[#E8DFD8]/70">
+                            <span className="font-semibold text-[#180200]">
+                              {i + 1}. {it.particular}
+                              {it.description && it.description !== it.particular && (
+                                <span className="font-normal text-[#863221]"> — {it.description}</span>
+                              )}
+                            </span>
+                            <span className="font-mono font-bold">{formatINR(it.amount)}</span>
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-between px-3 py-1.5 text-xs bg-[#FAF7F2] font-bold">
+                          <span>Total</span>
+                          <span className="font-mono">{formatINR(viewingReceipt.amount)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <span className="text-[10px] uppercase font-bold text-[#863221]">Payment Mode</span>
                     <p className="font-medium mt-0.5">{viewingReceipt.paymentMode || 'Online'}</p>
@@ -820,9 +849,6 @@ export default function ReceiptTracking() {
                     <h2 className="text-base font-bold text-[#180200]">
                       Edit Receipt #{editingReceipt.receiptNumber}
                     </h2>
-                    <p className="text-xs text-[#863221]">
-                      Update existing receipt details
-                    </p>
                   </div>
                 </div>
                 <button

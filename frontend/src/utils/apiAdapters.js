@@ -80,7 +80,16 @@ export const normalizeMember = (member) => {
     nativeDetails: firstDefined(member.native_place_text, member.nativeDetails, ''),
     // details captured on the Register New Member form
     nameTitle: member.name_title || '',
-    fatherHusbandName: member.father_husband_name || '',
+    fatherHusbandName: member.father_name || member.father_husband_name || '',
+    fatherName: member.father_name || member.father_husband_name || '',
+    fatherMembershipNumber: member.father_membership_number || '',
+    motherName: member.mother_name || '',
+    motherMembershipNumber: member.mother_membership_number || '',
+    isMarried: member.is_married,
+    spouseName: member.spouse_name || '',
+    spouseMembershipNumber: member.spouse_membership_number || '',
+    hasChildren: member.has_children,
+    childrenDetails: member.children_details || [],
     aadharNumber: member.aadhaar_number || '',
     whatsappNumber: member.whatsapp_number
       ? `${member.whatsapp_country_code || member.mobile_country_code || '+91'} ${member.whatsapp_number}`
@@ -179,15 +188,37 @@ export const normalizeReceipt = (receipt) => ({
   transactionDate: firstDefined(receipt.transaction_date, receipt.cheque_date, receipt.transactionDate, ''),
   description: firstDefined(receipt.notes, receipt.description, ''),
   status: firstDefined(receipt.payment_status, receipt.status, ''),
+  items: receipt.items || [],
+  itemsCount: receipt.items_count || (receipt.items || []).length || 0,
 });
 
 export const receiptToApiPayload = (formData, selectedMember = null) => {
-  const amount = Number(formData.amount || 0);
+  // One receipt can carry many particular lines (hostel deposit + donation + ...).
+  const lines = (formData.lines && formData.lines.length ? formData.lines : [{
+    particular: formData.particulars,
+    particularId: null,
+    detail: formData.donationSubType || formData.othersDescription || formData.particulars,
+    amount: formData.amount,
+  }]).map((l) => ({ ...l, amount: Number(l.amount || 0), type: receiptTypeToApi(l.particular) }));
+  const amount = lines.reduce((sum, l) => sum + l.amount, 0);
+  // Only these count toward a member's credit; the rest (hostel, deposits...) must not be allocated as credit.
+  const creditLines = lines.filter((l) => ['MEMBERSHIP', 'DONATION', 'SCHOLARSHIP'].includes(l.type));
+  const allocatedAmount = creditLines.length ? creditLines.reduce((sum, l) => sum + l.amount, 0) : amount;
+  const headType = (creditLines[0] || lines[0]).type;
   const allocationMemberId = Number(selectedMember?.memberId || selectedMember?.member_id || selectedMember?.id);
+  const baseNotes = (formData.description || '').trim() || (formData.paymentReceivedDetails || '').trim();
+  // Not linked to a member yet: keep what was typed so the receipt can be mapped later.
+  const unlinkedNote = allocationMemberId
+    ? ''
+    : [
+        formData.membershipNo?.trim() && `Membership No. entered: ${formData.membershipNo.trim()}`,
+        formData.mobile?.trim() && `Mobile: ${formData.mobile.trim()}`,
+        formData.panNo?.trim() && `PAN: ${formData.panNo.trim()}`,
+      ].filter(Boolean).join('; ');
   return {
     receipt_number: formData.receiptNumber.trim() || null,
     receipt_date: formData.receiptDate,
-    receipt_type: receiptTypeToApi(formData.particulars),
+    receipt_type: headType,
     payer_name: formData.name.trim() || null,
     payment_mode: paymentModeToApi(formData.paymentMode, formData.bankAccount),
     transaction_reference: formData.transactionId.trim() || null,
@@ -198,16 +229,16 @@ export const receiptToApiPayload = (formData, selectedMember = null) => {
     net_amount: amount,
     source: 'OFFLINE',
     is_renewal: Boolean(formData.isRenewal),
-    notes: (formData.description || '').trim() || (formData.paymentReceivedDetails || '').trim() || null,
-    items: [
-      {
-        item_type: receiptTypeToApi(formData.particulars),
-        description: formData.donationSubType || formData.othersDescription || formData.particulars,
-        amount,
-      },
-    ],
+    notes: [baseNotes, unlinkedNote].filter(Boolean).join(' | ') || null,
+    items: lines.map((l) => ({
+      item_type: l.type,
+      particular_id: l.particularId || null,
+      particular_name: l.particular || null,
+      description: l.detail || l.particular || null,
+      amount: l.amount,
+    })),
     allocations: allocationMemberId
-      ? [{ member_id: allocationMemberId, allocated_amount: amount }]
+      ? [{ member_id: allocationMemberId, allocated_amount: allocatedAmount }]
       : [],
   };
 };

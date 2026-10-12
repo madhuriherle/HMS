@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, CheckCircle2, Loader2, UserCheck, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Loader2, UserCheck } from 'lucide-react';
 import { formatDate } from '../utils/dateUtils';
 
 // Result of "who is this membership number?" under the Membership No. box of Receipt Entry.
@@ -27,9 +27,9 @@ export default function MemberLookupCard({ lookup, onUse }) {
 
   if (!lookup.matches || lookup.matches.length === 0) {
     return (
-      <div className="mt-1.5 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-[11px] font-semibold text-red-700">
-        <XCircle className="w-3.5 h-3.5 shrink-0" />
-        <span>No member or applicant has this number.</span>
+      <div className="mt-1.5 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-800">
+        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+        <span>No member has this number yet. You can still save; the receipt stays Unassigned until it is mapped.</span>
       </div>
     );
   }

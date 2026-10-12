@@ -98,7 +98,7 @@ export default function ReceiptTypeManagement() {
       });
       setReceiptTypes(mapped);
     } catch (err) {
-      console.error(err);
+      console.error(err); showToast(err.response?.data?.detail || 'Could not load data from the server.', 'error');
     }
   };
 
@@ -457,7 +457,7 @@ export default function ReceiptTypeManagement() {
       <div>
 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
               Particulars Master
             </h1>
           </div>
@@ -1097,6 +1097,54 @@ export default function ReceiptTypeManagement() {
       </Modal>
 
       
+
+      {/* ============================================================ */}
+      {/* DELETE CONFIRMATION DIALOG                                   */}
+      {/* ============================================================ */}
+      <Modal
+        isOpen={Boolean(deletingItem)}
+        onClose={() => setDeletingItem(null)}
+      >
+        {deletingItem && (
+          <div
+            className="bg-white rounded-2xl max-w-sm w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 rounded-full bg-red-100 text-[#ED4636] flex items-center justify-center mx-auto mb-3.5">
+              <AlertTriangle className="w-7 h-7" />
+            </div>
+
+            <h3 className="text-base font-bold text-[#180200]">
+              Delete {deletingItem.targetType === 'subType' ? 'Sub-Type' : 'Particular'}?
+            </h3>
+            <p className="text-xs text-[#863221] mt-1.5 leading-relaxed">
+              Are you sure you want to delete <strong className="text-[#180200]">{deletingItem.item.name}</strong>?
+              {deletingItem.targetType === 'receiptType' && deletingItem.item.subTypes?.length > 0
+                ? ` Its ${deletingItem.item.subTypes.length} sub-type(s) will be deleted too.`
+                : ' Historical receipts are preserved.'}
+            </p>
+
+            <div className="mt-5 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setDeletingItem(null)}
+                className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!hasPermission('masters.particulars.delete')}
+                title={!hasPermission('masters.particulars.delete') ? 'Requires masters.particulars.delete permission' : undefined}
+                onClick={handleConfirmDelete}
+                className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* ============================================================ */}
       {/* STATUS TOGGLE CONFIRMATION DIALOG                            */}

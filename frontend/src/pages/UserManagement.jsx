@@ -75,7 +75,7 @@ export default function UserManagement() {
           : (rolesResponse.data?.data || rolesResponse.data?.items || []);
         setRoles(roleRows);
       } catch (error) {
-        console.error("API Fetch Error:", error);
+        console.error("API Fetch Error:", error); showToast(error.response?.data?.detail || 'Could not load data from the server.', 'error');
       } finally {
         setLoading(false);
       }
@@ -492,7 +492,7 @@ export default function UserManagement() {
       {/* Header, Search & Filters */}
       <SearchFilterBar
         
-        title={<h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">User Management</h1>}
+        title={<h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">User Management</h1>}
         searchQuery={searchQuery}
         onSearchChange={(val) => {
           setSearchQuery(val);

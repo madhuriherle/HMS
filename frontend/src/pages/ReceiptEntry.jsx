@@ -25,7 +25,9 @@ import {
   Calendar,
   Layers,
   CreditCard,
-  Hash
+  Hash,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import PermissionGate from '../components/PermissionGate';
@@ -282,6 +284,21 @@ export default function ReceiptEntry() {
 
   const hasActiveSubTypes = activeSubTypes.length > 0;
 
+  // More particulars on the same receipt (the paper receipt has many lines)
+  const [extraLines, setExtraLines] = useState([]);
+  const emptyLine = () => ({ key: Math.random().toString(36).slice(2), particular: '', subType: '', description: '', amount: '' });
+  const particularObj = (name) =>
+    particularsMaster.find((p) => (p.name || '').toLowerCase().trim() === (name || '').toLowerCase().trim());
+  const activeSubTypesOf = (name) => (particularObj(name)?.subTypes || []).filter((st) => (st.status || 'Active') === 'Active');
+  const updateExtraLine = (key, patch) => {
+    setExtraLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+    setFormErrors((prev) => ({ ...prev, extraLines: '' }));
+  };
+  const receiptTotal = useMemo(
+    () => (Number(formData.amount) || 0) + extraLines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0),
+    [formData.amount, extraLines]
+  );
+
   // ----------------------------------------------------
   // LOAD EVERYTHING FROM THE SERVER
   // ----------------------------------------------------
@@ -399,8 +416,6 @@ export default function ReceiptEntry() {
     setMatchedExistingReceipt(null);
     setFormData((prev) => ({
       ...prev,
-      receiptNumber: '', // Strictly MANUAL entry
-      receiptDate: '', // Strictly MANUAL entry
       panNo: '', // Strictly MANUAL entry (never auto-fill even if present)
       name: member.fullName || member.name || '',
       membershipNo: memNo,
@@ -458,6 +473,37 @@ export default function ReceiptEntry() {
       description: (prev.description || '').startsWith('Membership registration receipt for') ? '' : prev.description
     }));
   };
+
+  // ----------------------------------------------------
+  // RECEIPT NUMBER / DATE DEFAULTS (financial year 2026-27/0001 series)
+  // ----------------------------------------------------
+  const [financialYear, setFinancialYear] = useState('');
+  const numberTouched = useRef(false); // true once the user typed their own number
+  const defaultsSeq = useRef(0);
+
+  // Fetches the default date (last receipt entered, else today) and the next number for a date's financial year.
+  const loadReceiptDefaults = (date, { keepNumber = false, keepDate = false } = {}) => {
+    const seq = (defaultsSeq.current += 1);
+    api
+      .get('/receipts/next-number', { params: date ? { date } : {} })
+      .then(({ data }) => {
+        if (seq !== defaultsSeq.current) return;
+        setFinancialYear(data.financial_year || '');
+        setFormData((prev) => ({
+          ...prev,
+          receiptDate: keepDate ? prev.receiptDate : data.receipt_date || prev.receiptDate,
+          receiptNumber: keepNumber ? prev.receiptNumber : data.receipt_number || prev.receiptNumber,
+        }));
+      })
+      .catch(() => {
+        /* the field stays editable; the server still validates on save */
+      });
+  };
+
+  useEffect(() => {
+    loadReceiptDefaults();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ----------------------------------------------------
   // MEMBERSHIP NUMBER LOOKUP LOGIC (over the members loaded from the server)
@@ -615,6 +661,13 @@ export default function ReceiptEntry() {
     } else if (name === 'mobile') {
       const cleaned = value.replace(/\D/g, '').slice(0, 10);
       setFormData((prev) => ({ ...prev, mobile: cleaned }));
+    } else if (name === 'receiptNumber') {
+      numberTouched.current = true;
+      setFormData((prev) => ({ ...prev, receiptNumber: value }));
+    } else if (name === 'receiptDate') {
+      setFormData((prev) => ({ ...prev, receiptDate: value }));
+      // a different financial year has its own series: re-suggest unless the user typed a number
+      if (value && value.length === 10) loadReceiptDefaults(value, { keepNumber: numberTouched.current, keepDate: true });
     } else if (name === 'membershipNo') {
       setFormData((prev) => ({ ...prev, membershipNo: value }));
       setLookupMembershipNo(value);
@@ -643,13 +696,26 @@ export default function ReceiptEntry() {
     } else if (formData.receiptNumber.trim().length > 50) {
       errors.receiptNumber = 'Receipt No. can be at most 50 characters.';
     } else {
+      const fyOf = (d) => {
+        if (!d || d.length < 7) return '';
+        const y = Number(d.slice(0, 4));
+        const m = Number(d.slice(5, 7));
+        const start = m >= 4 ? y : y - 1;
+        return `${start}-${String(start + 1).slice(-2)}`;
+      };
+      const wantedFy = fyOf(formData.receiptDate);
+      const typed = formData.receiptNumber.trim().toLowerCase();
       const existingMatch = existingReceipts.find(
-        (r) => r.receiptNumber && r.receiptNumber.toLowerCase().trim() === formData.receiptNumber.toLowerCase().trim()
+        (r) =>
+          r.receiptNumber &&
+          r.receiptNumber.toLowerCase().trim() === typed &&
+          (!wantedFy || fyOf(String(r.receiptDate || '')) === wantedFy)
       );
       if (existingMatch) {
-        errors.receiptNumber = 'This Receipt Number already exists. Please enter a unique Receipt No.';
+        errors.receiptNumber = `Receipt number "${formData.receiptNumber.trim()}" already exists in financial year ${wantedFy}. Use a different number, or change the receipt date to another financial year.`;
       }
     }
+
 
     // 2. Receipt Date (Mandatory)
     if (!formData.receiptDate) {
@@ -719,7 +785,29 @@ export default function ReceiptEntry() {
       errors.mobile = 'Mobile number must start with 6, 7, 8 or 9.';
     }
 
+    // Extra particular lines: each needs a particular, an amount, and its sub-type / description
+    for (const [i, l] of extraLines.entries()) {
+      const n = i + 2;
+      if (!l.particular || !activeParticulars.some((p) => p.name === l.particular)) {
+        errors.extraLines = `Line ${n}: choose a particular.`;
+        break;
+      }
+      if (!(Number(l.amount) > 0)) {
+        errors.extraLines = `Line ${n}: enter an amount greater than 0.`;
+        break;
+      }
+      if (activeSubTypesOf(l.particular).length > 0 && !l.subType) {
+        errors.extraLines = `Line ${n}: choose the ${l.particular} sub-type.`;
+        break;
+      }
+      if (l.particular === 'Others' && !l.description.trim()) {
+        errors.extraLines = `Line ${n}: describe the Others amount.`;
+        break;
+      }
+    }
+
     // 10. PAN (If entered, validate standard format)
+
     if (formData.panNo && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.panNo)) {
       errors.panNo = 'Enter a valid 10-character PAN (e.g. ABCDE1234F).';
     }
@@ -728,12 +816,9 @@ export default function ReceiptEntry() {
     if (!selectedMember && formData.membershipNo.trim()) {
       const typed = formData.membershipNo.trim();
       const answered = numberLookup.status === 'done' && numberLookup.number === typed;
-      if (answered && numberLookup.matches.length === 0) {
-        errors.membershipNo = `Membership Number / ID "${typed}" does not exist.`;
-      } else if (answered) {
+      // An unknown number is fine: the receipt is saved unassigned and mapped to a member later.
+      if (answered && numberLookup.matches.length > 0) {
         errors.membershipNo = `This number belongs to ${numberLookup.matches[0].name}. Click "Use this member" to link the receipt, or clear the box.`;
-      } else if (!findMemberByQuery(typed)) {
-        errors.membershipNo = `Membership Number / ID "${typed}" could not be checked. Please wait a moment and try again.`;
       }
     }
 
@@ -772,7 +857,24 @@ export default function ReceiptEntry() {
       particulars: formData.particulars,
       donationSubType: formData.particulars === 'Donation' ? formData.donationSubType : '',
       othersDescription: formData.particulars === 'Others' ? formData.othersDescription.trim() : '',
-      amount: Number(formData.amount),
+      amount: receiptTotal,
+      lines: [
+        {
+          particular: formData.particulars,
+          particularId: currentParticularObj?.id || null,
+          detail:
+            formData.donationSubType ||
+            (formData.particulars === 'Others' ? formData.othersDescription.trim() : '') ||
+            formData.particulars,
+          amount: Number(formData.amount),
+        },
+        ...extraLines.map((l) => ({
+          particular: l.particular,
+          particularId: particularObj(l.particular)?.id || null,
+          detail: l.subType || l.description.trim() || l.particular,
+          amount: Number(l.amount),
+        })),
+      ],
       paymentMode: formData.paymentMode,
       bankAccount: isCash ? '' : formData.bankAccount || formData.paymentMode,
       transactionId: isCash ? '' : formData.transactionId.trim(),
@@ -803,6 +905,10 @@ export default function ReceiptEntry() {
       }
     } catch (error) {
       console.error('Failed to save receipt.', error);
+      if (error.response?.status === 409 && /Receipt number/i.test(error.response?.data?.detail || '')) {
+        setFormErrors((prev) => ({ ...prev, receiptNumber: error.response.data.detail }));
+      }
+
       showToast(apiErrorMessage(error, 'Failed to save the receipt. Please try again.'), 'error');
     } finally {
       setSaving(false);
@@ -817,6 +923,9 @@ export default function ReceiptEntry() {
     setLookupError('');
     setFormData({ ...emptyForm, particulars: defaultParticular });
     setFormErrors({});
+    numberTouched.current = false;
+    setExtraLines([]);
+    loadReceiptDefaults();
   };
 
   // ----------------------------------------------------
@@ -1120,7 +1229,7 @@ export default function ReceiptEntry() {
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
               Receipt Entry
             </h1>
           </div>
@@ -1202,6 +1311,7 @@ export default function ReceiptEntry() {
                   <div>
                     <label className="block text-xs font-bold text-[#180200] mb-1">
                       Receipt No. <span className="text-[#ED4636]">*</span>
+                      {financialYear && <span className="ml-1 font-normal text-[#863221]">(FY {financialYear})</span>}
                     </label>
                     <input
                       type="text"
@@ -1595,6 +1705,102 @@ export default function ReceiptEntry() {
                   </div>
                 </div>
 
+                {/* More particulars on the same receipt */}
+                <div className="space-y-2">
+                  {extraLines.map((l, idx) => {
+                    const subs = activeSubTypesOf(l.particular);
+                    return (
+                      <div key={l.key} className="grid grid-cols-12 gap-2 items-start p-2.5 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2]/60">
+                        <div className="col-span-12 sm:col-span-4">
+                          <label className="block text-[11px] font-bold text-[#180200] mb-1">Particulars (line {idx + 2})</label>
+                          <select
+                            value={l.particular}
+                            onChange={(e) => updateExtraLine(l.key, { particular: e.target.value, subType: '', description: '' })}
+                            className="w-full px-2 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs font-semibold text-[#180200] focus:outline-none focus:border-[#510601] cursor-pointer"
+                          >
+                            <option value="">Select</option>
+                            {activeParticulars.map((opt) => (
+                              <option key={opt.id || opt.name} value={opt.name}>{opt.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="col-span-12 sm:col-span-4">
+                          <label className="block text-[11px] font-bold text-[#180200] mb-1">
+                            {subs.length > 0 ? 'Sub-Type' : l.particular === 'Others' ? 'Description' : 'Details (optional)'}
+                          </label>
+                          {subs.length > 0 ? (
+                            <select
+                              value={l.subType}
+                              onChange={(e) => updateExtraLine(l.key, { subType: e.target.value })}
+                              className="w-full px-2 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs font-semibold text-[#180200] focus:outline-none focus:border-[#510601] cursor-pointer"
+                            >
+                              <option value="">Select sub-type</option>
+                              {subs.map((st) => (
+                                <option key={st.id || st.name} value={st.name}>{st.name}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={l.description}
+                              onChange={(e) => updateExtraLine(l.key, { description: e.target.value })}
+                              className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601]"
+                            />
+                          )}
+                        </div>
+                        <div className="col-span-10 sm:col-span-3">
+                          <label className="block text-[11px] font-bold text-[#180200] mb-1">Amount</label>
+                          <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#863221]/70">₹</span>
+                            <input
+                              type="text"
+                              value={l.amount}
+                              onChange={(e) => updateExtraLine(l.key, { amount: e.target.value.replace(/\D/g, '') })}
+                              className="w-full pl-7 pr-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs font-mono font-bold text-[#180200] focus:outline-none focus:border-[#510601]"
+                            />
+                          </div>
+                        </div>
+                        <div className="col-span-2 sm:col-span-1 flex sm:justify-end pt-5">
+                          <button
+                            type="button"
+                            title="Remove this line"
+                            onClick={() => setExtraLines((prev) => prev.filter((x) => x.key !== l.key))}
+                            className="p-2 rounded-lg text-[#ED4636] hover:bg-red-50 cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {formErrors.extraLines && (
+                    <p className="text-[11px] text-[#ED4636] font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      {formErrors.extraLines}
+                    </p>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setExtraLines((prev) => [...prev, emptyLine()])}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#510601] border border-dashed border-[#510601]/40 rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Add another particular
+                    </button>
+                    {extraLines.length > 0 && (
+                      <div className="text-right">
+                        <div className="text-xs font-bold text-[#180200]">
+                          Total: <span className="font-mono">₹{receiptTotal.toLocaleString('en-IN')}</span>
+                        </div>
+                        <div className="text-[10px] text-[#863221]/80 italic">{numberToWords(receiptTotal)}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
                 {/* Row 5: Transaction ID & Transaction Date */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* 11. Transaction Id */}
@@ -1944,9 +2150,6 @@ export default function ReceiptEntry() {
                     <h2 className="text-sm sm:text-base font-bold text-[#180200]">
                       Membership List
                     </h2>
-                    <p className="text-xs text-[#863221]">
-                      Search and select an existing member to auto-fill into receipt form
-                    </p>
                   </div>
                 </div>
 
@@ -2160,9 +2363,6 @@ export default function ReceiptEntry() {
                 <h3 className="text-sm sm:text-base font-bold text-[#180200]">
                   Unapproved Members
                 </h3>
-                <p className="text-xs text-[#863221]">
-                  Unassigned members awaiting receipt assignment
-                </p>
               </div>
             </div>
 
@@ -2372,7 +2572,6 @@ export default function ReceiptEntry() {
         <div className="p-4 border-b border-[#E8DFD8] bg-[#FAF7F2]/60 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-bold text-[#180200]">Renewals due</h3>
-            <p className="text-[11px] text-[#863221]">Members whose membership needs a renewal payment.</p>
           </div>
           <div className="relative w-full sm:w-72">
             <Search className="w-3.5 h-3.5 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2" />

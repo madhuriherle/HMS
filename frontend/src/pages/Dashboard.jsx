@@ -174,7 +174,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
             Welcome to HMS
           </h1>
         </div>

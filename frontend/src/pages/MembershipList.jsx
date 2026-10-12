@@ -428,7 +428,7 @@ export default function MembershipList() {
           }
         }
       } catch (err) {
-        console.error("API Fetch Error", err);
+        console.error("API Fetch Error", err); showToast(err.response?.data?.detail || 'Could not load data from the server.', 'error');
       }
 
       // Clear previously auto-populated location fields
@@ -656,7 +656,7 @@ export default function MembershipList() {
       {/* ---------------------------------------------------- */}
       <SearchFilterBar
         
-        title={<h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Membership List</h1>}
+        title={<h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Membership List</h1>}
         searchQuery={searchQuery}
         onSearchChange={(val) => {
           setSearchQuery(val);

@@ -117,7 +117,7 @@ export default function BankDetailsManagement() {
       });
       setPaymentConfigs(mapped);
     } catch(err) {
-      console.error(err);
+      console.error(err); showToast(err.response?.data?.detail || 'Could not load data from the server.', 'error');
     }
   };
 
@@ -202,17 +202,15 @@ export default function BankDetailsManagement() {
   const openAddModal = () => {
     setModalMode('add');
     setEditingItem(null);
-    const defaultBank = AVAILABLE_BANK_ACCOUNTS[0] || '';
-    const lookup = BANK_DETAILS_LOOKUP[defaultBank] || {};
     setFormData({
-      paymentMode: AVAILABLE_PAYMENT_MODES[0] || '__CUSTOM__',
+      paymentMode: '',
       customPaymentMode: '',
       paymentType: 'Online',
-      bankAccount: defaultBank,
+      bankAccount: '',
       customBankAccount: '',
-      branch: lookup.branch || '',
-      ifscCode: lookup.ifscCode || '',
-      accountNumber: lookup.accountNumber || '',
+      branch: '',
+      ifscCode: '',
+      accountNumber: '',
       status: 'Active'
     });
     setFormErrors({});
@@ -222,69 +220,38 @@ export default function BankDetailsManagement() {
   const openEditModal = (config) => {
     setModalMode('edit');
     setEditingItem(config);
-    const isCustomMode = !AVAILABLE_PAYMENT_MODES.includes(config.paymentMode);
-    const isCustomBank = config.bankAccount && !AVAILABLE_BANK_ACCOUNTS.includes(config.bankAccount);
-    const lookup = BANK_DETAILS_LOOKUP[config.bankAccount] || {};
-
     setFormData({
-      paymentMode: isCustomMode ? '__CUSTOM__' : config.paymentMode,
-      customPaymentMode: isCustomMode ? config.paymentMode : '',
+      paymentMode: config.paymentMode || '',
+      customPaymentMode: '',
       paymentType: config.paymentType || (config.paymentMode === 'Cash' ? 'Offline' : 'Online'),
-      bankAccount: isCustomBank ? '__CUSTOM__' : (config.bankAccount || (config.paymentMode === 'Cash' ? '' : (AVAILABLE_BANK_ACCOUNTS[0] || ''))),
-      customBankAccount: isCustomBank ? config.bankAccount : '',
-      branch: config.branch || lookup.branch || '',
-      ifscCode: config.ifscCode || lookup.ifscCode || '',
-      accountNumber: config.accountNumber || lookup.accountNumber || '',
+      bankAccount: config.bankAccount || '',
+      customBankAccount: '',
+      branch: config.branch || '',
+      ifscCode: config.ifscCode || '',
+      accountNumber: config.accountNumber || '',
       status: config.status || 'Active'
     });
     setFormErrors({});
     setIsAddEditOpen(true);
   };
 
+  const isOfflineMode = (mode) => ['cash', 'cheque', 'dd'].includes((mode || '').trim().toLowerCase());
+
   const handlePaymentModeChange = (e) => {
     const val = e.target.value;
-    let autoType = 'Online';
-    let autoBank = formData.bankAccount;
-
-    if (val === 'Cash' || val === 'Cheque' || val === 'DD') {
-      autoType = 'Offline';
-      autoBank = '';
-    } else {
-      autoType = 'Online';
-      if (!autoBank) {
-        autoBank = AVAILABLE_BANK_ACCOUNTS[0] || '';
-      }
-    }
-
-    const lookup = BANK_DETAILS_LOOKUP[autoBank] || {};
-
     setFormData((prev) => ({
       ...prev,
       paymentMode: val,
-      paymentType: autoType,
-      bankAccount: autoBank,
-      branch: autoType === 'Offline' ? '' : (prev.branch || lookup.branch || ''),
-      ifscCode: autoType === 'Offline' ? '' : (prev.ifscCode || lookup.ifscCode || ''),
-      accountNumber: autoType === 'Offline' ? '' : (prev.accountNumber || lookup.accountNumber || '')
+      paymentType: isOfflineMode(val) ? 'Offline' : 'Online',
+      bankAccount: isOfflineMode(val) ? '' : prev.bankAccount
     }));
-
     if (formErrors.paymentMode) {
       setFormErrors((prev) => ({ ...prev, paymentMode: '' }));
     }
   };
 
   const handleBankAccountChange = (e) => {
-    const val = e.target.value;
-    const lookup = BANK_DETAILS_LOOKUP[val] || {};
-
-    setFormData((prev) => ({
-      ...prev,
-      bankAccount: val,
-      branch: lookup.branch || prev.branch || '',
-      ifscCode: lookup.ifscCode || prev.ifscCode || '',
-      accountNumber: lookup.accountNumber || prev.accountNumber || ''
-    }));
-
+    setFormData((prev) => ({ ...prev, bankAccount: e.target.value }));
     if (formErrors.bankAccount) {
       setFormErrors((prev) => ({ ...prev, bankAccount: '' }));
     }
@@ -344,15 +311,6 @@ export default function BankDetailsManagement() {
       if (!effectiveBank) {
         errors.bankAccount = 'Bank Account is mandatory for Online payment mode.';
       }
-      if (!formData.branch?.trim()) {
-        errors.branch = 'Branch name is mandatory.';
-      }
-      if (!formData.ifscCode?.trim()) {
-        errors.ifscCode = 'IFSC Code is mandatory.';
-      }
-      if (!formData.accountNumber?.trim()) {
-        errors.accountNumber = 'Account Number is mandatory.';
-      }
     }
 
     // Check duplicate configuration (same Payment Mode + Bank Account)
@@ -397,21 +355,12 @@ export default function BankDetailsManagement() {
       if (!isOffline && effectiveBank) {
         const banksRes = await api.get('/masters/banks?limit=1000');
         const banks = banksRes.data?.data || [];
-        // Same bank + same account (blank counts as blank) is one bank, so saving never makes a duplicate
         const norm = (v) => String(v || '').trim().toLowerCase();
-        let bank = banks.find(
-          (b) => norm(b.name_en) === norm(effectiveBank) && norm(b.account_number) === norm(formData.accountNumber)
-        );
-        
+        let bank = banks.find((b) => norm(b.name_en) === norm(effectiveBank));
+
         if (!bank) {
           const bankCode = effectiveBank.substring(0,3).toUpperCase() + Date.now().toString().slice(-4);
-          const newBankRes = await api.post('/masters/banks', {
-            code: bankCode,
-            name_en: effectiveBank,
-            account_number: formData.accountNumber.trim(),
-            branch_name: formData.branch.trim(),
-            ifsc_code: formData.ifscCode.trim().toUpperCase()
-          });
+          const newBankRes = await api.post('/masters/banks', { code: bankCode, name_en: effectiveBank });
           finalBankId = newBankRes.data.id;
         } else {
           finalBankId = bank.id;
@@ -532,7 +481,7 @@ export default function BankDetailsManagement() {
       {/* Breadcrumbs & Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#E8DFD8] pb-5">
         <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
               Payment Mode Configuration
             </h1>
         </div>
@@ -830,37 +779,24 @@ export default function BankDetailsManagement() {
           {/* Modal Form */}
           <form onSubmit={handleSaveForm} className="flex flex-col flex-1 overflow-hidden">
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {/* Field: Payment Mode * */}
+            {/* Field: Payment Mode */}
             <div>
               <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
                 Payment Mode <span className="text-[#ED4636]">*</span>
               </label>
-              <select
+              <input
+                type="text"
                 name="paymentMode"
+                list="payment-mode-options"
                 value={formData.paymentMode}
                 onChange={handlePaymentModeChange}
-                className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm font-semibold text-[#180200] focus:outline-none cursor-pointer"
-              >
+                className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm text-[#180200] focus:outline-none"
+              />
+              <datalist id="payment-mode-options">
                 {AVAILABLE_PAYMENT_MODES.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
+                  <option key={opt} value={opt} />
                 ))}
-                <option value="__CUSTOM__">+ Other / Custom Payment Mode</option>
-              </select>
-
-              {formData.paymentMode === '__CUSTOM__' && (
-                <div className="mt-2">
-                  <input
-                    type="text"
-                    name="customPaymentMode"
-                    value={formData.customPaymentMode}
-                    onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none uppercase"
-                  />
-                </div>
-              )}
-
+              </datalist>
               {formErrors.paymentMode && (
                 <p className="mt-1 text-xs text-red-600 flex items-center gap-1 font-medium">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -869,152 +805,31 @@ export default function BankDetailsManagement() {
               )}
             </div>
 
-            {/* Field: Bank Account (Conditional) */}
+            {/* Field: Bank Account (not for Cash / Cheque / DD) */}
             <div>
               <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                Bank Account{' '}
-                {formData.paymentMode !== 'Cash' && formData.paymentMode !== 'Cheque' && formData.paymentMode !== 'DD' ? (
-                  <span className="text-[#ED4636]">*</span>
-                ) : (
-                  <span className="text-gray-400 font-normal lowercase">(not applicable)</span>
-                )}
+                Bank Account {!isOfflineMode(formData.paymentMode) && <span className="text-[#ED4636]">*</span>}
               </label>
-
-              {formData.paymentMode === 'Cash' || formData.paymentMode === 'Cheque' || formData.paymentMode === 'DD' ? (
-                <div className="px-3.5 py-2.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-sm text-[#863221] italic flex items-center justify-between">
-                  <span>Not Applicable for {formData.paymentMode}</span>
-                  <span className="text-xs font-semibold px-2 py-0.5 bg-white border border-[#E8DFD8] rounded text-[#510601]">
-                    NA
-                  </span>
-                </div>
-              ) : (
-                <>
-                  <select
-                    name="bankAccount"
-                    value={formData.bankAccount}
-                    onChange={handleBankAccountChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm font-semibold text-[#180200] focus:outline-none cursor-pointer"
-                  >
-                    {AVAILABLE_BANK_ACCOUNTS.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
-                      </option>
-                    ))}
-                    <option value="__CUSTOM__">+ Other / Custom Bank Account</option>
-                  </select>
-
-                  {formData.bankAccount === '__CUSTOM__' && (
-                    <div className="mt-2">
-                      <input
-                        type="text"
-                        name="customBankAccount"
-                        value={formData.customBankAccount}
-                        onChange={handleInputChange}
-                        className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none uppercase"
-                      />
-                    </div>
-                  )}
-
-                  {formErrors.bankAccount && (
-                    <p className="mt-1 text-xs text-red-600 flex items-center gap-1 font-medium">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>{formErrors.bankAccount}</span>
-                    </p>
-                  )}
-                </>
+              <input
+                type="text"
+                name="bankAccount"
+                list="bank-account-options"
+                value={formData.bankAccount}
+                onChange={handleBankAccountChange}
+                disabled={isOfflineMode(formData.paymentMode)}
+                className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm text-[#180200] focus:outline-none disabled:bg-[#FAF7F2] disabled:cursor-not-allowed"
+              />
+              <datalist id="bank-account-options">
+                {AVAILABLE_BANK_ACCOUNTS.map((opt) => (
+                  <option key={opt} value={opt} />
+                ))}
+              </datalist>
+              {formErrors.bankAccount && (
+                <p className="mt-1 text-xs text-red-600 flex items-center gap-1 font-medium">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{formErrors.bankAccount}</span>
+                </p>
               )}
-            </div>
-
-            {/* Online Bank Details: Branch, IFSC Code, Account Number */}
-            {formData.paymentMode !== 'Cash' && formData.paymentMode !== 'Cheque' && formData.paymentMode !== 'DD' && (
-              <div className="space-y-4 pt-1 border-t border-[#E8DFD8]/60">
-                {/* Branch */}
-                <div>
-                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                    Branch <span className="text-[#ED4636]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="branch"
-                    value={formData.branch || ''}
-                    onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none"
-                  />
-                  {formErrors.branch && (
-                    <p className="mt-1 text-xs text-red-600 flex items-center gap-1 font-medium">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>{formErrors.branch}</span>
-                    </p>
-                  )}
-                </div>
-
-                {/* IFSC Code */}
-                <div>
-                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                    IFSC Code <span className="text-[#ED4636]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="ifscCode"
-                    value={formData.ifscCode || ''}
-                    onChange={handleInputChange}
-                    maxLength={11}
-                    className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm font-mono uppercase text-[#180200] placeholder-[#863221]/40 focus:outline-none"
-                  />
-                  {formErrors.ifscCode && (
-                    <p className="mt-1 text-xs text-red-600 flex items-center gap-1 font-medium">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>{formErrors.ifscCode}</span>
-                    </p>
-                  )}
-                </div>
-
-                {/* Account Number */}
-                <div>
-                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                    Account Number <span className="text-[#ED4636]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="accountNumber"
-                    value={formData.accountNumber || ''}
-                    onChange={handleInputChange}
-                    className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm font-mono text-[#180200] placeholder-[#863221]/40 focus:outline-none"
-                  />
-                  {formErrors.accountNumber && (
-                    <p className="mt-1 text-xs text-red-600 flex items-center gap-1 font-medium">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>{formErrors.accountNumber}</span>
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Live Preview Box (Styled exactly like the clean input/select field above it) */}
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                Receipt Form Display Preview
-              </label>
-              <div className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-semibold text-[#180200] shadow-2xs">
-                {previewLabel}
-              </div>
-            </div>
-
-            {/* Field: Status */}
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                Status
-              </label>
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleInputChange}
-                className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm font-semibold text-[#180200] focus:outline-none cursor-pointer"
-              >
-                <option value="Active">Active (Available in Receipt dropdown)</option>
-                <option value="Inactive">Inactive (Disabled for new receipts)</option>
-              </select>
             </div>
 
             {/* Modal Buttons */}

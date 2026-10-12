@@ -80,7 +80,7 @@ export default function LocationSetup() {
       });
       setStatesSummary(sMap);
     } catch (err) {
-      console.error(err);
+      console.error(err); showToast(err.response?.data?.detail || 'Could not load data from the server.', 'error');
     }
   };
 
@@ -200,7 +200,7 @@ export default function LocationSetup() {
           setTotalPostalPages(Math.max(1, Math.ceil((data?.total || 0) / postalPageSize)));
           setPostalTotalRecords(data?.total || 0);
         } catch (err) {
-          console.error(err);
+          console.error(err); showToast(err.response?.data?.detail || 'Could not load data from the server.', 'error');
         }
       };
       fetchPostalCodes();
@@ -929,7 +929,7 @@ export default function LocationSetup() {
       <div>
 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Location Setup</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Location Setup</h1>
 
           </div>
         </div>
@@ -2243,9 +2243,6 @@ export default function LocationSetup() {
                 <h3 className="text-base font-bold text-[#180200]">
                   Bulk Import PIN Code Directory
                 </h3>
-                <p className="text-xs text-[#863221]">
-                  Import multiple postal code mappings using CSV or Excel spreadsheet format.
-                </p>
               </div>
             </div>
             <button

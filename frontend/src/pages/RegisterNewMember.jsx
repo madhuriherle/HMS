@@ -12,7 +12,12 @@ import {
   MapPin,
   Save,
   ArrowLeft,
-  Tag
+  Tag,
+  Plus,
+  Trash2,
+  Search,
+  Users,
+  Heart
 } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';
@@ -131,6 +136,15 @@ export default function RegisterNewMember() {
     nameTitle: 'SRI.',
     name: '',
     fatherHusbandName: '',
+    fatherName: '',
+    fatherMembershipNo: '',
+    motherName: '',
+    motherMembershipNo: '',
+    isMarried: 'NO',
+    spouseName: '',
+    spouseMembershipNo: '',
+    hasChildren: 'NO',
+    children: [],
     mobileCountryCode: '+91',
     mobileCountryIso: 'IN',
     mobile: '',
@@ -256,7 +270,23 @@ export default function RegisterNewMember() {
           photoUrl,
           nameTitle: m.name_title || (gender === 'Female' ? 'MS.' : 'SRI.'),
           name: [m.first_name_en, m.middle_name_en, m.last_name_en].filter(Boolean).join(' '),
-          fatherHusbandName: m.father_husband_name || '',
+          fatherHusbandName: m.father_name || m.father_husband_name || '',
+          fatherName: m.father_name || m.father_husband_name || '',
+          fatherMembershipNo: m.father_membership_number || '',
+          motherName: m.mother_name || '',
+          motherMembershipNo: m.mother_membership_number || '',
+          isMarried: m.is_married ? 'YES' : 'NO',
+          spouseName: m.spouse_name || '',
+          spouseMembershipNo: m.spouse_membership_number || '',
+          hasChildren: m.has_children ? 'YES' : (Array.isArray(m.children_details) && m.children_details.length > 0 ? 'YES' : 'NO'),
+          children: Array.isArray(m.children_details)
+            ? m.children_details.map((c) => ({
+                name: c.name || '',
+                gender: c.gender || 'Male',
+                membershipNo: c.membership_number || '',
+                dob: c.dob || ''
+              }))
+            : [],
           mobileCountryCode: dial,
           mobileCountryIso: COUNTRY_CODES.find((c) => c.dialCode === dial)?.code || 'IN',
           mobile: m.mobile || '',
@@ -578,7 +608,7 @@ export default function RegisterNewMember() {
   const validateForm = () => {
     const errors = {};
     const cleanName = formData.name.trim();
-    const cleanFather = formData.fatherHusbandName.trim();
+    const cleanFather = (formData.fatherName || formData.fatherHusbandName || '').trim();
     const cleanAadhar = formData.aadharNumber.trim();
     const cleanAddress = formData.address.trim();
     const cleanPin = formData.postalCode.trim();
@@ -592,7 +622,12 @@ export default function RegisterNewMember() {
     }
 
     if (!cleanFather) {
-      errors.fatherHusbandName = 'Father / Husband Name is required';
+      errors.fatherName = "Father's Name is required";
+      errors.fatherHusbandName = "Father's Name is required";
+    }
+
+    if (formData.isMarried === 'YES' && !(formData.spouseName || '').trim()) {
+      errors.spouseName = 'Spouse Name is required when married';
     }
 
     // International Mobile Validation
@@ -691,6 +726,71 @@ export default function RegisterNewMember() {
   };
 
   // ----------------------------------------------------
+  // FAMILY LOOKUP & CHILDREN HANDLERS
+  // ----------------------------------------------------
+  const [memberLookupState, setMemberLookupState] = useState({});
+
+  const performMemberLookup = async (fieldKey, number) => {
+    const clean = (number || '').trim();
+    if (!clean || clean.length < 3) return;
+    setMemberLookupState((prev) => ({ ...prev, [fieldKey]: { loading: true } }));
+    try {
+      const res = await api.get('/members/lookup', { params: { number: clean } });
+      if (res.data?.found && res.data?.member) {
+        const m = res.data.member;
+        setMemberLookupState((prev) => ({
+          ...prev,
+          [fieldKey]: { loading: false, verified: true, name: m.name, memberCode: m.member_code || m.membership_number }
+        }));
+        if (fieldKey === 'father' && !formData.fatherName) {
+          setFormData((prev) => ({ ...prev, fatherName: m.name, fatherHusbandName: m.name }));
+        } else if (fieldKey === 'mother' && !formData.motherName) {
+          setFormData((prev) => ({ ...prev, motherName: m.name }));
+        } else if (fieldKey === 'spouse' && !formData.spouseName) {
+          setFormData((prev) => ({ ...prev, spouseName: m.name }));
+        }
+      } else {
+        setMemberLookupState((prev) => ({
+          ...prev,
+          [fieldKey]: { loading: false, verified: false, error: 'No member found' }
+        }));
+      }
+    } catch {
+      setMemberLookupState((prev) => ({
+        ...prev,
+        [fieldKey]: { loading: false, verified: false, error: 'Lookup failed' }
+      }));
+    }
+  };
+
+  const handleAddChild = () => {
+    setFormData((prev) => ({
+      ...prev,
+      hasChildren: 'YES',
+      children: [...(prev.children || []), { name: '', gender: 'Male', membershipNo: '', dob: '' }]
+    }));
+  };
+
+  const handleRemoveChild = (index) => {
+    setFormData((prev) => {
+      const filtered = (prev.children || []).filter((_, i) => i !== index);
+      return {
+        ...prev,
+        children: filtered,
+        hasChildren: filtered.length > 0 ? prev.hasChildren : 'NO'
+      };
+    });
+  };
+
+  const handleChildChange = (index, key, val) => {
+    setFormData((prev) => {
+      const updated = [...(prev.children || [])];
+      updated[index] = { ...updated[index], [key]: val };
+      return { ...prev, children: updated };
+    });
+  };
+
+  // ----------------------------------------------------
   // SAVE (server calls)
   // ----------------------------------------------------
   const buildPayload = () => {
@@ -703,7 +803,25 @@ export default function RegisterNewMember() {
       first_name_en: parts[0],
       middle_name_en: parts.length > 2 ? parts.slice(1, -1).join(' ') : null,
       last_name_en: parts.length > 1 ? parts[parts.length - 1] : null,
-      father_husband_name: formData.fatherHusbandName.trim(),
+      father_husband_name: (formData.fatherName || formData.spouseName || formData.fatherHusbandName || '').trim() || null,
+      father_name: (formData.fatherName || formData.fatherHusbandName || '').trim() || null,
+      father_membership_number: (formData.fatherMembershipNo || '').trim() || null,
+      mother_name: (formData.motherName || '').trim() || null,
+      mother_membership_number: (formData.motherMembershipNo || '').trim() || null,
+      is_married: formData.isMarried === 'YES',
+      spouse_name: formData.isMarried === 'YES' ? (formData.spouseName || '').trim() || null : null,
+      spouse_membership_number: formData.isMarried === 'YES' ? (formData.spouseMembershipNo || '').trim() || null : null,
+      has_children: formData.hasChildren === 'YES',
+      children_details: formData.hasChildren === 'YES' && Array.isArray(formData.children)
+        ? formData.children
+            .filter((c) => c && c.name && c.name.trim())
+            .map((c) => ({
+              name: c.name.trim(),
+              gender: c.gender || 'Male',
+              membership_number: (c.membershipNo || '').trim() || null,
+              dob: toISODate(c.dob) || null
+            }))
+        : [],
       mobile: formData.mobile.trim(),
       mobile_country_code: formData.mobileCountryCode,
       whatsapp_number: (formData.whatsappNumber || '').trim() || null,
@@ -829,7 +947,7 @@ export default function RegisterNewMember() {
         </nav>
         <div className="flex items-center justify-between gap-4 w-full">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#180200] tracking-tight flex items-center gap-3">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-[#180200] tracking-tight flex items-center gap-3">
               <span>{isViewMode ? 'View Member Details' : isEditMode ? 'Edit Member Details' : 'Register New Member'}</span>
               {(isViewMode || isEditMode) && targetMember?.registrationNumber && (
                 <span className="font-mono text-sm font-bold bg-[#FAF7F2] text-[#510601] px-3 py-1 rounded-xl border border-[#E8DFD8]" title="Registration Number">
@@ -1038,26 +1156,28 @@ export default function RegisterNewMember() {
                       )}
                     </div>
 
-                    {/* Father / Husband Name */}
+                    {/* Father Name */}
                     <div>
                       <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        Father / Husband Name: <span className="text-red-600">*</span>
+                        Father's Name: <span className="text-red-600">*</span>
                       </label>
                       <input
                         type="text"
-                        value={formData.fatherHusbandName}
+                        placeholder="Father's Full Name"
+                        value={formData.fatherName || formData.fatherHusbandName}
                         onChange={(e) => {
-                          setFormData({ ...formData, fatherHusbandName: e.target.value });
-                          if (formErrors.fatherHusbandName)
-                            setFormErrors({ ...formErrors, fatherHusbandName: '' });
+                          const val = e.target.value;
+                          setFormData({ ...formData, fatherName: val, fatherHusbandName: val });
+                          if (formErrors.fatherName || formErrors.fatherHusbandName)
+                            setFormErrors({ ...formErrors, fatherName: '', fatherHusbandName: '' });
                         }}
-
-                        className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${formErrors.fatherHusbandName ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
-                          }`}
+                        className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                          (formErrors.fatherName || formErrors.fatherHusbandName) ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                        }`}
                       />
-                      {formErrors.fatherHusbandName && (
+                      {(formErrors.fatherName || formErrors.fatherHusbandName) && (
                         <p className="text-[11px] text-red-600 mt-1">
-                          {formErrors.fatherHusbandName}
+                          {formErrors.fatherName || formErrors.fatherHusbandName}
                         </p>
                       )}
                     </div>
@@ -1459,6 +1579,353 @@ export default function RegisterNewMember() {
                     </select>
                     {formErrors.magazineNeeded && (
                       <p className="text-[11px] text-red-600 mt-1">{formErrors.magazineNeeded}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* ═══════════════════════════════════════════════════════ */}
+                {/* Section: Family & Relationship Details (ಕುಟುಂಬದ ವಿವರಗಳು) */}
+                {/* ═══════════════════════════════════════════════════════ */}
+                <div className="pt-4 border-t border-[#DFD5CC] space-y-5">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-[#8C1801]" />
+                    <h3 className="text-sm font-bold text-[#8C1801]">
+                      Family & Relationship Details (ಕುಟುಂಬದ ವಿವರಗಳು)
+                    </h3>
+                  </div>
+
+                  {/* 1. Parents Details */}
+                  <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E8DFD8] space-y-4">
+                    <h4 className="text-xs font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
+                      <span>Parents Details (ತಂದೆ / ತಾಯಿಯ ವಿವರಗಳು)</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      {/* Father's Info */}
+                      <div className="space-y-3 bg-white p-3.5 rounded-lg border border-[#DFD5CC]">
+                        <div>
+                          <label className="block text-xs text-[#3D140C] mb-1 font-semibold">
+                            Father's Name: <span className="text-red-600">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Father's Full Name"
+                            value={formData.fatherName || formData.fatherHusbandName}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setFormData({ ...formData, fatherName: v, fatherHusbandName: v });
+                              if (formErrors.fatherName || formErrors.fatherHusbandName) {
+                                setFormErrors({ ...formErrors, fatherName: '', fatherHusbandName: '' });
+                              }
+                            }}
+                            className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                              (formErrors.fatherName || formErrors.fatherHusbandName) ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC]'
+                            }`}
+                          />
+                          {(formErrors.fatherName || formErrors.fatherHusbandName) && (
+                            <p className="text-[11px] text-red-600 mt-1">{formErrors.fatherName || formErrors.fatherHusbandName}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-[#3D140C] mb-1 font-semibold">
+                            Father's Membership Number (if any):
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="e.g. HMS-00123"
+                              value={formData.fatherMembershipNo}
+                              onChange={(e) => setFormData({ ...formData, fatherMembershipNo: e.target.value })}
+                              className="flex-1 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => performMemberLookup('father', formData.fatherMembershipNo)}
+                              disabled={!formData.fatherMembershipNo || memberLookupState.father?.loading}
+                              className="px-3 py-2 bg-[#510601] hover:bg-[#8C1801] disabled:opacity-50 text-white text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Search className="w-3.5 h-3.5" />
+                              <span>{memberLookupState.father?.loading ? '...' : 'Verify'}</span>
+                            </button>
+                          </div>
+                          {memberLookupState.father?.verified && (
+                            <p className="text-xs text-emerald-700 mt-1 font-semibold flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Verified: {memberLookupState.father.name}
+                            </p>
+                          )}
+                          {memberLookupState.father?.error && (
+                            <p className="text-xs text-amber-700 mt-1 font-medium flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5" /> {memberLookupState.father.error}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Mother's Info */}
+                      <div className="space-y-3 bg-white p-3.5 rounded-lg border border-[#DFD5CC]">
+                        <div>
+                          <label className="block text-xs text-[#3D140C] mb-1 font-semibold">
+                            Mother's Name:
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Mother's Full Name"
+                            value={formData.motherName}
+                            onChange={(e) => setFormData({ ...formData, motherName: e.target.value })}
+                            className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-[#3D140C] mb-1 font-semibold">
+                            Mother's Membership Number (if any):
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="e.g. HMS-00124"
+                              value={formData.motherMembershipNo}
+                              onChange={(e) => setFormData({ ...formData, motherMembershipNo: e.target.value })}
+                              className="flex-1 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => performMemberLookup('mother', formData.motherMembershipNo)}
+                              disabled={!formData.motherMembershipNo || memberLookupState.mother?.loading}
+                              className="px-3 py-2 bg-[#510601] hover:bg-[#8C1801] disabled:opacity-50 text-white text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Search className="w-3.5 h-3.5" />
+                              <span>{memberLookupState.mother?.loading ? '...' : 'Verify'}</span>
+                            </button>
+                          </div>
+                          {memberLookupState.mother?.verified && (
+                            <p className="text-xs text-emerald-700 mt-1 font-semibold flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Verified: {memberLookupState.mother.name}
+                            </p>
+                          )}
+                          {memberLookupState.mother?.error && (
+                            <p className="text-xs text-amber-700 mt-1 font-medium flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5" /> {memberLookupState.mother.error}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Marital Status & Spouse Details */}
+                  <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E8DFD8] space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-xs font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
+                          <Heart className="w-3.5 h-3.5 text-[#8C1801]" />
+                          <span>Marital Status & Spouse (ವೈವಾಹಿಕ ಸ್ಥಿತಿ)</span>
+                        </h4>
+                        <p className="text-xs text-stone-600 mt-0.5">Are you married?</p>
+                      </div>
+
+                      <div className="inline-flex rounded-lg border border-[#DFD5CC] bg-white p-0.5 shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, isMarried: 'NO' })}
+                          className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                            formData.isMarried !== 'YES'
+                              ? 'bg-[#510601] text-white shadow-xs'
+                              : 'text-stone-700 hover:text-[#510601]'
+                          }`}
+                        >
+                          No (ಅವಿವಾಹಿತ)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, isMarried: 'YES' })}
+                          className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                            formData.isMarried === 'YES'
+                              ? 'bg-[#510601] text-white shadow-xs'
+                              : 'text-stone-700 hover:text-[#510601]'
+                          }`}
+                        >
+                          Yes (ವಿವಾಹಿತ)
+                        </button>
+                      </div>
+                    </div>
+
+                    {formData.isMarried === 'YES' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-3 border-t border-[#DFD5CC] bg-white p-3.5 rounded-lg border">
+                        <div>
+                          <label className="block text-xs text-[#3D140C] mb-1 font-semibold">
+                            Spouse Name: <span className="text-red-600">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Spouse's Full Name"
+                            value={formData.spouseName}
+                            onChange={(e) => {
+                              setFormData({ ...formData, spouseName: e.target.value });
+                              if (formErrors.spouseName) setFormErrors({ ...formErrors, spouseName: '' });
+                            }}
+                            className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                              formErrors.spouseName ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC]'
+                            }`}
+                          />
+                          {formErrors.spouseName && (
+                            <p className="text-[11px] text-red-600 mt-1">{formErrors.spouseName}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-[#3D140C] mb-1 font-semibold">
+                            Spouse Membership Number (if any):
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              placeholder="e.g. HMS-00125"
+                              value={formData.spouseMembershipNo}
+                              onChange={(e) => setFormData({ ...formData, spouseMembershipNo: e.target.value })}
+                              className="flex-1 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => performMemberLookup('spouse', formData.spouseMembershipNo)}
+                              disabled={!formData.spouseMembershipNo || memberLookupState.spouse?.loading}
+                              className="px-3 py-2 bg-[#510601] hover:bg-[#8C1801] disabled:opacity-50 text-white text-xs font-semibold rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Search className="w-3.5 h-3.5" />
+                              <span>{memberLookupState.spouse?.loading ? '...' : 'Verify'}</span>
+                            </button>
+                          </div>
+                          {memberLookupState.spouse?.verified && (
+                            <p className="text-xs text-emerald-700 mt-1 font-semibold flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Verified: {memberLookupState.spouse.name}
+                            </p>
+                          )}
+                          {memberLookupState.spouse?.error && (
+                            <p className="text-xs text-amber-700 mt-1 font-medium flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5" /> {memberLookupState.spouse.error}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Children Details */}
+                  <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E8DFD8] space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-xs font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-[#8C1801]" />
+                          <span>Children Details (ಮಕ್ಕಳ ವಿವರಗಳು)</span>
+                        </h4>
+                        <p className="text-xs text-stone-600 mt-0.5">Do you have children?</p>
+                      </div>
+
+                      <div className="inline-flex rounded-lg border border-[#DFD5CC] bg-white p-0.5 shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, hasChildren: 'NO' })}
+                          className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                            formData.hasChildren !== 'YES'
+                              ? 'bg-[#510601] text-white shadow-xs'
+                              : 'text-stone-700 hover:text-[#510601]'
+                          }`}
+                        >
+                          No (ಇಲ್ಲ)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              hasChildren: 'YES',
+                              children: prev.children && prev.children.length > 0
+                                ? prev.children
+                                : [{ name: '', gender: 'Male', membershipNo: '', dob: '' }]
+                            }));
+                          }}
+                          className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                            formData.hasChildren === 'YES'
+                              ? 'bg-[#510601] text-white shadow-xs'
+                              : 'text-stone-700 hover:text-[#510601]'
+                          }`}
+                        >
+                          Yes (ಹೌದು)
+                        </button>
+                      </div>
+                    </div>
+
+                    {formData.hasChildren === 'YES' && (
+                      <div className="space-y-3 pt-3 border-t border-[#DFD5CC]">
+                        {formData.children && formData.children.length > 0 ? (
+                          <div className="space-y-2.5">
+                            {formData.children.map((child, index) => (
+                              <div
+                                key={index}
+                                className="bg-white p-3 rounded-lg border border-[#DFD5CC] grid grid-cols-1 sm:grid-cols-12 gap-3 items-center shadow-2xs"
+                              >
+                                <div className="sm:col-span-1 text-xs font-bold text-[#8C1801] flex items-center justify-center">
+                                  #{index + 1}
+                                </div>
+                                <div className="sm:col-span-4">
+                                  <input
+                                    type="text"
+                                    placeholder="Child Full Name *"
+                                    value={child.name}
+                                    onChange={(e) => handleChildChange(index, 'name', e.target.value)}
+                                    className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20"
+                                  />
+                                </div>
+                                <div className="sm:col-span-3">
+                                  <select
+                                    value={child.gender || 'Male'}
+                                    onChange={(e) => handleChildChange(index, 'gender', e.target.value)}
+                                    className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] focus:outline-none focus:border-[#510601] cursor-pointer"
+                                  >
+                                    <option value="Male">Son (Male)</option>
+                                    <option value="Female">Daughter (Female)</option>
+                                    <option value="Other">Other</option>
+                                  </select>
+                                </div>
+                                <div className="sm:col-span-3">
+                                  <input
+                                    type="text"
+                                    placeholder="Member No. (if any)"
+                                    value={child.membershipNo}
+                                    onChange={(e) => handleChildChange(index, 'membershipNo', e.target.value)}
+                                    className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20"
+                                  />
+                                </div>
+                                <div className="sm:col-span-1 flex justify-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveChild(index)}
+                                    title="Remove child"
+                                    className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="bg-white p-4 rounded-lg border border-dashed border-[#DFD5CC] text-center text-xs text-stone-500">
+                            No children added yet. Click "+ Add Child" below.
+                          </div>
+                        )}
+
+                        <div>
+                          <button
+                            type="button"
+                            onClick={handleAddChild}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-[#FAF7F2] text-[#510601] border border-[#510601]/30 hover:border-[#510601] text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-2xs"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Add Child</span>
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>

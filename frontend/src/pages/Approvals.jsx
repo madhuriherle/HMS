@@ -115,7 +115,7 @@ export default function Approvals() {
       <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Approvals</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Approvals</h1>
           </div>
         </div>
 

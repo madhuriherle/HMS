@@ -312,7 +312,7 @@ export default function PersonalMasters() {
     <PermissionGate required="masters.read">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">Personal Masters</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Personal Masters</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           {Object.entries(tabs).map(([key, t]) => (

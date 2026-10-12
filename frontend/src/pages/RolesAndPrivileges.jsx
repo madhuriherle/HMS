@@ -134,7 +134,7 @@ export default function RolesAndPrivileges() {
         setDisabledPrivilegeIds(offIds);
 
       } catch (err) {
-        console.error("Error fetching data", err);
+        console.error("Error fetching data", err); showToast(err.response?.data?.detail || 'Could not load data from the server.', 'error');
       } finally {
         setLoading(false);
       }
@@ -571,7 +571,7 @@ export default function RolesAndPrivileges() {
       <div>
 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
               User Roles & Privileges
             </h1>
           </div>
@@ -871,9 +871,6 @@ export default function RolesAndPrivileges() {
                 <h3 className="text-base font-bold text-[#180200]">
                   {modalMode === 'add' ? 'Add User Role' : 'Edit User Role'}
                 </h3>
-                <p className="text-xs text-[#863221]">
-                  {modalMode === 'add' ? 'Define a new role and establish privilege defaults.' : 'Update role title, description, and status.'}
-                </p>
               </div>
             </div>
             <button
@@ -1001,7 +998,7 @@ export default function RolesAndPrivileges() {
             <div className="space-y-6">
               {/* Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <h1 className="flex flex-wrap items-center gap-3 text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
+                <h1 className="flex flex-wrap items-center gap-3 text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
                   <span>Configure Privileges – {privilegeTargetRole.name}</span>
                   {isReadOnly && (
                     <span className="px-2 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[11px] font-bold rounded-md tracking-normal">

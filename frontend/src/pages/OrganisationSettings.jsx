@@ -360,7 +360,7 @@ export default function OrganisationSettings() {
       <div>
 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-[#180200] tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
               Organisation Settings
             </h1>
           </div>
@@ -484,9 +484,6 @@ export default function OrganisationSettings() {
                   <h3 className="text-sm font-bold text-[#180200]">
                     Organisation Logo
                   </h3>
-                  <p className="text-xs text-[#863221] mt-0.5">
-                    This logo appears on printed receipts, identity cards, label headers, and exported reports.
-                  </p>
                   <p className="text-[11px] text-[#863221]/70 mt-1">
                     Recommended: Transparent PNG or SVG with aspect ratio 1:1 or 4:3 (Max file size: 2MB).
                   </p>
@@ -1290,9 +1287,6 @@ export default function OrganisationSettings() {
               <h3 className="text-xs sm:text-sm font-bold text-[#180200]">
                 Display Contact Information
               </h3>
-              <p className="text-[11px] sm:text-xs text-[#863221] mt-0.5">
-                Enable this to display designated contact and helpdesk details on member portals and official receipts.
-              </p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer shrink-0">
               <input
