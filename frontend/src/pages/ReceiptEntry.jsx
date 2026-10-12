@@ -1754,7 +1754,7 @@ export default function ReceiptEntry() {
                 {/* Row 4: Amount & Payment Mode */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                   {/* 9. Amount */}
-                  <div className="sm:col-span-2">
+                  <div className="sm:col-span-6">
                     <label className="block text-xs font-bold text-[#180200] mb-1">
                       Amount <span className="text-[#ED4636]">*</span>
                     </label>
@@ -1788,7 +1788,7 @@ export default function ReceiptEntry() {
                   </div>
 
                   {/* 10. Payment Mode */}
-                  <div className="sm:col-span-4">
+                  <div className="sm:col-span-6">
                     <label className="block text-xs font-bold text-[#180200] mb-1">
                       Payment Mode <span className="text-[#ED4636]">*</span>
                     </label>
@@ -1823,7 +1823,7 @@ export default function ReceiptEntry() {
                     const subs = activeSubTypesOf(l.particular);
                     return (
                       <div key={l.key} className="grid grid-cols-12 gap-3 items-start">
-                        <div className={`col-span-12 ${subs.length > 0 || isOthersName(l.particular) ? 'sm:col-span-5' : 'sm:col-span-9'}`}>
+                        <div className={`col-span-12 ${subs.length > 0 || isOthersName(l.particular) ? 'sm:col-span-4' : 'sm:col-span-6'}`}>
                           <label className="block text-xs font-bold text-[#180200] mb-1">Particulars (line {idx + 2})</label>
                           <select
                             value={l.particular}
@@ -1863,7 +1863,7 @@ export default function ReceiptEntry() {
                           )}
                         </div>
                         )}
-                        <div className="col-span-10 sm:col-span-2">
+                        <div className={`col-span-10 ${subs.length > 0 || isOthersName(l.particular) ? 'sm:col-span-3' : 'sm:col-span-5'}`}>
                           <label className="block text-xs font-bold text-[#180200] mb-1">Amount</label>
                           <div className="relative">
                             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#863221]/70">₹</span>
