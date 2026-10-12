@@ -1841,9 +1841,11 @@ export default function ReceiptEntry() {
                             ))}
                           </select>
                         </div>
+                        {/* Sub-type / Others description only; a plain particular needs no details */}
+                        {(subs.length > 0 || isOthersName(l.particular)) && (
                         <div className="col-span-12 sm:col-span-4">
                           <label className="block text-[11px] font-bold text-[#180200] mb-1">
-                            {subs.length > 0 ? 'Sub-Type' : isOthersName(l.particular) ? 'Description' : 'Details (optional)'}
+                            {subs.length > 0 ? 'Sub-Type' : 'Description'}
                           </label>
                           {subs.length > 0 ? (
                             <select
@@ -1865,7 +1867,8 @@ export default function ReceiptEntry() {
                             />
                           )}
                         </div>
-                        <div className="col-span-10 sm:col-span-3">
+                        )}
+                        <div className={`col-span-10 ${subs.length > 0 || isOthersName(l.particular) ? 'sm:col-span-3' : 'sm:col-span-7'}`}>
                           <label className="block text-[11px] font-bold text-[#180200] mb-1">Amount</label>
                           <div className="relative">
                             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#863221]/70">₹</span>
