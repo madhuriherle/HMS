@@ -1046,8 +1046,8 @@ export default function LocationSetup() {
                           }}
                           className={`text-xs font-semibold cursor-pointer ${
                             st.status === 'Active'
-                              ? 'text-[#3D705C] hover:underline'
-                              : 'text-[#863221]/70 hover:underline'
+                              ? 'chip chip-on'
+                              : 'chip chip-off'
                           }`}
                           title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : `Click to ${st.status === 'Active' ? 'deactivate' : 'activate'}`}
                         >
@@ -1198,8 +1198,8 @@ export default function LocationSetup() {
                                 }
                                 className={`text-xs font-semibold cursor-pointer ${
                                   dist.status === 'Active'
-                                    ? 'text-[#3D705C] hover:underline'
-                                    : 'text-[#863221]/70 hover:underline'
+                                    ? 'chip chip-on'
+                                    : 'chip chip-off'
                                 }`}
                                 title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : `Click to ${dist.status === 'Active' ? 'deactivate' : 'activate'}`}
                               >
@@ -1347,8 +1347,8 @@ export default function LocationSetup() {
                                 }
                                 className={`text-xs font-semibold cursor-pointer ${
                                   tk.status === 'Active'
-                                    ? 'text-[#3D705C] hover:underline'
-                                    : 'text-[#863221]/70 hover:underline'
+                                    ? 'chip chip-on'
+                                    : 'chip chip-off'
                                 }`}
                                 title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : `Click to ${tk.status === 'Active' ? 'deactivate' : 'activate'}`}
                               >
@@ -1638,8 +1638,8 @@ export default function LocationSetup() {
                               }
                               className={`text-xs font-semibold cursor-pointer ${
                                 displayStatus === 'Active'
-                                  ? 'text-[#3D705C] hover:underline'
-                                  : 'text-[#863221]/70 hover:underline'
+                                  ? 'chip chip-on'
+                                  : 'chip chip-off'
                               }`}
                               title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : `Click to ${displayStatus === 'Active' ? 'deactivate' : 'activate'}`}
                             >

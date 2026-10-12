@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Pencil, User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Award, TrendingUp } from 'lucide-react';
+import { ArrowLeft, User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Award, TrendingUp } from 'lucide-react';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
@@ -143,14 +143,6 @@ export default function MemberProfile() {
           >
             <ArrowLeft className="w-4 h-4" /> Back
           </button>
-          {p && hasPermission('members.list.write') && (
-            <Link
-              to={`/dashboard/membership/edit/${p.id}`}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-xl hover:bg-[#3D0400]"
-            >
-              <Pencil className="w-3.5 h-3.5" /> Edit member
-            </Link>
-          )}
         </div>
 
         {loading && <Empty>Loading profile…</Empty>}

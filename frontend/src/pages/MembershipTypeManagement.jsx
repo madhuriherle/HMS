@@ -589,8 +589,8 @@ export default function MembershipTypeManagement() {
                           disabled={!hasPermission('masters.membership_types.write')}
                           onClick={() => promptToggleStatus(item)}
                           className={`text-xs font-semibold cursor-pointer ${isActive
-                            ? 'text-[#3D705C] hover:underline'
-                            : 'text-[#863221]/70 hover:underline'
+                            ? 'chip chip-on'
+                            : 'chip chip-off'
                             }`}
                           title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : `Click to set as ${isActive ? 'Inactive' : 'Active'}`}
                         >

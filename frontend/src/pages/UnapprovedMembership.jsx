@@ -489,7 +489,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
                       {/* Receipt Status Badge */}
                       <td className="py-3.5 px-4 text-center">
-                        <span className={`text-xs font-semibold ${isAssigned ? 'text-[#3D705C]' : 'text-[#B34E00]'}`}>
+                        <span className={`chip ${isAssigned ? 'chip-on' : 'chip-warn'}`}>
                           {(m.receiptStatus || 'Pending') === 'Pending' ? 'Unassigned' : m.receiptStatus}
                         </span>
                         {m.assignedReceiptNumber && (
@@ -522,6 +522,17 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           >
                             <Eye className="w-3.5 h-3.5 shrink-0" />
                             <span>View</span>
+                          </button>
+
+                          {/* Edit is its own action, not part of View */}
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/dashboard/membership/edit/${m.id}`, { state: { returnPath: '/dashboard/membership/unapproved' } })}
+                            disabled={!hasPermission('members.list.write')}
+                            className="btn-act"
+                            title={!hasPermission('members.list.write') ? 'Requires members.list.write permission' : 'Edit Application'}
+                          >
+                            <span>Edit</span>
                           </button>
 
                           {/* 3. Approve Action */}

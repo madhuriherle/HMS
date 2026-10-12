@@ -927,7 +927,7 @@ export default function MembershipList() {
                               nextStatus: displayStatus === 'Active' ? 'Inactive' : 'Active'
                             })
                           }
-                          className={`text-xs font-semibold cursor-pointer hover:underline ${displayStatus === 'Active' ? 'text-[#3D705C]' : 'text-[#863221]/70'}`}
+                          className={`chip ${displayStatus === 'Active' ? 'chip-on' : 'chip-off'}`}
                           title={`Click to ${displayStatus === 'Active' ? 'deactivate' : 'activate'}`}
                         >
                           <span>{displayStatus}</span>

@@ -189,6 +189,15 @@ export default function AssignedApprovals() {
                         </button>
                         <button
                           type="button"
+                          onClick={() => navigate(`/dashboard/membership/edit/${m.id}`, { state: { returnPath: '/dashboard/membership/assigned' } })}
+                          disabled={!hasPermission('members.list.write')}
+                          className="btn-act"
+                          title={hasPermission('members.list.write') ? 'Edit Application' : 'Requires members.list.write permission'}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => approve([m])}
                           disabled={!canApprove || busy}
                           title={canApprove ? 'Approve and give the permanent membership number' : 'Requires members.unapproved.write permission'}

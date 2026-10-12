@@ -2,19 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Row actions (View / Edit / Delete / Approve ...) look the same on every screen. */
+/* Row actions (View / Edit / Delete / Print / Approve): one tinted icon button everywhere.
+   The colour follows the icon inside, so no screen has to choose it. A button with an icon hides its
+   word (the title shows on hover); a button without an icon stays a text button. */
 @layer components {
   .btn-act {
-    @apply inline-flex items-center gap-1 px-1.5 py-1 text-xs font-semibold rounded-md shrink-0 cursor-pointer transition-colors;
-    @apply text-[#510601] hover:bg-[#510601]/10;
-    @apply disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent;
+    --act: 81 6 1;
+    @apply inline-flex items-center justify-center gap-1 px-2 py-1.5 text-xs font-semibold rounded-lg shrink-0 cursor-pointer transition-colors;
+    color: rgb(var(--act));
+    background-color: rgb(var(--act) / 0.09);
   }
-  .btn-act-danger {
-    @apply text-[#8C1801] hover:bg-[#8C1801]/10;
+  .btn-act:hover { background-color: rgb(var(--act) / 0.18); }
+  .btn-act:disabled { @apply opacity-40 cursor-not-allowed; }
+  .btn-act:disabled:hover { background-color: rgb(var(--act) / 0.09); }
+  .btn-act:has(svg) { width: 2rem; height: 2rem; padding: 0; }
+  .btn-act:has(svg) > span { display: none; }
+  .btn-act:has(.lucide-pencil) { --act: 180 83 9; }
+  .btn-act:has(.lucide-printer) { --act: 134 50 33; }
+  .btn-act:has(.lucide-eye) { --act: 81 6 1; }
+  .btn-act:has(.lucide-trash-2), .btn-act:has(.lucide-circle-x), .btn-act:has(.lucide-x-circle), .btn-act-danger { --act: 140 24 1; }
+  .btn-act:has(.lucide-check), .btn-act-ok { --act: 61 112 92; }
+
+  /* Status chips */
+  .chip {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap;
+    --chip: 134 50 33;
+    color: rgb(var(--chip) / 0.8);
+    background-color: rgb(var(--chip) / 0.1);
   }
-  .btn-act-ok {
-    @apply text-[#3D705C] hover:bg-[#3D705C]/10;
-  }
+  button.chip { @apply cursor-pointer; }
+  button.chip:hover { background-color: rgb(var(--chip) / 0.2); }
+  .chip-on { --chip: 61 112 92; color: rgb(61 112 92); }
+  .chip-warn { --chip: 238 106 0; color: rgb(179 78 0); }
+  .chip-bad { --chip: 140 24 1; color: rgb(140 24 1); }
+  .chip-brand { --chip: 81 6 1; color: rgb(81 6 1); }
+  .chip-off { --chip: 134 50 33; }
+
+  /* Neat rows on every list: centred contents, nothing smaller than 12px */
+  table tbody td { vertical-align: middle; }
+  table tbody td [class*="text-[10px]"], table tbody td [class*="text-[11px]"] { font-size: 0.75rem; line-height: 1rem; }
 }
 
 @layer base {

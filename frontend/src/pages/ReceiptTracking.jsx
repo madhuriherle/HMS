@@ -79,17 +79,17 @@ const numberToWords = (num) => {
 };
 
 const STATUS_LOOK = {
-  UNASSIGNED: { label: 'Unassigned', dot: 'bg-[#EE6A00]', text: 'text-[#B34E00]' },
-  ASSIGNED: { label: 'Assigned', dot: 'bg-[#3D705C]', text: 'text-[#3D705C]' },
-  APPROVED: { label: 'Approved', dot: 'bg-[#510601]', text: 'text-[#510601]' },
-  CANCELLED: { label: 'Cancelled', dot: 'bg-[#8C1801]', text: 'text-[#8C1801]' }
+  UNASSIGNED: { label: 'Unassigned', chip: 'chip-warn' },
+  ASSIGNED: { label: 'Assigned', chip: 'chip-on' },
+  APPROVED: { label: 'Approved', chip: 'chip-brand' },
+  CANCELLED: { label: 'Cancelled', chip: 'chip-bad' }
 };
 
 function StatusDot({ receipt }) {
   const key = receipt.receiptStatus || (isReceiptUnmapped(receipt) ? 'UNASSIGNED' : 'ASSIGNED');
   const look = STATUS_LOOK[key] || STATUS_LOOK.ASSIGNED;
   return (
-    <span className={`text-xs font-semibold whitespace-nowrap ${look.text}`}>{look.label}</span>
+    <span className={`chip ${look.chip}`}>{look.label}</span>
   );
 }
 

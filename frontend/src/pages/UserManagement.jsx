@@ -679,8 +679,8 @@ export default function UserManagement() {
                           className={`text-xs font-semibold ${isRowLocked
                               ? 'text-[#3D705C] cursor-not-allowed opacity-80'
                               : isActive
-                                ? 'text-[#3D705C] hover:underline cursor-pointer'
-                                : 'text-[#863221]/70 hover:underline cursor-pointer'
+                                ? 'chip chip-on cursor-pointer'
+                                : 'chip chip-off cursor-pointer'
                             }`}
                           title={
                             !hasPermission('users.management.write')
