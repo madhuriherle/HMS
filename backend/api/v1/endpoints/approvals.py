@@ -643,6 +643,15 @@ async def approve_generic_request(
         kwargs["force"] = True
 
     try:
+        # Re-check just before running: the record may have become "in use" since the request was filed.
+        if not force and "dry_run" in action.sig.parameters and not _inspect.iscoroutinefunction(action.fn):
+            from core.exceptions import InUseError
+            try:
+                action.fn(**{**kwargs, "dry_run": True, "force": False})
+            except InUseError as exc:
+                # fine only if the requester already agreed to this very warning
+                if not (kwargs.get("force") and str(exc.detail) == (req.payload or {}).get("_warning")):
+                    raise
         if _inspect.iscoroutinefunction(action.fn):
             result = await action.fn(**kwargs)
         else:

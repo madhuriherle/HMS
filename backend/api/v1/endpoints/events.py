@@ -1,6 +1,6 @@
 from typing import Any, Optional, Union
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from api import deps
@@ -169,10 +169,12 @@ def update_event(*, db: Session = Depends(deps.get_db), current_user: User = Dep
 
 @router.delete("/{id}", response_model=Union[schemas_events.Event, PendingApproval])
 @approval_gate.gated("events", "DELETE", "Event", "events.delete")
-def delete_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.delete")), id: int, force: bool = False) -> Any:
+def delete_event(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("events.delete")), id: int, force: bool = False, dry_run: bool = Query(False, include_in_schema=False)) -> Any:
     guests = db.query(EventParticipant).filter(EventParticipant.event_id == id, EventParticipant.is_deleted == False).count()  # noqa: E712
     if guests and not force:
         raise InUseError(f"This event has {guests} participant(s). Deleting it hides the event and its participant list.")
+    if dry_run is True:
+        return None
     return crud_events.event.remove(db, id=id, deleted_by=current_user.id)
 
 

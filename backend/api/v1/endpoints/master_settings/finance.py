@@ -1,7 +1,7 @@
 
 from typing import Any, Optional, Union
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -119,6 +119,7 @@ def delete_bank(
     current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
     force: bool = False,
+    dry_run: bool = Query(False, include_in_schema=False),
 ) -> Any:
     obj = crud_masters.bank.get(db, id)
     if not obj:
@@ -127,6 +128,8 @@ def delete_bank(
     if live_modes and not force:
         names = ', '.join(sorted({m.payment_mode for m in live_modes}))
         in_use(f"Bank is used by payment mode(s) {names}. Deleting the bank will delete those payment modes too.")
+    if dry_run is True:
+        return None
     for m in live_modes:
         m.is_deleted = True
         m.deleted_by = current_user.id
@@ -298,6 +301,7 @@ def delete_payment_mode(
     db: Session = Depends(deps.get_db),
     id: int,
     force: bool = False,
+    dry_run: bool = Query(False, include_in_schema=False),
     current_user: User = Depends(deps.require_permission("masters.delete")),
 ) -> Any:
     item = db.query(models.masters.PaymentMode).filter(models.masters.PaymentMode.id == id, models.masters.PaymentMode.is_deleted == False).first()  # noqa: E712
@@ -311,6 +315,8 @@ def delete_payment_mode(
     ).count()
     if used and not force:
         in_use(f"Payment mode '{item.payment_mode}' is used by {used} receipt(s). Those receipts keep their recorded mode. Deactivating it instead is safer.")
+    if dry_run is True:
+        return None
     return _soft_delete(db, item, current_user.id)
 
 
@@ -375,6 +381,7 @@ def delete_particular(
     current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
     force: bool = False,
+    dry_run: bool = Query(False, include_in_schema=False),
 ) -> Any:
     obj = crud_masters.particular.get(db, id)
     if not obj:
@@ -389,6 +396,8 @@ def delete_particular(
     )
     if used and not force:
         in_use(f"'{obj.name_en}' is used on {used} receipt(s). Those receipts keep the particular name. Deactivating it instead is safer.")
+    if dry_run is True:
+        return None
     # Deleting a particular takes its sub-types with it.
     for sub in db.query(Particular).filter(Particular.parent_id == id, Particular.is_deleted == False).all():  # noqa: E712
         crud_masters.particular.remove(db, id=sub.id, deleted_by=current_user.id)

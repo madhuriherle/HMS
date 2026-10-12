@@ -123,3 +123,93 @@ def test_event_with_participants_needs_force(client, admin_headers):
     r = client.delete(f"{V}/events/{ev['id']}", headers=h)
     assert r.status_code == 409 and r.json()["code"] == "IN_USE"
     assert client.delete(f"{V}/events/{ev['id']}?force=true", headers=h).status_code == 200
+
+
+def test_gated_delete_warns_at_request_time_and_approver_sees_it(client, admin_headers):
+    from test_api import _staff_with_role
+
+    h = admin_headers
+    _, _, clerk = _staff_with_role(
+        client, h, "guarddel_clerk", "GuardDelClerk", "GUARDDEL_CLERK",
+        permission_grants=[("masters.delete", True), ("approvals.write", False)],
+    )
+    pm = _post(client, h, "/masters/payment-modes", {"payment_mode": "GuardGated", "payment_type": "ONLINE"})
+    import datetime
+    from db.session import SessionLocal
+    from models.receipts import Receipt
+    db = SessionLocal()
+    try:
+        db.add(Receipt(receipt_number="GG-1", receipt_date=datetime.date(2026, 4, 11), financial_year="2026-27",
+                       receipt_type="DONATION", payment_mode="GuardGated", gross_amount=5, discount_amount=0,
+                       net_amount=5, payment_status="PAID"))
+        db.commit()
+    finally:
+        db.close()
+
+    # 1. clerk (needs approval) is warned straight away; nothing is filed yet
+    r = client.delete(f"{V}/masters/payment-modes/{pm['id']}", headers=clerk)
+    assert r.status_code == 409 and r.json()["code"] == "IN_USE"
+
+    # 2. clerk insists: the request is filed carrying the warning
+    r = client.delete(f"{V}/masters/payment-modes/{pm['id']}?force=true", headers=clerk)
+    assert r.status_code == 200, r.text
+    req_id = r.json()["approval_request_id"]
+    req = client.get(f"{V}/approvals/requests", headers=h, params={"status": "PENDING", "limit": 200}).json()["data"]
+    mine = next(x for x in req if x["id"] == req_id)
+    assert "used by 1 receipt" in mine["payload"]["_warning"]
+    assert "dry_run" not in mine["payload"]
+    assert client.get(f"{V}/masters/payment-modes/{pm['id']}", headers=h).status_code == 200  # still there
+
+    # 3. the approver approves; it runs with the force the requester agreed to
+    done = client.put(f"{V}/approvals/requests/{req_id}/approve", headers=h)
+    assert done.status_code == 200, done.text
+    assert client.get(f"{V}/masters/payment-modes/{pm['id']}", headers=h).status_code == 404
+
+
+def test_gated_delete_not_in_use_is_filed_without_warning(client, admin_headers):
+    from test_api import _staff_with_role
+
+    h = admin_headers
+    _, _, clerk = _staff_with_role(
+        client, h, "guarddel2_clerk", "GuardDel2Clerk", "GUARDDEL2_CLERK",
+        permission_grants=[("masters.delete", True)],
+    )
+    pm = _post(client, h, "/masters/payment-modes", {"payment_mode": "GuardFree", "payment_type": "CASH"})
+    r = client.delete(f"{V}/masters/payment-modes/{pm['id']}", headers=clerk)
+    assert r.status_code == 200 and r.json()["status"] == "PENDING"
+    req = client.get(f"{V}/approvals/requests", headers=h, params={"status": "PENDING", "limit": 200}).json()["data"]
+    mine = next(x for x in req if x["id"] == r.json()["approval_request_id"])
+    assert "_warning" not in mine["payload"]
+    # still there: only a request was filed
+    assert client.get(f"{V}/masters/payment-modes/{pm['id']}", headers=h).status_code == 200
+
+
+def test_approval_rechecks_when_record_became_in_use(client, admin_headers):
+    from test_api import _staff_with_role
+
+    h = admin_headers
+    _, _, clerk = _staff_with_role(
+        client, h, "guarddel3_clerk", "GuardDel3Clerk", "GUARDDEL3_CLERK",
+        permission_grants=[("masters.delete", True)],
+    )
+    pm = _post(client, h, "/masters/payment-modes", {"payment_mode": "GuardLate", "payment_type": "CASH"})
+    r = client.delete(f"{V}/masters/payment-modes/{pm['id']}", headers=clerk)
+    req_id = r.json()["approval_request_id"]
+    # ...then a receipt starts using the mode before the approver acts
+    import datetime
+    from db.session import SessionLocal
+    from models.receipts import Receipt
+    db = SessionLocal()
+    try:
+        db.add(Receipt(receipt_number="GL-1", receipt_date=datetime.date(2026, 4, 12), financial_year="2026-27",
+                       receipt_type="DONATION", payment_mode="GuardLate", gross_amount=5, discount_amount=0,
+                       net_amount=5, payment_status="PAID"))
+        db.commit()
+    finally:
+        db.close()
+    a = client.put(f"{V}/approvals/requests/{req_id}/approve", headers=h)
+    assert a.status_code == 409 and a.json()["code"] == "IN_USE"
+    assert client.get(f"{V}/masters/payment-modes/{pm['id']}", headers=h).status_code == 200
+    a = client.put(f"{V}/approvals/requests/{req_id}/approve?force=true", headers=h)
+    assert a.status_code == 200, a.text
+    assert client.get(f"{V}/masters/payment-modes/{pm['id']}", headers=h).status_code == 404

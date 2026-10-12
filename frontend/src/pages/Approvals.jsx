@@ -13,7 +13,11 @@ const KINDS = [
     label: 'Change requests',
     path: '/approvals/requests',
     summary: (r) => `${r.action} ${r.entity_type}${r.entity_id ? ` #${r.entity_id}` : ''} (${r.module})`,
-    detail: (r) => (r.payload ? JSON.stringify(r.payload) : r.error || '')
+    detail: (r) => {
+      const { _warning: warning, ...rest } = r.payload || {};
+      const body = r.payload ? JSON.stringify(rest) : r.error || '';
+      return warning ? `Warning: ${warning} | ${body}` : body;
+    }
   },
   {
     key: 'deletions',
@@ -169,7 +173,11 @@ export default function Approvals() {
                       <td className="py-3 px-4 font-mono text-[#510601]">{r.id}</td>
                       <td className="py-3 px-4 font-semibold text-[#180200]">{kind.summary(r)}</td>
                       <td className="py-3 px-4 max-w-[320px] truncate text-[#863221]" title={kind.detail(r)}>
-                        {kind.detail(r) || '—'}
+                        {kind.detail(r).startsWith('Warning:') ? (
+                          <span className="font-semibold text-red-700">{kind.detail(r)}</span>
+                        ) : (
+                          kind.detail(r) || '—'
+                        )}
                       </td>
                       <td className="py-3 px-4 text-[#863221]">
                         {formatDateTime(r.created_at, '—', false)}

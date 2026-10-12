@@ -1,7 +1,7 @@
 
 from typing import Any, Optional, Union
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Query
 from fastapi.responses import StreamingResponse
 import io
 import csv
@@ -170,6 +170,7 @@ def delete_state(
     current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
     force: bool = False,
+    dry_run: bool = Query(False, include_in_schema=False),
 ) -> Any:
     obj = crud_masters.state.get(db, id)
     if not obj:
@@ -181,6 +182,8 @@ def delete_state(
         state_ids=[id], district_ids=d_ids, taluk_ids=taluk_ids_of_districts(db, d_ids),
         pincode_ids=[r[0] for r in db.query(PostalCode.id).filter(PostalCode.state_id == id, PostalCode.is_deleted == False)],  # noqa: E712
     )
+    if dry_run is True:
+        return None
     for pc in db.query(PostalCode).filter(PostalCode.state_id == id, PostalCode.is_deleted == False).all():  # noqa: E712
         crud_masters.postal_code.remove(db, id=pc.id, deleted_by=current_user.id)
     for t in db.query(Taluk).filter(Taluk.district_id.in_(db.query(District.id).filter(District.state_id == id)), Taluk.is_deleted == False).all():  # noqa: E712
@@ -283,6 +286,7 @@ def delete_district(
     current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
     force: bool = False,
+    dry_run: bool = Query(False, include_in_schema=False),
 ) -> Any:
     obj = crud_masters.district.get(db, id)
     if not obj:
@@ -293,6 +297,8 @@ def delete_district(
         district_ids=[id], taluk_ids=taluk_ids_of_districts(db, [id]),
         pincode_ids=[r[0] for r in db.query(PostalCode.id).filter(PostalCode.district_id == id, PostalCode.is_deleted == False)],  # noqa: E712
     )
+    if dry_run is True:
+        return None
     for pc in db.query(PostalCode).filter(PostalCode.district_id == id, PostalCode.is_deleted == False).all():  # noqa: E712
         crud_masters.postal_code.remove(db, id=pc.id, deleted_by=current_user.id)
     for t in db.query(Taluk).filter(Taluk.district_id == id, Taluk.is_deleted == False).all():  # noqa: E712
@@ -395,6 +401,7 @@ def delete_taluk(
     current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
     force: bool = False,
+    dry_run: bool = Query(False, include_in_schema=False),
 ) -> Any:
     obj = crud_masters.taluk.get(db, id)
     if not obj:
@@ -405,6 +412,8 @@ def delete_taluk(
         taluk_ids=[id],
         pincode_ids=[r[0] for r in db.query(PostalCode.id).filter(PostalCode.taluk_id == id, PostalCode.is_deleted == False)],  # noqa: E712
     )
+    if dry_run is True:
+        return None
     for pc in db.query(PostalCode).filter(PostalCode.taluk_id == id, PostalCode.is_deleted == False).all():  # noqa: E712
         crud_masters.postal_code.remove(db, id=pc.id, deleted_by=current_user.id)
         
@@ -592,9 +601,12 @@ def delete_postal_code(
     current_user: User = Depends(deps.require_permission("masters.delete")),
     id: int,
     force: bool = False,
+    dry_run: bool = Query(False, include_in_schema=False),
 ) -> Any:
     obj = crud_masters.postal_code.get(db, id)
     if not obj:
         raise HTTPException(404, "Postal code not found")
     ensure_not_used_by_members(db, f"PIN code {obj.pincode}", pincode_ids=[id], force=force)
+    if dry_run is True:
+        return None
     return crud_masters.postal_code.remove(db, id=id, deleted_by=current_user.id)

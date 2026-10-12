@@ -1,5 +1,5 @@
 from typing import Any, Optional, Union
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from api import deps
@@ -221,13 +221,15 @@ def update_associate(*, db: Session = Depends(deps.get_db), current_user: User =
 
 @router.delete("/associates/{id}")
 @approval_gate.gated("engagements", "DELETE", "Associate", "engagements.delete")
-def delete_associate(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.delete")), id: int, force: bool = False) -> Any:
+def delete_associate(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.delete")), id: int, force: bool = False, dry_run: bool = Query(False, include_in_schema=False)) -> Any:
     obj = db.query(Associate).filter(Associate.id == id).first()
     if not obj: raise HTTPException(404, "Associate not found")
     from models.receipts import ReceiptAllocation
     paid = db.query(ReceiptAllocation).filter(ReceiptAllocation.associate_id == id, ReceiptAllocation.is_deleted == False).count()  # noqa: E712
     if paid and not force:
         raise InUseError(f"This associate has {paid} receipt payment(s) recorded against them. The receipts stay, but will point at a deleted associate.")
+    if dry_run is True:
+        return None
     obj.is_deleted = True; obj.deleted_by = current_user.id
     db.commit()
     return {"message": "Deleted"}

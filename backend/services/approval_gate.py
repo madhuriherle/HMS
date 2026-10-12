@@ -39,11 +39,11 @@ def _build_payload(kwargs: dict, action: str) -> dict:
     return {
         name: _serialize_kwarg(value, action)
         for name, value in kwargs.items()
-        if name not in ("db", "current_user")
+        if name not in ("db", "current_user", "dry_run")
     }
 
 
-def _file_request(db, current_user, module: str, action: str, entity_type: str, permission_code: str, kwargs: dict, id_param: Optional[str]) -> dict:
+def _file_request(db, current_user, module: str, action: str, entity_type: str, permission_code: str, kwargs: dict, id_param: Optional[str], warning: Optional[str] = None) -> dict:
     from models.approval_requests import ApprovalRequest
     from services.approval_notify import notify_approvers
 
@@ -51,7 +51,7 @@ def _file_request(db, current_user, module: str, action: str, entity_type: str, 
         module=module, action=action, entity_type=entity_type,
         entity_id=kwargs.get(id_param) if id_param else None,
         permission_code=permission_code,
-        payload=_build_payload(kwargs, action), requested_by=current_user.id,
+        payload={**_build_payload(kwargs, action), **({"_warning": warning} if warning else {})}, requested_by=current_user.id,
         status="PENDING", created_by=current_user.id,
     )
     db.add(req)
@@ -60,7 +60,7 @@ def _file_request(db, current_user, module: str, action: str, entity_type: str, 
     notify_approvers(
         db,
         title=f"Approval needed: {action.title()} {entity_type}",
-        body=f"{current_user.name} requested to {action.lower()} a {entity_type} ({permission_code}).",
+        body=f"{current_user.name} requested to {action.lower()} a {entity_type} ({permission_code})." + (f" Warning: {warning}" if warning else ""),
         data={"approval_request_id": req.id, "module": module, "action": action, "entity_type": entity_type},
     )
     return {
@@ -68,6 +68,22 @@ def _file_request(db, current_user, module: str, action: str, entity_type: str, 
         "approval_request_id": req.id,
         "status": "PENDING",
     }
+
+
+def _precheck(fn: Callable[..., Any], sig: inspect.Signature, action: str, kwargs: dict) -> Optional[str]:
+    """For a DELETE that needs approval: ask the endpoint (dry_run, nothing is changed) whether the
+    record is in use. Not forced -> the 409 goes back to the requester; forced -> the warning text
+    is returned so the approver can see what the requester agreed to."""
+    if action != "DELETE" or "dry_run" not in sig.parameters or inspect.iscoroutinefunction(fn):
+        return None
+    from core.exceptions import InUseError
+    try:
+        fn(**{**kwargs, "dry_run": True, "force": False})
+    except InUseError as exc:
+        if kwargs.get("force"):
+            return str(exc.detail)
+        raise
+    return None
 
 
 def gated(module: str, action: str, entity_type: str, permission_code: str, *, id_param: Optional[str] = "id"):
@@ -94,6 +110,7 @@ def gated(module: str, action: str, entity_type: str, permission_code: str, *, i
             current_user = kwargs.get("current_user")
             if db is None or current_user is None or not deps.permission_requires_approval(db, current_user, permission_code):
                 return fn(*args, **kwargs)
-            return _file_request(db, current_user, module, action, entity_type, permission_code, kwargs, id_param)
+            warning = _precheck(fn, sig, action, kwargs)
+            return _file_request(db, current_user, module, action, entity_type, permission_code, kwargs, id_param, warning)
         return wrapper
     return decorator

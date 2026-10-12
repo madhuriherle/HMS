@@ -1,6 +1,6 @@
 from typing import Any, Optional, Union
 from core.exceptions import InUseError
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from api import deps
@@ -988,6 +988,7 @@ def delete_receipt(
     current_user: User = Depends(deps.require_permission("receipts.delete")),
     id: int,
     force: bool = False,
+    dry_run: bool = Query(False, include_in_schema=False),
 ) -> Any:
     receipt = crud_receipts.receipt.get(db, id)
     if not receipt:
@@ -1004,6 +1005,8 @@ def delete_receipt(
             alloc.deleted_by = current_user.id
         db.flush()
         receipt_status.refresh(db, receipt)
+    if dry_run is True:
+        return None
     return crud_receipts.receipt.remove(db, id=id, deleted_by=current_user.id)
 
 

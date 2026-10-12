@@ -39,6 +39,8 @@ def rebuild_kwargs(action: RegisteredAction, payload: Optional[dict]) -> Dict[st
     reconstructing any BaseModel-typed parameter from its plain dict form."""
     kwargs: Dict[str, Any] = {}
     for name, value in (payload or {}).items():
+        if name.startswith("_"):  # notes stored with the request (e.g. _warning), not arguments
+            continue
         param = action.sig.parameters.get(name)
         ann = param.annotation if param is not None else None
         if isinstance(ann, type) and issubclass(ann, BaseModel) and isinstance(value, dict):
