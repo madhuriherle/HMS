@@ -148,6 +148,9 @@ const numberToWords = (num) => {
   return str.trim() + ' Rupees Only';
 };
 
+// "Other" / "Others" particular (free-text description unless it has sub-types)
+const isOthersName = (name) => /^others?$/i.test(String(name || '').trim());
+
 export default function ReceiptEntry() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -622,7 +625,7 @@ export default function ReceiptEntry() {
       ...prev,
       particulars: selectedParticular,
       donationSubType: '',
-      othersDescription: selectedParticular === 'Others' ? prev.othersDescription : ''
+      othersDescription: isOthersName(selectedParticular) ? prev.othersDescription : ''
     }));
 
     if (formErrors.particulars || formErrors.othersDescription || formErrors.donationSubType) {
@@ -747,13 +750,14 @@ export default function ReceiptEntry() {
           : 'Particulars selection is mandatory.';
     }
 
-    // 5. If Donation: Donation Type is mandatory if active sub-types exist
-    if (formData.particulars === 'Donation' && hasActiveSubTypes && !formData.donationSubType) {
-      errors.donationSubType = 'Please select a Donation Type.';
+    // 5. A particular with active sub-types needs one picked (Donation: "Donation Type")
+    if (hasActiveSubTypes && !formData.donationSubType) {
+      errors.donationSubType =
+        formData.particulars === 'Donation' ? 'Please select a Donation Type.' : `Please select the ${formData.particulars} sub-type.`;
     }
 
-    // 6. If Others: Description is mandatory
-    if (formData.particulars === 'Others' && !formData.othersDescription.trim()) {
+    // 6. Others without sub-types: a description is mandatory
+    if (isOthersName(formData.particulars) && !hasActiveSubTypes && !formData.othersDescription.trim()) {
       errors.othersDescription = 'Please specify the description for Others.';
     }
 
@@ -802,7 +806,7 @@ export default function ReceiptEntry() {
         errors.extraLines = `Line ${n}: choose the ${l.particular} sub-type.`;
         break;
       }
-      if (l.particular === 'Others' && !l.description.trim()) {
+      if (isOthersName(l.particular) && activeSubTypesOf(l.particular).length === 0 && !l.description.trim()) {
         errors.extraLines = `Line ${n}: describe the Others amount.`;
         break;
       }
@@ -857,8 +861,8 @@ export default function ReceiptEntry() {
       membershipNo: formData.membershipNo.trim(),
       mobile: formData.mobile.trim(),
       particulars: formData.particulars,
-      donationSubType: formData.particulars === 'Donation' ? formData.donationSubType : '',
-      othersDescription: formData.particulars === 'Others' ? formData.othersDescription.trim() : '',
+      donationSubType: hasActiveSubTypes ? formData.donationSubType : '',
+      othersDescription: isOthersName(formData.particulars) && !hasActiveSubTypes ? formData.othersDescription.trim() : '',
       amount: receiptTotal,
       lines: [
         {
@@ -866,7 +870,7 @@ export default function ReceiptEntry() {
           particularId: currentParticularObj?.id || null,
           detail:
             formData.donationSubType ||
-            (formData.particulars === 'Others' ? formData.othersDescription.trim() : '') ||
+            (isOthersName(formData.particulars) ? formData.othersDescription.trim() : '') ||
             formData.particulars,
           amount: Number(formData.amount),
         },
@@ -1668,7 +1672,7 @@ export default function ReceiptEntry() {
                       )}
                     </div>
                   </div>
-                ) : formData.particulars === 'Others' ? (
+                ) : isOthersName(formData.particulars) ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-bold text-[#180200] mb-1">
@@ -1782,7 +1786,7 @@ export default function ReceiptEntry() {
                         </div>
                         <div className="col-span-12 sm:col-span-4">
                           <label className="block text-[11px] font-bold text-[#180200] mb-1">
-                            {subs.length > 0 ? 'Sub-Type' : l.particular === 'Others' ? 'Description' : 'Details (optional)'}
+                            {subs.length > 0 ? 'Sub-Type' : isOthersName(l.particular) ? 'Description' : 'Details (optional)'}
                           </label>
                           {subs.length > 0 ? (
                             <select
