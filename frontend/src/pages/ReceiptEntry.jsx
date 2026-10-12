@@ -774,12 +774,8 @@ export default function ReceiptEntry() {
     if (!formData.paymentMode) {
       errors.paymentMode = 'Payment Mode is mandatory.';
     } else {
-      const isCash = formData.paymentMode.trim().toLowerCase() === 'cash';
-      if (!isCash && !formData.transactionId.trim()) {
-        errors.transactionId = `Transaction ID is mandatory for ${formData.paymentMode}.`;
-      } else if (!isCash && formData.transactionId.trim().length < 4) {
-        errors.transactionId = 'Transaction ID looks too short. Please check it.';
-      } else if (formData.transactionId.trim().length > 150) {
+      // Transaction Id / Date are optional for every payment mode (only the length is checked).
+      if (formData.transactionId.trim().length > 150) {
         errors.transactionId = 'Transaction ID can be at most 150 characters.';
       }
     }
@@ -1866,7 +1862,7 @@ export default function ReceiptEntry() {
                   {/* 11. Transaction Id */}
                   <div>
                     <label className="block text-xs font-bold text-[#180200] mb-1">
-                      Transaction Id {formData.paymentMode && formData.paymentMode.toLowerCase() !== 'cash' && <span className="text-[#ED4636]">*</span>}
+                      Transaction Id
                     </label>
                     <input
                       type="text"
