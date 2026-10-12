@@ -566,7 +566,6 @@ export default function ReceiptTypeManagement() {
           <table className="w-full text-left border-collapse min-w-[700px]">
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-semibold text-[#863221] uppercase tracking-wider">
-                <th className="px-5 py-3.5 w-12 text-center"></th>
                 <th className="px-5 py-3.5">Particular</th>
                 <th className="px-5 py-3.5">Sub-Types</th>
                 <th className="px-5 py-3.5 text-center">Status</th>
@@ -585,11 +584,6 @@ export default function ReceiptTypeManagement() {
                     <React.Fragment key={type.id}>
                       {/* Parent Particular Row */}
                       <tr className={`hover:bg-[#FAF7F2]/60 transition-colors group ${isExpanded ? 'bg-[#FAF7F2]/30' : ''}`}>
-
-                        {/* Number Index */}
-                        <td className="px-5 py-4 text-xs font-bold text-[#863221]/70 text-center">
-                          {(currentPage - 1) * pageSize + index + 1}
-                        </td>
 
                         {/* Particular Name + Expand Chevron if sub-types exist */}
                         <td className="px-5 py-4 font-bold text-[#180200]">
@@ -713,7 +707,7 @@ export default function ReceiptTypeManagement() {
                       {/* Expanded Sub-Types Tree View */}
                       {isExpanded && hasSubTypes && (
                         <tr className="bg-[#FAF7F2]/40 border-b border-[#E8DFD8]">
-                          <td colSpan="5" className="p-0">
+                          <td colSpan="4" className="p-0">
                             <div className="py-3 px-6 sm:px-12 bg-[#FAF7F2]/60 border-y border-[#E8DFD8]/70">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2 text-xs font-bold text-[#863221] uppercase tracking-wider">
@@ -736,7 +730,6 @@ export default function ReceiptTypeManagement() {
                                 <table className="w-full text-left text-xs border-collapse">
                                   <thead>
                                     <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[11px] font-semibold text-[#863221] uppercase tracking-wider">
-                                      <th className="px-4 py-2.5 w-12 text-center"></th>
                                       <th className="px-4 py-2.5">Sub-Type Name</th>
                                       <th className="px-4 py-2.5 text-center">Status</th>
                                       <th className="px-4 py-2.5 text-right min-w-[140px]">Actions</th>
@@ -747,11 +740,6 @@ export default function ReceiptTypeManagement() {
                                       const isSubActive = sub.status === 'Active';
                                       return (
                                         <tr key={sub.id || sIdx} className="hover:bg-[#FAF7F2]/50 transition-colors">
-
-                                          {/* Sub-Type Number */}
-                                          <td className="px-4 py-3 text-center text-[#863221]/70 font-mono">
-                                            {sIdx + 1}
-                                          </td>
 
                                           {/* Sub-Type Name */}
                                           <td className="px-4 py-3 font-semibold text-[#180200]">
@@ -815,7 +803,7 @@ export default function ReceiptTypeManagement() {
                 })
               ) : (
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-[#863221]">
+                  <td colSpan="4" className="px-6 py-12 text-center text-[#863221]">
                     <div className="w-12 h-12 rounded-full bg-[#FAF7F2] text-[#863221]/60 flex items-center justify-center mx-auto mb-3">
                       <FileText className="w-6 h-6" />
                     </div>
