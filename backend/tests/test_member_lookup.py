@@ -94,3 +94,15 @@ def test_lookup_needs_only_receipt_entry_access(client, admin_headers):
     assert client.get(f"{API}/receipts/member-lookup", headers=nobody, params={"number": code}).status_code == 403
     tracking = _role_user(client, h, ["receipts.tracking.read"])
     assert client.get(f"{API}/receipts/member-lookup", headers=tracking, params={"number": code}).status_code == 403
+
+
+def test_members_lookup_endpoint(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    mid, _t, code = _approved_member(client, h, s)
+    res = client.get(f"{API}/members/lookup", headers=h, params={"number": code})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["found"] is True
+    assert data["member"]["id"] == mid
+    assert data["member"]["member_code"] == code
+

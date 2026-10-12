@@ -32,6 +32,18 @@ def _payload(s, **over):
         "family_membership_name": "Hegde Family",
         "registration_payment": {"payment_mode": "Online", "bank_account": "SBI", "amount": 1000,
                                  "receipt_date": "2026-10-09", "transaction_id": "UTR1", "remarks": "paid at office"},
+        "father_name": "Krishna Rao",
+        "father_membership_number": "HMS-F-01",
+        "mother_name": "Lakshmi Rao",
+        "mother_membership_number": "HMS-M-01",
+        "is_married": True,
+        "spouse_name": "Sita Rao",
+        "spouse_membership_number": "HMS-S-01",
+        "has_children": True,
+        "children_details": [
+            {"name": "Anand Rao", "gender": "Male", "membership_number": "HMS-C-01"},
+            {"name": "Deepa Rao", "gender": "Female", "membership_number": None}
+        ],
         "registration_source": "OFFLINE",
     }
     body.update(over)

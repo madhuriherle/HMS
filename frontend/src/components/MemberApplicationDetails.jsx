@@ -38,7 +38,35 @@ export default function MemberApplicationDetails({ member }) {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
           <Field label="Title" value={member.nameTitle} />
-          <Field label="Father / Husband Name" value={member.fatherHusbandName} />
+          <Field
+            label="Father Name"
+            value={
+              member.fatherName
+                ? `${member.fatherName}${member.fatherMembershipNumber ? ` (${member.fatherMembershipNumber})` : ''}`
+                : member.fatherHusbandName
+            }
+          />
+          {member.motherName ? (
+            <Field
+              label="Mother Name"
+              value={`${member.motherName}${member.motherMembershipNumber ? ` (${member.motherMembershipNumber})` : ''}`}
+            />
+          ) : null}
+          {member.spouseName ? (
+            <Field
+              label="Spouse Name"
+              value={`${member.spouseName}${member.spouseMembershipNumber ? ` (${member.spouseMembershipNumber})` : ''}`}
+            />
+          ) : null}
+          {Array.isArray(member.childrenDetails) && member.childrenDetails.length > 0 ? (
+            <Field
+              label="Children"
+              value={member.childrenDetails
+                .map((c) => `${c.name}${c.gender ? ` (${c.gender})` : ''}${c.membership_number ? ` [${c.membership_number}]` : ''}`)
+                .join(', ')}
+              wide
+            />
+          ) : null}
           <Field
             label="Date of Birth"
             value={member.birthDate ? `${formatDate(member.birthDate)}${member.age ? ` (${member.age} yrs)` : ''}` : ''}
