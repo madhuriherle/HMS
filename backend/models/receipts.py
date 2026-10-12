@@ -1,6 +1,6 @@
 from sqlalchemy import text
 from sqlalchemy import Index, event
-from sqlalchemy import String, Integer, BigInteger, Boolean, DateTime, Date, Numeric, Text, ForeignKey
+from sqlalchemy import String, Integer, BigInteger, Boolean, DateTime, Date, Time, Numeric, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from models.base import Base, AuditMixin
 
@@ -29,6 +29,11 @@ class Receipt(AuditMixin, Base):
     cheque_number: Mapped[str] = mapped_column(String(50), nullable=True)
     cheque_date: Mapped[Date] = mapped_column(Date, nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
+    # Optional period the receipt covers (a seva slot, a sponsorship year...). All four are optional.
+    period_from_date: Mapped[Date] = mapped_column(Date, nullable=True)
+    period_to_date: Mapped[Date] = mapped_column(Date, nullable=True)
+    period_from_time: Mapped[Time] = mapped_column(Time, nullable=True)
+    period_to_time: Mapped[Time] = mapped_column(Time, nullable=True)
 
 class ReceiptItem(AuditMixin, Base):
     __tablename__ = "receipt_items"

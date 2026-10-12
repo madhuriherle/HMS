@@ -1101,6 +1101,18 @@ export default function ReceiptTracking() {
                   )}
                 </div>
 
+                {(viewingReceipt.periodFromDate || viewingReceipt.periodToDate || viewingReceipt.periodFromTime || viewingReceipt.periodToTime) && (
+                  <div className="pt-2 border-t border-[#E8DFD8]">
+                    <span className="text-[10px] uppercase font-bold text-[#863221]">Period</span>
+                    <p className="mt-0.5 text-[#180200]">
+                      {[
+                        [viewingReceipt.periodFromDate, viewingReceipt.periodToDate].filter(Boolean).join(' to '),
+                        [viewingReceipt.periodFromTime, viewingReceipt.periodToTime].filter(Boolean).join(' to ')
+                      ].filter(Boolean).join(', ')}
+                    </p>
+                  </div>
+                )}
+
                 {viewingReceipt.description && (
                   <div className="pt-2 border-t border-[#E8DFD8]">
                     <span className="text-[10px] uppercase font-bold text-[#863221]">Remarks / Description</span>

@@ -1,5 +1,5 @@
 from typing import List, Literal, Optional
-from datetime import datetime, date
+from datetime import datetime, date, time
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 # Receipts are entered at the counter (OFFLINE) or from the website/app (ONLINE).
@@ -72,6 +72,10 @@ class ReceiptBase(BaseModel):
     cheque_number: Optional[str] = None
     cheque_date: Optional[date] = None
     notes: Optional[str] = None
+    period_from_date: Optional[date] = None
+    period_to_date: Optional[date] = None
+    period_from_time: Optional[time] = None
+    period_to_time: Optional[time] = None
 
     @field_validator("gross_amount", "discount_amount", "net_amount")
     @classmethod
@@ -108,6 +112,15 @@ class ReceiptBase(BaseModel):
         if v is not None and v > date.today():
             raise ValueError("receipt_date cannot be in the future")
         return v
+
+    @model_validator(mode="after")
+    def period_in_order(self):
+        if self.period_from_date and self.period_to_date and self.period_to_date < self.period_from_date:
+            raise ValueError("period_to_date cannot be before period_from_date")
+        same_day = self.period_from_date == self.period_to_date  # also true when neither date is given
+        if same_day and self.period_from_time and self.period_to_time and self.period_to_time < self.period_from_time:
+            raise ValueError("period_to_time cannot be before period_from_time")
+        return self
 
     @model_validator(mode="after")
     def totals_consistent(self):
@@ -150,11 +163,24 @@ class ReceiptUpdate(BaseModel):
     cheque_number: Optional[str] = None
     cheque_date: Optional[date] = None
     notes: Optional[str] = None
+    period_from_date: Optional[date] = None
+    period_to_date: Optional[date] = None
+    period_from_time: Optional[time] = None
+    period_to_time: Optional[time] = None
 
     @field_validator("gross_amount", "discount_amount", "net_amount")
     @classmethod
     def amounts_non_negative(cls, v: float, info) -> float:
         return _check_non_negative(info.field_name, v)
+
+    @model_validator(mode="after")
+    def period_in_order(self):
+        if self.period_from_date and self.period_to_date and self.period_to_date < self.period_from_date:
+            raise ValueError("period_to_date cannot be before period_from_date")
+        same_day = self.period_from_date == self.period_to_date  # also true when neither date is given
+        if same_day and self.period_from_time and self.period_to_time and self.period_to_time < self.period_from_time:
+            raise ValueError("period_to_time cannot be before period_from_time")
+        return self
 
 class ReceiptItemResponse(ReceiptItemBase):
     id: int

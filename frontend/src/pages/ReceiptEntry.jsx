@@ -274,7 +274,11 @@ export default function ReceiptEntry() {
     transactionId: '',
     transactionDate: '',
     paymentReceivedDetails: '',
-    description: ''
+    description: '',
+    periodFromDate: '',
+    periodToDate: '',
+    periodFromTime: '',
+    periodToTime: ''
   };
   const [formData, setFormData] = useState(emptyForm);
   const [formErrors, setFormErrors] = useState({});
@@ -840,6 +844,13 @@ export default function ReceiptEntry() {
       }
     }
 
+    const { periodFromDate: pd1, periodToDate: pd2, periodFromTime: pt1, periodToTime: pt2 } = formData;
+    if (pd1 && pd2 && pd2 < pd1) {
+      errors.period = 'Period: To Date cannot be before From Date.';
+    } else if (pd1 === pd2 && pt1 && pt2 && pt2 < pt1) {
+      errors.period = 'Period: To Time cannot be before From Time.';
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -899,6 +910,10 @@ export default function ReceiptEntry() {
       transactionDate: formData.transactionDate || '',
       paymentReceivedDetails: formData.paymentReceivedDetails.trim(),
       description: formData.description.trim(),
+      periodFromDate: formData.periodFromDate,
+      periodToDate: formData.periodToDate,
+      periodFromTime: formData.periodFromTime,
+      periodToTime: formData.periodToTime,
       // a payment for someone who already holds a membership number is a renewal
       isRenewal: Boolean(linked && (linked.isRenewal || (linked.membershipNumber && formData.particulars === 'Membership')))
     };
@@ -1943,6 +1958,29 @@ export default function ReceiptEntry() {
 
                     className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors resize-y"
                   />
+                </div>
+
+                {/* Row 8: Period (optional) - one line */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    ['periodFromDate', 'From Date', 'date'],
+                    ['periodToDate', 'To Date', 'date'],
+                    ['periodFromTime', 'From Time', 'time'],
+                    ['periodToTime', 'To Time', 'time']
+                  ].map(([name, label, type]) => (
+                    <div key={name}>
+                      <label className="block text-xs font-bold text-[#180200] mb-1">{label}</label>
+                      <input
+                        type={type}
+                        name={name}
+                        value={formData[name]}
+                        min={name === 'periodToDate' && formData.periodFromDate ? formData.periodFromDate : undefined}
+                        onChange={handleInputChange}
+                        className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none transition-colors"
+                      />
+                    </div>
+                  ))}
+                  {formErrors.period && <p className="col-span-full text-[11px] text-red-600">{formErrors.period}</p>}
                 </div>
 
               </div>

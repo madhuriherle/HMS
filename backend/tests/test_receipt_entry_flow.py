@@ -133,3 +133,32 @@ def test_duplicate_bank_is_refused(client, admin_headers):
     assert again.status_code == 409, again.text
     other_acct = client.post(f"{API}/masters/banks", headers=h, json={**body, "code": f"DU{s}C", "account_number": "123456"})
     assert other_acct.status_code == 201, "same bank, different account is allowed"
+
+
+def test_receipt_period_is_saved_validated_and_printed(client, admin_headers):
+    from test_frontend_contract import API, _sfx
+    base = {
+        "receipt_date": "2026-04-10", "receipt_type": "DONATION", "payment_mode": "CASH",
+        "gross_amount": 500, "net_amount": 500, "source": "OFFLINE",
+        "items": [{"item_type": "DONATION", "particular_name": "Seva", "amount": 500}],
+    }
+    r = client.post(f"{API}/receipts/", headers=admin_headers, json={**base, "receipt_number": "2026-27/P" + _sfx(),
+        "period_from_date": "2026-05-01", "period_to_date": "2026-05-03", "period_from_time": "06:00", "period_to_time": "08:30"})
+    assert r.status_code in (200, 201), r.text
+    rid = r.json()["id"]
+    rows = client.get(f"{API}/receipts/tracking", headers=admin_headers, params={"limit": 500}).json()
+    rows = rows["data"] if isinstance(rows, dict) else rows
+    row = next(x for x in rows if x["id"] == rid)
+    assert (row["period_from_date"], row["period_to_date"], row["period_from_time"], row["period_to_time"]) == ("2026-05-01", "2026-05-03", "06:00", "08:30")
+    pdf = client.get(f"{API}/receipts/{rid}/pdf", headers=admin_headers)
+    assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF"
+
+    bad = client.post(f"{API}/receipts/", headers=admin_headers, json={**base, "receipt_number": "2026-27/Q" + _sfx(),
+        "period_from_date": "2026-05-03", "period_to_date": "2026-05-01"})
+    assert bad.status_code == 422
+    bad = client.post(f"{API}/receipts/", headers=admin_headers, json={**base, "receipt_number": "2026-27/R" + _sfx(),
+        "period_from_time": "09:00", "period_to_time": "08:00"})
+    assert bad.status_code == 422
+
+    plain = client.post(f"{API}/receipts/", headers=admin_headers, json={**base, "receipt_number": "2026-27/S" + _sfx()})
+    assert plain.status_code in (200, 201), plain.text

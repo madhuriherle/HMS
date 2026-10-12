@@ -39,6 +39,17 @@ def _inr(v) -> str:
     return f"Rs. {float(v):,.2f}"
 
 
+def _period_text(receipt) -> str:
+    """'15-03-2027 to 20-03-2027, 06:00 to 08:00' from whichever period fields are filled."""
+    d1, d2 = receipt.period_from_date, receipt.period_to_date
+    t1, t2 = receipt.period_from_time, receipt.period_to_time
+    fd = lambda d: d.strftime("%d-%m-%Y")
+    ft = lambda t: t.strftime("%H:%M")
+    dates = " to ".join(fd(d) for d in (d1, d2) if d) if d1 != d2 else (fd(d1) if d1 else "")
+    times = " to ".join(ft(t) for t in (t1, t2) if t)
+    return ", ".join(x for x in (dates, times) if x)
+
+
 def build_receipt_pdf(receipt, lines, org, payee_lines) -> bytes:
     buf = io.BytesIO()
     w, h = landscape(A5)
@@ -123,6 +134,10 @@ def build_receipt_pdf(receipt, lines, org, payee_lines) -> bytes:
     if receipt.transaction_reference:
         pay += f"   Ref: {receipt.transaction_reference}"
     c.drawString(margin, y, pay[:120])
+    period = _period_text(receipt)
+    if period:
+        y -= 13
+        c.drawString(margin, y, f"Period: {period}")
 
     # footer
     note = getattr(org, "receipt_footer_note_en", None) if org else None
