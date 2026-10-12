@@ -813,8 +813,6 @@ export default function MembershipList() {
                 <th className="py-3 px-4">Member</th>
                 <th className="py-3 px-4">Contact</th>
                 <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Location</th>
                 <th className="py-3 px-4 text-center">Status</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
@@ -822,7 +820,7 @@ export default function MembershipList() {
             <tbody className="divide-y divide-[#E8DFD8]">
               {paginatedMembers.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-[#863221]">
+                  <td colSpan="6" className="py-12 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center">
                       <AlertCircle className="w-8 h-8 text-[#863221]/40 mb-2" />
                       <p className="font-semibold text-sm text-[#180200]">No members found</p>
@@ -865,17 +863,11 @@ export default function MembershipList() {
                             {m.fullName || m.name}
                           </span>
                         </div>
-                        {m.gothra && (
-                          <div className="text-[11px] text-[#863221] mt-0.5">
-                            Gotra: <span className="font-medium text-[#180200]">{m.gothra}</span>
-                          </div>
-                        )}
                       </td>
 
                       {/* Contact Info (Mobile & Email) */}
                       <td className="py-3 px-4">
                         <div className="font-mono font-medium text-xs text-[#180200]">{m.mobile || m.mobileNumber || '—'}</div>
-                        {m.email && <div className="text-[11px] text-[#863221] mt-0.5 truncate max-w-[180px]">{m.email}</div>}
                       </td>
 
                       {/* Membership Type (Dynamically Calculated from Cumulative Receipts & Master) */}
@@ -901,23 +893,6 @@ export default function MembershipList() {
                             </div>
                           );
                         })()}
-                      </td>
-
-                      {/* Category */}
-                      <td className="py-3 px-4">
-                        <span className="text-xs font-medium text-[#863221]">
-                          {m.category || 'Individual'}
-                        </span>
-                      </td>
-
-                      {/* District / Location */}
-                      <td className="py-3 px-4 text-[#863221]">
-                        <div className="font-medium text-[#180200] text-xs">
-                          {m.districtName || m.stateName || '—'}
-                        </div>
-                        <div className="text-[11px] text-[#863221]/80 mt-0.5 truncate max-w-[160px]">
-                          {m.city || m.place || m.talukName || ''} {m.postalCode ? `(${m.postalCode})` : ''}
-                        </div>
                       </td>
 
                       {/* Status Toggle Button */}

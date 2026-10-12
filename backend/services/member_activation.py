@@ -31,7 +31,6 @@ REQUIRED_FOR_APPROVAL = (
     ("mobile", "mobile"),
     ("date_of_birth", "date of birth"),
     ("address_line1", "address"),
-    ("pincode_id", "PIN code"),
 )
 
 

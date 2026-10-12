@@ -796,6 +796,24 @@ def _member_master_checks(db: Session, data: dict) -> None:
             raise HTTPException(400, "Invalid referred_by_member_id")
 
 
+def _location_names(db: Session, member: Member) -> dict:
+    """State / district / taluk / PIN names for the profile screen (the member row only holds ids)."""
+    from models.masters import District, PostalCode, State, Taluk
+
+    def name(model, pk, attr="name_en"):
+        if not pk:
+            return None
+        row = db.query(model).filter(model.id == pk).first()
+        return getattr(row, attr, None) if row else None
+
+    return {
+        "state_name": name(State, member.state_id),
+        "district_name": name(District, member.district_id),
+        "taluk_name": name(Taluk, member.taluk_id),
+        "pincode": name(PostalCode, member.pincode_id, "pincode"),
+    }
+
+
 def _member_master_details(db: Session, member: Member) -> dict:
     """Resolved names for the member's master-backed fields (profile screen).
 
@@ -1616,9 +1634,12 @@ def read_member_profile(
 
     return {
         "personal": {
-            c.name: getattr(member, c.name)
-            for c in Member.__table__.columns
-            if c.name not in ("is_deleted", "deleted_by", "deleted_at")
+            **{
+                c.name: getattr(member, c.name)
+                for c in Member.__table__.columns
+                if c.name not in ("is_deleted", "deleted_by", "deleted_at")
+            },
+            **_location_names(db, member),
         },
         "memberships": membership_list,
         "membership_credit": __import__("services.membership_credit", fromlist=["summary"]).summary(db, id),

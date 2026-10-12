@@ -272,6 +272,7 @@ export default function MemberProfile() {
                   <Field label="Date of birth" value={p.date_of_birth ? formatDate(p.date_of_birth) : ''} />
                   <Field label="Blood group" value={p.blood_group} />
                   <Field label="Gothra" value={p.gothra} />
+                  <Field label="Category" value={p.category} />
                   <Field label="Marital Status" value={p.marital_status} />
                   <Field label="Qualification" value={p.qualification} />
                   <Field label="Occupation" value={p.occupation} />
@@ -282,7 +283,7 @@ export default function MemberProfile() {
                   <Field label="PAN Number" value={p.pan_number} />
                   <Field label="Aadhaar Number" value={p.aadhaar_number} />
                   <div className="col-span-2">
-                    <Field label="Address" value={[p.address_line1, p.address_line2, p.locality, p.city, p.post, p.pincode].filter(Boolean).join(', ')} />
+                    <Field label="Address" value={[p.address_line1, p.address_line2, p.locality, p.city, p.post, p.taluk_name, p.district_name, p.state_name, p.pincode].filter(Boolean).join(', ')} />
                   </div>
                 </div>
               </Card>

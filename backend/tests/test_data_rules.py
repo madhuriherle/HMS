@@ -46,15 +46,11 @@ def test_approval_needs_the_key_details(client, admin_headers):
     m = client.post(f"{API}/members/", headers=h, json={"first_name_en": "Check" + s}).json()
     refused = client.put(f"{API}/members/{m['id']}/approve", headers=h)
     assert refused.status_code == 400
-    for gap in ("mobile", "date of birth", "address", "PIN code"):
+    for gap in ("mobile", "date of birth", "address"):
         assert gap in refused.text
-    st = client.get(f"{API}/masters/states", headers=h).json()
-    st = st["data"] if isinstance(st, dict) else st
-    state = st[0] if st else client.post(f"{API}/masters/states", headers=h, json={"name_en": "RS" + s, "code": "RS" + s}).json()
-    d = client.post(f"{API}/masters/districts", headers=h, json={"name_en": "RD" + s, "code": "RD" + s, "state_id": state["id"]}).json()
-    pin = client.post(f"{API}/masters/postal-codes", headers=h, json={"pincode": "56" + s.zfill(4)[-4:], "state_id": state["id"], "district_id": d["id"]}).json()
+    assert "PIN" not in refused.text and "Aadhaar" not in refused.text
     done = client.put(f"{API}/members/{m['id']}", headers=h, json={
-        "mobile": "92" + s.zfill(8), "date_of_birth": "1980-01-01", "address_line1": "1 Main Road", "pincode_id": pin["id"]})
+        "mobile": "92" + s.zfill(8), "date_of_birth": "1980-01-01", "address_line1": "1 Main Road"})
     assert done.status_code == 200, done.text
     ok = client.put(f"{API}/members/{m['id']}/approve", headers=h)
     assert ok.status_code == 200 and ok.json()["approval_status"] == "APPROVED"
