@@ -169,7 +169,7 @@ export default function ReceiptEntry() {
   const [paymentModeConfigs, setPaymentModeConfigs] = useState([]);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [], postalCodes: [] });
   const [saving, setSaving] = useState(false);
-  const saveMode = useRef('go'); // 'go' (to Receipt Tracking) | 'new' (stay for the next receipt) | 'print'
+  const saveMode = useRef('new'); // Save stays on this screen, ready for the next receipt
 
   const lookupLocationByPin = (pin) => findLocationByPin(locations.postalCodes, pin);
 
@@ -1472,16 +1472,6 @@ export default function ReceiptEntry() {
                   </div>
                 </div>
 
-                <label className="flex items-center gap-2 text-xs font-semibold text-[#863221] cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={formData.isCancelled}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, isCancelled: e.target.checked }))}
-                    className="w-4 h-4 accent-[#510601] cursor-pointer"
-                  />
-                  Cancelled (spoiled paper receipt: keep the number, no other details needed)
-                </label>
-
                 {/* Row 2: Payee Name & Mobile */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* 3. Name */}
@@ -2027,41 +2017,28 @@ export default function ReceiptEntry() {
 
               {/* Action Buttons (Clear & Save) */}
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#E8DFD8]">
+                <label className="mr-auto flex items-center gap-2 text-xs font-semibold text-[#863221] cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={formData.isCancelled}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, isCancelled: e.target.checked }))}
+                    className="w-4 h-4 accent-[#510601] cursor-pointer"
+                  />
+                  Cancelled
+                </label>
+
                 <button
                   type="button"
                   onClick={handleClearForm}
                   className="px-4 py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] text-xs sm:text-sm font-semibold hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Clear</span>
+                  <span>Cancel</span>
                 </button>
 
-                {entrySource === 'normal' && (
-                  <>
-                    <button
-                      type="submit"
-                      onClick={() => { saveMode.current = 'print'; }}
-                      disabled={saving || !hasPermission('receipts.entry.write')}
-                      title="Save, open the printable receipt, and start the next one (Ctrl+S saves and starts the next)"
-                      className="disabled:opacity-50 px-4 py-2 rounded-xl border border-[#510601] text-[#510601] bg-white hover:bg-[#FAF7F2] text-xs sm:text-sm font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Save &amp; Print</span>
-                    </button>
-                    <button
-                      type="submit"
-                      onClick={() => { saveMode.current = 'new'; }}
-                      disabled={saving || !hasPermission('receipts.entry.write')}
-                      title="Save and stay here for the next receipt, keeping the date and payment mode"
-                      className="disabled:opacity-50 px-4 py-2 rounded-xl border border-[#510601] text-[#510601] bg-white hover:bg-[#FAF7F2] text-xs sm:text-sm font-bold transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <span>Save &amp; New</span>
-                    </button>
-                  </>
-                )}
                 <button
                   type="submit"
-                  onClick={() => { saveMode.current = 'go'; }}
+                  onClick={() => { saveMode.current = 'new'; }}
                   disabled={saving || !hasPermission('receipts.entry.write')}
                   title={!hasPermission('receipts.entry.write') ? 'Requires receipts.entry.write permission' : undefined}
                   className="disabled:opacity-50 px-5 py-2 rounded-xl bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
