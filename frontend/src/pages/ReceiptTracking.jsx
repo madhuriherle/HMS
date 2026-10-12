@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
@@ -404,8 +404,11 @@ export default function ReceiptTracking() {
     }
   };
 
+  const deleteInFlight = useRef(false);
+
   const handleConfirmDelete = async () => {
-    if (!deletingReceipt) return;
+    if (!deletingReceipt || deleteInFlight.current) return;
+    deleteInFlight.current = true;
 
     const num = deletingReceipt.receiptNumber;
     try {
@@ -413,8 +416,17 @@ export default function ReceiptTracking() {
       setReceipts((prev) => prev.filter((r) => r.id !== deletingReceipt.id));
       showToast(`Receipt #${num} deleted successfully.`);
     } catch (error) {
-      console.error('Failed to delete receipt.', error);
-      showToast(error.response?.data?.detail || 'Failed to delete receipt through API.', 'error');
+      if (error.response?.status === 404) {
+        // Already removed (e.g. a repeated click): just refresh the list.
+        setReceipts((prev) => prev.filter((r) => r.id !== deletingReceipt.id));
+        showToast(`Receipt #${num} was already deleted.`);
+        reloadData();
+      } else {
+        console.error('Failed to delete receipt.', error);
+        showToast(error.response?.data?.detail || 'Failed to delete receipt through API.', 'error');
+      }
+    } finally {
+      deleteInFlight.current = false;
     }
 
     setDeletingReceipt(null);
