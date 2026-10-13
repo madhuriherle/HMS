@@ -256,9 +256,11 @@ RULE 13: PERMISSIONS AND ACCESS
 13.6 USERS AND ROLES (rank 1 = top, bigger = weaker):
      - User Management lists every staff account (members are never users), the Super Admin
        included.
-     - Changing a user (edit, status, delete) needs the target to be weaker; the same rank
-       is allowed except at rank 1. Locked rows show locked buttons.
-     - Roles list and edit only roles strictly weaker than yours, never your own rank.
+     - Changing a user (edit, status, delete) needs the target to be the same rank or weaker.
+       This includes rank 1: a Super Admin may create and manage another Super Admin (a
+       lower rank never can). Stronger users' rows show locked buttons.
+     - Roles list and edit only roles strictly weaker than yours, never your own rank. The
+       roles you may GIVE to a user are your own rank and weaker.
      - Nobody changes their own role. The built-in admin account is changed only by the
        Super Admin, and the last active top-rank holder cannot be removed.
 13.7 PRIVILEGE CODES OF THE SETTINGS TOOLS: masters.organisation.read/write (Organisation

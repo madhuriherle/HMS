@@ -44,7 +44,7 @@ export default function UserManagement() {
   const { myRank, hasPermission } = useAuth();
   const rules = useRules(); // formats and limits from the server
   // Roles weaker than mine, or my own rank (not Rank 1) can be assigned — mirrors the backend rule.
-  const sameRankOk = (rank) => rank > myRank || (rank === myRank && myRank !== 1);
+  const sameRankOk = (rank) => rank >= myRank;
   const availableRoles = roles => roles.filter(r => r.code !== 'MEMBER' && r.name?.toLowerCase() !== 'member' && sameRankOk(r.rank_level ?? 99));
   const getUserRank = (user) => {
     const direct = user?.role_rank_level;

@@ -64,7 +64,7 @@ def read_users(
     role_id: Optional[int] = None,
 ) -> Any:
     """Every staff account is listed (members are not), Super Admin included. Changing one still needs a
-    strictly higher rank than theirs (see can_manage_rank), so the row actions are locked for the others."""
+    a rank at least as strong as theirs (see can_manage_rank), so the row actions are locked for stronger users."""
     q = (
         db.query(User)
         .join(Role, Role.id == User.role_id)
@@ -541,8 +541,8 @@ _ROLE_READERS = ("roles.read", "users.management.read", "users.privileges.read")
 
 
 def can_manage_rank(my_rank: int, target_rank: int) -> bool:
-    """Users: weaker, or the same rank (except Rank 1, which stays above everyone)."""
-    return target_rank > my_rank or (target_rank == my_rank and my_rank != 1)
+    """Users: weaker or the same rank. A Super Admin may create and manage another Super Admin."""
+    return target_rank >= my_rank
 
 
 _TOP_RANKS = 2  # Super Admin / Admin: never leave the system without one active holder
@@ -571,12 +571,12 @@ def read_roles(
     assignable: bool = False,
 ) -> Any:
     """Roles weaker than yours (Rank 1 sees every role). ``assignable=true`` lists the roles you may
-    give to a user: weaker than yours, plus your own (except Rank 1)."""
+    give to a user: weaker than yours, plus your own (a Super Admin may create another Super Admin)."""
     my_rank = deps.user_rank(db, current_user)
     q = db.query(Role).filter(Role.is_deleted == False)  # noqa: E712
     if assignable:
         q = q.filter(Role.code != "MEMBER")
-        q = q.filter(Role.rank_level >= my_rank) if my_rank > 1 else q.filter(Role.rank_level > 1)
+        q = q.filter(Role.rank_level >= my_rank)
     elif my_rank > 1:
         q = q.filter(Role.rank_level > my_rank)
     page_data = paginate(q.order_by(Role.rank_level, Role.id), page, limit)

@@ -6515,10 +6515,15 @@ def test_equal_rank_users_can_manage_each_other_with_safeguards(client, admin_he
     assert client.delete(f"/api/v1/users/{mgr_uid}", headers=mgr).status_code == 400
     assert client.delete("/api/v1/users/1", headers=mgr).status_code == 403
 
-    # Rank 1 stays above everyone: no second Super Admin
+    # a Super Admin may create another Super Admin and manage them; a lower rank never can
     sa = _role_id(client, admin_headers, "SUPERADMIN")
-    assert client.post("/api/v1/users/", headers=admin_headers,
-                       json={"name": "Boss2", "username": "boss_two", "password": "Bosstwo@123", "role_id": sa}).status_code == 403
+    boss2 = client.post("/api/v1/users/", headers=admin_headers,
+                        json={"name": "Boss2", "username": "boss_two", "password": "Bosstwo@123", "role_id": sa})
+    assert boss2.status_code == 200, boss2.text
+    assert client.put(f"/api/v1/users/{boss2.json()['id']}", headers=admin_headers, json={"name": "Boss Two"}).status_code == 200
+    assert client.post("/api/v1/users/", headers=mgr,
+                       json={"name": "Boss3", "username": "boss_three", "password": "Bossthree@123", "role_id": sa}).status_code == 403
+    assert client.delete(f"/api/v1/users/{boss2.json()['id']}", headers=admin_headers).status_code == 200
 
     # the last active holder of a top-two rank role cannot be deleted or deactivated
     top = client.post("/api/v1/users/roles", headers=admin_headers, json={"name": "Top Two", "code": "TOP_TWO", "rank_level": 2}).json()
