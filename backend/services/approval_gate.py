@@ -47,11 +47,30 @@ def _file_request(db, current_user, module: str, action: str, entity_type: str, 
     from models.approval_requests import ApprovalRequest
     from services.approval_notify import notify_approvers
 
+    entity_id = kwargs.get(id_param) if id_param else None
+    previous = None
+    if action in ("UPDATE", "DELETE") and entity_id:
+        try:
+            from models.base import Base
+            from core.pagination import _to_plain
+            model_cls = Base.registry._class_registry.get(entity_type)
+            if model_cls and hasattr(model_cls, "id"):
+                existing = db.query(model_cls).filter(model_cls.id == entity_id).first()
+                if existing:
+                    previous = _to_plain(existing, {"created_at", "updated_at", "created_by", "updated_by", "is_deleted"})
+        except Exception:
+            pass
+
     req = ApprovalRequest(
         module=module, action=action, entity_type=entity_type,
-        entity_id=kwargs.get(id_param) if id_param else None,
+        entity_id=entity_id,
         permission_code=permission_code,
-        payload={**_build_payload(kwargs, action), **({"_warning": warning} if warning else {})}, requested_by=current_user.id,
+        payload={
+            **_build_payload(kwargs, action),
+            **({"_warning": warning} if warning else {}),
+            **({"_previous": previous} if previous else {}),
+        },
+        requested_by=current_user.id,
         status="PENDING", created_by=current_user.id,
     )
     db.add(req)
