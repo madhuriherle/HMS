@@ -44,6 +44,7 @@ import {
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
+import { formatMoney } from '../utils/money';
 
 // assignedOnly: the final-approval queue (members whose receipt is already assigned)
 export default function UnapprovedMembership({ assignedOnly = false }) {
@@ -749,7 +750,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                     </div>
                     <div>
                       <span className="text-[10px] uppercase font-bold text-[#863221]">Amount</span>
-                      <p className="font-mono font-bold mt-0.5">₹{Number(viewingMember.receipt.amount || 0).toLocaleString('en-IN')}</p>
+                      <p className="font-mono font-bold mt-0.5">{formatMoney(viewingMember.receipt.amount || 0)}</p>
                     </div>
                     <div>
                       <span className="text-[10px] uppercase font-bold text-[#863221]">Payment Mode</span>

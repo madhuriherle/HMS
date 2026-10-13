@@ -576,7 +576,7 @@ export default function UserManagement() {
             { value: 'ALL', label: 'All Roles' },
             ...availableRoles(roles).map((r) => ({
               value: r.id,
-              label: r.rank_level != null ? `${r.name} (Rank ${r.rank_level})` : r.name
+              label: r.name
             }))
           ]}
           widthClass="w-full sm:w-48"
@@ -1098,7 +1098,7 @@ export default function UserManagement() {
                     <option value="">-- Select Role --</option>
                     {availableRoles(roles).map(r => (
                       <option key={r.id} value={r.id}>
-                        {r.name}{r.rank_level != null ? ` (Rank ${r.rank_level})` : ''}
+                        {r.name}
                       </option>
                     ))}
                   </select>

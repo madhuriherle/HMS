@@ -12,9 +12,34 @@ export default function SearchFilterBar({
   children,
   rightSlot,
   leftSlot,
+  searchInHeader = false, // put the search box in the title row, beside the action buttons
   className = ''
 }) {
-  const hasSearchOrFilters = (onSearchChange !== undefined) || children;
+  const hasSearchOrFilters = (onSearchChange !== undefined && !searchInHeader) || children;
+
+  const searchBox = onSearchChange !== undefined && (
+      
+        <div className="relative min-w-[200px] flex-1 max-w-sm">
+          <Search className="w-4 h-4 text-[#863221]/50 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={searchPlaceholder || 'Search...'}
+            className="w-full pl-10 pr-9 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] text-[#180200] placeholder-[#863221]/40 transition-colors shadow-sm"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => onSearchChange('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-[#510601] p-0.5 rounded-md hover:bg-stone-100 transition-colors cursor-pointer"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+  );
 
   return (
     <div className={`space-y-4 w-full ${className}`}>
@@ -26,7 +51,7 @@ export default function SearchFilterBar({
       )}
 
       {/* Title Row: Title on Left, Action Buttons on Right */}
-      {(title || leftSlot || rightSlot) && (
+      {(title || leftSlot || rightSlot || (searchInHeader && searchBox)) && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           {/* Title / Left Area */}
           <div className="flex items-center gap-3 min-w-0">
@@ -39,8 +64,9 @@ export default function SearchFilterBar({
           </div>
 
           {/* Right Action Buttons Slot */}
-          {rightSlot && (
-            <div className="flex items-center gap-2.5 shrink-0 flex-wrap justify-end">
+          {(rightSlot || (searchInHeader && searchBox)) && (
+            <div className="flex items-center gap-2.5 flex-wrap justify-end">
+              {searchInHeader && searchBox}
               {rightSlot}
             </div>
           )}
@@ -52,29 +78,7 @@ export default function SearchFilterBar({
         <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4">
           <div className="flex flex-wrap items-center gap-3">
             
-            {/* Search Box */}
-            {onSearchChange !== undefined && (
-              <div className="relative min-w-[200px] flex-1 max-w-sm">
-                <Search className="w-4 h-4 text-[#863221]/50 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                  placeholder={searchPlaceholder || 'Search...'}
-                  className="w-full pl-10 pr-9 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] text-[#180200] placeholder-[#863221]/40 transition-colors shadow-sm"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => onSearchChange('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-[#510601] p-0.5 rounded-md hover:bg-stone-100 transition-colors cursor-pointer"
-                    title="Clear search"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            )}
+            {!searchInHeader && searchBox}
 
             {/* Filter List (Dropdowns etc.) */}
             {children}

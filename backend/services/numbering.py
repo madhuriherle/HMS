@@ -68,7 +68,7 @@ class Fmt:
 DEFAULTS = {  # what the system produced before formats were configurable
     "MEMBER_CODE": Fmt("MEMBER_CODE", "HMS", "DATE_FULL", "-", 6, 1, "NEVER", "", True),
     "MEMBERSHIP_NO": Fmt("MEMBERSHIP_NO", "HMSM", "DATE_FULL", "-", 6, 1, "NEVER", "", True),
-    "RECEIPT": Fmt("RECEIPT", "", "FY", "/", 4, 1, "FY", "", True),
+    "RECEIPT": Fmt("RECEIPT", "", "NONE", "", 4, 1, "NEVER", "", True),  # 0001, 0002, 0003 ...
 }
 
 

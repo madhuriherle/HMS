@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, User, FileText } from 'lucide-react';
 import api from '../api';
+import { formatMoney } from '../utils/money';
 
 // One search box in the top bar: members (name, code, membership no., mobile) and receipts (no., payer, reference).
 export default function GlobalSearch() {
@@ -93,7 +94,7 @@ export default function GlobalSearch() {
                   <span className="min-w-0">
                     <span className="block text-xs font-semibold text-[#180200] truncate font-mono">{r.receipt_number}</span>
                     <span className="block text-[11px] text-[#863221] truncate">
-                      {r.payer_name || '—'} · ₹{Number(r.amount).toLocaleString('en-IN')}
+                      {r.payer_name || '—'} · {formatMoney(r.amount)}
                     </span>
                   </span>
                 </button>

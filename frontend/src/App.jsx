@@ -122,6 +122,7 @@ function App() {
           <Route path="receipts" element={<Navigate to="/dashboard/receipts/entry" replace />} />
           <Route path="receipts/entry" element={<ReceiptEntry />} />
           <Route path="receipts/add" element={<ReceiptEntry />} />
+          <Route path="receipts/edit/:id" element={<ReceiptEntry />} />
           <Route path="receipts/tracking" element={<ReceiptTracking />} />
           <Route path="receipt/tracking" element={<ReceiptTracking />} />
           <Route path="receipts/bulk-mapping" element={<PermissionGate required={['receipts.tracking.read', 'receipts.read']} title="Access Restricted" message="You need permission to track receipts to access Bulk Mapping."><BulkReceiptMapping /></PermissionGate>} />

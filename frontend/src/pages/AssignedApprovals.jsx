@@ -8,9 +8,10 @@ import { loadUnapprovedMembers } from '../utils/serverData';
 import { confirmYesNo } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import { formatDate } from '../utils/dateUtils';
+import { formatMoney } from '../utils/money';
 
 const PAGE_SIZE = 25;
-const inr = (v) => `₹${Number(v || 0).toLocaleString('en-IN')}`;
+const inr = formatMoney;
 
 // Final-approval queue: unapproved members whose receipt is already assigned.
 // Approving gives the permanent membership number.

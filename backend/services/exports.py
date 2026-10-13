@@ -29,6 +29,23 @@ def log_report_export(db: Session, user_id: int, report_key: str, export_format:
     db.commit()
 
 
+def _dates_as_dd_mm_yyyy(df: pd.DataFrame) -> pd.DataFrame:
+    """Dates in a download read DD-MM-YYYY, like everywhere else on screen (times are kept)."""
+    import datetime as _dt
+
+    def fmt(v):
+        if isinstance(v, _dt.datetime):
+            return v.strftime("%d-%m-%Y %H:%M:%S")
+        if isinstance(v, _dt.date):
+            return v.strftime("%d-%m-%Y")
+        return v
+
+    for col in df.columns:
+        if df[col].map(lambda v: isinstance(v, (_dt.date, _dt.datetime))).any():
+            df[col] = df[col].map(fmt)
+    return df
+
+
 def render_export(
     db: Session,
     current_user: User,
@@ -43,6 +60,7 @@ def render_export(
         raise HTTPException(400, "export must be 'csv' or 'excel'")
     log_report_export(db, current_user.id, report_key, export, filters)
     df = pd.DataFrame(data)
+    df = _dates_as_dd_mm_yyyy(df)
     if export == "csv":
         stream = io.StringIO()
         df.to_csv(stream, index=False)

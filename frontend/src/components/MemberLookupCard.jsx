@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, UserCheck } from 'lucide-react';
 import { formatDate } from '../utils/dateUtils';
+import { formatMoney } from '../utils/money';
 
 // Result of "who is this membership number?" under the Membership No. box of Receipt Entry.
 // lookup: { status: 'idle' | 'loading' | 'done' | 'error', matches: [...] } from GET /receipts/member-lookup
@@ -72,7 +73,7 @@ export default function MemberLookupCard({ lookup, onUse }) {
                 <span className="block text-[10px] font-semibold uppercase tracking-wide text-[#863221]/70">Last receipt</span>
                 <span className="block text-[#180200] font-medium truncate">
                   {m.last_receipt
-                    ? `${m.last_receipt.receipt_number} · ${formatDate(m.last_receipt.receipt_date)} · ₹${Number(m.last_receipt.amount || 0).toLocaleString('en-IN')}`
+                    ? `${m.last_receipt.receipt_number} · ${formatDate(m.last_receipt.receipt_date)} · ${formatMoney(m.last_receipt.amount || 0)}`
                     : 'None yet'}
                 </span>
               </div>

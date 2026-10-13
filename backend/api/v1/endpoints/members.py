@@ -91,8 +91,8 @@ def read_members(
 
 
 def _attach_membership_types(db: Session, rows: list) -> None:
-    """Each listed member carries the name of their current membership type (the latest membership record), so
-    the lists show the real type instead of leaving it blank."""
+    """Each listed member carries the name of their current membership type (the latest membership record) and
+    their credit total, so the lists show the real type and amount paid instead of working them out on the page."""
     from models.masters import MembershipType
     ids = [r.get("id") for r in rows if isinstance(r, dict) and r.get("id")]
     if not ids:
@@ -106,11 +106,14 @@ def _attach_membership_types(db: Session, rows: list) -> None:
         .all()
     ):
         latest[ms.member_id] = (t.id, t.name_en)
+    from services import membership_credit
+    credit = membership_credit.credit_totals(db, ids)
     for r in rows:
         if isinstance(r, dict):
             tid, name = latest.get(r.get("id"), (None, None))
             r["membership_type_id"] = tid
             r["membership_type"] = name
+            r["credit_total"] = credit.get(r.get("id"), 0.0)  # what the member has paid toward membership
 
 
 @router.post("/", response_model=Union[schemas_members.Member, PendingApproval], status_code=201)

@@ -1,3 +1,4 @@
+import { formatDateTime } from '../utils/dateUtils';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Activity,
@@ -142,24 +143,8 @@ export default function ActivityLogs() {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / limit));
 
-  // Format timestamp: 12/10/2026 4:08:59 pm
-  const formatLogDate = (isoStr) => {
-    if (!isoStr) return '—';
-    try {
-      const d = new Date(isoStr);
-      return d.toLocaleString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true,
-      });
-    } catch (_) {
-      return isoStr;
-    }
-  };
+  // Format timestamp: DD-MM-YYYY HH:mm:ss
+  const formatLogDate = (isoStr) => formatDateTime(isoStr);
 
   return (
     <div className="space-y-6">

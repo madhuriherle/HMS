@@ -17,6 +17,7 @@ import Swal from 'sweetalert2';
 import { normalizeMember, unwrapList } from '../utils/apiAdapters';
 import useAuth from '../hooks/useAuth';
 import { resolveLandingPath } from '../utils/landing';
+import { formatMoney } from '../utils/money';
 
 const iconMap = {
   'users': Users,
@@ -137,7 +138,7 @@ export default function Dashboard() {
   ];
 
 
-  const inr = (v) => `₹${Number(v || 0).toLocaleString('en-IN')}`;
+  const inr = formatMoney;
   const monthChange =
     money && money.last_month_amount > 0
       ? Math.round(((money.month_amount - money.last_month_amount) / money.last_month_amount) * 100)
@@ -187,7 +188,7 @@ export default function Dashboard() {
         talukName,
         mobile: m.mobile,
         address: m.address,
-        amount: latest ? `₹${Number(latest.amount).toLocaleString('en-IN')}` : ''
+        amount: latest ? `${formatMoney(latest.amount)}` : ''
       });
     } catch (err) {
       console.error('Failed to fetch member details', err);

@@ -5,7 +5,7 @@ import re
 from test_frontend_contract import API, _sfx
 from test_receipt_entry_flow import _entry_payload
 
-DEFAULT_RECEIPT = dict(prefix="", date_part="FY", separator="/", digits=4, start_value=1, restart="FY", suffix="", allow_manual=True)
+DEFAULT_RECEIPT = dict(prefix="", date_part="NONE", separator="", digits=4, start_value=1, restart="NEVER", suffix="", allow_manual=True)
 
 
 def _put(client, h, doc, **body):
@@ -16,7 +16,7 @@ def test_defaults_match_the_old_formats(client, admin_headers):
     rows = {r["doc_type"]: r for r in client.get(f"{API}/system/number-formats", headers=admin_headers).json()["data"]}
     assert re.fullmatch(r"HMS-\d{8}-000001", rows["MEMBER_CODE"]["example"])
     assert "MEMBERSHIP_NO" not in rows  # one permanent number: the membership number
-    assert re.fullmatch(r"\d{4}-\d\d/0001", rows["RECEIPT"]["example"])
+    assert rows["RECEIPT"]["example"] == "0001"
 
 
 def test_a_format_that_could_repeat_numbers_is_refused(client, admin_headers):
@@ -50,10 +50,10 @@ def test_typed_number_in_the_format_moves_the_counter_past_it(client, admin_head
     try:
         assert _put(client, h, "RECEIPT", prefix="MAN", date_part="NONE", separator="-", digits=4,
                     start_value=1, restart="NEVER", suffix="", allow_manual=True).status_code == 200
-        first = client.post(f"{API}/receipts/", headers=h, json=_entry_payload("MAN-0040", "Typed"))
+        first = client.post(f"{API}/receipts/", headers=h, json=_entry_payload("MAN-0900", "Typed"))
         assert first.status_code == 201, first.text
         nxt = client.get(f"{API}/receipts/next-number", headers=h).json()["receipt_number"]
-        assert nxt == "MAN-0041"
+        assert nxt == "MAN-0901"
     finally:
         assert _put(client, h, "RECEIPT", **DEFAULT_RECEIPT).status_code == 200
 

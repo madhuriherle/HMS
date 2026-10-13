@@ -1,3 +1,5 @@
+import pytest
+
 from test_frontend_contract import API
 from test_receipt_entry_flow import _entry_payload
 
@@ -6,7 +8,18 @@ def _create(client, h, number, date):
     return client.post(f"{API}/receipts/", headers=h, json=_entry_payload(number, "FY Payer", receipt_date=date))
 
 
-def test_financial_year_numbering_and_duplicate_messages(client, admin_headers):
+@pytest.fixture
+def fy_receipt_format(client, admin_headers):
+    """This test is about the year-wise format (2019-20/0001); the default is a plain 0001 counter."""
+    url = f"{API}/system/number-formats/RECEIPT"
+    fy = dict(prefix="", date_part="FY", separator="/", digits=4, start_value=1, restart="FY", suffix="", allow_manual=True)
+    plain = dict(fy, date_part="NONE", separator="", restart="NEVER")
+    assert client.put(url, headers=admin_headers, json=fy).status_code == 200
+    yield
+    client.put(url, headers=admin_headers, json=plain)
+
+
+def test_financial_year_numbering_and_duplicate_messages(client, admin_headers, fy_receipt_format):
     h = admin_headers
     # April starts a new year; March belongs to the previous one
     nxt = client.get(f"{API}/receipts/next-number", headers=h, params={"date": "2019-04-01"}).json()

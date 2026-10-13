@@ -273,6 +273,7 @@ def read_receipt_tracking(
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
     search: Optional[str] = None,
+    receipt_id: Optional[int] = None,  # one receipt (the edit screen loads it this way)
     export: Optional[str] = None,  # "csv" or "excel"
 ) -> Any:
     """Receipt register for the Receipt Tracking screen.
@@ -288,6 +289,8 @@ def read_receipt_tracking(
     """
     # Cancelled (spoiled) receipts stay listed, with a Cancelled status, but add nothing to the totals.
     filters = [Receipt.is_deleted == False]  # noqa: E712
+    if receipt_id:
+        filters.append(Receipt.id == receipt_id)
     if receipt_status:
         filters.append(Receipt.receipt_status == receipt_status.upper())
     if year:

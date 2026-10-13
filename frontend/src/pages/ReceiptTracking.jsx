@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
 import {
@@ -20,7 +20,6 @@ import {
   Award,
   Check,
   RotateCcw,
-  Printer,
   FileText,
   Building,
   CreditCard
@@ -33,13 +32,13 @@ import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import api from '../api';
 import { formatDate } from '../utils/dateUtils';
-import DateInput from '../components/DateInput';
 import { apiErrorMessage } from '../utils/apiError';
 import { askForm, askReason, confirmYesNo } from '../utils/dialogs';
 import { notify } from '../utils/notify';
-import { fetchReceipts, normalizeReceipt, receiptToApiPayload } from '../utils/apiAdapters';
-import useRules, { currentRules } from '../hooks/useRules';
+import { fetchReceipts } from '../utils/apiAdapters';
+import { currentRules } from '../hooks/useRules';
 import { useList } from '../hooks/useLists';
+import { formatMoney } from '../utils/money';
 
 // Financial year (April-March) of an ISO date: 2026-10-12 -> 2026-27
 const fyOf = (iso) => {
@@ -54,15 +53,6 @@ const fyOf = (iso) => {
 
 const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
-// Helper to format currency in Indian Rupees
-const formatINR = (amount) => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(amount || 0);
-};
 
 // Helper to format date string (YYYY-MM-DD to DD-MM-YYYY)
 // Helper for number to words (Indian Numbering System)
@@ -94,8 +84,8 @@ function StatusDot({ receipt }) {
 }
 
 export default function ReceiptTracking() {
-  const rules = useRules(); // formats and limits from the server
   const { hasPermission } = useAuth();
+  const navigate = useNavigate();
   // Master Synchronized Stores
   const [receipts, setReceipts] = useState([]);
   const [members, setMembers] = useState([]);
@@ -104,6 +94,7 @@ export default function ReceiptTracking() {
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
   const [particularsFilter, setParticularsFilter] = useState('ALL');
+  const [subTypeFilter, setSubTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, Assigned, Unassigned
   const [fyFilter, setFyFilter] = useState('ALL');
   const [modeFilter, setModeFilter] = useState('ALL');
@@ -114,9 +105,6 @@ export default function ReceiptTracking() {
 
   // Modals State
   const [viewingReceipt, setViewingReceipt] = useState(null);
-  const [editingReceipt, setEditingReceipt] = useState(null);
-  const [editFormData, setEditFormData] = useState({});
-  const [editFormErrors, setEditFormErrors] = useState({});
   const [deletingReceipt, setDeletingReceipt] = useState(null);
 
   // Toast State
@@ -195,6 +183,11 @@ export default function ReceiptTracking() {
         }
       }
 
+      // Sub type (the detail on a receipt line, e.g. the donation kind)
+      if (subTypeFilter !== 'ALL' && !(r.items || []).some((i) => (i.description || '').trim() === subTypeFilter)) {
+        return false;
+      }
+
       // 3. Status Filter (Assigned vs Unassigned)
       if (fyFilter !== 'ALL' && fyOf(r.receiptDate) !== fyFilter) return false;
       if (modeFilter !== 'ALL' && (r.paymentMode || '').toLowerCase() !== modeFilter.toLowerCase()) return false;
@@ -209,7 +202,13 @@ export default function ReceiptTracking() {
 
       return true;
     });
-  }, [receipts, searchQuery, particularsFilter, statusFilter, fyFilter, modeFilter, fromDate, toDate]);
+  }, [receipts, searchQuery, particularsFilter, subTypeFilter, statusFilter, fyFilter, modeFilter, fromDate, toDate]);
+
+  // sub types actually used on the receipt lines
+  const subTypeOptions = useMemo(
+    () => [...new Set(receipts.flatMap((r) => (r.items || []).map((i) => (i.description || '').trim())).filter(Boolean))].sort(),
+    [receipts]
+  );
 
   const fyOptions = useMemo(
     () => [...new Set(receipts.map((r) => fyOf(r.receiptDate)).filter(Boolean))].sort().reverse(),
@@ -225,44 +224,8 @@ export default function ReceiptTracking() {
   );
 
   // ----------------------------------------------------
-  // PRINT, EXPORT, DAY BOOK, BULK MAP
+  // EXPORT, DAY BOOK, BULK MAP
   // ----------------------------------------------------
-  const openReceiptPdf = async (receipt) => {
-    if (!receipt?.id) return;
-    const newWindow = window.open('', '_blank');
-    try {
-      const { data } = await api.get(`/receipts/${receipt.id}/pdf`, { responseType: 'blob' });
-      const blob = new Blob([data], { type: 'application/pdf' });
-      const fileUrl = URL.createObjectURL(blob);
-      if (newWindow) {
-        newWindow.location.href = fileUrl;
-      } else {
-        const a = document.createElement('a');
-        a.href = fileUrl;
-        a.target = '_blank';
-        a.download = `receipt-${String(receipt.receiptNumber || receipt.id).replace(/\//g, '-')}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      }
-    } catch (error) {
-      if (newWindow) newWindow.close();
-      let msg = 'Could not open the receipt PDF.';
-      if (error?.response?.data instanceof Blob) {
-        try {
-          const text = await error.response.data.text();
-          const parsed = JSON.parse(text);
-          if (parsed?.detail) {
-            msg = typeof parsed.detail === 'string' ? parsed.detail : JSON.stringify(parsed.detail);
-          }
-        } catch (_) {}
-      } else if (error?.response?.data?.detail) {
-        msg = typeof error.response.data.detail === 'string' ? error.response.data.detail : JSON.stringify(error.response.data.detail);
-      }
-      showToast(msg, 'error');
-    }
-  };
-
   const exportVisibleReceipts = () => {
     const head = ['Receipt No', 'Date', 'Financial Year', 'Name', 'Mobile', 'Particulars', 'Amount', 'Payment Mode', 'Reference', 'Status'];
     const rows = filteredReceipts.map((r) => [
@@ -308,7 +271,7 @@ export default function ReceiptTracking() {
     if (!chosen.length) return;
     const total = chosen.filter((r) => r.receiptStatus !== 'CANCELLED').reduce((sum, r) => sum + Number(r.amount || 0), 0);
     const v = await askForm({
-      title: `Map ${chosen.length} receipt(s) (${formatINR(total)}) to one member`,
+      title: `Map ${chosen.length} receipt(s) (${formatMoney(total)}) to one member`,
       confirmText: 'Map receipts',
       fields: [
         {
@@ -348,110 +311,8 @@ export default function ReceiptTracking() {
   // ACTION HANDLERS
   // ----------------------------------------------------
 
-  // 1. Open Edit Modal
-  const handleOpenEdit = (receipt) => {
-    setEditingReceipt(receipt);
-    setEditFormData({
-      receiptNumber: receipt.receiptNumber || '',
-      receiptDate: receipt.receiptDate || '',
-      name: receipt.name || '',
-      panNo: receipt.panNo || '',
-      membershipNo: receipt.membershipNo || '',
-      mobile: receipt.mobile || '',
-      particulars: receipt.particulars || 'Membership',
-      donationDetails: receipt.donationDetails || '',
-      othersDescription: receipt.othersDescription || '',
-      amount: String(receipt.amount || ''),
-      paymentMode: receipt.paymentMode || '',
-      bankName: receipt.bankName || receipt.bankAccount || '',
-      transactionId: receipt.transactionId || '',
-      transactionDate: receipt.transactionDate || '',
-      description: receipt.description || ''
-    });
-    setEditFormErrors({});
-  };
-
-  const handleEditChange = (e) => {
-    const { name, value } = e.target;
-    if (name === 'amount') {
-      const cleaned = value.replace(/\D/g, '');
-      setEditFormData((prev) => ({ ...prev, amount: cleaned }));
-    } else if (name === 'panNo') {
-      setEditFormData((prev) => ({ ...prev, panNo: value.toUpperCase() }));
-    } else if (name === 'mobile') {
-      const cleaned = value.replace(/\D/g, '').slice(0, 10);
-      setEditFormData((prev) => ({ ...prev, mobile: cleaned }));
-    } else {
-      setEditFormData((prev) => ({ ...prev, [name]: value }));
-    }
-
-    if (editFormErrors[name]) {
-      setEditFormErrors((prev) => ({ ...prev, [name]: '' }));
-    }
-  };
-
-  const handleSaveEdit = async (e) => {
-    e.preventDefault();
-    const errors = {};
-
-    if (!editFormData.receiptNumber?.trim()) {
-      errors.receiptNumber = 'Receipt No. is required';
-    }
-    if (!editFormData.receiptDate) {
-      errors.receiptDate = 'Receipt Date is required';
-    }
-    if (!editFormData.particulars) {
-      errors.particulars = 'Please select Receipt Type';
-    }
-    const amt = Number(editFormData.amount);
-    if (!editFormData.amount || isNaN(amt) || amt <= 0) {
-      errors.amount = 'Valid Amount > 0 is required';
-    }
-    if (!editFormData.paymentMode) {
-      errors.paymentMode = 'Payment Mode is required';
-    }
-
-    if (Object.keys(errors).length > 0) {
-      setEditFormErrors(errors);
-      showToast('Please fix highlighted required fields.', 'error');
-      return;
-    }
-
-    const uiPayload = {
-      receiptNumber: editFormData.receiptNumber.trim(),
-      receiptDate: editFormData.receiptDate,
-      name: editFormData.name ? editFormData.name.trim() : '',
-      panNo: editFormData.panNo ? editFormData.panNo.trim() : '',
-      membershipNo: editFormData.membershipNo ? editFormData.membershipNo.trim() : '',
-      mobile: editFormData.mobile ? editFormData.mobile.trim() : '',
-      particulars: editFormData.particulars,
-      donationDetails: editFormData.donationDetails ? editFormData.donationDetails.trim() : '',
-      othersDescription: editFormData.othersDescription ? editFormData.othersDescription.trim() : '',
-      amount: Number(editFormData.amount),
-      paymentMode: editFormData.paymentMode,
-      bankName: editFormData.bankName ? editFormData.bankName.trim() : '',
-      bankAccount: editFormData.bankName ? editFormData.bankName.trim() : '',
-      transactionId: editFormData.transactionId ? editFormData.transactionId.trim() : '',
-      transactionDate: editFormData.transactionDate,
-      description: editFormData.description ? editFormData.description.trim() : ''
-    };
-
-    try {
-      const apiPayload = receiptToApiPayload(uiPayload);
-      delete apiPayload.items;
-      delete apiPayload.allocations;
-      const editId = editingReceipt.id;
-      // Close the form first so the confirmation popup opens over a closed form.
-      setEditingReceipt(null);
-      const { data } = await api.put(`/receipts/${editId}`, apiPayload);
-      const updated = normalizeReceipt(data);
-      setReceipts((prev) => prev.map((r) => (r.id === editId ? updated : r)));
-      showToast(`Receipt #${updated.receiptNumber} updated successfully.`);
-    } catch (error) {
-      console.error('Failed to update receipt.', error);
-      showToast(error.response?.data?.detail || 'Failed to update receipt through API.', 'error');
-    }
-  };
+  // 1. Edit: the Receipt Entry screen, opened on this receipt
+  const handleOpenEdit = (receipt) => navigate(`/dashboard/receipts/edit/${receipt.id}`);
 
   // 2. Delete Receipt
   // ----------------------------------------------------
@@ -643,12 +504,13 @@ export default function ReceiptTracking() {
 
       {/* Header, Filter & Search Toolbar */}
       <SearchFilterBar
-        
+        searchInHeader
         title={<h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Receipt Tracking</h1>}
         searchQuery={searchQuery}
         onSearchChange={(val) => setSearchQuery(val)}
         activeFiltersCount={
           (particularsFilter !== 'ALL' ? 1 : 0) +
+          (subTypeFilter !== 'ALL' ? 1 : 0) +
           (statusFilter !== 'ALL' ? 1 : 0) +
           (fyFilter !== 'ALL' ? 1 : 0) +
           (modeFilter !== 'ALL' ? 1 : 0) +
@@ -657,6 +519,7 @@ export default function ReceiptTracking() {
         onResetFilters={() => {
           setSearchQuery('');
           setParticularsFilter('ALL');
+          setSubTypeFilter('ALL');
           setStatusFilter('ALL');
           setFyFilter('ALL');
           setModeFilter('ALL');
@@ -734,6 +597,14 @@ export default function ReceiptTracking() {
           widthClass="w-full sm:w-56"
         />
 
+        {/* Sub Type Filter */}
+        <FilterSelect
+          value={subTypeFilter}
+          onChange={(val) => setSubTypeFilter(val)}
+          options={[{ value: 'ALL', label: 'All Sub Types' }, ...subTypeOptions.map((t) => ({ value: t, label: t }))]}
+          widthClass="w-full sm:w-52"
+        />
+
         {/* Status Filter */}
         <FilterSelect
           value={statusFilter}
@@ -795,7 +666,7 @@ export default function ReceiptTracking() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="font-mono font-bold text-sm">{formatINR(receipt.amount)}</div>
+                  <div className="font-mono font-bold text-sm">{formatMoney(receipt.amount)}</div>
                   {unmapped && <div className="text-[10px] font-bold text-amber-700">Unassigned</div>}
                   {receipt.receiptStatus === 'CANCELLED' && <div className="text-[10px] font-bold text-red-700">Cancelled</div>}
                 </div>
@@ -813,7 +684,6 @@ export default function ReceiptTracking() {
                   </label>
                 )}
                 <button type="button" onClick={() => setViewingReceipt(receipt)} className="btn-act" title="View"><Eye className="w-3.5 h-3.5" /><span>View</span></button>
-                <button type="button" onClick={() => openReceiptPdf(receipt)} className="btn-act" title="Print"><Printer className="w-3.5 h-3.5" /><span>Print</span></button>
                 <button
                   type="button"
                   onClick={() => handleOpenEdit(receipt)}
@@ -916,7 +786,7 @@ export default function ReceiptTracking() {
                         {receipt.items?.length > 1 && (
                           <span
                             className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-bold text-[#863221]"
-                            title={receipt.items.map((i) => `${i.particular}${i.description && i.description !== i.particular ? ` (${i.description})` : ''}: ${formatINR(i.amount)}`).join(', ')}
+                            title={receipt.items.map((i) => `${i.particular}${i.description && i.description !== i.particular ? ` (${i.description})` : ''}: ${formatMoney(i.amount)}`).join(', ')}
                           >
                             +{receipt.items.length - 1} more
                           </span>
@@ -925,7 +795,7 @@ export default function ReceiptTracking() {
 
                       {/* Column 5b/5c: Amount and Payment Mode */}
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-xs whitespace-nowrap">
-                        {formatINR(receipt.amount)}
+                        {formatMoney(receipt.amount)}
                       </td>
                       <td className="py-3.5 px-4 text-xs">{receipt.paymentMode || '—'}</td>
                       <td className="py-3.5 px-4"><StatusDot receipt={receipt} /></td>
@@ -942,17 +812,6 @@ export default function ReceiptTracking() {
                           >
                             <Eye className="w-3.5 h-3.5" />
                             <span>View</span>
-                          </button>
-
-                          {/* Print Action */}
-                          <button
-                            type="button"
-                            onClick={() => openReceiptPdf(receipt)}
-                            className="btn-act"
-                            title="Print / download the receipt"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            <span>Print</span>
                           </button>
 
                           {/* Edit Action */}
@@ -1058,7 +917,7 @@ export default function ReceiptTracking() {
                 <div className="text-right">
                   <span className="text-[10px] uppercase font-bold text-[#863221] block">Amount Paid</span>
                   <span className="text-base font-extrabold text-[#510601]">
-                    {formatINR(viewingReceipt.amount)}
+                    {formatMoney(viewingReceipt.amount)}
                   </span>
                 </div>
               </div>
@@ -1116,12 +975,12 @@ export default function ReceiptTracking() {
                                 <span className="font-normal text-[#863221]"> — {it.description}</span>
                               )}
                             </span>
-                            <span className="font-mono font-bold">{formatINR(it.amount)}</span>
+                            <span className="font-mono font-bold">{formatMoney(it.amount)}</span>
                           </div>
                         ))}
                         <div className="flex items-center justify-between px-3 py-1.5 text-xs bg-[#FAF7F2] font-bold">
                           <span>Total</span>
-                          <span className="font-mono">{formatINR(viewingReceipt.amount)}</span>
+                          <span className="font-mono">{formatMoney(viewingReceipt.amount)}</span>
                         </div>
                       </div>
                     </div>
@@ -1170,16 +1029,7 @@ export default function ReceiptTracking() {
             </div>
 
             {/* Read-only footer */}
-            <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
-              <button
-                type="button"
-                onClick={() => openReceiptPdf(viewingReceipt)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#510601] hover:bg-[#6b0801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                title="Print / download the receipt PDF"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Print Receipt</span>
-              </button>
+            <div className="flex flex-wrap items-center justify-end gap-2 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
               <button
                 type="button"
                 onClick={() => setViewingReceipt(null)}
@@ -1188,210 +1038,6 @@ export default function ReceiptTracking() {
                 Close
               </button>
             </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* ============================================================ */}
-      {/* MODAL 2: EDIT RECEIPT RECORD                                 */}
-      {/* ============================================================ */}
-      <Modal isOpen={Boolean(editingReceipt)} onClose={() => setEditingReceipt(null)}>
-        {editingReceipt && (
-          <div className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
-            <form onSubmit={handleSaveEdit}>
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold">
-                    <Pencil className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h2 className="text-base font-bold text-[#180200]">
-                      Edit Receipt #{editingReceipt.receiptNumber}
-                    </h2>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setEditingReceipt(null)}
-                  className="p-1.5 rounded-lg text-stone-400 hover:text-[#510601] hover:bg-stone-100 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Body */}
-              <div className="flex flex-col flex-1 overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Receipt Number */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
-                      Receipt Number <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="receiptNumber"
-                      value={editFormData.receiptNumber || ''}
-                      onChange={handleEditChange}
-                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl font-mono text-xs focus:outline-none focus:border-[#510601]"
-                    />
-                    {editFormErrors.receiptNumber && (
-                      <p className="text-[10px] text-red-500 mt-1">{editFormErrors.receiptNumber}</p>
-                    )}
-                  </div>
-
-                  {/* Receipt Date */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
-                      Receipt Date <span className="text-red-500">*</span>
-                    </label>
-                    <DateInput
-                      name="receiptDate"
-                      value={editFormData.receiptDate || ''}
-                      onChange={handleEditChange}
-                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl font-mono text-xs focus:outline-none focus:border-[#510601]"
-                    />
-                  </div>
-
-                  {/* Payee / Member Name */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
-                      Payee / Member Name
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={editFormData.name || ''}
-                      onChange={handleEditChange}
-                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]"
-                    />
-                  </div>
-
-                  {/* Mobile */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
-                      Mobile Number
-                    </label>
-                    <input
-                      type="text"
-                      name="mobile"
-                      value={editFormData.mobile || ''}
-                      onChange={handleEditChange}
-                      maxLength={10}
-                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl font-mono text-xs focus:outline-none focus:border-[#510601]"
-                    />
-                  </div>
-
-                  {/* Particulars / Receipt Type */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
-                      Receipt Type / Particulars <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="particulars"
-                      value={editFormData.particulars || 'Membership'}
-                      onChange={handleEditChange}
-                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601] cursor-pointer"
-                    >
-                      {particularOptions.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Amount */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
-                      Amount (₹) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="amount"
-                      value={editFormData.amount || ''}
-                      onChange={handleEditChange}
-                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl font-mono font-bold text-xs focus:outline-none focus:border-[#510601]"
-                    />
-                    {editFormErrors.amount && (
-                      <p className="text-[10px] text-red-500 mt-1">{editFormErrors.amount}</p>
-                    )}
-                  </div>
-
-                  {/* Payment Mode */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
-                      Payment Mode <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                      name="paymentMode"
-                      value={editFormData.paymentMode || ''}
-                      onChange={handleEditChange}
-                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601] cursor-pointer"
-                    >
-                      {editFormData.paymentMode && !paymentModeOptions.includes(editFormData.paymentMode) && (
-                        <option value={editFormData.paymentMode}>{editFormData.paymentMode}</option>
-                      )}
-                      {paymentModeOptions.map((mode) => (
-                        <option key={mode} value={mode}>
-                          {mode}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Transaction ID */}
-                  <div>
-                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
-                      Txn ID / Cheque No.
-                    </label>
-                    <input
-                      type="text"
-                      name="transactionId"
-                      value={editFormData.transactionId || ''}
-                      onChange={handleEditChange}
-                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl font-mono text-xs focus:outline-none focus:border-[#510601]"
-                    />
-                  </div>
-
-                  {/* Description / Remarks */}
-                  <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-bold text-[#863221] uppercase mb-1">
-                      Description / Remarks
-                    </label>
-                    <textarea
-                      name="description"
-                      value={editFormData.description || ''}
-                      onChange={handleEditChange}
-                      rows={2}
-                      className="w-full py-2 px-3 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Footer */}
-              </div>
-            <div className="shrink-0 flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
-                <button
-                  type="button"
-                  onClick={() => setEditingReceipt(null)}
-                  className="px-4 py-2 bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#863221] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={!hasPermission('receipts.tracking.write')}
-                  title={!hasPermission('receipts.tracking.write') ? 'Requires receipts.tracking.write permission' : undefined}
-                  className="px-5 py-2 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>Save Changes</span>
-                </button>
-              </div>
-            </form>
           </div>
         )}
       </Modal>
@@ -1413,7 +1059,7 @@ export default function ReceiptTracking() {
             </div>
             <div className="mt-4 flex items-baseline justify-between">
               <span className="text-xs text-[#863221]">{dayBook.data.receipt_count} receipt(s)</span>
-              <span className="text-2xl font-bold font-mono text-[#510601]">{formatINR(dayBook.data.total)}</span>
+              <span className="text-2xl font-bold font-mono text-[#510601]">{formatMoney(dayBook.data.total)}</span>
             </div>
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div>
@@ -1422,7 +1068,7 @@ export default function ReceiptTracking() {
                 {dayBook.data.by_payment_mode.map((m) => (
                   <div key={m.payment_mode} className="flex justify-between py-1 border-b border-[#E8DFD8]/60">
                     <span>{m.payment_mode} <span className="text-[#863221]/70">({m.count})</span></span>
-                    <span className="font-mono font-bold">{formatINR(m.amount)}</span>
+                    <span className="font-mono font-bold">{formatMoney(m.amount)}</span>
                   </div>
                 ))}
               </div>
@@ -1432,7 +1078,7 @@ export default function ReceiptTracking() {
                 {dayBook.data.by_particular.map((p) => (
                   <div key={p.particular} className="flex justify-between py-1 border-b border-[#E8DFD8]/60">
                     <span>{p.particular}</span>
-                    <span className="font-mono font-bold">{formatINR(p.amount)}</span>
+                    <span className="font-mono font-bold">{formatMoney(p.amount)}</span>
                   </div>
                 ))}
               </div>

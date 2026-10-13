@@ -56,6 +56,7 @@ import {
   normalizeMember,
 } from '../utils/apiAdapters';
 import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
+import { formatMoney } from '../utils/money';
 
 const toId = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? v : Number(v));
 
@@ -288,14 +289,13 @@ export default function MembershipList() {
         }
       }
 
-      // Membership Type Filter (Dynamically calculated based on cumulative membership receipts & Master)
+      // Membership Type Filter (the member's type as recorded on the server)
       if (typeFilter !== 'ALL') {
-        const memStatus = calculateMemberMembershipStatus(m, receipts, membershipTypes);
-        const currentType = (memStatus.currentMembershipType || '').toLowerCase();
+        const currentType = String(m.membershipType || '').toLowerCase();
         if (typeFilter === 'None' || typeFilter === 'Not Yet Reached') {
-          if (memStatus.isMilestoneReached) return false;
-        } else {
-          if (currentType !== typeFilter.toLowerCase()) return false;
+          if (currentType) return false;
+        } else if (currentType !== typeFilter.toLowerCase()) {
+          return false;
         }
       }
 
@@ -878,29 +878,14 @@ export default function MembershipList() {
                         <div className="font-mono font-medium text-xs text-[#180200]">{m.mobile || m.mobileNumber || '—'}</div>
                       </td>
 
-                      {/* Membership Type (Dynamically Calculated from Cumulative Receipts & Master) */}
+                      {/* Membership Type and amount paid, both from the server */}
                       <td className="py-3 px-4">
-                        {(() => {
-                          const memStatus = calculateMemberMembershipStatus(m, receipts, membershipTypes);
-                          if (memStatus.isMilestoneReached) {
-                            return (
-                              <div className="space-y-0.5">
-                                <span className="text-xs font-semibold text-[#510601]">{memStatus.currentMembershipType}</span>
-                                <div className="text-[10px] text-[#863221] font-mono font-medium">
-                                  Paid: ₹{memStatus.totalMembershipPaid.toLocaleString('en-IN')}
-                                </div>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div className="space-y-0.5">
-                              <span className="text-xs font-semibold text-[#B34E00]">Not Yet Reached</span>
-                              <div className="text-[10px] text-[#863221] font-mono">
-                                Paid: ₹{memStatus.totalMembershipPaid.toLocaleString('en-IN')}
-                              </div>
-                            </div>
-                          );
-                        })()}
+                        <div className="space-y-0.5">
+                          <span className="text-xs font-semibold text-[#510601]">{m.membershipType || '—'}</span>
+                          <div className="text-[10px] text-[#863221] font-mono font-medium">
+                            Paid: {formatMoney(m.credit_total || 0)}
+                          </div>
+                        </div>
                       </td>
 
                       {/* Status Toggle Button */}
@@ -1114,7 +1099,7 @@ export default function MembershipList() {
                       <div className="bg-white p-2.5 rounded-xl border border-[#E8DFD8]">
                         <span className="text-[10px] uppercase font-bold text-[#863221] block">Total Paid</span>
                         <p className="font-mono font-bold text-base text-[#510601] mt-0.5">
-                          ₹{memStatus.totalMembershipPaid.toLocaleString('en-IN')}
+                          {formatMoney(memStatus.totalMembershipPaid)}
                         </p>
                       </div>
                       <div className="bg-white p-2.5 rounded-xl border border-[#E8DFD8]">
@@ -1134,7 +1119,7 @@ export default function MembershipList() {
                         <span className="text-[10px] uppercase font-bold text-[#863221] block">Next Milestone</span>
                         <p className="font-bold text-xs text-[#180200] mt-0.5">
                           {memStatus.nextMilestoneType ? (
-                            <span>{memStatus.nextMilestoneType} (₹{memStatus.nextMilestoneAmount.toLocaleString('en-IN')})</span>
+                            <span>{memStatus.nextMilestoneType} ({formatMoney(memStatus.nextMilestoneAmount)})</span>
                           ) : (
                             <span className="text-emerald-700 font-semibold">Highest Milestone Achieved</span>
                           )}
@@ -1144,9 +1129,9 @@ export default function MembershipList() {
                         <span className="text-[10px] uppercase font-bold text-[#863221] block">Remaining</span>
                         <p className="font-mono font-bold text-sm text-[#863221] mt-0.5">
                           {memStatus.nextMilestoneType ? (
-                            `₹${memStatus.remainingAmount.toLocaleString('en-IN')}`
+                            `${formatMoney(memStatus.remainingAmount)}`
                           ) : (
-                            <span className="text-emerald-700">₹0</span>
+                            <span className="text-emerald-700">{formatMoney(0)}</span>
                           )}
                         </p>
                       </div>
@@ -1193,7 +1178,7 @@ export default function MembershipList() {
                                 <span className="text-stone-600 font-medium">{r.paymentMode || '—'}</span>
                               </div>
                               <span className="font-mono font-bold text-[#180200]">
-                                ₹{Number(r.amount).toLocaleString('en-IN')}
+                                {formatMoney(r.amount)}
                               </span>
                             </div>
                           ))}
@@ -1221,7 +1206,7 @@ export default function MembershipList() {
                       <div className="text-right">
                         <span className="text-[10px] uppercase font-bold text-[#863221] block">Total Contributed</span>
                         <span className="font-mono font-bold text-sm text-[#3D705C]">
-                          ₹{memStatus.totalOtherPaid.toLocaleString('en-IN')}
+                          {formatMoney(memStatus.totalOtherPaid)}
                         </span>
                       </div>
                     </div>
@@ -1266,7 +1251,7 @@ export default function MembershipList() {
                                       {r.paymentMode || '—'}
                                     </td>
                                     <td className="py-2 px-2.5 text-right font-mono font-bold text-[#180200]">
-                                      ₹{Number(r.amount).toLocaleString('en-IN')}
+                                      {formatMoney(r.amount)}
                                     </td>
                                   </tr>
                                 );

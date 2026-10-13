@@ -18,8 +18,9 @@ export const formatPaymentModeLabel = (config) => {
 
 export const isReceiptUnmapped = (receipt) => {
   if (!receipt || receipt.receiptStatus === 'CANCELLED') return false;
-  // a receipt is assigned when the server has linked it to a member
-  return !(receipt.memberId || (receipt.membershipNo && String(receipt.membershipNo).trim() !== ''));
+  // assigned = the server has allocated it to a member / associate; a number typed on the receipt that matched nobody doesn't count
+  if (receipt.receiptStatus) return receipt.receiptStatus === 'UNASSIGNED';
+  return !receipt.memberId;
 };
 
 // Cumulative membership calculation: which membership type the amount paid has

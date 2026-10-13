@@ -191,6 +191,42 @@ def credit_ledger(db: Session, member_id: int, types: Optional[list] = None) -> 
     return {"total": total, "entries": entries, "receipt_types": types}
 
 
+def credit_totals(db: Session, member_ids: list, types: Optional[list] = None) -> dict:
+    """{member_id: credit total} for many members in two queries (same rules as credit_ledger)."""
+    from models.receipts import Receipt, ReceiptAllocation, RefundTransaction
+
+    if not member_ids:
+        return {}
+    types = types if types is not None else credit_receipt_types(db)
+    rows = (
+        db.query(ReceiptAllocation, Receipt)
+        .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
+        .filter(
+            ReceiptAllocation.member_id.in_(member_ids),
+            ReceiptAllocation.is_deleted == False,  # noqa: E712
+            Receipt.is_deleted == False,  # noqa: E712
+            Receipt.payment_status.in_(COUNTED_STATUSES),
+            Receipt.receipt_type.in_(types),
+        )
+        .all()
+    )
+    refunded = {}
+    receipt_ids = {r.id for _, r in rows}
+    if receipt_ids:
+        for rf in db.query(RefundTransaction).filter(
+            RefundTransaction.receipt_id.in_(receipt_ids), RefundTransaction.is_deleted == False  # noqa: E712
+        ).all():
+            if (rf.status or "").upper() not in IGNORED_REFUND_STATUSES:
+                refunded[rf.receipt_id] = refunded.get(rf.receipt_id, Decimal(0)) + _d(rf.amount)
+    totals = {}
+    for alloc, receipt in rows:
+        net_amount = _d(receipt.net_amount)
+        fraction = min(Decimal(1), refunded.get(receipt.id, Decimal(0)) / net_amount) if net_amount > 0 else Decimal(0)
+        counted = (_d(alloc.allocated_amount) * (Decimal(1) - fraction)).quantize(Decimal("0.01"))
+        totals[alloc.member_id] = totals.get(alloc.member_id, Decimal(0)) + counted
+    return {mid: float(v) for mid, v in totals.items()}
+
+
 def _current_membership(db: Session, member_id: int):
     from models.members import MemberMembership
     return (
@@ -224,6 +260,14 @@ def summary(db: Session, member_id: int, receipt_types: Optional[list] = None) -
     current_type = db.get(MembershipType, current.membership_type_id) if current else None
     current_price = active_price(db, current.membership_type_id) if current else None
 
+    # What the member is working toward: the type they hold when they have not yet paid its price,
+    # otherwise the next type up the ladder.
+    held_price = _d(current_price.amount) if current_price else None
+    if current_type and held_price and held_price > total:
+        target = (current_type, held_price)
+    else:
+        target = nxt
+
     def _t(pair):
         return {"id": pair[0].id, "code": pair[0].code, "name_en": pair[0].name_en, "price": float(pair[1])} if pair else None
 
@@ -241,6 +285,8 @@ def summary(db: Session, member_id: int, receipt_types: Optional[list] = None) -
         "remaining_amount": float(remaining),
         "next_type": _t(nxt),
         "amount_to_next_type": float(nxt[1] - total) if nxt else None,
+        "target_type": _t(target),
+        "amount_to_target": float(target[1] - total) if target else None,
         "upgrade_pending": bool(qualified and (
             not current or (current_price is not None and qualified[1] > _d(current_price.amount))
         )),

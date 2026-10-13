@@ -6,9 +6,9 @@ import api from '../api';
 import { formatDate, formatDateTime } from '../utils/dateUtils';
 import { apiErrorMessage } from '../utils/apiError';
 import { notify } from '../utils/notify';
+import { formatMoney } from '../utils/money';
 
-const inr = (v) =>
-  new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v || 0);
+const inr = formatMoney;
 
 const Card = ({ icon: Icon, title, children, className = '' }) => (
   <section className={`bg-white rounded-2xl border border-[#E8DFD8] shadow-sm ${className}`}>
@@ -218,17 +218,17 @@ export default function MemberProfile() {
                     </p>
                   </div>
                   <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
-                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Current / Qualified Tier</span>
+                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Membership Type</span>
                     <p className="font-bold text-sm text-[#180200] mt-0.5 flex items-center gap-1">
                       <Award className="w-3.5 h-3.5 text-[#510601] shrink-0" />
-                      <span>{profile.membership_credit.qualified_type?.name_en || profile.membership_credit.current_type?.name_en || 'Basic'}</span>
+                      <span>{profile.membership_credit.current_type?.name_en || profile.membership_credit.qualified_type?.name_en || 'Basic'}</span>
                     </p>
                   </div>
                   <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
                     <span className="text-[10px] uppercase font-bold text-[#863221] block">Next Milestone</span>
                     <p className="font-bold text-xs text-[#180200] mt-0.5">
-                      {profile.membership_credit.next_type ? (
-                        <span>{profile.membership_credit.next_type.name_en} ({inr(profile.membership_credit.next_type.price)})</span>
+                      {profile.membership_credit.target_type ? (
+                        <span>{profile.membership_credit.target_type.name_en} ({inr(profile.membership_credit.target_type.price)})</span>
                       ) : (
                         <span className="text-emerald-700 font-semibold">Highest Tier Achieved</span>
                       )}
@@ -237,24 +237,24 @@ export default function MemberProfile() {
                   <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
                     <span className="text-[10px] uppercase font-bold text-[#863221] block">Remaining to Next</span>
                     <p className="font-mono font-bold text-sm text-[#863221] mt-0.5">
-                      {profile.membership_credit.amount_to_next_type ? inr(profile.membership_credit.amount_to_next_type) : '₹0'}
+                      {profile.membership_credit.amount_to_target ? inr(profile.membership_credit.amount_to_target) : formatMoney(0)}
                     </p>
                   </div>
                 </div>
 
-                {profile.membership_credit.next_type && (
+                {profile.membership_credit.target_type && (
                   <div className="space-y-1 pt-1">
                     <div className="flex justify-between text-[10px] text-[#863221]">
-                      <span>Progress to {profile.membership_credit.next_type.name_en}</span>
+                      <span>Progress to {profile.membership_credit.target_type.name_en}</span>
                       <span className="font-mono font-semibold">
-                        {Math.min(100, Math.round((profile.membership_credit.credit_total / profile.membership_credit.next_type.price) * 100))}%
+                        {Math.min(100, Math.round((profile.membership_credit.credit_total / profile.membership_credit.target_type.price) * 100))}%
                       </span>
                     </div>
                     <div className="w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
                       <div
                         className="bg-[#510601] h-1.5 rounded-full transition-all duration-500"
                         style={{
-                          width: `${Math.min(100, (profile.membership_credit.credit_total / profile.membership_credit.next_type.price) * 100)}%`
+                          width: `${Math.min(100, (profile.membership_credit.credit_total / profile.membership_credit.target_type.price) * 100)}%`
                         }}
                       />
                     </div>

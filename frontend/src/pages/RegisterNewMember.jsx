@@ -39,6 +39,7 @@ import PermissionGate from '../components/PermissionGate';
 import SearchableFormSelect from '../components/SearchableFormSelect';
 import useAuth from '../hooks/useAuth';
 import useRules, { hasDigits } from '../hooks/useRules';
+import { formatMoney } from '../utils/money';
 
 const DEFAULT_CATEGORY = 'Only Havyaka Mahasabha Membership';
 
@@ -1042,7 +1043,7 @@ export default function RegisterNewMember() {
                       <option value="">Select a Havyaka membership type</option>
                       {activeMembershipTypes.map((mt) => (
                         <option key={mt.id} value={mt.id}>
-                          {mt.name} (Rs. {mt.currentPrice?.toLocaleString('en-IN') || mt.price || mt.fee})
+                          {mt.name} ({formatMoney(mt.currentPrice ?? mt.price ?? mt.fee)})
                         </option>
                       ))}
                     </select>

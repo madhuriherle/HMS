@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { useLocation, useNavigate, Link } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
 import {
   ChevronRight,
   ChevronLeft,
@@ -27,8 +27,7 @@ import {
   Hash,
   Plus,
   Trash2,
-  Coins,
-  UserCheck
+  Coins
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import PermissionGate from '../components/PermissionGate';
@@ -52,6 +51,7 @@ import {
   findLocationByPin
 } from '../utils/serverData';
 import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
+import { formatMoney } from '../utils/money';
 
 // ----------------------------------------------------
 // Server member -> the shape this screen draws
@@ -157,6 +157,12 @@ export default function ReceiptEntry() {
   const location = useLocation();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
+  // /receipts/edit/:id reuses this screen to correct a saved receipt (and to assign / unassign its member)
+  const { id: editParam } = useParams();
+  const editId = editParam ? Number(editParam) : null;
+  const isEdit = Boolean(editId);
+  const [editOriginal, setEditOriginal] = useState(null); // { receipt, allocation } as loaded from the server
+  const [dataReady, setDataReady] = useState(false);
   const showToast = (message, type = 'success') => {
     notify(message, type);
   };
@@ -216,7 +222,6 @@ export default function ReceiptEntry() {
 
   // Selected Member State & Lookup State
   const [selectedMember, setSelectedMember] = useState(null);
-  const [memberProfile, setMemberProfile] = useState(null); // renewal date + payment history of the chosen approved member
   const [lookupMembershipNo, setLookupMembershipNo] = useState('');
   const [lookupError, setLookupError] = useState('');
   // "who is this membership number?" answer from the server, shown under the Membership No. box
@@ -338,7 +343,7 @@ export default function ReceiptEntry() {
   };
 
   useEffect(() => {
-    reloadData();
+    reloadData().finally(() => setDataReady(true));
   }, []);
 
   // A member handed over from another screen (Unapproved Members / Membership List)
@@ -368,19 +373,6 @@ export default function ReceiptEntry() {
     loadPhotoFor(selectedMember, (url) => setSelectedMember((prev) => (prev && prev.id === selectedMember.id ? { ...prev, photoUrl: url } : prev)));
   }, [selectedMember?.id, selectedMember?.photoPath]);
 
-  // For an approved member, load the renewal date and the last payment from the server
-  useEffect(() => {
-    setMemberProfile(null);
-    if (entrySource !== 'membership-assignment' || !selectedMember?.id) return undefined;
-    let cancelled = false;
-    api
-      .get(`/members/${selectedMember.id}/profile`)
-      .then(({ data }) => { if (!cancelled) setMemberProfile(data); })
-      .catch((error) => {
-        if (!cancelled) showToast(apiErrorMessage(error, 'Could not load the payment history.'), 'error');
-      });
-    return () => { cancelled = true; };
-  }, [entrySource, selectedMember?.id]);
   useEffect(() => {
     loadPhotoFor(viewingMember, (url) => setViewingMember((prev) => (prev && prev.id === viewingMember.id ? { ...prev, photoUrl: url } : prev)));
   }, [viewingMember?.id, viewingMember?.photoPath]);
@@ -506,9 +498,92 @@ export default function ReceiptEntry() {
   };
 
   useEffect(() => {
-    loadReceiptDefaults();
+    if (!isEdit) loadReceiptDefaults();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ----------------------------------------------------
+  // EDIT MODE: load the saved receipt into this same form
+  // ----------------------------------------------------
+  useEffect(() => {
+    if (!isEdit || !dataReady) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await api.get('/receipts/tracking', { params: { receipt_id: editId, limit: 1 } });
+        const raw = (data?.data || [])[0];
+        if (!raw) throw new Error('Receipt not found.');
+        if (raw.receipt_status === 'CANCELLED' || raw.payment_status === 'CANCELLED') {
+          showToast('Cancelled receipts cannot be edited.', 'error');
+          navigate('/dashboard/receipts/tracking');
+          return;
+        }
+        const subsOf = (name) => (particularObj(name)?.subTypes || []).filter((st) => (st.status || 'Active') === 'Active');
+        const toLine = (it) => {
+          const name = it.particular || '';
+          const desc = it.description && it.description !== name ? it.description : '';
+          const subs = subsOf(name);
+          return {
+            particular: name,
+            subType: subs.some((st) => st.name === desc) ? desc : '',
+            description: isOthersName(name) && !subs.length ? desc : '',
+            amount: String(it.amount ?? ''),
+          };
+        };
+        const lines = (raw.items || []).map(toLine);
+        const first = lines[0] || { particular: titleCase(raw.receipt_type), subType: '', description: '', amount: String(raw.amount ?? '') };
+        const mode = raw.bank_account && activePaymentModes.includes(raw.bank_account)
+          ? raw.bank_account
+          : titleCase(raw.payment_mode);
+        const isCash = mode.trim().toLowerCase() === 'cash';
+        const detail = {
+          receiptNumber: raw.receipt_number || '',
+          receiptDate: raw.receipt_date || '',
+          name: raw.payer_name || '',
+          panNo: raw.payer_pan || '',
+          membershipNo: raw.payer_membership_no || '',
+          mobile: raw.payer_mobile || '',
+          particulars: first.particular,
+          donationSubType: first.subType,
+          othersDescription: first.description,
+          amount: first.amount,
+          paymentMode: mode,
+          bankAccount: isCash ? '' : raw.bank_account || mode,
+          transactionId: raw.transaction_reference || raw.cheque_number || '',
+          transactionDate: raw.transaction_date || '',
+          description: raw.notes || '',
+          periodFromDate: raw.period_from_date || '',
+          periodToDate: raw.period_to_date || '',
+          periodFromTime: raw.period_from_time || '',
+          periodToTime: raw.period_to_time || '',
+        };
+        if (cancelled) return;
+        setFormData((prev) => ({ ...prev, ...detail }));
+        setExtraLines(lines.slice(1).map((l) => ({ ...emptyLine(), ...l })));
+
+        // the member this receipt is assigned to (if any)
+        let allocation = null;
+        if (raw.member_id) {
+          const { data: allocs } = await api.get(`/receipts/${editId}/allocations`);
+          allocation = (allocs || []).find((a) => a.member_id) || null;
+          const { data: m } = await api.get(`/members/${raw.member_id}`);
+          if (cancelled) return;
+          const mem = toEntryMember(m, locations);
+          setEntrySource(m.approval_status === 'APPROVED' ? 'membership-assignment' : 'unapproved-assignment');
+          setSelectedMember(mem);
+          setLookupMembershipNo(mem.membershipNumber || mem.registrationNumber || mem.id || '');
+        }
+        setEditOriginal({ receipt: raw, allocation });
+      } catch (error) {
+        if (!cancelled) {
+          showToast(apiErrorMessage(error, 'Could not load that receipt.'), 'error');
+          navigate('/dashboard/receipts/tracking');
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, editId, dataReady]);
 
   // ----------------------------------------------------
   // MEMBERSHIP NUMBER LOOKUP LOGIC (over the members loaded from the server)
@@ -696,6 +771,7 @@ export default function ReceiptEntry() {
         (r) =>
           r.receiptNumber &&
           r.receiptNumber.toLowerCase().trim() === typed &&
+          !(isEdit && r.id === editId) &&
           (!wantedFy || fyOf(String(r.receiptDate || '')) === wantedFy)
       );
       if (existingMatch) {
@@ -832,6 +908,11 @@ export default function ReceiptEntry() {
       return;
     }
 
+    if (isEdit) {
+      await handleSaveEdit();
+      return;
+    }
+
     if (formData.isCancelled) {
       setSaving(true);
       try {
@@ -943,16 +1024,7 @@ export default function ReceiptEntry() {
         showToast(`Receipt #${receiptNo} successfully linked to member "${memberDisplayName}"!`, 'success');
         handleClearForm();
         await reloadData();
-      } else if (saveMode.current === 'new' || saveMode.current === 'print') {
-        if (saveMode.current === 'print' && data?.id) {
-          try {
-            const pdf = await api.get(`/receipts/${data.id}/pdf`, { responseType: 'blob' });
-            const blob = new Blob([pdf.data], { type: 'application/pdf' });
-            window.open(URL.createObjectURL(blob), '_blank');
-          } catch (_) {
-            showToast('Saved, but the receipt PDF could not be opened.', 'error');
-          }
-        }
+      } else if (saveMode.current === 'new') {
         showToast(`Receipt #${receiptNo} saved. Ready for the next one.`, 'success');
         // keep the date and payment details for the next receipt of the batch
         const keep = { receiptDate: formData.receiptDate, paymentMode: formData.paymentMode, bankAccount: formData.bankAccount };
@@ -971,6 +1043,76 @@ export default function ReceiptEntry() {
       }
 
       showToast(apiErrorMessage(error, 'Failed to save the receipt. Please try again.'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Edit mode: save the corrections, then add / move / remove the member link if it changed
+  const handleSaveEdit = async () => {
+    const isCash = String(formData.paymentMode || '').trim().toLowerCase() === 'cash';
+    const linked = selectedMember || null;
+    const payload = {
+      receiptNumber: formData.receiptNumber.trim(),
+      receiptDate: formData.receiptDate,
+      name: formData.name.trim(),
+      panNo: formData.panNo.trim(),
+      membershipNo: formData.membershipNo.trim(),
+      mobile: formData.mobile.trim(),
+      particulars: formData.particulars,
+      amount: receiptTotal,
+      lines: [
+        {
+          particular: formData.particulars,
+          particularId: currentParticularObj?.id || null,
+          detail:
+            formData.donationSubType ||
+            (isOthersName(formData.particulars) ? formData.othersDescription.trim() : '') ||
+            formData.particulars,
+          amount: Number(formData.amount),
+        },
+        ...extraLines.map((l) => ({
+          particular: l.particular,
+          particularId: particularObj(l.particular)?.id || null,
+          detail: l.subType || l.description.trim() || l.particular,
+          amount: Number(l.amount),
+        })),
+      ],
+      paymentMode: formData.paymentMode,
+      bankAccount: isCash ? '' : formData.bankAccount || formData.paymentMode,
+      transactionId: isCash ? '' : formData.transactionId.trim(),
+      transactionDate: formData.transactionDate || '',
+      description: formData.description.trim(),
+      periodFromDate: formData.periodFromDate,
+      periodToDate: formData.periodToDate,
+      periodFromTime: formData.periodFromTime,
+      periodToTime: formData.periodToTime,
+    };
+    setSaving(true);
+    try {
+      const body = receiptToApiPayload(payload, linked);
+      const allocated = body.allocations?.[0]?.allocated_amount;
+      delete body.allocations;
+      delete body.is_renewal; // editing never changes these
+      delete body.is_cancelled;
+      delete body.source;
+      await api.put(`/receipts/${editId}`, body);
+
+      const old = editOriginal?.allocation;
+      const newMemberId = linked ? Number(linked.memberId || linked.member_id || linked.id) : null;
+      if (old && Number(old.member_id) !== newMemberId) {
+        await api.delete(`/receipts/${editId}/allocations/${old.id}`);
+      }
+      if (newMemberId && (!old || Number(old.member_id) !== newMemberId)) {
+        await api.post(`/receipts/${editId}/allocate`, { member_id: newMemberId, allocated_amount: allocated });
+      }
+      showToast(`Receipt #${payload.receiptNumber} updated.`, 'success');
+      navigate('/dashboard/receipts/tracking');
+    } catch (error) {
+      if (error.response?.status === 409 && /Receipt number/i.test(error.response?.data?.detail || '')) {
+        setFormErrors((prev) => ({ ...prev, receiptNumber: error.response.data.detail }));
+      }
+      showToast(apiErrorMessage(error, 'Failed to update the receipt.'), 'error');
     } finally {
       setSaving(false);
     }
@@ -1058,7 +1200,7 @@ export default function ReceiptEntry() {
   }, [filteredBottomMembers, unapprovedPage, unapprovedPageSize]);
 
   return (
-    <PermissionGate required="receipts.entry.read">
+    <PermissionGate required={isEdit ? 'receipts.tracking.write' : 'receipts.entry.read'}>
     <div className="space-y-6 pb-16 font-sans">
 
       {/* Member Profile is viewed on dedicated full-screen page /dashboard/membership/profile/:id */}
@@ -1272,7 +1414,7 @@ export default function ReceiptEntry() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-              Receipt Entry
+              {isEdit ? `Edit Receipt${formData.receiptNumber ? ` #${formData.receiptNumber}` : ''}` : 'Receipt Entry'}
             </h1>
           </div>
         </div>
@@ -1297,7 +1439,7 @@ export default function ReceiptEntry() {
                 </div>
                 <div>
                   <h2 className="text-sm sm:text-base font-bold text-[#180200]">
-                    Create New Receipt
+                    {isEdit ? 'Edit Receipt' : 'Create New Receipt'}
                   </h2>
                 </div>
               </div>
@@ -1752,7 +1894,7 @@ export default function ReceiptEntry() {
                   </div>
                   <div className="text-right sm:self-center">
                     <span className="text-xl sm:text-2xl font-extrabold text-[#510601] font-mono tracking-tight">
-                      ₹{receiptTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatMoney(receiptTotal)}
                     </span>
                   </div>
                 </div>
@@ -1856,34 +1998,35 @@ export default function ReceiptEntry() {
 
               {/* Action Buttons (Reset, Save & New) */}
               <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-[#E8DFD8]">
-                <label className="mr-auto flex items-center gap-2 text-xs font-semibold text-[#863221] cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={formData.isCancelled}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, isCancelled: e.target.checked }))}
-                    className="w-4 h-4 accent-[#510601] cursor-pointer"
-                  />
-                  Cancelled
-                </label>
+                {!isEdit && (
+                  <label className="mr-auto flex items-center gap-2 text-xs font-semibold text-[#863221] cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={formData.isCancelled}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, isCancelled: e.target.checked }))}
+                      className="w-4 h-4 accent-[#510601] cursor-pointer"
+                    />
+                    Cancelled
+                  </label>
+                )}
 
                 <button
                   type="button"
-                  onClick={handleClearForm}
+                  onClick={isEdit ? () => navigate('/dashboard/receipts/tracking') : handleClearForm}
                   className="px-3.5 py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] text-xs sm:text-sm font-semibold hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Reset</span>
+                  {isEdit ? <X className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                  <span>{isEdit ? 'Cancel' : 'Reset'}</span>
                 </button>
 
                 <button
                   type="submit"
                   onClick={() => { saveMode.current = 'new'; }}
-                  disabled={saving || !hasPermission('receipts.entry.write')}
-                  title={!hasPermission('receipts.entry.write') ? 'Requires receipts.entry.write permission' : undefined}
+                  disabled={saving || (isEdit ? !editOriginal : false) || !hasPermission(isEdit ? 'receipts.tracking.write' : 'receipts.entry.write')}
                   className="disabled:opacity-50 px-4 py-2 rounded-xl bg-white hover:bg-amber-50/50 border border-[#510601]/40 text-[#510601] text-xs sm:text-sm font-bold shadow-2xs hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <Save className="w-3.5 h-3.5" />
-                  <span>Save & New</span>
+                  <span>{isEdit ? 'Save Changes' : 'Save & New'}</span>
                 </button>
               </div>
 
@@ -2050,51 +2193,6 @@ export default function ReceiptEntry() {
                   </div>
                 </div>
 
-                {/* Approved member: renewal date and last payment */}
-                {entrySource === 'membership-assignment' && (() => {
-                  const ms = memberProfile?.memberships?.[0];
-                  const receipts = (memberProfile?.financial?.receipts || []).filter((r) => r.payment_status !== 'CANCELLED');
-                  const last = receipts[0];
-                  return (
-                    <div className="space-y-2">
-                      <h4 className="text-xs font-bold text-[#1D4ED8] tracking-wide uppercase flex items-center gap-1.5">
-                        <CreditCard className="w-3.5 h-3.5 text-[#1D4ED8]" />
-                        <span>Renewal &amp; Payments:</span>
-                      </h4>
-                      {!memberProfile ? (
-                        <div className="bg-white p-3.5 rounded-xl border border-[#E8DFD8] text-xs text-[#863221]">Loading...</div>
-                      ) : (
-                        <div className="bg-white p-3.5 rounded-xl border border-[#E8DFD8] grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                          <div>
-                            <span className="text-[#863221] font-semibold block">Valid Till / Renewal Due:</span>
-                            <strong className="text-[#180200] font-mono">{formatDate(ms?.expires_at, 'Lifetime / not set')}</strong>
-                          </div>
-                          <div>
-                            <span className="text-[#863221] font-semibold block">Membership Status:</span>
-                            <strong className="text-[#180200]">{ms?.status || '—'}</strong>
-                          </div>
-                          <div>
-                            <span className="text-[#863221] font-semibold block">Receipts So Far:</span>
-                            <strong className="text-[#180200]">{receipts.length}</strong>
-                          </div>
-                          <div className="sm:col-span-3 pt-2 border-t border-[#E8DFD8]">
-                            <span className="text-[#863221] font-semibold block">Last Payment:</span>
-                            {last ? (
-                              <span className="text-[#180200]">
-                                <strong className="font-mono">{last.receipt_number}</strong>
-                                {' · '}{formatDate(last.receipt_date)}
-                                {' · '}<strong className="font-mono text-[#3D705C]">₹{Number(last.net_amount || 0).toLocaleString('en-IN')}</strong>
-                              </span>
-                            ) : (
-                              <span className="text-[#863221]">No receipts recorded for this member yet.</span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
                 {/* Section 4: Payment / Registration Remarks */}
                 {entrySource === 'unapproved-assignment' && (
                 <div className="space-y-2">
@@ -2106,7 +2204,7 @@ export default function ReceiptEntry() {
                     <div>
                       <span className="text-[#863221] font-semibold block">Registration Amount:</span>
                       <strong className="font-mono text-[#3D705C] text-sm">
-                        ₹{Number(selectedMember.amount || 0).toLocaleString('en-IN')}
+                        {formatMoney(selectedMember.amount || 0)}
                       </strong>
                     </div>
                     <div>
@@ -2194,7 +2292,7 @@ export default function ReceiptEntry() {
               </div>
 
               {/* Membership Cards Directory */}
-              <div className="p-3.5 space-y-3 min-h-[300px] max-h-[580px] overflow-y-auto custom-scrollbar bg-[#FAF7F2]/30">
+              <div className="h-[480px] overflow-y-auto custom-scrollbar bg-white divide-y divide-[#E8DFD8]/70">
                 {paginatedRightMembers.length === 0 ? (
                   <div className="py-12 text-center text-[#863221]">
                     <div className="w-10 h-10 rounded-2xl bg-[#510601]/5 text-[#510601] flex items-center justify-center mx-auto mb-2 border border-[#510601]/10">
@@ -2215,53 +2313,38 @@ export default function ReceiptEntry() {
                       member.postalCode || member.pinCode ? `(${member.postalCode || member.pinCode})` : ''
                     ].filter(Boolean).join(', ');
 
-                    const memCode = member.membershipNumber || member.registrationNumber || member.id || '—';
+                    const memCode = String(member.membershipNumber || member.registrationNumber || member.id || '—');
+                    const shortCode = memCode.includes('-') ? `#${memCode.split('-').pop()}` : `#${memCode}`;
+                    const mobile = member.contactNumber || member.mobile || member.phone || '';
 
                     return (
                       <div
                         key={member.id || member.registrationNumber || member.membershipNumber}
-                        className="bg-white rounded-xl border border-[#E8DFD8] hover:border-[#510601]/50 p-3.5 transition-all duration-200 shadow-[0_2px_8px_-2px_rgba(24,2,0,0.04)] hover:shadow-md relative group"
+                        className="h-10 px-3 flex items-center gap-2 text-xs text-[#863221] hover:bg-[#FAF7F2]"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-1 flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-[11px] font-mono font-bold text-[#510601] bg-amber-50/90 border border-amber-200/90 px-2 py-0.5 rounded-md">
-                                #{memCode}
-                              </span>
-                            </div>
-
-                            <h4 className="font-extrabold text-xs sm:text-sm text-[#180200] group-hover:text-[#510601] transition-colors flex items-center gap-1.5 truncate">
-                              <span>{member.fullName || member.name}</span>
-                            </h4>
-
-                            <div className="pt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#863221]">
-                              {(member.contactNumber || member.mobile || member.phone) && (
-                                <div className="flex items-center space-x-1.5">
-                                  <Phone className="w-3 h-3 text-[#863221]/60 shrink-0" />
-                                  <span className="font-mono">{member.contactNumber || member.mobile || member.phone}</span>
-                                </div>
-                              )}
-                              {locParts && (
-                                <div className="flex items-center space-x-1.5 truncate max-w-[220px]">
-                                  <MapPin className="w-3 h-3 text-[#863221]/60 shrink-0" />
-                                  <span className="truncate">{locParts}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="self-center shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => handleAssignFromMembership(member)}
-                              className="px-3 py-1.5 rounded-xl bg-[#510601]/10 hover:bg-[#510601] text-[#510601] hover:text-white font-bold text-xs flex items-center gap-1.5 transition-all border border-[#510601]/25 cursor-pointer shadow-xs"
-                              title="Assign this member's details into the receipt form"
-                            >
-                              <UserCheck className="w-3.5 h-3.5" />
-                              <span>Assign</span>
-                            </button>
-                          </div>
-                        </div>
+                        <span className="font-mono font-bold text-[#510601] shrink-0" title={memCode}>{shortCode}</span>
+                        <span className="text-[#863221]/40 shrink-0">|</span>
+                        <span className="font-bold text-[#180200] truncate max-w-[40%] shrink-0">{member.fullName || member.name}</span>
+                        {mobile && (
+                          <>
+                            <span className="text-[#863221]/40 shrink-0">|</span>
+                            <span className="font-mono shrink-0">{mobile}</span>
+                          </>
+                        )}
+                        {locParts && (
+                          <>
+                            <span className="text-[#863221]/40 shrink-0">|</span>
+                            <span className="truncate min-w-0 flex-1" title={locParts}>{locParts}</span>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleAssignFromMembership(member)}
+                          className="ml-auto shrink-0 px-2.5 py-1 rounded-lg border border-[#510601]/40 text-[#510601] hover:bg-[#510601] hover:text-white font-semibold text-xs cursor-pointer transition-colors"
+                          title="Assign this member's details into the receipt form"
+                        >
+                          Assign
+                        </button>
                       </div>
                     );
                   })

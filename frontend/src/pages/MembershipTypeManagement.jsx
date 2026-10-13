@@ -35,15 +35,8 @@ import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 import RecentlyDeleted from '../components/RecentlyDeleted';
+import { formatMoney } from '../utils/money';
 
-// Helper to format currency in Indian Rupee format
-const formatINR = (amount) => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0
-  }).format(amount || 0);
-};
 
 export default function MembershipTypeManagement() {
   const { hasPermission } = useAuth();
@@ -373,7 +366,7 @@ export default function MembershipTypeManagement() {
       showToast(
         isPendingApproval(data)
           ? `Price change for "${target.name}" submitted for approval.`
-          : `Price for "${target.name}" updated to ${formatINR(Number(priceFormData.newPrice))}.`
+          : `Price for "${target.name}" updated to ${formatMoney(Number(priceFormData.newPrice))}.`
       );
       setIsUpdatePriceOpen(false);
       await fetchMembershipTypes();
@@ -583,7 +576,7 @@ export default function MembershipTypeManagement() {
 
                       {/* Amount */}
                       <td className="px-5 py-4 font-mono font-bold text-[#510601] text-base text-right">
-                        {formatINR(item.currentPrice)}
+                        {formatMoney(item.currentPrice)}
                       </td>
 
                       {/* Status (Active / Inactive Toggle) */}
@@ -975,7 +968,7 @@ export default function MembershipTypeManagement() {
                 <div>
                   <p className="text-[11px] font-semibold text-[#863221] uppercase">Current Active Price</p>
                   <p className="text-xl font-mono font-bold text-[#510601] mt-0.5">
-                    {formatINR(priceTargetItem.currentPrice)}
+                    {formatMoney(priceTargetItem.currentPrice)}
                   </p>
                 </div>
                 <div className="text-right">
@@ -1112,7 +1105,7 @@ export default function MembershipTypeManagement() {
                 <div>
                   <span className="text-[11px] font-bold text-[#863221] uppercase tracking-wider">Current Active Price</span>
                   <p className="text-2xl font-mono font-bold text-[#510601] mt-0.5">
-                    {formatINR(historyTargetItem.currentPrice)}
+                    {formatMoney(historyTargetItem.currentPrice)}
                   </p>
                   <span className="text-xs text-[#863221]/80 mt-0.5 block">
                     Applicable from {formatDate(historyTargetItem.effectiveFrom)}
@@ -1154,7 +1147,7 @@ export default function MembershipTypeManagement() {
                         return (
                           <tr key={ph.id || idx} className={isCurrent ? 'bg-[#3D705C]/5' : 'hover:bg-[#FAF7F2]/40'}>
                             <td className="px-4 py-3 font-mono font-bold text-[#510601] text-right text-sm">
-                              {formatINR(ph.price)}
+                              {formatMoney(ph.price)}
                             </td>
                             <td className="px-4 py-3 font-medium text-[#180200]">
                               {formatDate(ph.effectiveFrom)}
@@ -1244,7 +1237,7 @@ export default function MembershipTypeManagement() {
                 <div>
                   <p className="text-xs font-medium text-[#863221]">Current Active Price</p>
                   <p className="text-2xl font-mono font-bold text-[#510601] mt-0.5">
-                    {formatINR(viewingItem.currentPrice)}
+                    {formatMoney(viewingItem.currentPrice)}
                   </p>
                 </div>
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${viewingItem.status === 'Active'

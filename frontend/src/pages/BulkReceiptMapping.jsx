@@ -23,15 +23,8 @@ import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import { formatDate } from '../utils/dateUtils';
 import Modal from '../components/Modal';
+import { formatMoney } from '../utils/money';
 
-// Currency formatter
-const formatINR = (val) => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0
-  }).format(val || 0);
-};
 
 export default function BulkReceiptMapping() {
   const { hasPermission } = useAuth();
@@ -301,7 +294,7 @@ export default function BulkReceiptMapping() {
             </span>
             <div className="flex items-baseline justify-between mt-1">
               <span className="text-2xl font-bold text-[#180200] font-mono">{totalUnassigned.toLocaleString()}</span>
-              <span className="text-xs font-semibold text-[#863221]">{formatINR(totalAmount)}</span>
+              <span className="text-xs font-semibold text-[#863221]">{formatMoney(totalAmount)}</span>
             </div>
             <p className="text-[10px] text-[#863221]/70 mt-1">Receipts waiting to be linked to members</p>
           </div>
@@ -312,7 +305,7 @@ export default function BulkReceiptMapping() {
             </span>
             <div className="flex items-baseline justify-between mt-1">
               <span className="text-2xl font-bold text-[#3D705C] font-mono">{totalMatched.toLocaleString()}</span>
-              <span className="text-xs font-semibold text-[#3D705C]">{formatINR(matchedAmount)}</span>
+              <span className="text-xs font-semibold text-[#3D705C]">{formatMoney(matchedAmount)}</span>
             </div>
             <p className="text-[10px] text-[#3D705C]/80 mt-1">Member number matches imported register</p>
           </div>
@@ -326,7 +319,7 @@ export default function BulkReceiptMapping() {
                 {Math.max(0, totalUnassigned - totalMatched).toLocaleString()}
               </span>
               <span className="text-xs font-semibold text-[#863221]">
-                {formatINR(Math.max(0, totalAmount - matchedAmount))}
+                {formatMoney(Math.max(0, totalAmount - matchedAmount))}
               </span>
             </div>
             <p className="text-[10px] text-[#863221]/70 mt-1">Can be mapped manually via member picker</p>
@@ -402,7 +395,7 @@ export default function BulkReceiptMapping() {
                   ) : (
                     <Sparkles className="w-4 h-4 text-emerald-200" />
                   )}
-                  ⚡ Auto-Map All {totalMatched} Matched Receipts ({formatINR(matchedAmount)})
+                  ⚡ Auto-Map All {totalMatched} Matched Receipts ({formatMoney(matchedAmount)})
                 </button>
               )}
 
@@ -541,7 +534,7 @@ export default function BulkReceiptMapping() {
 
                         {/* Amount */}
                         <td className="py-3 px-3 font-mono font-bold text-[#180200]">
-                          {formatINR(cand.net_amount)}
+                          {formatMoney(cand.net_amount)}
                         </td>
 
                         {/* Matched Live Member */}
@@ -633,7 +626,7 @@ export default function BulkReceiptMapping() {
                   Map Receipt #{activeReceiptForManual?.receipt_number}
                 </h3>
                 <p className="text-xs text-[#863221]">
-                  Amount: {formatINR(activeReceiptForManual?.net_amount)} · Payer: {activeReceiptForManual?.payer_name}
+                  Amount: {formatMoney(activeReceiptForManual?.net_amount)} · Payer: {activeReceiptForManual?.payer_name}
                 </p>
               </div>
               <button

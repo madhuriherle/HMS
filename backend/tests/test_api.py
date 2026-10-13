@@ -533,7 +533,7 @@ def test_generic_approval_engine_receipts_nested_and_decimal_fields(client, admi
     body = approved.json()
     assert float(body["net_amount"]) == 700.0
     assert body["payer_name"] == "Gated Receipt Payer"
-    assert re.match(r"^\d{4}-\d{2}/\d{4}$", body["receipt_number"])
+    assert re.match(r"^\d{4}$", body["receipt_number"])
 
 
 def test_password_fields_never_captured_by_generic_engine(client, admin_headers):
@@ -1220,7 +1220,7 @@ def test_receipt_creation_and_sequence(client, admin_headers):
 
     number_1 = first.json()["receipt_number"]
     number_2 = second.json()["receipt_number"]
-    pattern = r"^\d{4}-\d{2}/\d{4}$"
+    pattern = r"^\d{4}$"
     assert re.match(pattern, number_1), number_1
     assert re.match(pattern, number_2), number_2
     assert number_1 != number_2
@@ -2970,7 +2970,7 @@ def test_receipt_entry_online_offline_and_management(client, admin_headers):
     assert created.status_code == 201, created.text
     receipt = created.json()
     assert receipt["source"] == "OFFLINE"
-    assert re.match(r"^\d{4}-\d{2}/\d{4}$", receipt["receipt_number"])
+    assert re.match(r"^\d{4}$", receipt["receipt_number"])
 
     # unknown source rejected at validation
     bad_source = dict(payload, source="PHONE")
@@ -6040,6 +6040,15 @@ def test_activate_member_from_receipt_requires_permission(client, admin_headers)
 
 
 # ─────────────── receipt screen gaps: tracking export ───────────────
+
+def test_receipt_tracking_loads_one_receipt_by_id(client, admin_headers):
+    """The edit screen loads a single receipt (with its lines) through receipt_id."""
+    _make_receipt(client, admin_headers, payer_name="One By Id")
+    other = _make_receipt(client, admin_headers, payer_name="Another")
+    body = client.get("/api/v1/receipts/tracking", headers=admin_headers, params={"receipt_id": other["id"]}).json()
+    assert [r["id"] for r in body["data"]] == [other["id"]]
+    assert body["data"][0]["items"]
+
 
 def test_receipt_tracking_export_csv_and_excel(client, admin_headers):
     """The Tracking screen's Export button: the whole filtered register as a
