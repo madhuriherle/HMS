@@ -210,6 +210,18 @@ export default function LocationSetup() {
     }
   }, [activeTab, postalCurrentPage, postalPageSize, postalSearchQuery, postalPincodeFilter, postalStateFilter, postalDistrictFilter, postalPrefixFilter, postalStatusFilter, states, summaryTick]);
 
+  // Modals for Taluk (declared before the effects below that read them)
+  const [isTalukModalOpen, setIsTalukModalOpen] = useState(false);
+  const [talukModalMode, setTalukModalMode] = useState('add'); // 'add' | 'edit'
+  const [editingTaluk, setEditingTaluk] = useState(null);
+  const [talukFormData, setTalukFormData] = useState({
+    name: '',
+    stateId: '',
+    districtId: '',
+    status: 'Active'
+  });
+  const [talukFormErrors, setTalukFormErrors] = useState({});
+
   // Modals Data Fetching
   const [modalDistricts, setModalDistricts] = useState([]);
   const [modalTaluks, setModalTaluks] = useState([]);
@@ -306,18 +318,6 @@ export default function LocationSetup() {
     status: 'Active'
   });
   const [districtFormErrors, setDistrictFormErrors] = useState({});
-
-  // Modals for Taluk
-  const [isTalukModalOpen, setIsTalukModalOpen] = useState(false);
-  const [talukModalMode, setTalukModalMode] = useState('add'); // 'add' | 'edit'
-  const [editingTaluk, setEditingTaluk] = useState(null);
-  const [talukFormData, setTalukFormData] = useState({
-    name: '',
-    stateId: '',
-    districtId: '',
-    status: 'Active'
-  });
-  const [talukFormErrors, setTalukFormErrors] = useState({});
 
   // Confirmation Modals (Delete & Status)
   const [deleteDialog, setDeleteDialog] = useState(null); // { type: 'state' | 'district' | 'taluk' | 'postal', item }

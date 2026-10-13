@@ -65,7 +65,7 @@ const SAMPLE_PROPS = {
     { props: { lookup: { status: 'idle', matches: [] }, onUse() {} }, text: '' },
     { props: { lookup: { status: 'loading', matches: [] }, onUse() {} }, text: 'Checking this number' },
     { props: { lookup: { status: 'error', matches: [] }, onUse() {} }, text: 'Could not check' },
-    { props: { lookup: { status: 'done', matches: [] }, onUse() {} }, text: 'No member or applicant has this number' },
+    { props: { lookup: { status: 'done', matches: [] }, onUse() {} }, text: 'No member has this number yet' },
     { props: { lookup: { status: 'done', matches: [FOUND] }, onUse() {} }, text: 'Use this member' },
     { props: { lookup: { status: 'done', matches: [{ ...FOUND, kind: 'applicant', member_status: 'INACTIVE', last_receipt: null }] }, onUse() {} }, text: 'Applicant (not yet approved)' },
   ],
