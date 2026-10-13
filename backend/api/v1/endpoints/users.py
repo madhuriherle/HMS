@@ -64,7 +64,8 @@ def read_users(
     role_id: Optional[int] = None,
 ) -> Any:
     """Staff accounts whose role is the same rank as yours or weaker (members are not users). A stronger rank is
-    never listed or opened: a rank 2 Admin does not see the Super Admin; a rank 1 sees everyone."""
+    never listed or opened: a rank 2 Admin does not see the Super Admin; a rank 1 sees everyone else. Your own account is
+    not listed (My Profile edits it)."""
     my_rank = deps.user_rank(db, current_user)
     q = (
         db.query(User)
@@ -74,6 +75,7 @@ def read_users(
             User.user_type != "MEMBER",
             Role.code != "MEMBER",
             Role.rank_level >= my_rank,
+            User.id != current_user.id,  # your own account is edited on My Profile, not here
         )  # noqa: E712
     )
     if search:

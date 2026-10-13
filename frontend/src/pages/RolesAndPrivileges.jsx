@@ -453,15 +453,38 @@ export default function RolesAndPrivileges() {
   };
 
   // Selection rules (Write/Delete tick Read; clearing Read clears them) live in utils/privilegeSelection.js
-  const handleTogglePrivilege = (id) => setSelectedPrivileges(prev => toggleOne(prev, id, allPrivilegeIds));
+  const handleTogglePrivilege = (id) => {
+    setSelectedPrivileges(prev => {
+      const next = toggleOne(prev, id, allPrivilegeIds);
+      if (!next.includes(id)) {
+        setApprovalRequiredCodes(a => a.filter(x => x !== id));
+      }
+      return next;
+    });
+  };
 
   // Tick or clear several privileges at once (a column, a row, a module, or everything)
-  const applyPrivilegeBulk = (codes, on) => setSelectedPrivileges(prev => applyBulk(prev, codes, on, allPrivilegeIds));
+  const applyPrivilegeBulk = (codes, on) => {
+    setSelectedPrivileges(prev => applyBulk(prev, codes, on, allPrivilegeIds));
+    if (!on) {
+      const drop = new Set(codes);
+      setApprovalRequiredCodes(prev => prev.filter(x => !drop.has(x)));
+    }
+  };
 
-  const handleToggleApprovalGate = (id) => {
-    setApprovalRequiredCodes(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+  const handleToggleApprovalGate = (codesOrId, targetState) => {
+    const list = (Array.isArray(codesOrId) ? codesOrId : [codesOrId]).filter(Boolean);
+    if (list.length === 0) return;
+    setApprovalRequiredCodes(prev => {
+      const allPresent = list.every(c => prev.includes(c));
+      const shouldAdd = targetState !== undefined ? Boolean(targetState) : !allPresent;
+      if (shouldAdd) {
+        return Array.from(new Set([...prev, ...list]));
+      } else {
+        const drop = new Set(list);
+        return prev.filter(x => !drop.has(x));
+      }
+    });
   };
 
   const handleToggleModulePrivileges = (ids) => {
@@ -1157,22 +1180,39 @@ export default function RolesAndPrivileges() {
                   );
 
                   // Direct / Needs approval: shown beside a ticked Write or Delete
-                  const ApprovalChoice = ({ id }) => {
-                    const needs = approvalRequiredCodes.includes(id);
+                  // Supports a single privilege ID or an array of child privileges for a parent row
+                  const ApprovalChoice = ({ codes }) => {
+                    const list = (Array.isArray(codes) ? codes : [codes]).filter(
+                      (c) => Boolean(c) && !String(c).startsWith('approvals.')
+                    );
+                    const activeList = list.filter((c) => isOn(c));
+                    if (activeList.length === 0) return null;
+
+                    const neededCount = activeList.filter((c) => approvalRequiredCodes.includes(c)).length;
+                    const isAllNeeded = neededCount === activeList.length;
+                    const isSomeNeeded = neededCount > 0 && !isAllNeeded;
+
                     return (
                       <button
                         type="button"
-                        onClick={() => handleToggleApprovalGate(id)}
-                        title={needs
-                          ? 'Needs approval: this role\u2019s actions here wait in the Approvals queue. Click to let them apply directly.'
-                          : 'Direct: this role\u2019s actions here apply at once. Click to make them need approval.'}
-                        className={`px-2 py-0.5 rounded-full border text-[10px] font-bold whitespace-nowrap transition-colors ${
-                          needs
+                        disabled={isReadOnly}
+                        onClick={() => handleToggleApprovalGate(activeList)}
+                        title={
+                          isAllNeeded
+                            ? 'Needs approval: actions here wait in Approvals queue. Click to set Direct.'
+                            : isSomeNeeded
+                              ? 'Partial: some actions need approval. Click to make all need approval.'
+                              : 'Direct: actions apply at once. Click to make them need approval.'
+                        }
+                        className={`px-2 py-0.5 rounded-full border text-[10px] font-bold whitespace-nowrap transition-colors cursor-pointer ${
+                          isAllNeeded
                             ? 'bg-[#FFF1C9] border-[#F2B600] text-[#7A4A00]'
-                            : 'bg-white border-[#E8DFD8] text-[#863221]/70 hover:border-[#863221]'
+                            : isSomeNeeded
+                              ? 'bg-[#FFF8E6] border-[#F2B600]/70 text-[#7A4A00] border-dashed'
+                              : 'bg-white border-[#E8DFD8] text-[#863221]/70 hover:border-[#863221]'
                         }`}
                       >
-                        {needs ? 'Needs approval' : 'Direct'}
+                        {isAllNeeded ? 'Needs approval' : isSomeNeeded ? 'Needs approval (Some)' : 'Direct'}
                       </button>
                     );
                   };
@@ -1237,6 +1277,9 @@ export default function RolesAndPrivileges() {
                               const codes = r.hasChildren ? colCodes(sub, col) : colCodes([r], col);
                               if (codes.length === 0) return <span className="text-[#D9CEC4]">–</span>;
                               const own = r.cells[col];
+                              const eligibleCodes = codes.filter((c) => Boolean(c) && !String(c).startsWith('approvals.'));
+                              const hasActivePrivileges = eligibleCodes.some((c) => isOn(c));
+
                               return (
                                 <div className="inline-flex items-center gap-2">
                                   <Box
@@ -1247,7 +1290,9 @@ export default function RolesAndPrivileges() {
                                       else applyPrivilegeBulk(codes, stateOf(codes, isOn) !== 'all');
                                     }}
                                   />
-                                  {!isReadOnly && own && col !== 'read' && isOn(own.id) && !String(own.id).startsWith('approvals.') && <ApprovalChoice id={own.id} />}
+                                  {!isReadOnly && col !== 'read' && hasActivePrivileges && (
+                                    <ApprovalChoice codes={eligibleCodes} />
+                                  )}
                                 </div>
                               );
                             };

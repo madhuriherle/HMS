@@ -296,7 +296,8 @@ RULE 13: PERMISSIONS AND ACCESS
 13.10 WHO YOU CAN SEE IN USER MANAGEMENT: only users whose role is your own rank or weaker.
       A stronger rank is never listed and never opened (a rank 2 Admin does not see the
       Super Admin). Opening, editing or deleting a stronger user is refused by the server
-      too (403). A rank 1 user sees everyone.
+      too (403). A rank 1 user sees everyone else. Your OWN account is not listed: you cannot
+      change your own role or privileges, and My Profile edits your details.
 13.11 ROLE DATA IN THE SCREENS: GET /users/roles returns each role with permission_codes
      (the privilege codes it holds) and is_all_access. A full-access role holds no
      individual privilege rows, so show "All privileges" / "Every module" for it. Never read
@@ -307,6 +308,14 @@ RULE 13: PERMISSIONS AND ACCESS
      unique, is shown as the display name in the top bar, and changing it signs the person
      out. Dates and last login come from created_at / last_login_at (snake_case) as the
      server sends them.
+13.13 NEEDS APPROVAL CASCADING & UNIFIED APPROVALS SCREEN:
+     - In Roles & Privileges, selecting "Needs approval" on a parent module row automatically
+       cascades to all active child sub-modules under that subtree; setting it to "Direct" also
+       cascades to all children. Parent badge shows "Needs approval", "Needs approval (Some)",
+       or "Direct".
+     - The Approvals screen (/dashboard/approvals) displays all approval actions in ONE unified
+       list by default, with live category filter pills (All, Change Requests, Member Deletions,
+       Profile Changes, Type Changes) and status filters, rather than fragmented isolated tabs.
 
 --------------------------------------------------------------------------------
 RULE 14: SETTINGS AND ADMIN TOOLS

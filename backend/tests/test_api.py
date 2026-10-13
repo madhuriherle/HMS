@@ -2052,7 +2052,7 @@ def test_rank_hierarchy_rules(client, admin_headers):
                        json={"name": "Up", "username": "up_user", "password": "Upuser@1234", "role_id": _role_id(client, admin_headers, "ADMIN")}).status_code == 403
     users = {u["username"] for u in client.get("/api/v1/users/", headers=mgr, params={"limit": 200}).json()["data"]}
     # only your own rank and weaker are listed: a stronger rank (the Super Admin) is neither listed nor reachable
-    assert {"sub_user", "rank3_mgr"} <= users and "admin" not in users
+    assert "sub_user" in users and "admin" not in users and "rank3_mgr" not in users  # your own account is on My Profile, not in this list
     assert client.get("/api/v1/users/1", headers=mgr).status_code == 403
     assert client.put("/api/v1/users/1", headers=mgr, json={"name": "Hacked"}).status_code == 403
     assert client.delete("/api/v1/users/1", headers=mgr).status_code == 403
