@@ -927,7 +927,7 @@ export default function RegisterNewMember() {
       <div>
         <div className="flex items-center justify-between gap-4 w-full">
           <div>
-            <h1 className="text-xl sm:text-2xl font-extrabold text-[#180200] tracking-tight flex items-center gap-3">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight flex items-center gap-3">
               <span>{isViewMode ? 'View Member Details' : isEditMode ? 'Edit Member Details' : 'Register New Member'}</span>
               {(isViewMode || isEditMode) && targetMember?.registrationNumber && (
                 <span className="font-mono text-sm font-bold bg-[#FAF7F2] text-[#510601] px-3 py-1 rounded-xl border border-[#E8DFD8]" title="MID (member id)">
@@ -951,7 +951,7 @@ export default function RegisterNewMember() {
         {/* Form Top Bar with Tabs */}
         <div className="px-6 sm:px-8 pt-6 sm:pt-7 pb-3 border-b border-[#E8DFD8]">
           <div className="flex items-center justify-between pb-3 border-b-2 border-[#8C1801]">
-            <h2 className="text-xl sm:text-2xl font-bold text-[#180200]">
+            <h2 className="text-base sm:text-lg font-bold text-[#180200]">
               {isViewMode
                 ? `Membership Details: ${formData.name || targetMember?.fullName || 'Member Record'}`
                 : isEditMode

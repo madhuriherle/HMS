@@ -248,9 +248,9 @@ export default function MemberImport() {
 
   return (
     <PermissionGate required={['members.register.write', 'members.write']} title="Access Restricted" message="You need permission to register or import members.">
-      <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 py-6 animate-in fade-in duration-300">
+      <div className="space-y-6">
         {/* Breadcrumb Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-[#E8DFD8]">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div className="space-y-1">
             <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Bulk Member Import (Live Register)</h1>
           </div>

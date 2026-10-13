@@ -165,7 +165,7 @@ export default function NumberFormats() {
   return (
     <PermissionGate required="system.number_formats.read">
       <div className="space-y-4">
-        <h2 className="text-xl font-bold text-[#180200]">Number Formats</h2>
+        <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Number Formats</h1>
         {loadError && <p className="text-sm font-semibold text-red-700">{loadError}</p>}
         {!data && !loadError && <p className="text-sm text-[#863221]">Loading...</p>}
         {data && (

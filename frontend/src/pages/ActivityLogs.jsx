@@ -160,7 +160,7 @@ export default function ActivityLogs() {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6">
       {/* Page Title & Quick Date Presets */}
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">User Activity Logs</h1>

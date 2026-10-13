@@ -101,7 +101,7 @@ export default function AssignedApprovals() {
 
   return (
     <PermissionGate required="members.unapproved.read">
-      <div className="space-y-4 max-w-7xl mx-auto pb-10">
+      <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Assigned for Approval</h1>
           <div className="flex items-center gap-2 w-full sm:w-auto">
