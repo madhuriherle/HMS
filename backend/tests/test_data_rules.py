@@ -101,3 +101,9 @@ def test_pincode_lookup_goes_through_the_server(client, admin_headers, monkeypat
         raise OSError("no network")
     monkeypatch.setattr(meta, "_fetch_pincode", down)
     assert client.get(f"{API}/meta/pincode/560003", headers=admin_headers).json() == {"found": False}
+
+
+def test_redirects_keep_https_behind_the_proxy(client):
+    r = client.get(f"{API}/dashboard", headers={"X-Forwarded-Proto": "https", "X-Forwarded-For": "1.2.3.4"}, follow_redirects=False)
+    assert r.status_code == 307
+    assert r.headers["location"].startswith("https://"), r.headers["location"]

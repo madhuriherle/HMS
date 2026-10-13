@@ -113,6 +113,11 @@ async def request_context(request: Request, call_next):
 
 
 # ── Middleware ──────────────────────────────
+# The API sits behind nginx, which tells us the original scheme (X-Forwarded-Proto). Without this the
+# automatic "add the missing trailing slash" redirect points at http://, which a browser on the https site blocks.
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware  # noqa: E402
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
 _origins = settings.cors_origins
 from services.permission_areas import RequestPathMiddleware  # noqa: E402
 app.add_middleware(RequestPathMiddleware)
