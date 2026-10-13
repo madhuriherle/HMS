@@ -27,7 +27,10 @@ import {
   CreditCard,
   Hash,
   Plus,
-  Trash2
+  Trash2,
+  Printer,
+  Coins,
+  UserCheck
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import PermissionGate from '../components/PermissionGate';
@@ -1337,9 +1340,9 @@ export default function ReceiptEntry() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
         {/* ------------------------------------------------------------ */}
-        {/* LEFT COLUMN: RECEIPT ENTRY FORM (5 cols)                     */}
+        {/* LEFT COLUMN: RECEIPT ENTRY FORM (6 cols, 50%)                */}
         {/* ------------------------------------------------------------ */}
-        <div className="col-span-12 lg:col-span-5">
+        <div className="col-span-12 lg:col-span-6">
           <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_16px_-4px_rgba(24,2,0,0.06)] overflow-hidden">
 
             {/* Form Card Header */}
@@ -1910,12 +1913,21 @@ export default function ReceiptEntry() {
                 </div>
 
                 {/* Grand total of every particular line */}
-                <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[#510601]/5 border border-[#510601]/20">
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-[#863221] uppercase tracking-wide">Grand Total</div>
-                    <div className="text-[10px] text-[#863221]/80 italic truncate">{receiptTotal > 0 ? numberToWords(receiptTotal) : ''}</div>
+                <div className="bg-gradient-to-r from-[#FAF7F2] via-amber-50/50 to-orange-50/30 border border-[#E8DFD8] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-extrabold text-[#510601] uppercase tracking-wider">
+                      <Coins className="w-4 h-4 text-amber-600" />
+                      <span>Grand Total Amount</span>
+                    </div>
+                    <div className="text-[11px] font-medium text-[#863221] italic mt-0.5 truncate">
+                      {receiptTotal > 0 ? numberToWords(receiptTotal) : 'Zero Rupees Only'}
+                    </div>
                   </div>
-                  <div className="font-mono font-extrabold text-xl text-[#510601] shrink-0">₹{receiptTotal.toLocaleString('en-IN')}</div>
+                  <div className="text-right sm:self-center">
+                    <span className="text-xl sm:text-2xl font-extrabold text-[#510601] font-mono tracking-tight">
+                      ₹{receiptTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Row 5: Transaction ID & Transaction Date */}
@@ -2015,8 +2027,8 @@ export default function ReceiptEntry() {
 
               </div>
 
-              {/* Action Buttons (Clear & Save) */}
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#E8DFD8]">
+              {/* Action Buttons (Clear, Save & New, Save & Print) */}
+              <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-[#E8DFD8]">
                 <label className="mr-auto flex items-center gap-2 text-xs font-semibold text-[#863221] cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -2030,7 +2042,7 @@ export default function ReceiptEntry() {
                 <button
                   type="button"
                   onClick={handleClearForm}
-                  className="px-4 py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] text-xs sm:text-sm font-semibold hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                  className="px-3.5 py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] text-xs sm:text-sm font-semibold hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Cancel</span>
@@ -2041,10 +2053,21 @@ export default function ReceiptEntry() {
                   onClick={() => { saveMode.current = 'new'; }}
                   disabled={saving || !hasPermission('receipts.entry.write')}
                   title={!hasPermission('receipts.entry.write') ? 'Requires receipts.entry.write permission' : undefined}
-                  className="disabled:opacity-50 px-5 py-2 rounded-xl bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-bold shadow-sm hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
+                  className="disabled:opacity-50 px-4 py-2 rounded-xl bg-white hover:bg-amber-50/50 border border-[#510601]/40 text-[#510601] text-xs sm:text-sm font-bold shadow-2xs hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <Save className="w-3.5 h-3.5" />
-                  <span>Save</span>
+                  <span>Save & New</span>
+                </button>
+
+                <button
+                  type="submit"
+                  onClick={() => { saveMode.current = 'print'; }}
+                  disabled={saving || !hasPermission('receipts.entry.write')}
+                  title={!hasPermission('receipts.entry.write') ? 'Requires receipts.entry.write permission' : undefined}
+                  className="disabled:opacity-50 px-5 py-2 rounded-xl bg-gradient-to-r from-[#510601] to-[#3D0808] hover:from-[#6b0801] hover:to-[#510601] active:bg-[#180200] text-white text-xs sm:text-sm font-extrabold shadow-md hover:shadow-lg transition-all cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Save & Print</span>
                 </button>
               </div>
 
@@ -2053,11 +2076,11 @@ export default function ReceiptEntry() {
         </div>
 
         {/* ------------------------------------------------------------ */}
-        {/* RIGHT COLUMN: CONDITIONAL ACCORDING TO ENTRY SOURCE          */}
+        {/* RIGHT COLUMN: CONDITIONAL ACCORDING TO ENTRY SOURCE (6 cols, 50%) */}
         {/* - Flow 1 (unapproved-assignment): Show Member Details Panel  */}
         {/* - Flow 2 (membership-assignment) & Flow 3 (normal): Show Membership List Table */}
         {/* ------------------------------------------------------------ */}
-        <div className="col-span-12 lg:col-span-7 w-full space-y-4">
+        <div className="col-span-12 lg:col-span-6 w-full space-y-4">
 
           {(entrySource === 'unapproved-assignment' || entrySource === 'membership-assignment') && selectedMember ? (
             /* ========================================================== */
@@ -2339,95 +2362,90 @@ export default function ReceiptEntry() {
                 </div>
               </div>
 
-              {/* Membership List Table */}
-              <div className="overflow-x-auto min-h-[300px]">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-[#E8DFD8] bg-[#FAF7F2] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                      <th className="py-3 px-3.5 whitespace-nowrap">Member</th>
-                      <th className="py-3 px-3.5 whitespace-nowrap">Contact</th>
-                      <th className="py-3 px-3.5 whitespace-nowrap">Location</th>
-                      <th className="py-3 px-3.5 text-right whitespace-nowrap">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E8DFD8]">
-                    {paginatedRightMembers.length === 0 ? (
-                      <tr>
-                        <td colSpan="4" className="py-12 text-center text-[#863221]">
-                          <div className="w-10 h-10 rounded-2xl bg-[#510601]/5 text-[#510601] flex items-center justify-center mx-auto mb-2 border border-[#510601]/10">
-                            <Users className="w-5 h-5 opacity-60" />
-                          </div>
-                          <p className="font-semibold text-sm text-[#180200]">No members found</p>
-                          <p className="text-xs text-[#863221] mt-0.5">
-                            {rightSearchQuery ? 'Try adjusting your search criteria.' : 'No members registered yet in the Membership List.'}
-                          </p>
-                        </td>
-                      </tr>
-                    ) : (
-                      paginatedRightMembers.map((member) => {
-                        const pinLookup = member.postalCode ? lookupLocationByPin(member.postalCode) : null;
-                        const districtText = member.districtName || member.district || (pinLookup?.found ? pinLookup.districtName : '') || '—';
-                        const locParts = [
-                          member.locality || member.talukName || member.taluk || member.place || (pinLookup?.found ? pinLookup.talukName : ''),
-                          member.postalCode || member.pinCode ? `(${member.postalCode || member.pinCode})` : ''
-                        ].filter(Boolean).join(' ');
+              {/* Membership Cards Directory */}
+              <div className="p-3.5 space-y-3 min-h-[300px] max-h-[580px] overflow-y-auto custom-scrollbar bg-[#FAF7F2]/30">
+                {paginatedRightMembers.length === 0 ? (
+                  <div className="py-12 text-center text-[#863221]">
+                    <div className="w-10 h-10 rounded-2xl bg-[#510601]/5 text-[#510601] flex items-center justify-center mx-auto mb-2 border border-[#510601]/10">
+                      <Users className="w-5 h-5 opacity-60" />
+                    </div>
+                    <p className="font-semibold text-sm text-[#180200]">No members found</p>
+                    <p className="text-xs text-[#863221] mt-0.5">
+                      {rightSearchQuery ? 'Try adjusting your search criteria.' : 'No members registered yet in the Membership List.'}
+                    </p>
+                  </div>
+                ) : (
+                  paginatedRightMembers.map((member) => {
+                    const pinLookup = member.postalCode ? lookupLocationByPin(member.postalCode) : null;
+                    const districtText = member.districtName || member.district || (pinLookup?.found ? pinLookup.districtName : '') || '';
+                    const locParts = [
+                      member.locality || member.talukName || member.taluk || member.place || (pinLookup?.found ? pinLookup.talukName : ''),
+                      districtText,
+                      member.postalCode || member.pinCode ? `(${member.postalCode || member.pinCode})` : ''
+                    ].filter(Boolean).join(', ');
 
-                        return (
-                          <tr
-                            key={member.id || member.registrationNumber || member.membershipNumber}
-                            className="transition-colors hover:bg-[#FAF7F2]/60"
-                          >
-                            {/* 1. Membership No. & Name */}
-                            <td className="py-3 px-3.5">
-                              <div className="flex items-center gap-2">
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#510601]/10 text-[#510601] border border-[#510601]/20 shrink-0">
-                                  #{member.membershipNumber || member.registrationNumber || member.id || '—'}
-                                </span>
-                                <span className="font-bold text-[#180200] text-xs sm:text-sm whitespace-nowrap">
-                                  {member.fullName || member.name}
-                                </span>
-                              </div>
-                              <div className="text-[11px] text-[#863221] mt-0.5 truncate max-w-[200px]">
-                                {member.membershipType || member.membershipTypeCategory || 'Standard'} {member.gothra || member.gotra ? `• Gotra: ${member.gothra || member.gotra}` : ''}
-                              </div>
-                            </td>
+                    const memCode = member.membershipNumber || member.registrationNumber || member.id || '—';
+                    const category = member.membershipType || member.membershipTypeCategory || 'Life Member';
 
-                            {/* 2. Contact Number */}
-                            <td className="py-3 px-3.5 whitespace-nowrap">
-                              <div className="flex items-center gap-1.5 font-mono font-medium text-xs text-[#180200]">
-                                <Phone className="w-3 h-3 text-[#863221]/70 shrink-0" />
-                                <span>{member.contactNumber || member.mobile || member.mobileNumber || member.phone || '—'}</span>
-                              </div>
-                            </td>
+                    return (
+                      <div
+                        key={member.id || member.registrationNumber || member.membershipNumber}
+                        className="bg-white rounded-xl border border-[#E8DFD8] hover:border-[#510601]/50 p-3.5 transition-all duration-200 shadow-[0_2px_8px_-2px_rgba(24,2,0,0.04)] hover:shadow-md relative group"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-1 flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[11px] font-mono font-bold text-[#510601] bg-amber-50/90 border border-amber-200/90 px-2 py-0.5 rounded-md">
+                                #{memCode}
+                              </span>
+                              <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md">
+                                {category}
+                              </span>
+                            </div>
 
-                            {/* 3. District / Location */}
-                            <td className="py-3 px-3.5 text-xs text-[#863221]">
-                              <div className="font-bold text-[#180200] text-xs whitespace-nowrap">{districtText}</div>
-                              {locParts && (
-                                <div className="text-[11px] text-[#863221]/80 mt-0.5 truncate max-w-[180px]">
-                                  {locParts}
+                            <h4 className="font-extrabold text-xs sm:text-sm text-[#180200] group-hover:text-[#510601] transition-colors flex items-center gap-1.5 truncate">
+                              <span>{member.fullName || member.name}</span>
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            </h4>
+
+                            {(member.gothra || member.gotra) && (
+                              <div className="text-[11px] text-[#863221]/80 font-medium">
+                                Gotra: {member.gothra || member.gotra}
+                              </div>
+                            )}
+
+                            <div className="pt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#863221]">
+                              {(member.contactNumber || member.mobile || member.phone) && (
+                                <div className="flex items-center space-x-1.5">
+                                  <Phone className="w-3 h-3 text-[#863221]/60 shrink-0" />
+                                  <span className="font-mono">{member.contactNumber || member.mobile || member.phone}</span>
                                 </div>
                               )}
-                            </td>
+                              {locParts && (
+                                <div className="flex items-center space-x-1.5 truncate max-w-[220px]">
+                                  <MapPin className="w-3 h-3 text-[#863221]/60 shrink-0" />
+                                  <span className="truncate">{locParts}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
 
-                            {/* 4. Actions: Single "Assign to Receipt" Button */}
-                            <td className="py-3 px-3.5 text-right whitespace-nowrap">
-                              <button
-                                type="button"
-                                onClick={() => handleAssignFromMembership(member)}
-                                className="btn-act"
-                                title="Assign this member's details into the receipt form"
-                              >
-                                <FileText className="w-3.5 h-3.5 shrink-0" />
-                                <span>Assign to Receipt</span>
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
+                          <div className="self-center shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => handleAssignFromMembership(member)}
+                              className="px-3 py-1.5 rounded-xl bg-[#510601]/10 hover:bg-[#510601] text-[#510601] hover:text-white font-bold text-xs flex items-center gap-1.5 transition-all border border-[#510601]/25 cursor-pointer shadow-xs"
+                              title="Assign this member's details into the receipt form"
+                            >
+                              <UserCheck className="w-3.5 h-3.5" />
+                              <span>Assign</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
               {/* Pagination Footer */}
