@@ -6609,3 +6609,12 @@ def test_editing_a_members_type_changes_the_profile(client, admin_headers):
 
     bad = client.put(f"/api/v1/members/{member['id']}", headers=admin_headers, json={"membership_type_id": 999999})
     assert bad.status_code == 400
+
+
+def test_member_list_carries_the_membership_type_name(client, admin_headers):
+    mt = _create_membership_type(client, admin_headers, "TST_LST", "List Type")
+    member = _create_member(client, admin_headers, "9330000032", "ListTyped")
+    client.post(f"/api/v1/members/{member['id']}/memberships", headers=admin_headers,
+                json={"membership_type_id": mt["id"]})
+    rows = client.get("/api/v1/members/", headers=admin_headers, params={"search": "ListTyped"}).json()["data"]
+    assert rows[0]["membership_type"] == "List Type" and rows[0]["membership_type_id"] == mt["id"]

@@ -100,6 +100,8 @@ export const normalizeMember = (member) => {
     appliedOnBehalfOf: member.applied_on_behalf_of || '',
     magazineNeededLabel: member.magazine_needed === true ? 'Yes' : member.magazine_needed === false ? 'No' : '',
     membershipTypeCategory: member.membership_type_category || '',
+    membershipType: member.membership_type || '',
+    membershipTypeId: member.membership_type_id || '',
     referredBy: [member.referred_by_number, member.referred_by_name].filter(Boolean).join(' - '),
     familyMembership: [member.family_membership_number, member.family_membership_name].filter(Boolean).join(' - '),
     registrationPayment: member.registration_payment || null,

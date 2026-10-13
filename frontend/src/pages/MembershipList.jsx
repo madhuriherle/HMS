@@ -1499,7 +1499,7 @@ export default function MembershipList() {
                       Mob: {m.mobile || m.mobileNumber || '—'}
                     </span>
                     <span className="px-1.5 py-0.5 bg-[#FAF7F2] text-[#510601] font-semibold rounded border border-[#E8DFD8]">
-                      {m.membershipType || 'Member'}
+                      {m.membershipType || '—'}
                     </span>
                   </div>
                 </div>

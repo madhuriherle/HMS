@@ -85,7 +85,32 @@ def read_members(
             Member.email.ilike(f"%{search}%"),
         ))
 
-    return paginate(query, page, limit)
+    result = paginate(query, page, limit)
+    _attach_membership_types(db, result["data"])
+    return result
+
+
+def _attach_membership_types(db: Session, rows: list) -> None:
+    """Each listed member carries the name of their current membership type (the latest membership record), so
+    the lists show the real type instead of leaving it blank."""
+    from models.masters import MembershipType
+    ids = [r.get("id") for r in rows if isinstance(r, dict) and r.get("id")]
+    if not ids:
+        return
+    latest = {}
+    for ms, t in (
+        db.query(MemberMembership, MembershipType)
+        .join(MembershipType, MembershipType.id == MemberMembership.membership_type_id)
+        .filter(MemberMembership.member_id.in_(ids), MemberMembership.is_deleted == False)  # noqa: E712
+        .order_by(MemberMembership.id.asc())
+        .all()
+    ):
+        latest[ms.member_id] = (t.id, t.name_en)
+    for r in rows:
+        if isinstance(r, dict):
+            tid, name = latest.get(r.get("id"), (None, None))
+            r["membership_type_id"] = tid
+            r["membership_type"] = name
 
 
 @router.post("/", response_model=Union[schemas_members.Member, PendingApproval], status_code=201)
