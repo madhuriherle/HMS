@@ -1151,7 +1151,7 @@ export default function UserManagement() {
                       </span>
                     </div>
                     <span className="text-[11px] px-2 py-0.5 rounded-full font-bold bg-[#510601]/10 text-[#510601]">
-                      {selectedFormRole.privileges ? selectedFormRole.privileges.length : 0} Privileges Granted
+                      {selectedFormRole.is_all_access ? 'All privileges' : `${(selectedFormRole.permission_codes || selectedFormRole.privileges || []).length} Privileges Granted`}
                     </span>
                   </div>
 
@@ -1165,8 +1165,11 @@ export default function UserManagement() {
                       Module Coverage
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {allPrivileges.map(mod => {
-                        const rolePrivs = selectedFormRole.privileges || [];
+                      {selectedFormRole.is_all_access && (
+                        <span className="px-2 py-0.5 bg-white border border-[#E8DFD8] rounded-md text-[10px] font-medium text-[#180200]">Every module</span>
+                      )}
+                      {!selectedFormRole.is_all_access && allPrivileges.map(mod => {
+                        const rolePrivs = selectedFormRole.permission_codes || selectedFormRole.privileges || [];
                         const hasPrivs = mod.privileges.some(p =>
                           rolePrivs.includes(p.id)
                         );
@@ -1178,7 +1181,7 @@ export default function UserManagement() {
 
                         return (
                           <span
-                            key={mod.id}
+                            key={mod.module}
                             className="px-2 py-0.5 bg-white border border-[#E8DFD8] rounded-md text-[10px] font-medium text-[#180200] flex items-center gap-1"
                           >
                             <Check className="w-2.5 h-2.5 text-[#3D705C]" />
@@ -1285,7 +1288,9 @@ export default function UserManagement() {
                 const userRole = getRoleById(viewingUser.role_id ?? viewingUser.roleId);
                 const roleName = userRole?.name || viewingUser.role_name;
                 const roleRank = userRole?.rank_level ?? viewingUser.role_rank_level;
-                const fullAccess = !userRole && roleRank === 1;
+                // the roles list carries permission_codes (the privilege codes the role holds)
+                const roleCodes = userRole?.permission_codes || userRole?.privileges || [];
+                const fullAccess = Boolean(userRole?.is_all_access) || (!userRole && roleRank === 1);
                 return (
                   <div className="p-3.5 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8] space-y-2">
                     <div className="flex items-center justify-between">
@@ -1299,7 +1304,7 @@ export default function UserManagement() {
                         )}
                       </span>
                       <span className="text-[10px] font-bold px-2 py-0.5 bg-[#510601]/10 text-[#510601] rounded-full">
-                        {fullAccess ? 'All privileges' : `${userRole?.privileges?.length || 0} Privileges`}
+                        {fullAccess ? 'All privileges' : `${roleCodes.length} Privileges`}
                       </span>
                     </div>
 
@@ -1318,14 +1323,14 @@ export default function UserManagement() {
                           </span>
                         )}
                         {allPrivileges.map(mod => {
-                          const hasPrivs = mod.privileges.some(p =>
-                            userRole?.privileges?.includes(p.id)
+                          const hasPrivs = !fullAccess && mod.privileges.some(p =>
+                            roleCodes.includes(p.id)
                           );
                           if (!hasPrivs) return null;
 
                           return (
                             <span
-                              key={mod.id}
+                              key={mod.module}
                               className="px-2 py-0.5 bg-white border border-[#E8DFD8] rounded text-[10px] text-[#180200] font-medium"
                             >
                               {mod.module}
