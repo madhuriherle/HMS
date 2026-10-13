@@ -164,6 +164,8 @@ class MemberUpdate(BaseModel):
     """Admin edit — every column is editable except identity/status fields
     that have dedicated flows (member_code via approval, statuses via
     approve/activate endpoints)."""
+    # the member's current membership type (changed on the membership record, not on the member row)
+    membership_type_id: Optional[int] = None
     first_name_en: Optional[str] = None
     middle_name_en: Optional[str] = None
     last_name_en: Optional[str] = None

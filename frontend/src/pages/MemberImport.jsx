@@ -252,21 +252,7 @@ export default function MemberImport() {
         {/* Breadcrumb Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-[#E8DFD8]">
           <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#863221]">
-              <Link to="/dashboard" className="hover:underline">Dashboard</Link>
-              <span>/</span>
-              <Link to="/dashboard/membership/list" className="hover:underline">Membership</Link>
-              <span>/</span>
-              <span className="text-[#180200]">Import Live Members</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-[#180200] flex items-center gap-2.5">
-              <Users className="w-7 h-7 text-[#510601]" />
-              Bulk Member Import (Live Register)
-            </h1>
-            <p className="text-xs text-[#863221]/80 max-w-2xl">
-              Import 30,000+ existing and legacy members into the system with their permanent membership numbers.
-              Imported members become immediately searchable and eligible for receipt linking.
-            </p>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Bulk Member Import (Live Register)</h1>
           </div>
 
           <div className="flex items-center gap-3">

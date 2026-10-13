@@ -273,21 +273,7 @@ export default function BulkReceiptMapping() {
         {/* Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-[#E8DFD8]">
           <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#863221]">
-              <Link to="/dashboard" className="hover:underline">Dashboard</Link>
-              <span>/</span>
-              <Link to="/dashboard/receipts/tracking" className="hover:underline">Receipt Tracking</Link>
-              <span>/</span>
-              <span className="text-[#180200]">Bulk Receipt-to-Member Mapping</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-[#180200] flex items-center gap-2.5">
-              <Link2 className="w-7 h-7 text-[#510601]" />
-              Bulk Receipt Auto-Mapping
-            </h1>
-            <p className="text-xs text-[#863221]/80 max-w-2xl">
-              Reconcile unassigned receipts that were entered with membership numbers.
-              Match them against your imported live members and link in 1-click.
-            </p>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Bulk Receipt Auto-Mapping</h1>
           </div>
 
           <div className="flex items-center gap-3">

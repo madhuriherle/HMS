@@ -6587,3 +6587,25 @@ def test_equal_rank_users_can_manage_each_other_with_safeguards(client, admin_he
                          json={"name": "Top B", "username": "top_b", "password": "Topbbbb@123", "role_id": top["id"]}).json()
     assert client.delete(f"/api/v1/users/{first['id']}", headers=admin_headers).status_code == 200
     assert client.delete(f"/api/v1/users/{second['id']}", headers=admin_headers).status_code == 400
+
+
+def test_editing_a_members_type_changes_the_profile(client, admin_headers):
+    """Editing a member's membership type (e.g. Mahapalaka -> Poshaka) must change the membership record the
+    profile reads, and leave a line in the type history."""
+    old = _create_membership_type(client, admin_headers, "TST_EDT_A", "Edit Type A")
+    new = _create_membership_type(client, admin_headers, "TST_EDT_B", "Edit Type B")
+    member = _create_member(client, admin_headers, "9330000031", "TypeEdit")
+    client.post(f"/api/v1/members/{member['id']}/memberships", headers=admin_headers,
+                json={"membership_type_id": old["id"]})
+
+    r = client.put(f"/api/v1/members/{member['id']}", headers=admin_headers,
+                   json={"membership_type_id": new["id"]})
+    assert r.status_code == 200, r.text
+
+    body = client.get(f"/api/v1/members/{member['id']}/profile", headers=admin_headers).json()
+    assert [m["type_code"] for m in body["memberships"]] == ["TST_EDT_B"]
+    changes = body["history"]["membership_type_changes"]
+    assert changes and changes[0]["old_type_id"] == old["id"] and changes[0]["new_type_id"] == new["id"]
+
+    bad = client.put(f"/api/v1/members/{member['id']}", headers=admin_headers, json={"membership_type_id": 999999})
+    assert bad.status_code == 400

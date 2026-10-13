@@ -847,6 +847,7 @@ export default function RegisterNewMember() {
       applied_on_behalf_of: formData.appliedOnBehalfOf || null,
       magazine_needed: formData.magazineNeeded === 'YES',
       membership_type_category: formData.membershipTypeCategory || null,
+      ...(isEditMode && formData.membershipTypeId ? { membership_type_id: Number(formData.membershipTypeId) } : {}),
       referred_by_number: formData.referredMembershipNo.trim() || null,
       referred_by_name: formData.referredMembershipName.trim() || null,
       family_membership_number: formData.familyMembershipNo.trim() || null,

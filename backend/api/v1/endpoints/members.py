@@ -771,7 +771,49 @@ def update_member(
     # Mangalya-parity personal master references must exist.
     _member_master_checks(db, data)
 
+    new_type_id = data.pop("membership_type_id", None)
+    if new_type_id:
+        _change_membership_type(db, member, new_type_id, current_user.id)
     return crud_members.member.update(db=db, db_obj=member, obj_in=data, updated_by=current_user.id)
+
+
+def _change_membership_type(db: Session, member: Member, new_type_id: int, user_id: int) -> None:
+    """Editing a member's membership type changes the type on their membership record (what the profile and the
+    lists read) and leaves a line in the type history; with no membership record yet, one is created."""
+    from models.masters import MembershipType
+    from models.members import MembershipTypeHistory
+    from services.pricing import active_price
+
+    if not db.query(MembershipType.id).filter(MembershipType.id == new_type_id, MembershipType.is_deleted == False).first():  # noqa: E712
+        raise HTTPException(status_code=400, detail="Unknown membership_type_id")
+    price_row = active_price(db, new_type_id)
+    now = datetime.now(timezone.utc)
+    current = (
+        db.query(MemberMembership)
+        .filter(MemberMembership.member_id == member.id, MemberMembership.is_deleted == False)  # noqa: E712
+        .order_by(MemberMembership.id.desc()).first()
+    )
+    if current is None:
+        current = MemberMembership(
+            member_id=member.id, membership_type_id=new_type_id, price_id=price_row.id if price_row else None,
+            status="ACTIVE" if member.approval_status == "APPROVED" else "PENDING", applied_at=now, created_by=user_id,
+        )
+        db.add(current)
+        db.flush()
+        old_type_id, old_price = None, None
+    else:
+        if current.membership_type_id == new_type_id:
+            return
+        old_row = active_price(db, current.membership_type_id)
+        old_type_id, old_price = current.membership_type_id, (float(old_row.amount) if old_row else None)
+        current.membership_type_id = new_type_id
+        current.price_id = price_row.id if price_row else None
+        current.updated_by = user_id
+    db.add(MembershipTypeHistory(
+        member_id=member.id, membership_id=current.id, old_type_id=old_type_id, new_type_id=new_type_id,
+        old_price=old_price, new_price=float(price_row.amount) if price_row else 0,
+        changed_by=user_id, changed_at=now, reason="Changed while editing the member", created_by=user_id,
+    ))
 
 
 def _member_master_checks(db: Session, data: dict) -> None:
