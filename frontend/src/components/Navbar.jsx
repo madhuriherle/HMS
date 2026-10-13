@@ -128,7 +128,7 @@ export default function Navbar({ onToggleSidebar }) {
                 type="button"
                 onClick={() => {
                   setProfileOpen(false);
-                  navigate('/dashboard/master/organisation-settings');
+                  navigate('/dashboard/settings');
                 }}
                 className="w-full flex items-center gap-2 px-4 py-2 text-sm text-[#180200] hover:bg-[#FAF7F2] transition-colors text-left cursor-pointer"
               >

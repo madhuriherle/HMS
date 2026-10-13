@@ -4,7 +4,7 @@ The office owns these rows from then on: seeding only fills a list that has no r
 never touched. Each entry is (code, label, extra).
 """
 
-from db.lookup_countries import COUNTRY_CODES
+from db.lookup_countries import COUNTRY_CODES, PHONE_LENGTHS
 
 LOOKUP_DEFAULTS = {
     "child_relations": [("Male", "Son (Male)", None), ("Female", "Daughter (Female)", None), ("Other", "Other", None)],
@@ -30,4 +30,6 @@ LOOKUP_DEFAULTS = {
     "activity_clients": [("Web Admin", "Web Admin", None), ("Mobile App", "Mobile App", None)],
     # extra = the dial code
     "country_codes": [(code, name, dial) for code, name, dial in COUNTRY_CODES],
+    # extra = "fewest-most" digits a national number may have in that country
+    "phone_lengths": [(code, name, f"{PHONE_LENGTHS[code][0]}-{PHONE_LENGTHS[code][1]}") for code, name, _ in COUNTRY_CODES],
 }

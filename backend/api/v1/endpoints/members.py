@@ -1859,6 +1859,373 @@ def read_member_profile(
         ],
     }
 
+# ── Member profile, one tab at a time ──────────────────────────────────────
+# GET /members/{id}/profile/{section} returns only that tab's data, so the screen loads what is open and nothing
+# else. "summary" is the header (name, photo, status, credit and a count for each tab).
+PROFILE_SECTIONS = (
+    "summary", "personal", "contact", "family", "membership", "receipts", "magazine", "events", "history",
+)
+
+
+def _profile_summary(db: Session, member: Member) -> dict:
+    from models.events import EventMemberLink, EventParticipant
+    from models.magazines import MagazineSubscription
+    from models.masters import MembershipType
+    from models.members import MembershipTypeHistory
+    from models.receipts import Receipt, ReceiptAllocation
+    from services import membership_credit
+
+    mid = member.id
+    active = (
+        db.query(MemberMembership, MembershipType)
+        .join(MembershipType, MembershipType.id == MemberMembership.membership_type_id)
+        .filter(MemberMembership.member_id == mid, MemberMembership.is_deleted == False)  # noqa: E712
+        .order_by((MemberMembership.status == "ACTIVE").desc(), MemberMembership.applied_at.desc())
+        .first()
+    )
+    paid_rows = (
+        db.query(func.count(ReceiptAllocation.id), func.coalesce(func.sum(ReceiptAllocation.allocated_amount), 0))
+        .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
+        .filter(ReceiptAllocation.member_id == mid, ReceiptAllocation.is_deleted == False,  # noqa: E712
+                Receipt.is_deleted == False, Receipt.payment_status != "CANCELLED")  # noqa: E712
+        .first()
+    )
+    receipt_count = (
+        db.query(func.count(ReceiptAllocation.id))
+        .filter(ReceiptAllocation.member_id == mid, ReceiptAllocation.is_deleted == False)  # noqa: E712
+        .scalar() or 0
+    )
+    magazine_count = (
+        db.query(func.count(MagazineSubscription.id))
+        .filter(MagazineSubscription.member_id == mid, MagazineSubscription.is_deleted == False)  # noqa: E712
+        .scalar() or 0
+    ) + (
+        db.query(func.count(MemberServiceOptin.id))
+        .filter(MemberServiceOptin.member_id == mid, MemberServiceOptin.is_deleted == False,  # noqa: E712
+                MemberServiceOptin.status == "ACTIVE")
+        .scalar() or 0
+    )
+    event_count = (
+        db.query(func.count(EventMemberLink.id)).filter(EventMemberLink.member_id == mid).scalar() or 0
+    ) + (
+        db.query(func.count(EventParticipant.id))
+        .filter(EventParticipant.member_id == mid, EventParticipant.is_deleted == False)  # noqa: E712
+        .scalar() or 0
+    )
+    membership_count = (
+        db.query(func.count(MemberMembership.id))
+        .filter(MemberMembership.member_id == mid, MemberMembership.is_deleted == False)  # noqa: E712
+        .scalar() or 0
+    )
+    family_count = sum(
+        1 for v in (member.father_name or member.father_husband_name, member.mother_name, member.spouse_name) if v
+    ) + len(member.children_details or [])
+    mm, mt = active if active else (None, None)
+    return {
+        "id": member.id,
+        "member_code": member.member_code,
+        "name_title": member.name_title,
+        "first_name_en": member.first_name_en,
+        "middle_name_en": member.middle_name_en,
+        "last_name_en": member.last_name_en,
+        "full_name_kn": member.full_name_kn,
+        "approval_status": member.approval_status,
+        "member_status": member.member_status,
+        "mobile": member.mobile,
+        "mobile_country_code": member.mobile_country_code,
+        "photo_path": member.photo_path,
+        "locality": member.locality,
+        "city": member.city,
+        "post": member.post,
+        "active_membership": {
+            "type_name_en": mt.name_en, "type_name_kn": mt.name_kn, "status": mm.status,
+            "membership_number": mm.membership_number,
+        } if mm else None,
+        "membership_credit": membership_credit.summary(db, mid),
+        "paid_so_far": float(paid_rows[1] or 0) if paid_rows else 0.0,
+        "counts": {
+            "family": family_count,
+            "membership": membership_count,
+            "receipts": receipt_count,
+            "magazine": magazine_count,
+            "events": event_count,
+        },
+    }
+
+
+def _profile_personal(db: Session, member: Member) -> dict:
+    masters = _member_master_details(db, member)
+    pick = lambda key: (masters.get(key) or {}).get("name_en")  # noqa: E731
+    return {
+        "name_title": member.name_title,
+        "first_name_en": member.first_name_en,
+        "middle_name_en": member.middle_name_en,
+        "last_name_en": member.last_name_en,
+        "full_name_kn": member.full_name_kn,
+        "gender": member.gender,
+        "date_of_birth": member.date_of_birth,
+        "blood_group": member.blood_group,
+        "is_married": member.is_married,
+        "gotra": pick("gotra"),
+        "qualification": pick("qualification"),
+        "native_place": pick("native_place"),
+        "occupation": member.occupation,
+        "category": member.category,
+        "company": member.company,
+        "website": member.website,
+        "aadhaar_number": member.aadhaar_number,
+        "remarks": member.remarks,
+        "registration_source": member.registration_source,
+        "member_status": member.member_status,
+        "approval_status": member.approval_status,
+        "applied_on_behalf_of": member.applied_on_behalf_of,
+        "created_at": member.created_at,
+    }
+
+
+def _profile_contact(db: Session, member: Member) -> dict:
+    return {
+        "mobile": member.mobile,
+        "mobile_country_code": member.mobile_country_code,
+        "whatsapp_number": member.whatsapp_number,
+        "whatsapp_country_code": member.whatsapp_country_code,
+        "alternate_mobile": member.alternate_mobile,
+        "email": member.email,
+        "address_line1": member.address_line1,
+        "address_line2": member.address_line2,
+        "address_line1_kn": member.address_line1_kn,
+        "address_line2_kn": member.address_line2_kn,
+        "locality": member.locality,
+        "locality_kn": member.locality_kn,
+        "area": member.area,
+        "place": member.place,
+        "grama": member.grama,
+        "village": member.village,
+        "post": member.post,
+        "city": member.city,
+        "label_point": member.label_point,
+        "address_remarks": member.address_remarks,
+        "country": member.country,
+        **_location_names(db, member),
+    }
+
+
+def _profile_family(db: Session, member: Member) -> dict:
+    masters = _member_master_details(db, member)
+    return {
+        "father_name": member.father_name or member.father_husband_name,
+        "father_membership_number": member.father_membership_number,
+        "mother_name": member.mother_name,
+        "mother_membership_number": member.mother_membership_number,
+        "is_married": member.is_married,
+        "spouse_name": member.spouse_name,
+        "spouse_membership_number": member.spouse_membership_number,
+        "has_children": member.has_children,
+        "children": member.children_details or [],
+        "family_membership_number": member.family_membership_number,
+        "family_membership_name": member.family_membership_name,
+        "referred_by_number": member.referred_by_number,
+        "referred_by_name": member.referred_by_name,
+        "referred_by": masters.get("referred_by"),
+    }
+
+
+def _profile_membership(db: Session, member: Member) -> dict:
+    from models.masters import MembershipType
+    from models.members import MembershipTypeHistory
+    from services import membership_credit
+
+    mid = member.id
+    rows = (
+        db.query(MemberMembership, MembershipType)
+        .join(MembershipType, MembershipType.id == MemberMembership.membership_type_id)
+        .filter(MemberMembership.member_id == mid, MemberMembership.is_deleted == False)  # noqa: E712
+        .order_by(MemberMembership.applied_at.desc())
+        .all()
+    )
+    memberships = []
+    for m, t in rows:
+        price = active_price(db, t.id)
+        memberships.append({
+            "id": m.id, "membership_type_id": t.id, "type_code": t.code, "type_name_en": t.name_en,
+            "type_name_kn": t.name_kn, "membership_number": m.membership_number, "status": m.status,
+            "applied_at": m.applied_at, "activated_at": m.activated_at, "expires_at": m.expires_at,
+            "current_price": float(price.amount) if price else None,
+        })
+    names = {t.id: t.name_en for t in db.query(MembershipType).all()}
+    changes = (
+        db.query(MembershipTypeHistory)
+        .filter(MembershipTypeHistory.member_id == mid)
+        .order_by(MembershipTypeHistory.changed_at.desc())
+        .all()
+    )
+    return {
+        "memberships": memberships,
+        "membership_credit": membership_credit.summary(db, mid),
+        "type_changes": [
+            {
+                "old_type": names.get(h.old_type_id), "new_type": names.get(h.new_type_id),
+                "old_price": float(h.old_price) if h.old_price is not None else None,
+                "new_price": float(h.new_price) if h.new_price is not None else None,
+                "receipt_id": h.receipt_id, "changed_at": h.changed_at, "reason": h.reason,
+            }
+            for h in changes
+        ],
+    }
+
+
+def _profile_receipts(db: Session, member: Member, page: int, limit: int) -> dict:
+    from models.receipts import Receipt, ReceiptAllocation
+
+    q = (
+        db.query(ReceiptAllocation, Receipt)
+        .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
+        .filter(ReceiptAllocation.member_id == member.id, ReceiptAllocation.is_deleted == False)  # noqa: E712
+        .order_by(Receipt.receipt_date.desc(), Receipt.id.desc())
+    )
+    total = q.count()
+    rows = q.offset((page - 1) * limit).limit(limit).all()
+    return {
+        "total": total, "page": page, "limit": limit,
+        "data": [
+            {
+                "receipt_id": r.id, "receipt_number": r.receipt_number, "receipt_date": r.receipt_date,
+                "receipt_type": r.receipt_type, "net_amount": float(r.net_amount),
+                "payment_status": r.payment_status, "payment_mode": r.payment_mode,
+                "allocated_amount": float(a.allocated_amount),
+            }
+            for a, r in rows
+        ],
+    }
+
+
+def _profile_magazine(db: Session, member: Member) -> dict:
+    from models.magazines import MagazineReturn, MagazineSubscription
+
+    subs = (
+        db.query(MagazineSubscription)
+        .filter(MagazineSubscription.member_id == member.id, MagazineSubscription.is_deleted == False)  # noqa: E712
+        .all()
+    )
+    ids = [x.id for x in subs]
+    returns = (
+        db.query(MagazineReturn)
+        .filter(MagazineReturn.subscription_id.in_(ids), MagazineReturn.is_deleted == False)  # noqa: E712
+        .order_by(MagazineReturn.return_date.desc())
+        .all()
+        if ids else []
+    )
+    opted = (
+        db.query(MemberServiceOptin, ServiceType)
+        .join(ServiceType, ServiceType.id == MemberServiceOptin.service_type_id)
+        .filter(MemberServiceOptin.member_id == member.id, MemberServiceOptin.is_deleted == False,  # noqa: E712
+                MemberServiceOptin.status == "ACTIVE")
+        .order_by(ServiceType.name_en)
+        .all()
+    )
+    return {
+        "magazine_needed": member.magazine_needed,
+        "subscriptions": [
+            {"id": x.id, "delivery_status": x.delivery_status, "address_override": x.address_override, "notes": x.notes}
+            for x in subs
+        ],
+        "returns": [
+            {"id": r.id, "subscription_id": r.subscription_id, "issue_month_year": r.issue_month_year,
+             "return_date": r.return_date, "return_reason": r.return_reason, "follow_up_status": r.follow_up_status}
+            for r in returns
+        ],
+        "services": [
+            {"id": o.id, "service_code": t.code, "service_name_en": t.name_en, "status": o.status,
+             "opted_at": o.opted_at, "opted_via": o.opted_via, "notes": o.notes}
+            for o, t in opted
+        ],
+    }
+
+
+def _profile_events(db: Session, member: Member) -> dict:
+    from models.events import Event, EventMemberLink, EventParticipant
+
+    links = (
+        db.query(EventMemberLink, Event)
+        .join(Event, Event.id == EventMemberLink.event_id)
+        .filter(EventMemberLink.member_id == member.id)
+        .order_by(Event.event_date.desc())
+        .all()
+    )
+    guests = (
+        db.query(EventParticipant, Event)
+        .join(Event, Event.id == EventParticipant.event_id)
+        .filter(EventParticipant.member_id == member.id, EventParticipant.is_deleted == False,  # noqa: E712
+                Event.is_deleted == False)  # noqa: E712
+        .order_by(Event.event_date.desc())
+        .all()
+    )
+    return {
+        "events": [{"event_id": e.id, "title": e.title, "event_date": e.event_date, "role": l.role} for l, e in links],
+        "guests_and_honours": [
+            {"event_id": e.id, "event_title": e.title, "event_date": e.event_date, "location": e.location,
+             "participant_type": p.participant_type, "role": p.participant_role,
+             "honoured_as": p.participant_role if p.participant_type == "HONOURED" else None}
+            for p, e in guests
+        ],
+    }
+
+
+def _profile_history(db: Session, member: Member) -> dict:
+    from models.members import MemberProfileHistory
+
+    changes = (
+        db.query(MemberProfileHistory)
+        .filter(MemberProfileHistory.member_id == member.id)
+        .order_by(MemberProfileHistory.changed_at.desc())
+        .limit(100)
+        .all()
+    )
+    approvals = (
+        db.query(MemberApprovalHistory)
+        .filter(MemberApprovalHistory.member_id == member.id, MemberApprovalHistory.is_deleted == False)  # noqa: E712
+        .order_by(MemberApprovalHistory.acted_at.desc())
+        .all()
+    )
+    return {
+        "profile_changes": [
+            {"field": h.field_name, "old_value": h.old_value, "new_value": h.new_value,
+             "changed_at": h.changed_at, "changed_by": h.changed_by}
+            for h in changes
+        ],
+        "approvals": [{c.name: getattr(a, c.name) for c in MemberApprovalHistory.__table__.columns} for a in approvals],
+    }
+
+
+@router.get("/{id}/profile/{section}")
+def read_member_profile_section(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    id: int,
+    section: str,
+    page: int = 1,
+    limit: int = 20,
+) -> Any:
+    """One tab of the member profile (summary, personal, contact, family, membership, receipts, magazine, events,
+    history). The activity timeline has its own call: GET /activity/members/{id}/timeline."""
+    if section not in PROFILE_SECTIONS:
+        raise HTTPException(status_code=404, detail="Unknown profile section")
+    member = crud_members.member.get(db=db, id=id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    page = max(page, 1)
+    limit = min(max(limit, 1), 100)
+    if section == "receipts":
+        return _profile_receipts(db, member, page, limit)
+    builders = {
+        "summary": _profile_summary, "personal": _profile_personal, "contact": _profile_contact,
+        "family": _profile_family, "membership": _profile_membership, "magazine": _profile_magazine,
+        "events": _profile_events, "history": _profile_history,
+    }
+    return builders[section](db, member)
+
+
 @router.post("/profile-changes/", response_model=schemas_members.MemberProfileChangeRequest)
 def request_profile_change(
     *,

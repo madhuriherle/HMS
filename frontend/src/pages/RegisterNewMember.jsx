@@ -30,7 +30,7 @@ import {
   loadQualifications,
   loadPaymentModeConfigs
 } from '../utils/serverData';
-import { validateInternationalPhone } from '../utils/phoneValidation';
+import { validateInternationalPhone, maxPhoneDigits } from '../utils/phoneValidation';
 import useLists, { useCountryCodes } from '../hooks/useLists';
 import { toISODate } from '../utils/dateUtils';
 import DateInput from '../components/DateInput';
@@ -537,6 +537,7 @@ export default function RegisterNewMember() {
     if (dialDigits && cleanVal.startsWith(dialDigits) && cleanVal.length > dialDigits.length + 5) {
       cleanVal = cleanVal.slice(dialDigits.length);
     }
+    cleanVal = cleanVal.slice(0, maxPhoneDigits(formData.mobileCountryIso || 'IN'));
 
     setFormData((prev) => ({
       ...prev,
@@ -549,12 +550,26 @@ export default function RegisterNewMember() {
     }
   };
 
+  // Tell the user straight away (on leaving the field) when a number is not valid for the chosen country.
+  const checkPhoneField = (field) => {
+    const isMobile = field === 'mobile';
+    const number = isMobile ? formData.mobile : formData.whatsappNumber;
+    if (!number || !String(number).trim()) return; // blank: the submit check decides (mobile is required)
+    const result = validateInternationalPhone(
+      number,
+      (isMobile ? formData.mobileCountryIso : formData.whatsappCountryIso) || 'IN',
+      (isMobile ? formData.mobileCountryCode : formData.whatsappCountryCode) || '+91'
+    );
+    setFormErrors((prev) => ({ ...prev, [field]: result.isValid ? '' : result.errorMsg }));
+  };
+
   const handleWhatsAppChange = (val) => {
     let cleanVal = val.replace(/[^\d]/g, '');
     const dialDigits = (formData.whatsappCountryCode || '').replace(/\D/g, '');
     if (dialDigits && cleanVal.startsWith(dialDigits) && cleanVal.length > dialDigits.length + 5) {
       cleanVal = cleanVal.slice(dialDigits.length);
     }
+    cleanVal = cleanVal.slice(0, maxPhoneDigits(formData.whatsappCountryIso || 'IN'));
 
     setFormData((prev) => ({
       ...prev,
@@ -1174,6 +1189,7 @@ export default function RegisterNewMember() {
                             type="tel"
                             value={formData.mobile}
                             onChange={(e) => handleMobileChange(e.target.value)}
+                            onBlur={() => checkPhoneField('mobile')}
 
                             className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${formErrors.mobile ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
                               }`}
@@ -1220,6 +1236,7 @@ export default function RegisterNewMember() {
                             type="tel"
                             value={formData.whatsappNumber}
                             onChange={(e) => handleWhatsAppChange(e.target.value)}
+                            onBlur={() => checkPhoneField('whatsappNumber')}
 
                             readOnly={isWhatsAppSameAsMobile}
                             className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${isWhatsAppSameAsMobile

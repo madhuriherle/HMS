@@ -6381,8 +6381,13 @@ def test_membership_credit_auto_upgrade_with_remaining_carried(client, admin_hea
     assert c["remaining_amount"] == 500 and c["amount_to_next_type"] == 3500 and c["upgrade_pending"] is False
     assert client.get(f"/api/v1/members/{mid}/profile", headers=H).json()["membership_credit"]["credit_total"] == 1500
 
-    # a general donation counts too: 1500 + 3500 = 5000 -> Mahaposhaka, nothing left over
-    donation = pay(3500, "GENERAL_DONATION")
+    # a donation does not count: 1500 stays 1500 and the member stays Poshaka
+    pay(3500, "GENERAL_DONATION")
+    c = credit()
+    assert c["credit_total"] == 1500 and c["current_type"]["code"] == "LAD_POSHAKA"
+
+    # paying for the membership does: 1500 + 3500 = 5000 -> Mahaposhaka, nothing left over
+    donation = pay(3500)
     c = credit()
     assert c["current_type"]["code"] == "LAD_MAHA" and c["remaining_amount"] == 0 and c["next_type"] is None
 
@@ -6390,17 +6395,15 @@ def test_membership_credit_auto_upgrade_with_remaining_carried(client, admin_hea
     hist = client.get(f"/api/v1/members/{mid}/profile", headers=H).json()
     assert any(m["membership_type_id"] == maha["id"] for m in hist["memberships"])
 
-    # every fund counts by default (Don 1-3, P.Nidhi, scholarship), but a
-    # magazine payment is a purchase, not giving
+    # only the membership fee and the upgrade difference count by default; donations, funds and magazine do not
     settings = client.get("/api/v1/masters/membership-credit-settings", headers=H).json()
-    assert {"DONATION_1", "DONATION_2", "DONATION_3", "P_NIDHI", "SCHOLARSHIP", "MEMBERSHIP"} <= set(settings["receipt_types"])
-    assert "MAGAZINE" not in settings["receipt_types"]
+    assert set(settings["receipt_types"]) == {"MEMBERSHIP", "TYPE_CHANGE"}
     pay(100, "MAGAZINE")
-    assert credit()["credit_total"] == 5000
     pay(100, "DONATION_1"); pay(100, "DONATION_2"); pay(100, "DONATION_3"); pay(100, "P_NIDHI"); pay(300, "SCHOLARSHIP")
-    assert credit()["credit_total"] == 5700
+    assert credit()["credit_total"] == 5000
 
-    # extra money beyond the top type is kept as remaining
+    # extra membership money beyond the top type is kept as remaining
+    pay(700)
     assert credit()["remaining_amount"] == 700 and credit()["current_type"]["code"] == "LAD_MAHA"
 
     # cancelling a receipt never downgrades; the summary just shows the shortfall
@@ -6440,7 +6443,8 @@ def test_membership_credit_checkbox_options_api(client, admin_headers):
     opts = {o["code"]: o for o in cfg["options"]}
     assert {"MEMBERSHIP", "TYPE_CHANGE", "GENERAL_DONATION", "DONATION_1", "DONATION_2", "DONATION_3", "P_NIDHI",
             "SCHOLARSHIP", "MAGAZINE", "EVENT", "OTHER"} <= set(opts)
-    assert opts["P_NIDHI"]["label"] == "P. Nidhi" and opts["P_NIDHI"]["selected"] is True and opts["P_NIDHI"]["default"] is True
+    assert opts["P_NIDHI"]["label"] == "P. Nidhi" and opts["P_NIDHI"]["selected"] is False and opts["P_NIDHI"]["default"] is False
+    assert opts["MEMBERSHIP"]["selected"] is True and opts["TYPE_CHANGE"]["selected"] is True
     assert opts["MAGAZINE"]["selected"] is False and opts["MAGAZINE"]["default"] is False
 
     # untick everything but membership + P.Nidhi, save, read back
@@ -6590,5 +6594,31 @@ def test_lists_come_from_the_lookup_table(client, admin_headers):
     assert lists["receipt_statuses"][0]["extra"] == "chip-warn"
     india = next(c for c in lists["country_codes"] if c["code"] == "IN")
     assert india["label"] == "India" and india["extra"] == "+91"
+    lengths = {r["code"]: r["extra"] for r in lists["phone_lengths"]}
+    assert lengths["PE"] == "8-11" and lengths["JM"] == "10-10"
+    assert lengths["IN"] == "10-10" and lengths["US"] == "10-10" and lengths["AE"] == "8-9"
+    assert set(lengths) == {c["code"] for c in lists["country_codes"]}
     assert client.get("/api/v1/meta/lists").status_code == 401
     assert isinstance(client.get("/api/v1/meta/pin-prefixes", headers=admin_headers).json(), list)
+
+
+def test_member_profile_comes_one_tab_at_a_time(client, admin_headers):
+    H = admin_headers
+    m = _create_member(client, H, "9677777701", "Tabbed Person")
+    mid = m["id"]
+    summary = client.get(f"/api/v1/members/{mid}/profile/summary", headers=H)
+    assert summary.status_code == 200, summary.text
+    body = summary.json()
+    assert body["id"] == mid and body["first_name_en"] == "Tabbed Person" and set(body["counts"]) == {
+        "family", "membership", "receipts", "magazine", "events"}
+    assert body["membership_credit"] is not None and body["paid_so_far"] == 0
+    for section in ("personal", "contact", "family", "membership", "magazine", "events", "history"):
+        r = client.get(f"/api/v1/members/{mid}/profile/{section}", headers=H)
+        assert r.status_code == 200, (section, r.text)
+    assert "whatsapp_number" in client.get(f"/api/v1/members/{mid}/profile/contact", headers=H).json()
+    assert "memberships" in client.get(f"/api/v1/members/{mid}/profile/membership", headers=H).json()
+    rc = client.get(f"/api/v1/members/{mid}/profile/receipts", headers=H, params={"limit": 5}).json()
+    assert rc["total"] == 0 and rc["data"] == [] and rc["limit"] == 5
+    assert client.get(f"/api/v1/members/{mid}/profile/nope", headers=H).status_code == 404
+    assert client.get("/api/v1/members/999999/profile/summary", headers=H).status_code == 404
+    assert client.get(f"/api/v1/members/{mid}/profile/summary").status_code == 401

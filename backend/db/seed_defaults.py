@@ -46,13 +46,13 @@ SUB_MODULE_AREAS = {
             ("GET", r"^/members/?$", "not-unapproved"),
             ("GET", r"^/members/export-labels/?$"),
             ("GET", r"^/members/documents/\d+/file/?$"),
-            ("GET", r"^/members/\d+(/(family|services|donations|profile|membership-credit|documents|service-optins))?/?$"),
+            ("GET", r"^/members/\d+(/(family|services|donations|profile(/[a-z]+)?|membership-credit|documents|service-optins))?/?$"),
             ("PUT|DELETE", r"^/members/\d+/?$"),
         ]),
         ("members.unapproved", "Unapproved Members", [
             ("GET", r"^/members/?$", "unapproved"),
             ("GET", r"^/members/documents/\d+/file/?$"),
-            ("GET", r"^/members/\d+(/(family|services|donations|profile|membership-credit|documents|service-optins))?/?$"),
+            ("GET", r"^/members/\d+(/(family|services|donations|profile(/[a-z]+)?|membership-credit|documents|service-optins))?/?$"),
             ("PUT|POST", r"^/members/\d+/(approve|request-activation)/?$"),
         ]),
         ("members.register", "Register New Member", [
@@ -79,6 +79,9 @@ SUB_MODULE_AREAS = {
     ],
     "system": [
         ("system.number_formats", "Number Formats", ["/system/number-formats"]),
+        # Settings hub tools. Read = look, Write = restore / delete / clear (the Super Admin hands these out)
+        ("system.recycle_bin", "Recycle Bin", ["/system/recycle-bin"]),
+        ("system.cleanup", "Data Cleanup", ["/system/cleanup"]),
     ],
     "engagements": [
         ("engagements.affiliations", "Affiliations", ["/engagements/affiliations"]),
@@ -93,6 +96,8 @@ AREA_ACTIONS = {
     "members.register": ("write",),
     "receipts.entry": ("read", "write"),
     "system.number_formats": ("read", "write"),
+    "system.recycle_bin": ("read", "write"),
+    "system.cleanup": ("read", "write"),
 }
 
 # Modules whose screens are not built yet: switched off (status = false) by migration 0032
@@ -123,6 +128,12 @@ MODULE_CATALOG = [
     ("engagements", "Affiliation, Associates & Press", None, "/engagements", "link", 100, None),
     ("imports", "Imports", None, "/imports", "upload", 110, None),
     ("system", "Settings", None, None, "settings", 120, 1),  # holds Organisation Settings (a Masters page) and future screens
+]
+# Settings tools reached from the System Settings page (no sidebar entry of their own, so no route).
+# Data Cleanup is also locked to rank 1 roles, whatever a role is granted.
+MODULE_CATALOG += [
+    ("system.recycle_bin", "Recycle Bin", "system", None, None, 4, None),
+    ("system.cleanup", "Data Cleanup", "system", None, None, 5, 1),
 ]
 MODULE_CATALOG += [  # sub-modules of Affiliation, Associates & Press (no menu page yet, so no route)
     (code, label, parent, route, icon, order, rank)
@@ -287,6 +298,7 @@ MENU_PAGE_CATALOG = [
     ("masters.membership_types", "Membership Types", "masters", "/dashboard/master/membership-type", "badge", 2, "masters.membership_types.read", None),
     ("masters.particulars", "Particulars Master", "masters", "/dashboard/master/receipt-type", "list-checks", 3, "masters.particulars.read", None),
     ("system.number_formats", "Number Formats", "system", "/dashboard/system/number-formats", "list-checks", 2, "system.number_formats.read", None),
+    ("system.hub", "System Settings", "system", "/dashboard/settings", "settings", 0, "system.read", None),
     ("masters.organisation", "Organisation Settings", "system", "/dashboard/master/organisation-settings", "building", 1, "system.read", None),
     ("masters.payment_modes", "Payment Mode Setup", "masters", "/dashboard/master/payment-modes", "credit-card", 5, "masters.payment_modes.read", None),
     ("masters.banks", "Bank Master", "masters", "/dashboard/master/banks", "building", 6, "masters.banks.read", None),

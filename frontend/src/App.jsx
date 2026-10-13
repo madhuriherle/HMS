@@ -19,6 +19,9 @@ import UnapprovedMembership from './pages/UnapprovedMembership';
 import AssignedApprovals from './pages/AssignedApprovals';
 import OrganisationSettings from './pages/OrganisationSettings';
 import NumberFormats from './pages/NumberFormats';
+import SystemSettings from './pages/SystemSettings';
+import RecycleBin from './pages/RecycleBin';
+import DataCleanup from './pages/DataCleanup';
 import BankDetailsManagement from './pages/BankDetailsManagement';
 import Approvals from './pages/Approvals';
 import RegisterNewMember from './pages/RegisterNewMember';
@@ -91,7 +94,9 @@ function App() {
           <Route path="system/number-formats" element={<NumberFormats />} />
           <Route path="master/organisation" element={<OrganisationSettings />} />
           <Route path="settings/organisation" element={<OrganisationSettings />} />
-          <Route path="settings" element={<OrganisationSettings />} />
+          <Route path="settings" element={<SystemSettings />} />
+          <Route path="settings/recycle-bin" element={<RecycleBin />} />
+          <Route path="settings/cleanup" element={<DataCleanup />} />
           <Route path="master/payment-modes" element={<BankDetailsManagement />} />
           <Route path="master/banks" element={<BankMaster />} />
           {/* <Route path="master/personal-masters" element={<PersonalMasters />} /> */}

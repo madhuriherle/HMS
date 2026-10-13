@@ -1443,6 +1443,16 @@ export default function ReceiptEntry() {
                   </h2>
                 </div>
               </div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  Active
+                </span>
+                {financialYear && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-stone-100 text-stone-700 border border-stone-200">
+                    FY: {financialYear}
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* Form Fields */}
@@ -1632,7 +1642,7 @@ export default function ReceiptEntry() {
                   {/* PAN */}
                   <div>
                     <label className="block text-xs font-bold text-[#180200] mb-1">
-                      PAN
+                      PAN <span className="font-normal text-[#863221]/70">(optional)</span>
                     </label>
                     <input
                       type="text"
@@ -1652,187 +1662,195 @@ export default function ReceiptEntry() {
                   </div>
                 </div>
 
-                {/* Row 4: Particulars, Sub-Type, Amount (same layout as the extra lines) */}
-                <div className="grid grid-cols-12 gap-3 items-start">
-                {/* Particulars */}
-                <div className={`col-span-12 ${showSubField ? 'sm:col-span-4' : 'sm:col-span-8'}`}>
-                  <label className="block text-xs font-bold text-[#180200] mb-1">
-                    Particulars <span className="text-[#ED4636]">*</span>
-                  </label>
-                  <select
-                    name="particulars"
-                    value={formData.particulars}
-                    onChange={handleParticularsChange}
-                    className={`w-full px-2 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white cursor-pointer transition-colors ${formErrors.particulars
-                      ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                      : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                      }`}
-                  >
-                    {activeParticulars.map((opt) => (
-                      <option key={opt.id || opt.name} value={opt.name}>
-                        {opt.name}
-                      </option>
-                    ))}
-                  </select>
-                  {formErrors.particulars && (
-                    <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 shrink-0" />
-                      {formErrors.particulars}
-                    </p>
-                  )}
-                </div>
-
-                  {/* Sub-type / Others description */}
-                  {showSubField && (
-                    <div className="col-span-12 sm:col-span-4">
+                {/* Row 4: Particulars, Sub-Type, Amount & Add Item */}
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-12 gap-3 items-end">
+                    {/* Particulars */}
+                    <div className={`col-span-12 ${showSubField ? 'sm:col-span-4' : 'sm:col-span-5'}`}>
                       <label className="block text-xs font-bold text-[#180200] mb-1">
-                        {hasSubTypeSelect ? 'Sub-Type' : 'Description'} <span className="text-[#ED4636]">*</span>
+                        Particulars <span className="text-[#ED4636]">*</span>
                       </label>
-                      {hasSubTypeSelect ? (
-                        <select
-                          name="donationSubType"
-                          value={formData.donationSubType}
-                          onChange={handleInputChange}
-                          className={`w-full px-2 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white cursor-pointer transition-colors ${formErrors.donationSubType
-                            ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                            : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                            }`}
-                        >
-                          <option value="">Select sub-type</option>
-                          {activeSubTypes.map((st) => (
-                            <option key={st.id || st.name} value={st.name}>
-                              {st.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type="text"
-                          name="othersDescription"
-                          value={formData.othersDescription}
-                          onChange={handleInputChange}
-                          className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none transition-colors ${formErrors.othersDescription
-                            ? 'bg-[#FAF7F2] border border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                            : 'bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                            }`}
-                        />
-                      )}
-                      {(hasSubTypeSelect ? formErrors.donationSubType : formErrors.othersDescription) && (
+                      <select
+                        name="particulars"
+                        value={formData.particulars}
+                        onChange={handleParticularsChange}
+                        className={`w-full px-2 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white cursor-pointer transition-colors ${formErrors.particulars
+                          ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
+                          : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                          }`}
+                      >
+                        {activeParticulars.map((opt) => (
+                          <option key={opt.id || opt.name} value={opt.name}>
+                            {opt.name}
+                          </option>
+                        ))}
+                      </select>
+                      {formErrors.particulars && (
                         <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
                           <AlertCircle className="w-3 h-3 shrink-0" />
-                          {hasSubTypeSelect ? formErrors.donationSubType : formErrors.othersDescription}
+                          {formErrors.particulars}
                         </p>
                       )}
                     </div>
-                  )}
 
-                {/* 9. Amount */}
-                <div className="col-span-12 sm:col-span-3">
-                  <label className="block text-xs font-bold text-[#180200] mb-1">
-                    Amount <span className="text-[#ED4636]">*</span>
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm font-bold text-[#863221]/70">
-                      ₹
-                    </span>
-                    <input
-                      type="text"
-                      name="amount"
-                      value={formData.amount}
-                      onChange={handleInputChange}
-
-                      className={`w-full pl-7 pr-3 py-2 border rounded-xl text-xs sm:text-sm font-mono font-bold text-[#180200] focus:outline-none focus:bg-white transition-colors ${formErrors.amount
-                        ? 'bg-red-50/20 border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                        : 'bg-[#FAF7F2] border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                        }`}
-                    />
-                  </div>
-                  {formErrors.amount && (
-                    <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 shrink-0" />
-                      {formErrors.amount}
-                    </p>
-                  )}
-                  {formData.amount && Number(formData.amount) > 0 && (
-                    <p className="text-[10px] text-[#863221]/80 italic mt-1 truncate" title={numberToWords(formData.amount)}>
-                      {numberToWords(formData.amount)}
-                    </p>
-                  )}
-                </div>
-                <div className="hidden sm:block sm:col-span-1" />
-                </div>
-
-                {/* More particulars on the same receipt */}
-                <div className="space-y-2">
-                  {extraLines.map((l, idx) => {
-                    const subs = activeSubTypesOf(l.particular);
-                    return (
-                      <div key={l.key} className="grid grid-cols-12 gap-3 items-start">
-                        <div className={`col-span-12 ${subs.length > 0 || isOthersName(l.particular) ? 'sm:col-span-4' : 'sm:col-span-6'}`}>
-                          <label className="block text-xs font-bold text-[#180200] mb-1">Particulars</label>
+                    {/* Sub-type / Others description */}
+                    {showSubField && (
+                      <div className="col-span-12 sm:col-span-4">
+                        <label className="block text-xs font-bold text-[#180200] mb-1">
+                          {hasSubTypeSelect ? 'Sub-Type' : 'Description'} <span className="text-[#ED4636]">*</span>
+                        </label>
+                        {hasSubTypeSelect ? (
                           <select
-                            value={l.particular}
-                            onChange={(e) => updateExtraLine(l.key, { particular: e.target.value, subType: '', description: '' })}
-                            className="w-full px-2 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
+                            name="donationSubType"
+                            value={formData.donationSubType}
+                            onChange={handleInputChange}
+                            className={`w-full px-2 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white cursor-pointer transition-colors ${formErrors.donationSubType
+                              ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
+                              : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                              }`}
                           >
-                            <option value="">Select</option>
-                            {activeParticulars.map((opt) => (
-                              <option key={opt.id || opt.name} value={opt.name}>{opt.name}</option>
+                            <option value="">Select sub-type</option>
+                            {activeSubTypes.map((st) => (
+                              <option key={st.id || st.name} value={st.name}>
+                                {st.name}
+                              </option>
                             ))}
                           </select>
-                        </div>
-                        {/* Sub-type / Others description only; a plain particular needs no details */}
-                        {(subs.length > 0 || isOthersName(l.particular)) && (
-                        <div className="col-span-12 sm:col-span-4">
-                          <label className="block text-xs font-bold text-[#180200] mb-1">
-                            {subs.length > 0 ? 'Sub-Type' : 'Description'}
-                          </label>
-                          {subs.length > 0 ? (
-                            <select
-                              value={l.subType}
-                              onChange={(e) => updateExtraLine(l.key, { subType: e.target.value })}
-                              className="w-full px-2 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
-                            >
-                              <option value="">Select sub-type</option>
-                              {subs.map((st) => (
-                                <option key={st.id || st.name} value={st.name}>{st.name}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              type="text"
-                              value={l.description}
-                              onChange={(e) => updateExtraLine(l.key, { description: e.target.value })}
-                              className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
-                            />
-                          )}
-                        </div>
+                        ) : (
+                          <input
+                            type="text"
+                            name="othersDescription"
+                            value={formData.othersDescription}
+                            onChange={handleInputChange}
+                            className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none transition-colors ${formErrors.othersDescription
+                              ? 'bg-[#FAF7F2] border border-[#ED4636] ring-1 ring-[#ED4636]/30'
+                              : 'bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                              }`}
+                          />
                         )}
-                        <div className={`col-span-10 ${subs.length > 0 || isOthersName(l.particular) ? 'sm:col-span-3' : 'sm:col-span-5'}`}>
-                          <label className="block text-xs font-bold text-[#180200] mb-1">Amount</label>
-                          <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#863221]/70">₹</span>
-                            <input
-                              type="text"
-                              value={l.amount}
-                              onChange={(e) => updateExtraLine(l.key, { amount: e.target.value.replace(/\D/g, '') })}
-                              className="w-full pl-7 pr-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm font-mono font-bold text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
-                            />
-                          </div>
-                        </div>
-                        <div className="col-span-2 sm:col-span-1 flex sm:justify-end pt-6">
-                          <button
-                            type="button"
-                            title="Remove this line"
-                            onClick={() => setExtraLines((prev) => prev.filter((x) => x.key !== l.key))}
-                            className="p-2 rounded-lg text-[#ED4636] hover:bg-red-50 cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                        {(hasSubTypeSelect ? formErrors.donationSubType : formErrors.othersDescription) && (
+                          <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3 shrink-0" />
+                            {hasSubTypeSelect ? formErrors.donationSubType : formErrors.othersDescription}
+                          </p>
+                        )}
                       </div>
-                    );
-                  })}
+                    )}
+
+                    {/* Amount */}
+                    <div className={`col-span-7 ${showSubField ? 'sm:col-span-3' : 'sm:col-span-4'}`}>
+                      <label className="block text-xs font-bold text-[#180200] mb-1">
+                        Amount <span className="text-[#ED4636]">*</span>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm font-bold text-[#863221]/70">
+                          ₹
+                        </span>
+                        <input
+                          type="text"
+                          name="amount"
+                          value={formData.amount}
+                          onChange={handleInputChange}
+                          className={`w-full pl-7 pr-3 py-2 border rounded-xl text-xs sm:text-sm font-mono font-bold text-[#180200] focus:outline-none focus:bg-white transition-colors ${formErrors.amount
+                            ? 'bg-red-50/20 border-[#ED4636] ring-1 ring-[#ED4636]/30'
+                            : 'bg-[#FAF7F2] border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                            }`}
+                        />
+                      </div>
+                      {formErrors.amount && (
+                        <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          {formErrors.amount}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Add Item button inline */}
+                    <div className={`col-span-5 ${showSubField ? 'sm:col-span-1' : 'sm:col-span-3'} pb-0.5`}>
+                      <button
+                        type="button"
+                        onClick={() => setExtraLines((prev) => [...prev, emptyLine()])}
+                        className="inline-flex items-center gap-1 px-2.5 py-2 text-xs font-bold text-[#510601] hover:text-[#180200] transition-colors cursor-pointer whitespace-nowrap"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Add Item</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Extra Lines if any */}
+                  {extraLines.length > 0 && (
+                    <div className="space-y-2 pt-1 border-t border-dashed border-[#E8DFD8]">
+                      {extraLines.map((l) => {
+                        const subs = activeSubTypesOf(l.particular);
+                        return (
+                          <div key={l.key} className="grid grid-cols-12 gap-3 items-end">
+                            <div className={`col-span-12 ${subs.length > 0 || isOthersName(l.particular) ? 'sm:col-span-4' : 'sm:col-span-5'}`}>
+                              <label className="block text-xs font-bold text-[#180200] mb-1">Particulars</label>
+                              <select
+                                value={l.particular}
+                                onChange={(e) => updateExtraLine(l.key, { particular: e.target.value, subType: '', description: '' })}
+                                className="w-full px-2 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
+                              >
+                                <option value="">Select</option>
+                                {activeParticulars.map((opt) => (
+                                  <option key={opt.id || opt.name} value={opt.name}>{opt.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                            {(subs.length > 0 || isOthersName(l.particular)) && (
+                              <div className="col-span-12 sm:col-span-4">
+                                <label className="block text-xs font-bold text-[#180200] mb-1">
+                                  {subs.length > 0 ? 'Sub-Type' : 'Description'}
+                                </label>
+                                {subs.length > 0 ? (
+                                  <select
+                                    value={l.subType}
+                                    onChange={(e) => updateExtraLine(l.key, { subType: e.target.value })}
+                                    className="w-full px-2 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
+                                  >
+                                    <option value="">Select sub-type</option>
+                                    {subs.map((st) => (
+                                      <option key={st.id || st.name} value={st.name}>{st.name}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={l.description}
+                                    onChange={(e) => updateExtraLine(l.key, { description: e.target.value })}
+                                    className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
+                                  />
+                                )}
+                              </div>
+                            )}
+                            <div className={`col-span-9 ${subs.length > 0 || isOthersName(l.particular) ? 'sm:col-span-3' : 'sm:col-span-5'}`}>
+                              <label className="block text-xs font-bold text-[#180200] mb-1">Amount</label>
+                              <div className="relative">
+                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#863221]/70">₹</span>
+                                <input
+                                  type="text"
+                                  value={l.amount}
+                                  onChange={(e) => updateExtraLine(l.key, { amount: e.target.value.replace(/\D/g, '') })}
+                                  className="w-full pl-7 pr-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm font-mono font-bold text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
+                                />
+                              </div>
+                            </div>
+                            <div className="col-span-3 sm:col-span-2 flex items-center justify-end pb-1">
+                              <button
+                                type="button"
+                                title="Remove this line"
+                                onClick={() => setExtraLines((prev) => prev.filter((x) => x.key !== l.key))}
+                                className="p-1.5 rounded-lg text-[#ED4636] hover:bg-red-50 cursor-pointer transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {formErrors.extraLines && (
                     <p className="text-[11px] text-[#ED4636] font-medium flex items-center gap-1">
@@ -1840,18 +1858,12 @@ export default function ReceiptEntry() {
                       {formErrors.extraLines}
                     </p>
                   )}
+                </div>
 
-                  <div className="flex flex-wrap items-end justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setExtraLines((prev) => [...prev, emptyLine()])}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#510601] border border-dashed border-[#510601]/40 rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Add
-                    </button>
-                  {/* 10. Payment Mode */}
-                  <div className="w-full sm:w-64">
+                {/* Row 5: Payment Mode, Transaction ID & Transaction Date */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Payment Mode */}
+                  <div>
                     <label className="block text-xs font-bold text-[#180200] mb-1">
                       Payment Mode <span className="text-[#ED4636]">*</span>
                     </label>
@@ -1878,30 +1890,8 @@ export default function ReceiptEntry() {
                       </p>
                     )}
                   </div>
-                  </div>
-                </div>
 
-                {/* Grand total of every particular line */}
-                <div className="bg-gradient-to-r from-[#FAF7F2] via-amber-50/50 to-orange-50/30 border border-[#E8DFD8] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
-                  <div>
-                    <div className="flex items-center gap-1.5 text-xs font-extrabold text-[#510601] uppercase tracking-wider">
-                      <Coins className="w-4 h-4 text-amber-600" />
-                      <span>Grand Total Amount</span>
-                    </div>
-                    <div className="text-[11px] font-medium text-[#863221] italic mt-0.5 truncate">
-                      {receiptTotal > 0 ? numberToWords(receiptTotal) : 'Zero Rupees Only'}
-                    </div>
-                  </div>
-                  <div className="text-right sm:self-center">
-                    <span className="text-xl sm:text-2xl font-extrabold text-[#510601] font-mono tracking-tight">
-                      {formatMoney(receiptTotal)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Row 5: Transaction ID & Transaction Date */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* 11. Transaction Id */}
+                  {/* Transaction Id */}
                   <div>
                     <label className="block text-xs font-bold text-[#180200] mb-1">
                       Transaction Id
@@ -1912,6 +1902,7 @@ export default function ReceiptEntry() {
                       value={formData.transactionId}
                       onChange={handleInputChange}
                       disabled={!formData.paymentMode || formData.paymentMode.toLowerCase() === 'cash'}
+                      placeholder={!formData.paymentMode || formData.paymentMode.toLowerCase() === 'cash' ? '' : 'e.g. UTR / Cheque'}
                       className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm font-mono text-[#180200] focus:outline-none focus:bg-white transition-colors ${!formData.paymentMode || formData.paymentMode.toLowerCase() === 'cash'
                         ? 'bg-[#FAF7F2]/50 text-stone-400 cursor-not-allowed border border-[#E8DFD8]/80'
                         : formErrors.transactionId
@@ -1927,7 +1918,7 @@ export default function ReceiptEntry() {
                     )}
                   </div>
 
-                  {/* 12. Transaction Date */}
+                  {/* Transaction Date */}
                   <div>
                     <label className="block text-xs font-bold text-[#180200] mb-1">
                       Transaction Date
@@ -1941,37 +1932,65 @@ export default function ReceiptEntry() {
                   </div>
                 </div>
 
-                {/* Row 6: Payment Received Details */}
-                <div>
-                  <label className="block text-xs font-bold text-[#180200] mb-1">
-                    Payment Received Details
-                  </label>
-                  <input
-                    type="text"
-                    name="paymentReceivedDetails"
-                    value={formData.paymentReceivedDetails}
-                    onChange={handleInputChange}
+                {/* Row 6: Payment Details & Payment Received Details */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-[#180200] mb-1">
+                      Payment Details
+                    </label>
+                    <input
+                      type="text"
+                      name="bankAccount"
+                      value={formData.bankAccount}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
+                    />
+                  </div>
 
-                    className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
-                  />
+                  <div>
+                    <label className="block text-xs font-bold text-[#180200] mb-1">
+                      Payment Received Details
+                    </label>
+                    <input
+                      type="text"
+                      name="paymentReceivedDetails"
+                      value={formData.paymentReceivedDetails}
+                      onChange={handleInputChange}
+                      className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
+                    />
+                  </div>
                 </div>
 
-                {/* Row 7: Description */}
-                <div>
-                  <label className="block text-xs font-bold text-[#180200] mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    rows={2}
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
+                {/* Row 7: Description & Grand Total Amount */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+                  <div className="flex flex-col">
+                    <label className="block text-xs font-bold text-[#180200] mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      rows={3}
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      className="w-full flex-1 min-h-[96px] px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors resize-y"
+                    />
+                  </div>
 
-                    className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors resize-y"
-                  />
+                  {/* Grand total card matching mockup */}
+                  <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-2xl p-4 flex flex-col justify-center items-center text-center shadow-2xs">
+                    <div className="text-[10px] sm:text-xs font-bold text-[#510601] uppercase tracking-wider mb-1">
+                      GRAND TOTAL AMOUNT
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-extrabold text-[#180200] font-mono tracking-tight">
+                      {formatMoney(receiptTotal)}
+                    </div>
+                    <div className="text-[11px] font-medium text-[#863221] italic mt-1 truncate max-w-full" title={receiptTotal > 0 ? numberToWords(receiptTotal) : 'Zero Rupees Only'}>
+                      {receiptTotal > 0 ? numberToWords(receiptTotal) : 'Zero Rupees Only'}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Row 8: Period (optional) - one line */}
+                {/* Row 8: Period (optional) - From Date, To Date, From Time, To Time */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
                     ['periodFromDate', 'From Date', 'date'],
@@ -1996,10 +2015,10 @@ export default function ReceiptEntry() {
 
               </div>
 
-              {/* Action Buttons (Reset, Save & New) */}
-              <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-[#E8DFD8]">
-                {!isEdit && (
-                  <label className="mr-auto flex items-center gap-2 text-xs font-semibold text-[#863221] cursor-pointer select-none">
+              {/* Action Buttons (Reset, Save & Close, Save & New) */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-[#E8DFD8]">
+                {!isEdit ? (
+                  <label className="flex items-center gap-2 text-xs font-semibold text-[#863221] cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={formData.isCancelled}
@@ -2008,26 +2027,38 @@ export default function ReceiptEntry() {
                     />
                     Cancelled
                   </label>
-                )}
+                ) : <div />}
 
-                <button
-                  type="button"
-                  onClick={isEdit ? () => navigate('/dashboard/receipts/tracking') : handleClearForm}
-                  className="px-3.5 py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] text-xs sm:text-sm font-semibold hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  {isEdit ? <X className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
-                  <span>{isEdit ? 'Cancel' : 'Reset'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={isEdit ? () => navigate('/dashboard/receipts/tracking') : handleClearForm}
+                    className="px-3.5 py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] text-xs sm:text-sm font-semibold hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    {isEdit ? <X className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                    <span>{isEdit ? 'Cancel' : 'Reset'}</span>
+                  </button>
 
-                <button
-                  type="submit"
-                  onClick={() => { saveMode.current = 'new'; }}
-                  disabled={saving || (isEdit ? !editOriginal : false) || !hasPermission(isEdit ? 'receipts.tracking.write' : 'receipts.entry.write')}
-                  className="disabled:opacity-50 px-4 py-2 rounded-xl bg-white hover:bg-amber-50/50 border border-[#510601]/40 text-[#510601] text-xs sm:text-sm font-bold shadow-2xs hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>{isEdit ? 'Save Changes' : 'Save & New'}</span>
-                </button>
+                  <button
+                    type="submit"
+                    onClick={() => { saveMode.current = 'close'; }}
+                    disabled={saving || (isEdit ? !editOriginal : false) || !hasPermission(isEdit ? 'receipts.tracking.write' : 'receipts.entry.write')}
+                    className="disabled:opacity-50 px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#180200] text-xs sm:text-sm font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <Save className="w-3.5 h-3.5 text-[#863221]" />
+                    <span>{isEdit ? 'Save Changes' : 'Save & Close'}</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    onClick={() => { saveMode.current = 'new'; }}
+                    disabled={saving || (isEdit ? !editOriginal : false) || !hasPermission(isEdit ? 'receipts.tracking.write' : 'receipts.entry.write')}
+                    className="disabled:opacity-50 px-4 py-2 rounded-xl bg-[#510601] hover:bg-[#680801] text-white text-xs sm:text-sm font-bold shadow-2xs hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <Save className="w-3.5 h-3.5 text-white" />
+                    <span>Save & New</span>
+                  </button>
+                </div>
               </div>
 
             </form>
@@ -2041,7 +2072,7 @@ export default function ReceiptEntry() {
         {/* ------------------------------------------------------------ */}
         <div className="col-span-12 lg:col-span-6 w-full space-y-4">
 
-          {(entrySource === 'unapproved-assignment' || entrySource === 'membership-assignment') && selectedMember ? (
+          {entrySource === 'unapproved-assignment' && selectedMember ? (
             /* ========================================================== */
             /* FLOW 1 STATE: MEMBER DETAILS PANEL (UNAPPROVED ASSIGNMENT)*/
             /* ========================================================== */
@@ -2292,7 +2323,7 @@ export default function ReceiptEntry() {
               </div>
 
               {/* Membership Cards Directory */}
-              <div className="h-[480px] overflow-y-auto custom-scrollbar bg-white divide-y divide-[#E8DFD8]/70">
+              <div className="p-3 sm:p-4 space-y-2.5 max-h-[540px] min-h-[460px] overflow-y-auto custom-scrollbar bg-[#FAF7F2]/30">
                 {paginatedRightMembers.length === 0 ? (
                   <div className="py-12 text-center text-[#863221]">
                     <div className="w-10 h-10 rounded-2xl bg-[#510601]/5 text-[#510601] flex items-center justify-center mx-auto mb-2 border border-[#510601]/10">
@@ -2316,34 +2347,60 @@ export default function ReceiptEntry() {
                     const memCode = String(member.membershipNumber || member.registrationNumber || member.id || '—');
                     const shortCode = memCode.includes('-') ? `#${memCode.split('-').pop()}` : `#${memCode}`;
                     const mobile = member.contactNumber || member.mobile || member.phone || '';
+                    const isAssigned = selectedMember && (
+                      String(member.id) === String(selectedMember.id) ||
+                      (member.membershipNumber && member.membershipNumber === selectedMember.membershipNumber)
+                    );
 
                     return (
                       <div
                         key={member.id || member.registrationNumber || member.membershipNumber}
-                        className="h-10 px-3 flex items-center gap-2 text-xs text-[#863221] hover:bg-[#FAF7F2]"
+                        className={`p-3 sm:p-3.5 rounded-xl border transition-all flex items-center justify-between gap-3 ${
+                          isAssigned
+                            ? 'bg-amber-50/70 border-amber-300 ring-1 ring-amber-300'
+                            : 'bg-white border-[#E8DFD8] hover:border-[#510601]/40 hover:bg-[#FAF7F2]/40'
+                        }`}
                       >
-                        <span className="font-mono font-bold text-[#510601] shrink-0" title={memCode}>{shortCode}</span>
-                        <span className="text-[#863221]/40 shrink-0">|</span>
-                        <span className="font-bold text-[#180200] truncate max-w-[40%] shrink-0">{member.fullName || member.name}</span>
-                        {mobile && (
-                          <>
-                            <span className="text-[#863221]/40 shrink-0">|</span>
-                            <span className="font-mono shrink-0">{mobile}</span>
-                          </>
-                        )}
-                        {locParts && (
-                          <>
-                            <span className="text-[#863221]/40 shrink-0">|</span>
-                            <span className="truncate min-w-0 flex-1" title={locParts}>{locParts}</span>
-                          </>
-                        )}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className="text-xs sm:text-sm font-mono font-bold text-[#510601] pr-3 border-r border-[#E8DFD8] shrink-0"
+                            title={memCode}
+                          >
+                            {shortCode}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-xs sm:text-sm font-bold text-[#180200] truncate">
+                              {member.fullName || member.name}
+                            </h4>
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-[#863221]/80 mt-0.5">
+                              {mobile && (
+                                <span className="inline-flex items-center gap-1 font-mono">
+                                  <Phone className="w-3 h-3 text-[#863221]/60 shrink-0" />
+                                  <span>{mobile}</span>
+                                </span>
+                              )}
+                              {mobile && locParts && <span className="text-[#863221]/30">|</span>}
+                              {locParts && (
+                                <span className="inline-flex items-center gap-1 truncate max-w-[200px] sm:max-w-[240px]" title={locParts}>
+                                  <MapPin className="w-3 h-3 text-[#863221]/60 shrink-0" />
+                                  <span className="truncate">{locParts}</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
                         <button
                           type="button"
                           onClick={() => handleAssignFromMembership(member)}
-                          className="ml-auto shrink-0 px-2.5 py-1 rounded-lg border border-[#510601]/40 text-[#510601] hover:bg-[#510601] hover:text-white font-semibold text-xs cursor-pointer transition-colors"
+                          className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer ${
+                            isAssigned
+                              ? 'bg-[#510601] text-white border border-[#510601]'
+                              : 'border border-[#510601]/30 text-[#510601] hover:bg-[#510601] hover:text-white'
+                          }`}
                           title="Assign this member's details into the receipt form"
                         >
-                          Assign
+                          {isAssigned ? 'Assigned' : 'Assign'}
                         </button>
                       </div>
                     );
