@@ -293,6 +293,8 @@ export default function ReceiptEntry() {
   }, [currentParticularObj]);
 
   const hasActiveSubTypes = activeSubTypes.length > 0;
+  const hasSubTypeSelect = formData.particulars === 'Donation' || hasActiveSubTypes;
+  const showSubField = hasSubTypeSelect || isOthersName(formData.particulars);
 
   // More particulars on the same receipt (the paper receipt has many lines)
   const [extraLines, setExtraLines] = useState([]);
@@ -1471,271 +1473,155 @@ export default function ReceiptEntry() {
                   </div>
                 </div>
 
-                {/* Row 3: Membership No, PAN, Particulars */}
-                {formData.particulars === 'Donation' ? (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {/* Membership No */}
-                      <div>
-                        <label className="block text-xs font-bold text-[#180200] mb-1">
-                          Membership No.
-                        </label>
-                        <input
-                          type="text"
-                          name="membershipNo"
-                          value={formData.membershipNo}
-                          onChange={handleInputChange}
-
-                          className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
-                        />
-                        <MemberLookupCard lookup={numberLookup} onUse={handleUseLookedUpMember} />
-                      </div>
-
-                      {/* PAN */}
-                      <div>
-                        <label className="block text-xs font-bold text-[#180200] mb-1">
-                          PAN
-                        </label>
-                        <input
-                          type="text"
-                          name="panNo"
-                          value={formData.panNo}
-                          onChange={handleInputChange}
-                          maxLength={10}
-
-                          className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono uppercase text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
-                        />
-                        {formErrors.panNo && (
-                          <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3 shrink-0" />
-                            {formErrors.panNo}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {/* Particulars */}
-                      <div>
-                        <label className="block text-xs font-bold text-[#180200] mb-1">
-                          Particulars <span className="text-[#ED4636]">*</span>
-                        </label>
-                        <select
-                          name="particulars"
-                          value={formData.particulars}
-                          onChange={handleParticularsChange}
-                          className={`w-full px-3 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white cursor-pointer transition-colors ${formErrors.particulars
-                            ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                            : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                            }`}
-                        >
-                          {activeParticulars.map((opt) => (
-                            <option key={opt.id || opt.name} value={opt.name}>
-                              {opt.name}
-                            </option>
-                          ))}
-                        </select>
-                        {formErrors.particulars && (
-                          <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3 shrink-0" />
-                            {formErrors.particulars}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Donation Type */}
-                      <div>
-                        <label className="block text-xs font-bold text-[#180200] mb-1">
-                          Donation Type <span className="text-[#ED4636]">*</span>
-                        </label>
-                        <select
-                          name="donationSubType"
-                          value={formData.donationSubType}
-                          onChange={handleInputChange}
-                          className={`w-full px-3 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none cursor-pointer transition-colors ${formErrors.donationSubType
-                            ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                            : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                            }`}
-                        >
-                          <option value="">Select Type</option>
-                          {activeSubTypes.map((st) => (
-                            <option key={st.id || st.name} value={st.name}>
-                              {st.name}
-                            </option>
-                          ))}
-                        </select>
-                        {formErrors.donationSubType && (
-                          <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3 shrink-0" />
-                            {formErrors.donationSubType}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Membership No */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] mb-1">
-                        Membership No.
-                      </label>
-                      <input
-                        type="text"
-                        name="membershipNo"
-                        value={formData.membershipNo}
-                        onChange={handleInputChange}
-
-                        className="w-full px-2.5 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
-                      />
-                        <MemberLookupCard lookup={numberLookup} onUse={handleUseLookedUpMember} />
-                    </div>
-
-                    {/* PAN */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] mb-1">
-                        PAN
-                      </label>
-                      <input
-                        type="text"
-                        name="panNo"
-                        value={formData.panNo}
-                        onChange={handleInputChange}
-                        maxLength={10}
-
-                        className="w-full px-2.5 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono uppercase text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
-                      />
-                      {formErrors.panNo && (
-                        <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 shrink-0" />
-                          {formErrors.panNo}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Particulars with its sub-type / Others description on the same row */}
-                {formData.particulars !== 'Donation' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Particulars */}
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] mb-1">
-                        Particulars <span className="text-[#ED4636]">*</span>
-                      </label>
-                      <select
-                        name="particulars"
-                        value={formData.particulars}
-                        onChange={handleParticularsChange}
-                        className={`w-full px-2 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white cursor-pointer transition-colors ${formErrors.particulars
-                          ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                          : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                          }`}
-                      >
-                        {activeParticulars.map((opt) => (
-                          <option key={opt.id || opt.name} value={opt.name}>
-                            {opt.name}
-                          </option>
-                        ))}
-                      </select>
-                      {formErrors.particulars && (
-                        <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 shrink-0" />
-                          {formErrors.particulars}
-                        </p>
-                      )}
-                    </div>
-
-                    {hasActiveSubTypes ? (
-                      <div>
-                        <label className="block text-xs font-bold text-[#180200] mb-1">
-                          {`${formData.particulars} Sub-Type`} <span className="text-[#ED4636]">*</span>
-                        </label>
-                        <select
-                          name="donationSubType"
-                          value={formData.donationSubType}
-                          onChange={handleInputChange}
-                          className={`w-full px-3 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none cursor-pointer transition-colors ${formErrors.donationSubType
-                            ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                            : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                            }`}
-                        >
-                          <option value="">{`Select ${formData.particulars} Sub-Type`}</option>
-                          {activeSubTypes.map((st) => (
-                            <option key={st.id || st.name} value={st.name}>
-                              {st.name}
-                            </option>
-                          ))}
-                        </select>
-                        {formErrors.donationSubType && (
-                          <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3 shrink-0" />
-                            {formErrors.donationSubType}
-                          </p>
-                        )}
-                      </div>
-                    ) : isOthersName(formData.particulars) ? (
-                    <div>
-                      <label className="block text-xs font-bold text-[#180200] mb-1">
-                        Others Description <span className="text-[#ED4636]">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        name="othersDescription"
-                        value={formData.othersDescription}
-                        onChange={handleInputChange}
-
-                        className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none transition-colors ${formErrors.othersDescription
-                          ? 'bg-[#FAF7F2] border border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                          : 'bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                          }`}
-                      />
-                      {formErrors.othersDescription && (
-                        <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 shrink-0" />
-                          {formErrors.othersDescription}
-                        </p>
-                      )}
-                    </div>
-                    ) : null}
-                  </div>
-                )}
-
-                {/* Row 4: Amount */}
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                  {/* 9. Amount */}
-                  <div className="sm:col-span-6">
+                {/* Row 3: Membership No, PAN */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Membership No */}
+                  <div>
                     <label className="block text-xs font-bold text-[#180200] mb-1">
-                      Amount <span className="text-[#ED4636]">*</span>
+                      Membership No.
                     </label>
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm font-bold text-[#863221]/70">
-                        ₹
-                      </span>
-                      <input
-                        type="text"
-                        name="amount"
-                        value={formData.amount}
-                        onChange={handleInputChange}
+                    <input
+                      type="text"
+                      name="membershipNo"
+                      value={formData.membershipNo}
+                      onChange={handleInputChange}
 
-                        className={`w-full pl-7 pr-3 py-2 border rounded-xl text-xs sm:text-sm font-mono font-bold text-[#180200] focus:outline-none focus:bg-white transition-colors ${formErrors.amount
-                          ? 'bg-red-50/20 border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                          : 'bg-[#FAF7F2] border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                          }`}
-                      />
-                    </div>
-                    {formErrors.amount && (
+                      className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
+                    />
+                    <MemberLookupCard lookup={numberLookup} onUse={handleUseLookedUpMember} />
+                  </div>
+
+                  {/* PAN */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#180200] mb-1">
+                      PAN
+                    </label>
+                    <input
+                      type="text"
+                      name="panNo"
+                      value={formData.panNo}
+                      onChange={handleInputChange}
+                      maxLength={10}
+
+                      className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono uppercase text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
+                    />
+                    {formErrors.panNo && (
                       <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
                         <AlertCircle className="w-3 h-3 shrink-0" />
-                        {formErrors.amount}
-                      </p>
-                    )}
-                    {formData.amount && Number(formData.amount) > 0 && (
-                      <p className="text-[10px] text-[#863221]/80 italic mt-1 truncate" title={numberToWords(formData.amount)}>
-                        {numberToWords(formData.amount)}
+                        {formErrors.panNo}
                       </p>
                     )}
                   </div>
+                </div>
+
+                {/* Row 4: Particulars, Sub-Type, Amount (same layout as the extra lines) */}
+                <div className="grid grid-cols-12 gap-3 items-start">
+                {/* Particulars */}
+                <div className={`col-span-12 ${showSubField ? 'sm:col-span-4' : 'sm:col-span-8'}`}>
+                  <label className="block text-xs font-bold text-[#180200] mb-1">
+                    Particulars <span className="text-[#ED4636]">*</span>
+                  </label>
+                  <select
+                    name="particulars"
+                    value={formData.particulars}
+                    onChange={handleParticularsChange}
+                    className={`w-full px-2 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white cursor-pointer transition-colors ${formErrors.particulars
+                      ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
+                      : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                      }`}
+                  >
+                    {activeParticulars.map((opt) => (
+                      <option key={opt.id || opt.name} value={opt.name}>
+                        {opt.name}
+                      </option>
+                    ))}
+                  </select>
+                  {formErrors.particulars && (
+                    <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      {formErrors.particulars}
+                    </p>
+                  )}
+                </div>
+
+                  {/* Sub-type / Others description */}
+                  {showSubField && (
+                    <div className="col-span-12 sm:col-span-4">
+                      <label className="block text-xs font-bold text-[#180200] mb-1">
+                        {hasSubTypeSelect ? 'Sub-Type' : 'Description'} <span className="text-[#ED4636]">*</span>
+                      </label>
+                      {hasSubTypeSelect ? (
+                        <select
+                          name="donationSubType"
+                          value={formData.donationSubType}
+                          onChange={handleInputChange}
+                          className={`w-full px-2 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white cursor-pointer transition-colors ${formErrors.donationSubType
+                            ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
+                            : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                            }`}
+                        >
+                          <option value="">Select sub-type</option>
+                          {activeSubTypes.map((st) => (
+                            <option key={st.id || st.name} value={st.name}>
+                              {st.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          name="othersDescription"
+                          value={formData.othersDescription}
+                          onChange={handleInputChange}
+                          className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none transition-colors ${formErrors.othersDescription
+                            ? 'bg-[#FAF7F2] border border-[#ED4636] ring-1 ring-[#ED4636]/30'
+                            : 'bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                            }`}
+                        />
+                      )}
+                      {(hasSubTypeSelect ? formErrors.donationSubType : formErrors.othersDescription) && (
+                        <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          {hasSubTypeSelect ? formErrors.donationSubType : formErrors.othersDescription}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                {/* 9. Amount */}
+                <div className="col-span-12 sm:col-span-3">
+                  <label className="block text-xs font-bold text-[#180200] mb-1">
+                    Amount <span className="text-[#ED4636]">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs sm:text-sm font-bold text-[#863221]/70">
+                      ₹
+                    </span>
+                    <input
+                      type="text"
+                      name="amount"
+                      value={formData.amount}
+                      onChange={handleInputChange}
+
+                      className={`w-full pl-7 pr-3 py-2 border rounded-xl text-xs sm:text-sm font-mono font-bold text-[#180200] focus:outline-none focus:bg-white transition-colors ${formErrors.amount
+                        ? 'bg-red-50/20 border-[#ED4636] ring-1 ring-[#ED4636]/30'
+                        : 'bg-[#FAF7F2] border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                        }`}
+                    />
+                  </div>
+                  {formErrors.amount && (
+                    <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 shrink-0" />
+                      {formErrors.amount}
+                    </p>
+                  )}
+                  {formData.amount && Number(formData.amount) > 0 && (
+                    <p className="text-[10px] text-[#863221]/80 italic mt-1 truncate" title={numberToWords(formData.amount)}>
+                      {numberToWords(formData.amount)}
+                    </p>
+                  )}
+                </div>
+                <div className="hidden sm:block sm:col-span-1" />
                 </div>
 
                 {/* More particulars on the same receipt */}
@@ -1745,7 +1631,7 @@ export default function ReceiptEntry() {
                     return (
                       <div key={l.key} className="grid grid-cols-12 gap-3 items-start">
                         <div className={`col-span-12 ${subs.length > 0 || isOthersName(l.particular) ? 'sm:col-span-4' : 'sm:col-span-6'}`}>
-                          <label className="block text-xs font-bold text-[#180200] mb-1">Particulars (line {idx + 2})</label>
+                          <label className="block text-xs font-bold text-[#180200] mb-1">Particulars</label>
                           <select
                             value={l.particular}
                             onChange={(e) => updateExtraLine(l.key, { particular: e.target.value, subType: '', description: '' })}
@@ -1824,7 +1710,7 @@ export default function ReceiptEntry() {
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#510601] border border-dashed border-[#510601]/40 rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      Add another particular
+                      Add
                     </button>
                   {/* 10. Payment Mode */}
                   <div className="w-full sm:w-64">
