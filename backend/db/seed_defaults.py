@@ -57,6 +57,7 @@ SUB_MODULE_AREAS = {
         ]),
         ("members.register", "Register New Member", [
             ("POST", r"^/members/?$"),
+            ("POST", r"^/members/bulk-import(-file)?/?$"),
             ("POST", r"^/members/\d+/(memberships|photo)/?$"),
         ]),
     ],
@@ -69,10 +70,11 @@ SUB_MODULE_AREAS = {
         ]),
         ("receipts.tracking", "Receipt Tracking", [
             ("GET", r"^/receipts/?$"),
-            ("GET", r"^/receipts/(tracking|allocations)/?$"),
+            ("GET", r"^/receipts/(tracking|allocations|unassigned-candidates)/?$"),
             ("GET", r"^/receipts/\d+(/allocations)?/?$"),
             ("PUT|DELETE", r"^/receipts/\d+/?$"),
             ("POST", r"^/receipts/\d+/(allocate|cancel|refund|payment-transactions)/?$"),
+            ("POST", r"^/receipts/bulk-allocate/?$"),
             ("DELETE", r"^/receipts/\d+/allocations/\d+/?$"),
         ]),
     ],
@@ -195,6 +197,9 @@ PERMISSION_CATALOG += [
     ("system.read", "system", "Read system", f"Read {_DESC['system']}"),
     ("system.write", "system", "Write system", f"Edit {_DESC['system']}"),
     ("imports.write", "imports", "Bulk imports", "CSV imports such as postal codes"),
+    # Dashboard opener: the endpoint itself is gated on it, while every data
+    # block on it keeps following the module reads (members/receipts/...).
+    ("dashboard.read", "dashboard", "Open the Dashboard", "See the dashboard summary (each card still follows the module's own read privilege)"),
 ]
 
 # Read / Write / Delete for every sub-module area
@@ -294,14 +299,16 @@ def seed_modules(db) -> int:
 # front-end path; permission_code is the privilege that shows it.
 # (code, name, parent_code, route, icon, display_order, permission_code, min_rank_level)
 MENU_PAGE_CATALOG = [
-    ("dashboard", "Dashboard", None, "/dashboard", "layout-dashboard", 5, None, None),
+    ("dashboard", "Dashboard", None, "/dashboard", "layout-dashboard", 5, "dashboard.read", None),
     ("members.list", "Membership List", "members", "/dashboard/membership/list", "list", 1, "members.list.read", None),
     ("members.unapproved", "Unapproved Members", "members", "/dashboard/membership/unapproved", "user-check", 2, "members.unapproved.read", None),
     ("members.register", "Register New Member", "members", "/dashboard/membership/register", "user-plus", 3, "members.register.write", None),
+    ("members.import", "Member Import", "members", "/dashboard/membership/import", "upload", 4, "members.register.write", None),
     # Final-approval queue: unapproved members who already have a receipt assigned (same privilege as Unapproved Members).
     ("members.assigned", "Assigned for Approval", "approvals", "/dashboard/membership/assigned", "check-circle", 2, "members.unapproved.read", None),
     ("receipts.entry", "Receipt Entry", "receipts", "/dashboard/receipts/entry", "file-plus", 1, "receipts.entry.read", None),
     ("receipts.tracking", "Receipt Tracking", "receipts", "/dashboard/receipts/tracking", "search", 2, "receipts.tracking.read", None),
+    ("receipts.bulk_mapping", "Bulk Receipt Mapping", "receipts", "/dashboard/receipts/bulk-mapping", "link", 3, "receipts.tracking.read", None),
     ("users.modules", "Modules", "users", "/dashboard/users/modules", "layout-grid", 4, None, 1),
     ("masters.location", "Location Setup", "masters", "/dashboard/master/location-setup", "map-pin", 1, "masters.location.read", None),
     ("masters.membership_types", "Membership Types", "masters", "/dashboard/master/membership-type", "badge", 2, "masters.membership_types.read", None),
@@ -341,6 +348,9 @@ MENU_ORDER_FIXES = {
 # Page privilege changes, applied only while the row still has the old one: code -> (old, new)
 MENU_PERMISSION_FIXES = {
     "system.number_formats": ("system.read", "system.number_formats.read"),
+    # the dashboard opens only for roles holding dashboard.read (migration 0046);
+    # applied only while the row still has no privilege, so admin edits are kept.
+    "dashboard": (None, "dashboard.read"),
 }
 
 MENU_ROUTE_FIXES = {

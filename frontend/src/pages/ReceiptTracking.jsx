@@ -668,6 +668,16 @@ export default function ReceiptTracking() {
         }}
         rightSlot={
           <>
+            {(hasPermission('receipts.tracking.read') || hasPermission('receipts.read')) && (
+              <Link
+                to="/dashboard/receipts/bulk-mapping"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#6D28D9] bg-purple-50 border border-purple-200 rounded-xl hover:bg-purple-100 cursor-pointer shadow-sm transition-colors"
+                title="Bulk Auto-Map Unassigned Receipts with Live Members"
+              >
+                <LinkIcon className="w-4 h-4 text-purple-600" />
+                <span>Bulk Auto-Map</span>
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => loadDayBook(new Date().toISOString().slice(0, 10))}

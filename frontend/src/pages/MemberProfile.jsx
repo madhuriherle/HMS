@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Award, TrendingUp } from 'lucide-react';
 import PermissionGate from '../components/PermissionGate';
-import useAuth from '../hooks/useAuth';
 import api from '../api';
 import { formatDate, formatDateTime } from '../utils/dateUtils';
 import { apiErrorMessage } from '../utils/apiError';
@@ -58,7 +57,6 @@ function Relative({ relation, name, number, links }) {
 export default function MemberProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState('');

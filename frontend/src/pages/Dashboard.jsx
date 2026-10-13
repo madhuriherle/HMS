@@ -10,11 +10,13 @@ import {
 } from 'recharts';
 import Modal from '../components/Modal';
 import clsx from 'clsx';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../api';
 import { getTodayDisplayDate } from '../utils/dateUtils';
 import Swal from 'sweetalert2';
 import { normalizeMember, unwrapList } from '../utils/apiAdapters';
+import useAuth from '../hooks/useAuth';
+import { resolveLandingPath } from '../utils/landing';
 
 const iconMap = {
   'users': Users,
@@ -57,6 +59,8 @@ const StatCard = ({ title, value, icon, color, trend }) => {
 };
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const { hasPermission } = useAuth();
   const [viewingMember, setViewingMember] = useState(null);
   
   const [stats, setStats] = useState({
@@ -72,6 +76,18 @@ export default function Dashboard() {
   const [registrationData, setRegistrationData] = useState([]);
   const [districtData, setDistrictData] = useState([]);
   
+  // the dashboard is privilege-gated now (dashboard.read); a role without it
+  // lands on its first accessible page instead of a screen full of errors.
+  useEffect(() => {
+    if (hasPermission('dashboard.read')) return undefined;
+    let alive = true;
+    resolveLandingPath().then((path) => {
+      if (alive && path && path !== '/dashboard') navigate(path, { replace: true });
+    });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {

@@ -1867,3 +1867,248 @@ def request_member_activation(
         raise HTTPException(status_code=409, detail=f"Activation already requested (request {dup.id})")
     return _file_request(db, current_user, "members", "ACTIVATE", "Member",
                          "members.write", {"id": id}, "id")
+
+
+# ─── BULK MEMBER IMPORT ──────────────────────────────────────────
+
+class BulkMemberImportRow(pydantic.BaseModel):
+    membership_number: str
+    first_name_en: str
+    middle_name_en: Optional[str] = None
+    last_name_en: Optional[str] = None
+    full_name_kn: Optional[str] = None
+    mobile: Optional[str] = None
+    gender: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    email: Optional[str] = None
+    address_line1: Optional[str] = None
+    address_line2: Optional[str] = None
+    locality: Optional[str] = None
+    city: Optional[str] = None
+    pincode: Optional[str] = None
+    membership_type: Optional[str] = None
+    remarks: Optional[str] = None
+
+class BulkMemberImportPayload(pydantic.BaseModel):
+    members: List[BulkMemberImportRow]
+    skip_duplicates: bool = True
+
+
+@router.post("/bulk-import")
+def bulk_import_members(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_any_permission("members.register.write", "members.write")),
+    payload: BulkMemberImportPayload,
+) -> Any:
+    """Import a batch of existing/live members with their permanent membership numbers."""
+    from models.masters import MembershipType
+    from models.members import Member, MemberMembership
+
+    # Cache active membership types
+    m_types = db.query(MembershipType).filter(MembershipType.is_deleted == False).all()
+    default_m_type_id = m_types[0].id if m_types else None
+    type_lookup = {mt.name_en.strip().upper(): mt.id for mt in m_types}
+    type_lookup.update({mt.code.strip().upper(): mt.id for mt in m_types if mt.code})
+
+    # Load existing membership numbers for deduplication
+    existing_nums = set(
+        num.strip().upper()
+        for (num,) in db.query(MemberMembership.membership_number)
+        .filter(MemberMembership.is_deleted == False, MemberMembership.membership_number != None)  # noqa: E711
+        .all()
+    )
+    # the number is also the member's member_code, which must stay unique
+    existing_nums |= {
+        c.strip().upper()
+        for (c,) in db.query(Member.member_code).filter(Member.member_code != None).all()  # noqa: E711
+    }
+
+    created_count = 0
+    skipped = []
+    now = datetime.now(timezone.utc)
+
+    for item in payload.members:
+        num = str(item.membership_number or "").strip()
+        if not num:
+            skipped.append({"membership_number": "", "reason": "Missing membership number"})
+            continue
+        if num.upper() in existing_nums:
+            if payload.skip_duplicates:
+                skipped.append({"membership_number": num, "reason": "Already exists in database"})
+                continue
+            else:
+                raise HTTPException(409, f"Duplicate membership number '{num}'")
+
+        # Resolve membership type
+        mt_id = default_m_type_id
+        if item.membership_type:
+            mt_key = str(item.membership_type).strip().upper()
+            if mt_key in type_lookup:
+                mt_id = type_lookup[mt_key]
+
+        if not mt_id:
+            fallback = db.query(MembershipType).first()
+            if not fallback:
+                fallback = MembershipType(code="LIFE", name_en="Life Member", status=True)
+                db.add(fallback)
+                db.flush()
+            mt_id = fallback.id
+
+        gen = (item.gender or "MALE").strip().upper()
+        if gen not in ("MALE", "FEMALE", "OTHER"):
+            gen = "MALE"
+
+        member = Member(
+            first_name_en=item.first_name_en.strip(),
+            middle_name_en=item.middle_name_en.strip() if item.middle_name_en else None,
+            last_name_en=item.last_name_en.strip() if item.last_name_en else None,
+            full_name_kn=item.full_name_kn.strip() if item.full_name_kn else None,
+            gender=gen,
+            date_of_birth=item.date_of_birth,
+            mobile=item.mobile.strip() if item.mobile else None,
+            email=item.email.strip() if item.email else None,
+            address_line1=item.address_line1.strip() if item.address_line1 else None,
+            address_line2=item.address_line2.strip() if item.address_line2 else None,
+            locality=item.locality.strip() if item.locality else (item.city.strip() if item.city else None),
+            city=item.city.strip() if item.city else None,
+            remarks=item.remarks.strip() if item.remarks else None,
+            member_code=num,
+            approval_status="APPROVED",
+            member_status="ACTIVE",
+            registration_status="APPROVED",
+            registration_source="MIGRATION",
+            created_by=current_user.id,
+        )
+        db.add(member)
+        db.flush()
+
+        mm = MemberMembership(
+            member_id=member.id,
+            membership_type_id=mt_id,
+            membership_number=num,
+            status="ACTIVE",
+            applied_at=now,
+            activated_at=now,
+            created_by=current_user.id,
+        )
+        db.add(mm)
+        existing_nums.add(num.upper())
+        created_count += 1
+
+    db.commit()
+    return {
+        "success_count": created_count,
+        "skipped_count": len(skipped),
+        "skipped": skipped[:100],
+    }
+
+
+@router.post("/bulk-import-file")
+async def bulk_import_members_file(
+    file: UploadFile = File(...),
+    skip_duplicates: bool = True,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_any_permission("members.register.write", "members.write")),
+) -> Any:
+    """Upload a CSV or Excel file containing live/legacy members to import in bulk."""
+    import io
+    import csv
+
+    content = await file.read()
+    filename = (file.filename or "").lower()
+    rows = []
+
+    if filename.endswith(".csv"):
+        text_stream = io.StringIO(content.decode("utf-8", errors="replace"))
+        reader = csv.DictReader(text_stream)
+        for r in reader:
+            rows.append(r)
+    elif filename.endswith(".xlsx") or filename.endswith(".xls"):
+        try:
+            import pandas as pd
+            df = pd.read_excel(io.BytesIO(content))
+            df = df.where(pd.notnull(df), None)
+            rows = df.to_dict(orient="records")
+        except Exception as e:
+            raise HTTPException(400, f"Could not parse Excel file: {str(e)}")
+    else:
+        raise HTTPException(400, "Supported formats: .csv, .xlsx, .xls")
+
+    if not rows:
+        raise HTTPException(400, "The uploaded file contains no data rows.")
+
+    parsed_members = []
+    for raw in rows:
+        norm = {str(k).strip().lower().replace(" ", "_"): v for k, v in raw.items() if k is not None}
+        
+        num = (
+            norm.get("membership_number")
+            or norm.get("membership_no")
+            or norm.get("member_no")
+            or norm.get("membership_code")
+            or norm.get("member_code")
+            or norm.get("no")
+        )
+        if not num:
+            continue
+
+        first_name = (
+            norm.get("first_name_en")
+            or norm.get("first_name")
+            or norm.get("name")
+            or norm.get("full_name")
+            or norm.get("member_name")
+        )
+        if not first_name:
+            continue
+
+        last_name = norm.get("last_name_en") or norm.get("last_name")
+        first_name_str = str(first_name).strip()
+        if not last_name and " " in first_name_str:
+            parts = first_name_str.split(" ", 1)
+            first_name_str = parts[0]
+            last_name = parts[1]
+
+        dob = norm.get("date_of_birth") or norm.get("dob")
+        dob_parsed = None
+        if dob:
+            try:
+                if isinstance(dob, str):
+                    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+                        try:
+                            dob_parsed = datetime.strptime(dob.strip(), fmt).date()
+                            break
+                        except ValueError:
+                            pass
+                elif hasattr(dob, "date"):
+                    dob_parsed = dob.date()
+            except Exception:
+                dob_parsed = None
+
+        parsed_members.append(
+            BulkMemberImportRow(
+                membership_number=str(num).strip(),
+                first_name_en=first_name_str,
+                middle_name_en=str(norm.get("middle_name_en") or "").strip() or None,
+                last_name_en=str(last_name).strip() if last_name else None,
+                full_name_kn=str(norm.get("full_name_kn") or "").strip() or None,
+                mobile=str(norm.get("mobile") or norm.get("phone") or norm.get("mobile_number") or "").strip() or None,
+                gender=str(norm.get("gender") or "").strip() or None,
+                date_of_birth=dob_parsed,
+                email=str(norm.get("email") or "").strip() or None,
+                address_line1=str(norm.get("address_line1") or norm.get("address") or "").strip() or None,
+                address_line2=str(norm.get("address_line2") or "").strip() or None,
+                locality=str(norm.get("locality") or norm.get("place") or norm.get("village") or "").strip() or None,
+                city=str(norm.get("city") or norm.get("district") or "").strip() or None,
+                pincode=str(norm.get("pincode") or norm.get("postal_code") or "").strip() or None,
+                membership_type=str(norm.get("membership_type") or norm.get("type") or "").strip() or None,
+                remarks=str(norm.get("remarks") or "").strip() or None,
+            )
+        )
+
+    if not parsed_members:
+        raise HTTPException(400, "Could not identify required columns (Membership No, Name) in the file.")
+
+    payload = BulkMemberImportPayload(members=parsed_members, skip_duplicates=skip_duplicates)
+    return bulk_import_members(db=db, current_user=current_user, payload=payload)

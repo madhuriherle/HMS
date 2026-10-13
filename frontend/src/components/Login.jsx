@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import logoIcon from '../assets/logo-icon.png';
 import api from '../api';
 import { notifySuccess } from '../utils/notify';
+import { resolveLandingPath } from '../utils/landing';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -73,7 +74,9 @@ export default function Login() {
         throw meErr;
       }
 
-      navigate('/dashboard');
+      // Landing page = the first page this role can actually open (the menu
+      // endpoint already filters by privileges and sidebar order).
+      navigate((await resolveLandingPath()) || '/dashboard');
       notifySuccess('Login successful! Welcome back.');
     } catch (err) {
       const detail = err?.response?.data?.detail;

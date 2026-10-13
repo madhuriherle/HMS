@@ -900,6 +900,199 @@ def read_allocations(
     return page_data
 
 
+# ─── BULK RECEIPT-MEMBER MAPPING ─────────────────────────────────
+
+@router.get("/unassigned-candidates")
+def get_unassigned_candidates(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_any_permission("receipts.tracking.read", "receipts.read")),
+    search: Optional[str] = None,
+    filter_type: Optional[str] = "ALL",  # ALL, MATCHED, UNMATCHED
+    limit: int = 500,
+) -> Any:
+    """Fetch unassigned receipts and cross-reference with members for auto-mapping."""
+    q = db.query(Receipt).filter(
+        Receipt.is_deleted == False,
+        Receipt.receipt_status == "UNASSIGNED",
+        Receipt.payment_status != "CANCELLED",
+    )
+
+    if search:
+        s = f"%{search.strip()}%"
+        q = q.filter(
+            or_(
+                Receipt.receipt_number.ilike(s),
+                Receipt.payer_name.ilike(s),
+                Receipt.payer_membership_no.ilike(s),
+                Receipt.payer_mobile.ilike(s),
+            )
+        )
+
+    receipts = q.order_by(Receipt.id.desc()).limit(limit).all()
+
+    # Pre-fetch candidate members by membership numbers & mobiles
+    mem_nums = {r.payer_membership_no.strip().upper() for r in receipts if r.payer_membership_no and r.payer_membership_no.strip()}
+    mobiles = {r.payer_mobile.strip() for r in receipts if r.payer_mobile and r.payer_mobile.strip()}
+
+    matched_by_num = {}
+    if mem_nums:
+        m_rows = (
+            db.query(Member, MemberMembership)
+            .join(MemberMembership, MemberMembership.member_id == Member.id)
+            .filter(
+                Member.is_deleted == False,
+                MemberMembership.is_deleted == False,
+                func.upper(MemberMembership.membership_number).in_(mem_nums),
+            )
+            .all()
+        )
+        for m, mm in m_rows:
+            key = mm.membership_number.strip().upper()
+            matched_by_num[key] = (m, mm)
+
+    matched_by_mob = {}
+    if mobiles:
+        mob_rows = (
+            db.query(Member, MemberMembership)
+            .outerjoin(MemberMembership, (MemberMembership.member_id == Member.id) & (MemberMembership.is_deleted == False))
+            .filter(
+                Member.is_deleted == False,
+                Member.mobile.in_(mobiles),
+            )
+            .all()
+        )
+        for m, mm in mob_rows:
+            if m.mobile:
+                matched_by_mob[m.mobile.strip()] = (m, mm)
+
+    candidates = []
+    total_matched = 0
+
+    for r in receipts:
+        r_num = (r.payer_membership_no or "").strip().upper()
+        r_mob = (r.payer_mobile or "").strip()
+
+        matched_m = None
+        matched_mm = None
+        match_type = "NONE"
+
+        if r_num and r_num in matched_by_num:
+            matched_m, matched_mm = matched_by_num[r_num]
+            match_type = "EXACT_NUMBER"
+        elif r_mob and r_mob in matched_by_mob:
+            matched_m, matched_mm = matched_by_mob[r_mob]
+            match_type = "MOBILE"
+
+        if match_type != "NONE":
+            total_matched += 1
+
+        if filter_type == "MATCHED" and match_type == "NONE":
+            continue
+        if filter_type == "UNMATCHED" and match_type != "NONE":
+            continue
+
+        item = {
+            "receipt_id": r.id,
+            "receipt_number": r.receipt_number,
+            "receipt_date": str(r.receipt_date),
+            "net_amount": float(r.net_amount),
+            "payer_name": r.payer_name,
+            "payer_membership_no": r.payer_membership_no,
+            "payer_mobile": r.payer_mobile,
+            "match_type": match_type,
+            "matched_member": None,
+        }
+        if matched_m:
+            full_name = f"{matched_m.first_name_en} {matched_m.last_name_en or ''}".strip()
+            item["matched_member"] = {
+                "id": matched_m.id,
+                "name": full_name or matched_m.full_name_kn or f"Member #{matched_m.id}",
+                "membership_number": matched_mm.membership_number if matched_mm else matched_m.member_code,
+                "mobile": matched_m.mobile,
+                "status": matched_m.approval_status,
+            }
+
+        candidates.append(item)
+
+    return {
+        "total_unassigned": len(receipts),
+        "total_matched": total_matched,
+        "candidates": candidates,
+    }
+
+
+import pydantic as _pydantic
+
+class BulkAllocationItem(_pydantic.BaseModel):
+    receipt_id: int
+    member_id: int
+    allocated_amount: Optional[float] = None
+
+class BulkAllocationPayload(_pydantic.BaseModel):
+    allocations: list[BulkAllocationItem]
+
+@router.post("/bulk-allocate")
+def bulk_allocate_receipts(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_any_permission("receipts.tracking.write", "receipts.write")),
+    payload: BulkAllocationPayload,
+) -> Any:
+    """Map multiple unassigned receipts to members in a single transaction."""
+    allocated_count = 0
+    failed = []
+    affected_member_ids = set()
+
+    for item in payload.allocations:
+        receipt = db.query(Receipt).filter(Receipt.id == item.receipt_id, Receipt.is_deleted == False).first()
+        if not receipt:
+            failed.append({"receipt_id": item.receipt_id, "reason": "Receipt not found"})
+            continue
+        if receipt_status.is_cancelled(receipt):
+            failed.append({"receipt_id": item.receipt_id, "reason": "Cannot allocate cancelled receipt"})
+            continue
+
+        member = db.query(Member).filter(Member.id == item.member_id, Member.is_deleted == False).first()
+        if not member:
+            failed.append({"receipt_id": item.receipt_id, "reason": "Member not found"})
+            continue
+
+        alloc_amount = item.allocated_amount if item.allocated_amount is not None else float(receipt.net_amount)
+
+        existing_alloc = db.query(ReceiptAllocation).filter(
+            ReceiptAllocation.receipt_id == receipt.id,
+            ReceiptAllocation.is_deleted == False,
+        ).first()
+
+        if existing_alloc:
+            existing_alloc.member_id = member.id
+            existing_alloc.allocated_amount = alloc_amount
+        else:
+            new_alloc = ReceiptAllocation(
+                receipt_id=receipt.id,
+                member_id=member.id,
+                allocated_amount=alloc_amount,
+                created_by=current_user.id,
+            )
+            db.add(new_alloc)
+
+        db.flush()
+        receipt_status.refresh(db, receipt)
+        allocated_count += 1
+        affected_member_ids.add(member.id)
+
+    if affected_member_ids:
+        membership_credit.recompute_members(db, list(affected_member_ids), current_user.id)
+
+    db.commit()
+    return {
+        "allocated_count": allocated_count,
+        "failed_count": len(failed),
+        "failed": failed,
+    }
+
+
 @router.get("/{id}", response_model=schemas_receipts.Receipt)
 def read_receipt(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:
     obj = crud_receipts.receipt.get(db, id)

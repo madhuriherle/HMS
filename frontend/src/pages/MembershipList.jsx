@@ -8,6 +8,7 @@ import {
   User,
   Plus,
   Search,
+  Upload,
   Pencil,
   Trash2,
   Eye,
@@ -719,6 +720,16 @@ export default function MembershipList() {
                   <X className="w-4 h-4" />
                 </button>
               </>
+            )}
+            {(hasPermission('members.register.write') || hasPermission('members.write')) && (
+              <Link
+                to="/dashboard/membership/import"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#510601] text-[#510601] hover:bg-[#510601]/5 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs cursor-pointer shrink-0"
+                title="Import live members in bulk via CSV"
+              >
+                <Upload className="w-4 h-4" />
+                <span>Import Members</span>
+              </Link>
             )}
             <button
               type="button"

@@ -31,17 +31,43 @@ def test_user_without_privileges_cannot_read_or_change_anything(client, admin_he
 
 
 def test_dashboard_blocks_follow_read_privileges(client, admin_headers):
-    # nothing granted -> every block is hidden
+    # nothing granted -> the dashboard itself refuses (needs dashboard.read)
     _, _, nobody = _staff_with_role(client, admin_headers, "dash_nobody", "DashNobody", "DASH_NOBODY", permission_grants=[])
-    d = client.get(f"{API}/dashboard/", headers=nobody).json()
-    assert d["members"] is None and d["receipts"] is None and d["magazines"] is None and d["pending_approvals"] is None
+    assert client.get(f"{API}/dashboard/", headers=nobody).status_code == 403
 
-    # only receipts.read -> only the receipts block
+    # dashboard.read + only receipts.read -> the dashboard opens, but only the receipts block
     _, _, cashier = _staff_with_role(client, admin_headers, "dash_cashier", "DashCashier", "DASH_CASHIER",
-                                     permission_grants=[("receipts.read", False)])
+                                     permission_grants=[("dashboard.read", False), ("receipts.read", False)])
     d = client.get(f"{API}/dashboard/", headers=cashier).json()
-    assert d["receipts"] is not None and d["members"] is None and d["magazines"] is None
+    assert d["receipts"] is not None and d["members"] is None and d["magazines"] is None and d["pending_approvals"] is None
 
     # an all-access admin sees everything
     d = client.get(f"{API}/dashboard/", headers=admin_headers).json()
     assert d["members"] and d["receipts"] is not None and d["magazines"] is not None and d["pending_approvals"] is not None
+
+
+def test_login_landing_follows_the_menu(client, admin_headers):
+    """The login redirect lands on the first page the role can actually open:
+    the menu returns only entitled pages, so the first route in it is home."""
+    _, _, h = _staff_with_role(client, admin_headers, "landing_user", "Landing Role", "LANDING_ROLE",
+                               permission_grants=[("masters.banks.read", False)])
+    menu = client.get(f"{API}/users/modules/menu", headers=h).json()
+
+    def first_route(nodes):
+        for node in nodes or []:
+            if isinstance(node.get("route"), str) and node["route"].startswith("/dashboard"):
+                return node["route"]
+            sub = first_route(node.get("submodules"))
+            if sub:
+                return sub
+        return None
+
+    # the gated dashboard is not in the menu; the banks screen is the first page
+    def codes(nodes):
+        out = {n["code"] for n in nodes or []}
+        for n in nodes or []:
+            out |= codes(n.get("submodules"))
+        return out
+
+    assert "dashboard" not in codes(menu)
+    assert first_route(menu) == "/dashboard/master/banks"

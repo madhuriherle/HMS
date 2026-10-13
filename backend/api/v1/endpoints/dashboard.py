@@ -13,7 +13,7 @@ router = APIRouter()
 @router.get("/")
 def get_dashboard(
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_permission("dashboard.read")),
 ) -> Any:
     """Returns summary stats for the dashboard."""
 

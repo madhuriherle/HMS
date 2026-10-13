@@ -26,6 +26,8 @@ import MemberProfile from './pages/MemberProfile';
 import ActivityLogs from './pages/ActivityLogs';
 import FormModalHost from './components/FormModalHost';
 import { BankMaster } from './pages/MasterLists';
+import MemberImport from './pages/MemberImport';
+import BulkReceiptMapping from './pages/BulkReceiptMapping';
 // Personal Masters (gotra / qualification / native place) screen is switched off for now:
 // import PersonalMasters, { BankMaster } from './pages/MasterLists';
 
@@ -59,6 +61,7 @@ function App() {
           
           {/* Membership Module Routes */}
           <Route path="membership/list" element={<MembershipList />} />
+          <Route path="membership/import" element={<PermissionGate required={['members.register.write', 'members.write']} title="Access Restricted" message="You need permission to register or import members."><MemberImport /></PermissionGate>} />
           <Route path="membership/unapproved" element={<UnapprovedMembership />} />
           <Route path="membership/assigned" element={<AssignedApprovals />} />
           <Route path="membership/register" element={<RegisterNewMember />} />
@@ -121,6 +124,8 @@ function App() {
           <Route path="receipts/add" element={<ReceiptEntry />} />
           <Route path="receipts/tracking" element={<ReceiptTracking />} />
           <Route path="receipt/tracking" element={<ReceiptTracking />} />
+          <Route path="receipts/bulk-mapping" element={<PermissionGate required={['receipts.tracking.read', 'receipts.read']} title="Access Restricted" message="You need permission to track receipts to access Bulk Mapping."><BulkReceiptMapping /></PermissionGate>} />
+          <Route path="receipts/auto-map" element={<PermissionGate required={['receipts.tracking.read', 'receipts.read']} title="Access Restricted" message="You need permission to track receipts to access Bulk Mapping."><BulkReceiptMapping /></PermissionGate>} />
           <Route path="receipts/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
           <Route path="receipts/label-list" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
           <Route path="magazine/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
