@@ -27,7 +27,6 @@ import {
   Hash,
   Plus,
   Trash2,
-  Printer,
   Coins,
   UserCheck
 } from 'lucide-react';
@@ -554,7 +553,6 @@ export default function ReceiptEntry() {
     setEntrySource('normal');
     setLookupMembershipNo('');
     clearAutoPopulatedMemberFields();
-    showToast('Member unassigned. Switched to direct receipt entry mode.');
   };
 
   // "Use this member" on the lookup card: link the receipt to the member / applicant that was found
@@ -590,7 +588,6 @@ export default function ReceiptEntry() {
     setLookupMembershipNo(memNo);
     applyMemberToForm(member);
     setLookupError('');
-    showToast(`Assigned unapproved member "${member.fullName || member.name}" to Receipt.`);
   };
 
   // "ASSIGN TO RECEIPT" FROM RIGHT-SIDE MEMBERSHIP LIST TABLE (FLOW 2)
@@ -600,7 +597,6 @@ export default function ReceiptEntry() {
     setLookupMembershipNo(memNo);
     applyMemberToForm(member);
     setLookupError('');
-    showToast(`Assigned membership record "${member.fullName || member.name}" to Receipt.`);
   };
 
   // Update Particulars Change
@@ -1858,7 +1854,7 @@ export default function ReceiptEntry() {
 
               </div>
 
-              {/* Action Buttons (Clear, Save & New, Save & Print) */}
+              {/* Action Buttons (Reset, Save & New) */}
               <div className="flex flex-wrap items-center justify-end gap-2.5 pt-3 border-t border-[#E8DFD8]">
                 <label className="mr-auto flex items-center gap-2 text-xs font-semibold text-[#863221] cursor-pointer select-none">
                   <input
@@ -1876,7 +1872,7 @@ export default function ReceiptEntry() {
                   className="px-3.5 py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] text-xs sm:text-sm font-semibold hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center gap-1.5"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Cancel</span>
+                  <span>Reset</span>
                 </button>
 
                 <button
@@ -1888,17 +1884,6 @@ export default function ReceiptEntry() {
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Save & New</span>
-                </button>
-
-                <button
-                  type="submit"
-                  onClick={() => { saveMode.current = 'print'; }}
-                  disabled={saving || !hasPermission('receipts.entry.write')}
-                  title={!hasPermission('receipts.entry.write') ? 'Requires receipts.entry.write permission' : undefined}
-                  className="disabled:opacity-50 px-5 py-2 rounded-xl bg-gradient-to-r from-[#510601] to-[#3D0808] hover:from-[#6b0801] hover:to-[#510601] active:bg-[#180200] text-white text-xs sm:text-sm font-extrabold shadow-md hover:shadow-lg transition-all cursor-pointer inline-flex items-center gap-1.5"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Save & Print</span>
                 </button>
               </div>
 
@@ -1956,7 +1941,7 @@ export default function ReceiptEntry() {
                     <Award className="w-3.5 h-3.5 text-[#1D4ED8]" />
                     <span>Profile Details:</span>
                   </h4>
-                  <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E8DFD8] grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className={`bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E8DFD8] grid grid-cols-1 gap-3 text-xs ${entrySource === 'unapproved-assignment' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
                     {entrySource === 'unapproved-assignment' && (
                       <>
                         <div>
@@ -2045,14 +2030,14 @@ export default function ReceiptEntry() {
                     <MapPin className="w-3.5 h-3.5 text-[#1D4ED8]" />
                     <span>Address Details:</span>
                   </h4>
-                  <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E8DFD8] text-xs space-y-1.5">
-                    <div>
-                      <span className="text-[#863221] font-semibold block">Full Address:</span>
-                      <p className="text-[#180200] mt-0.5 leading-relaxed">
-                        {enrichedMember?.address || '—'}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1.5 border-t border-[#E8DFD8]">
+                  <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E8DFD8] text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <span className="text-[#863221] font-semibold block">Full Address:</span>
+                        <p className="text-[#180200] mt-0.5 leading-relaxed break-words">
+                          {enrichedMember?.address || '—'}
+                        </p>
+                      </div>
                       <div>
                         <span className="text-[#863221] font-semibold block">Taluk / Locality:</span>
                         <span className="text-[#180200]">{enrichedMember?.postTaluk || '—'}</span>
@@ -2231,7 +2216,6 @@ export default function ReceiptEntry() {
                     ].filter(Boolean).join(', ');
 
                     const memCode = member.membershipNumber || member.registrationNumber || member.id || '—';
-                    const category = member.membershipType || member.membershipTypeCategory || 'Life Member';
 
                     return (
                       <div
@@ -2244,21 +2228,11 @@ export default function ReceiptEntry() {
                               <span className="text-[11px] font-mono font-bold text-[#510601] bg-amber-50/90 border border-amber-200/90 px-2 py-0.5 rounded-md">
                                 #{memCode}
                               </span>
-                              <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md">
-                                {category}
-                              </span>
                             </div>
 
                             <h4 className="font-extrabold text-xs sm:text-sm text-[#180200] group-hover:text-[#510601] transition-colors flex items-center gap-1.5 truncate">
                               <span>{member.fullName || member.name}</span>
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                             </h4>
-
-                            {(member.gothra || member.gotra) && (
-                              <div className="text-[11px] text-[#863221]/80 font-medium">
-                                Gotra: {member.gothra || member.gotra}
-                              </div>
-                            )}
 
                             <div className="pt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#863221]">
                               {(member.contactNumber || member.mobile || member.phone) && (
