@@ -46,6 +46,8 @@ def upgrade() -> None:
     for table, column in TARGETS:
         if table not in tables:
             continue
+        if column not in {c["name"] for c in inspector.get_columns(table)}:
+            continue  # e.g. members.member_code, renamed membership_number by a later migration
         new_name = f"uq_{table}_{column}_active"
         for uc in inspector.get_unique_constraints(table):
             if uc["column_names"] == [column]:

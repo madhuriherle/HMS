@@ -80,6 +80,8 @@ SUB_MODULE_AREAS = {
     "system": [
         ("system.number_formats", "Number Formats", ["/system/number-formats"]),
         # Settings hub tools. Read = look, Write = restore / delete / clear (the Super Admin hands these out)
+        # the Organisation Settings page is its own area (its menu page row is the module)
+        ("masters.organisation", "Organisation Settings", ["/system/settings"]),
         ("system.recycle_bin", "Recycle Bin", ["/system/recycle-bin"]),
         ("system.cleanup", "Data Cleanup", ["/system/cleanup"]),
     ],
@@ -96,6 +98,7 @@ AREA_ACTIONS = {
     "members.register": ("write",),
     "receipts.entry": ("read", "write"),
     "system.number_formats": ("read", "write"),
+    "masters.organisation": ("read", "write"),
     "system.recycle_bin": ("read", "write"),
     "system.cleanup": ("read", "write"),
 }
@@ -297,9 +300,9 @@ MENU_PAGE_CATALOG = [
     ("masters.location", "Location Setup", "masters", "/dashboard/master/location-setup", "map-pin", 1, "masters.location.read", None),
     ("masters.membership_types", "Membership Types", "masters", "/dashboard/master/membership-type", "badge", 2, "masters.membership_types.read", None),
     ("masters.particulars", "Particulars Master", "masters", "/dashboard/master/receipt-type", "list-checks", 3, "masters.particulars.read", None),
-    ("system.number_formats", "Number Formats", "system", "/dashboard/system/number-formats", "list-checks", 2, "system.number_formats.read", None),
     ("system.hub", "System Settings", "system", "/dashboard/settings", "settings", 0, "system.read", None),
-    ("masters.organisation", "Organisation Settings", "system", "/dashboard/master/organisation-settings", "building", 1, "system.read", None),
+    ("system.number_formats", "Number Formats", "system.hub", "/dashboard/system/number-formats", "list-checks", 2, "system.number_formats.read", None),
+    ("masters.organisation", "Organisation Settings", "system.hub", "/dashboard/master/organisation-settings", "building", 1, "system.read", None),
     ("masters.payment_modes", "Payment Mode Setup", "masters", "/dashboard/master/payment-modes", "credit-card", 5, "masters.payment_modes.read", None),
     ("masters.banks", "Bank Master", "masters", "/dashboard/master/banks", "building", 6, "masters.banks.read", None),
     # Personal Masters screen is switched off for now (also switched off in migration 0025):
@@ -324,6 +327,11 @@ MENU_MOVES = {
     "masters.organisation": ("masters", "system", 1),
     "members.assigned": ("members", "approvals", 2),
 }
+# Pages nested one level deeper, under another page (the System Settings page holds its tools). Same rule as MENU_MOVES.
+MENU_NEST = {
+    "masters.organisation": ("system", "system.hub", 1),
+    "system.number_formats": ("system", "system.hub", 2),
+}
 # Order changes, applied only while the row still has the old order: code -> (old, new)
 MENU_ORDER_FIXES = {
     "system.number_formats": (3, 2),
@@ -333,6 +341,7 @@ MENU_ORDER_FIXES = {
 # Page privilege changes, applied only while the row still has the old one: code -> (old, new)
 MENU_PERMISSION_FIXES = {
     "system.number_formats": ("system.read", "system.number_formats.read"),
+    "masters.organisation": ("system.read", "masters.organisation.read"),
     # the dashboard opens only for roles holding dashboard.read (migration 0046);
     # applied only while the row still has no privilege, so admin edits are kept.
     "dashboard": (None, "dashboard.read"),
@@ -365,6 +374,7 @@ def seed_menu_pages(db) -> int:
             parent_id=parent_row.id if parent_row else None,
         )
         db.add(row)
+        db.flush()  # a page may be the parent of the next one
         rows[code] = row
         created += 1
     for code, (old, new) in MENU_ROUTE_FIXES.items():
@@ -376,6 +386,10 @@ def seed_menu_pages(db) -> int:
         if m is not None and m.name_en == old:
             m.name_en = new
     for code, (old_parent, new_parent, order) in MENU_MOVES.items():
+        m, old_row, new_row = rows.get(code), rows.get(old_parent), rows.get(new_parent)
+        if m is not None and old_row is not None and new_row is not None and m.parent_id == old_row.id:
+            m.parent_id, m.display_order = new_row.id, order
+    for code, (old_parent, new_parent, order) in MENU_NEST.items():
         m, old_row, new_row = rows.get(code), rows.get(old_parent), rows.get(new_parent)
         if m is not None and old_row is not None and new_row is not None and m.parent_id == old_row.id:
             m.parent_id, m.display_order = new_row.id, order

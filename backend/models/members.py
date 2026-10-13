@@ -1,5 +1,5 @@
 from sqlalchemy import String, BigInteger, Boolean, DateTime, Date, Numeric, Text, ForeignKey, JSON, Index, text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, synonym
 from models.base import Base, AuditMixin
 
 class Member(AuditMixin, Base):
@@ -14,7 +14,10 @@ class Member(AuditMixin, Base):
         ),
     )
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    member_code: Mapped[str] = mapped_column(String(30), nullable=True)
+    # The one permanent membership number, given at approval (null until then). Formerly called member_code;
+    # the old name still works in code as an alias.
+    membership_number: Mapped[str] = mapped_column(String(30), nullable=True)
+    member_code = synonym("membership_number")
     first_name_en: Mapped[str] = mapped_column(String(100), nullable=False)
     middle_name_en: Mapped[str] = mapped_column(String(100), nullable=True)
     last_name_en: Mapped[str] = mapped_column(String(100), nullable=True)
@@ -252,7 +255,7 @@ class MemberKycRequest(AuditMixin, Base):
 
 
 # Unique among live rows only, so a soft-deleted record never blocks re-using its code/number.
-Index("uq_members_member_code_active", Member.__table__.c.member_code, unique=True,
+Index("uq_members_membership_number_active", Member.__table__.c.membership_number, unique=True,
       postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
 Index("uq_member_memberships_membership_number_active", MemberMembership.__table__.c.membership_number, unique=True,
       postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))

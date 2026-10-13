@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
+import ParticularPicker from '../components/ParticularPicker';
 import {
   ChevronRight,
   ChevronLeft,
@@ -297,8 +298,8 @@ export default function ReceiptEntry() {
   }, [currentParticularObj]);
 
   const hasActiveSubTypes = activeSubTypes.length > 0;
-  const hasSubTypeSelect = formData.particulars === 'Donation' || hasActiveSubTypes;
-  const showSubField = hasSubTypeSelect || isOthersName(formData.particulars);
+  // "Others" with no sub-types listed keeps a free-text description beside the amount
+  const showDescription = isOthersName(formData.particulars) && !hasActiveSubTypes;
 
   // More particulars on the same receipt (the paper receipt has many lines)
   const [extraLines, setExtraLines] = useState([]);
@@ -411,7 +412,9 @@ export default function ReceiptEntry() {
   // ----------------------------------------------------
   const applyMemberToForm = (member) => {
     setSelectedMember(member);
-    const memNo = member.membershipNumber || member.registrationNumber || member.id || '';
+    // the Membership No. box holds the real membership number only (given on approval); the member id (MID) is
+    // not a membership number, so an unapproved member leaves it blank and is linked by id
+    const memNo = member.membershipNumber || '';
     const memType = member.membershipType || member.membershipTypeCategory || '';
 
     // Only who is paying is filled in: name, membership no., mobile and PAN (members hold no PAN, so it is the
@@ -613,10 +616,10 @@ export default function ReceiptEntry() {
     const clean = String(query || '').trim().toLowerCase();
     if (!clean) return null;
     const same = (v) => v !== undefined && v !== null && String(v).trim().toLowerCase() === clean;
+    // a membership number only: the member id (MID) and the registration number are not membership numbers
     return (
       registeredMembers.find((m) => same(m.membershipNumber)) ||
-      registeredMembers.find((m) => same(m.registrationNumber) || same(m.id)) ||
-      unapprovedMembers.find((m) => same(m.registrationNumber) || same(m.id) || same(m.membershipNumber)) ||
+      unapprovedMembers.find((m) => same(m.membershipNumber)) ||
       null
     );
   };
@@ -659,7 +662,7 @@ export default function ReceiptEntry() {
   // "ASSIGN TO RECEIPT" FROM BOTTOM UNAPPROVED MEMBERS TABLE (FLOW 1)
   const handleAssignFromUnapproved = (member) => {
     setEntrySource('unapproved-assignment');
-    const memNo = member.registrationNumber || member.membershipNumber || member.id || '';
+    const memNo = member.membershipNumber || '';
     setLookupMembershipNo(memNo);
     applyMemberToForm(member);
     setLookupError('');
@@ -668,21 +671,19 @@ export default function ReceiptEntry() {
   // "ASSIGN TO RECEIPT" FROM RIGHT-SIDE MEMBERSHIP LIST TABLE (FLOW 2)
   const handleAssignFromMembership = (member) => {
     setEntrySource('membership-assignment');
-    const memNo = member.membershipNumber || member.registrationNumber || member.id || '';
+    const memNo = member.membershipNumber || '';
     setLookupMembershipNo(memNo);
     applyMemberToForm(member);
     setLookupError('');
   };
 
-  // Update Particulars Change
-  const handleParticularsChange = (e) => {
-    const selectedParticular = e.target.value;
-
+  // The particular + sub-type picker (first line)
+  const handleParticularsChange = ({ particular: selectedParticular, subType }) => {
     setFormData((prev) => ({
       ...prev,
       particulars: selectedParticular,
-      donationSubType: '',
-      othersDescription: isOthersName(selectedParticular) ? prev.othersDescription : ''
+      donationSubType: subType || '',
+      othersDescription: isOthersName(selectedParticular) && selectedParticular === prev.particulars ? prev.othersDescription : ''
     }));
 
     if (formErrors.particulars || formErrors.othersDescription || formErrors.donationSubType) {
@@ -1662,83 +1663,56 @@ export default function ReceiptEntry() {
                   </div>
                 </div>
 
-                {/* Row 4: Particulars, Sub-Type, Amount & Add Item */}
+                {/* Row 4: Particulars (with sub-type), Amount & Add Item */}
                 <div className="space-y-2.5">
                   <div className="grid grid-cols-12 gap-3 items-end">
-                    {/* Particulars */}
-                    <div className={`col-span-12 ${showSubField ? 'sm:col-span-4' : 'sm:col-span-5'}`}>
+                    {/* Particulars + Sub-Type in one picker */}
+                    <div className={`col-span-12 ${showDescription ? 'sm:col-span-4' : 'sm:col-span-6'}`}>
                       <label className="block text-xs font-bold text-[#180200] mb-1">
                         Particulars <span className="text-[#ED4636]">*</span>
                       </label>
-                      <select
-                        name="particulars"
-                        value={formData.particulars}
+                      <ParticularPicker
+                        particulars={activeParticulars}
+                        particular={formData.particulars}
+                        subType={formData.donationSubType}
                         onChange={handleParticularsChange}
-                        className={`w-full px-2 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white cursor-pointer transition-colors ${formErrors.particulars
-                          ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                          : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                          }`}
-                      >
-                        {activeParticulars.map((opt) => (
-                          <option key={opt.id || opt.name} value={opt.name}>
-                            {opt.name}
-                          </option>
-                        ))}
-                      </select>
-                      {formErrors.particulars && (
+                        hasError={Boolean(formErrors.particulars || formErrors.donationSubType)}
+                      />
+                      {(formErrors.particulars || formErrors.donationSubType) && (
                         <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
                           <AlertCircle className="w-3 h-3 shrink-0" />
-                          {formErrors.particulars}
+                          {formErrors.particulars || formErrors.donationSubType}
                         </p>
                       )}
                     </div>
 
-                    {/* Sub-type / Others description */}
-                    {showSubField && (
-                      <div className="col-span-12 sm:col-span-4">
+                    {/* Description (Others without sub-types) */}
+                    {showDescription && (
+                      <div className="col-span-12 sm:col-span-3">
                         <label className="block text-xs font-bold text-[#180200] mb-1">
-                          {hasSubTypeSelect ? 'Sub-Type' : 'Description'} <span className="text-[#ED4636]">*</span>
+                          Description <span className="text-[#ED4636]">*</span>
                         </label>
-                        {hasSubTypeSelect ? (
-                          <select
-                            name="donationSubType"
-                            value={formData.donationSubType}
-                            onChange={handleInputChange}
-                            className={`w-full px-2 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white cursor-pointer transition-colors ${formErrors.donationSubType
-                              ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                              : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                              }`}
-                          >
-                            <option value="">Select sub-type</option>
-                            {activeSubTypes.map((st) => (
-                              <option key={st.id || st.name} value={st.name}>
-                                {st.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            name="othersDescription"
-                            value={formData.othersDescription}
-                            onChange={handleInputChange}
-                            className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none transition-colors ${formErrors.othersDescription
-                              ? 'bg-[#FAF7F2] border border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                              : 'bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                              }`}
-                          />
-                        )}
-                        {(hasSubTypeSelect ? formErrors.donationSubType : formErrors.othersDescription) && (
+                        <input
+                          type="text"
+                          name="othersDescription"
+                          value={formData.othersDescription}
+                          onChange={handleInputChange}
+                          className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none transition-colors ${formErrors.othersDescription
+                            ? 'bg-[#FAF7F2] border border-[#ED4636] ring-1 ring-[#ED4636]/30'
+                            : 'bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                            }`}
+                        />
+                        {formErrors.othersDescription && (
                           <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
                             <AlertCircle className="w-3 h-3 shrink-0" />
-                            {hasSubTypeSelect ? formErrors.donationSubType : formErrors.othersDescription}
+                            {formErrors.othersDescription}
                           </p>
                         )}
                       </div>
                     )}
 
                     {/* Amount */}
-                    <div className={`col-span-7 ${showSubField ? 'sm:col-span-3' : 'sm:col-span-4'}`}>
+                    <div className="col-span-7 sm:col-span-3">
                       <label className="block text-xs font-bold text-[#180200] mb-1">
                         Amount <span className="text-[#ED4636]">*</span>
                       </label>
@@ -1766,7 +1740,7 @@ export default function ReceiptEntry() {
                     </div>
 
                     {/* Add Item button inline */}
-                    <div className={`col-span-5 ${showSubField ? 'sm:col-span-1' : 'sm:col-span-3'} pb-0.5`}>
+                    <div className={`col-span-5 ${showDescription ? 'sm:col-span-2' : 'sm:col-span-3'} pb-0.5`}>
                       <button
                         type="button"
                         onClick={() => setExtraLines((prev) => [...prev, emptyLine()])}
@@ -1783,48 +1757,32 @@ export default function ReceiptEntry() {
                     <div className="space-y-2 pt-1 border-t border-dashed border-[#E8DFD8]">
                       {extraLines.map((l) => {
                         const subs = activeSubTypesOf(l.particular);
+                        const needsDescription = isOthersName(l.particular) && subs.length === 0;
                         return (
                           <div key={l.key} className="grid grid-cols-12 gap-3 items-end">
-                            <div className={`col-span-12 ${subs.length > 0 || isOthersName(l.particular) ? 'sm:col-span-4' : 'sm:col-span-5'}`}>
+                            <div className={`col-span-12 ${needsDescription ? 'sm:col-span-4' : 'sm:col-span-6'}`}>
                               <label className="block text-xs font-bold text-[#180200] mb-1">Particulars</label>
-                              <select
-                                value={l.particular}
-                                onChange={(e) => updateExtraLine(l.key, { particular: e.target.value, subType: '', description: '' })}
-                                className="w-full px-2 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
-                              >
-                                <option value="">Select</option>
-                                {activeParticulars.map((opt) => (
-                                  <option key={opt.id || opt.name} value={opt.name}>{opt.name}</option>
-                                ))}
-                              </select>
+                              <ParticularPicker
+                                particulars={activeParticulars}
+                                particular={l.particular}
+                                subType={l.subType}
+                                onChange={({ particular, subType }) =>
+                                  updateExtraLine(l.key, { particular, subType, description: particular === l.particular ? l.description : '' })
+                                }
+                              />
                             </div>
-                            {(subs.length > 0 || isOthersName(l.particular)) && (
-                              <div className="col-span-12 sm:col-span-4">
-                                <label className="block text-xs font-bold text-[#180200] mb-1">
-                                  {subs.length > 0 ? 'Sub-Type' : 'Description'}
-                                </label>
-                                {subs.length > 0 ? (
-                                  <select
-                                    value={l.subType}
-                                    onChange={(e) => updateExtraLine(l.key, { subType: e.target.value })}
-                                    className="w-full px-2 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
-                                  >
-                                    <option value="">Select sub-type</option>
-                                    {subs.map((st) => (
-                                      <option key={st.id || st.name} value={st.name}>{st.name}</option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  <input
-                                    type="text"
-                                    value={l.description}
-                                    onChange={(e) => updateExtraLine(l.key, { description: e.target.value })}
-                                    className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
-                                  />
-                                )}
+                            {needsDescription && (
+                              <div className="col-span-12 sm:col-span-3">
+                                <label className="block text-xs font-bold text-[#180200] mb-1">Description</label>
+                                <input
+                                  type="text"
+                                  value={l.description}
+                                  onChange={(e) => updateExtraLine(l.key, { description: e.target.value })}
+                                  className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
+                                />
                               </div>
                             )}
-                            <div className={`col-span-9 ${subs.length > 0 || isOthersName(l.particular) ? 'sm:col-span-3' : 'sm:col-span-5'}`}>
+                            <div className="col-span-9 sm:col-span-3">
                               <label className="block text-xs font-bold text-[#180200] mb-1">Amount</label>
                               <div className="relative">
                                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#863221]/70">₹</span>

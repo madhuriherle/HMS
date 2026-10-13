@@ -152,3 +152,44 @@ def test_tools_have_their_own_privileges_and_stay_inside_the_rank_1_settings_mod
     assert client.get(f"{API}/system/recycle-bin", headers=nobody).status_code == 403
     assert client.get(f"{API}/system/cleanup", headers=nobody).status_code == 403
     assert client.post(f"{API}/system/recycle-bin/restore", headers=nobody, json={"items": [{"entity": "particular", "id": 1}]}).status_code == 403
+
+
+def test_a_deleted_taluk_with_deleted_pin_codes_and_a_membership_type_with_prices_can_be_removed(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    st = client.post(f"{API}/masters/states", headers=h, json={"name_en": f"St{s}", "code": f"S{s}"[:6]}).json()
+    d = client.post(f"{API}/masters/districts", headers=h, json={"name_en": f"Di{s}", "state_id": st["id"]}).json()
+    t = client.post(f"{API}/masters/taluks", headers=h, json={"name_en": f"Ta{s}", "district_id": d["id"]}).json()
+    pin = client.post(f"{API}/masters/postal-codes", headers=h, json={
+        "pincode": "5" + s[-5:], "post_office_name": f"PO{s}", "state_id": st["id"], "district_id": d["id"], "taluk_id": t["id"]})
+    assert pin.status_code in (200, 201), pin.text
+    # delete the PIN code first, then the taluk and the district: all sit in the bin, the pin code too
+    for path, o in (("postal-codes", pin.json()), ("taluks", t), ("districts", d)):
+        assert client.delete(f"{API}/masters/{path}/{o['id']}", headers=h).status_code in (200, 204)
+    items = [{"entity": "district", "id": d["id"]}]
+    done = client.post(f"{API}/system/recycle-bin/purge", headers=h, json={"items": items}).json()
+    assert done["deleted"] == 1 and not done["failed"], done
+
+
+def test_sidebar_nests_organisation_and_receipt_pages_under_system_settings(client, admin_headers):
+    menu = client.get(f"{API}/users/modules/menu", headers=admin_headers).json()
+    settings = next(m for m in menu if m["name"] == "Settings")
+    hub = next(m for m in settings["submodules"] if m["route"] == "/dashboard/settings")
+    assert [c["route"] for c in hub["submodules"]] == ["/dashboard/master/organisation-settings", "/dashboard/system/number-formats"]
+    assert not [m for m in settings["submodules"] if m["route"] in ("/dashboard/master/organisation-settings", "/dashboard/system/number-formats")]
+
+
+def test_organisation_settings_has_its_own_privileges(client, admin_headers):
+    tree = client.get(f"{API}/users/modules/privilege-tree", headers=admin_headers).json()
+
+    def find(nodes, code):
+        for n in nodes:
+            if n["code"] == code:
+                return n
+            hit = find(n.get("submodules", []), code)
+            if hit:
+                return hit
+
+    org = find(tree, "masters.organisation")
+    assert {p["code"] for p in org["privileges"]} == {"masters.organisation.read", "masters.organisation.write"}
+    assert org["permission_code"] == "masters.organisation.read"
+    assert client.get(f"{API}/system/settings", headers=admin_headers).status_code == 200

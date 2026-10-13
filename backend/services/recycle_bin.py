@@ -5,6 +5,8 @@ Only record types listed in ``ENTITIES`` appear. A row is "in the bin" while
 collide with a record created since (same code / number) is refused row by row.
 """
 from dataclasses import dataclass
+import logging
+import re
 from typing import Callable, Optional
 
 from sqlalchemy import or_
@@ -13,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from models.engagements import Affiliation, Associate, PressMedia
 from models.events import Event
-from models.masters import Bank, District, MembershipType, Particular, State, Taluk
+from models.masters import Bank, District, MembershipType, MembershipTypePrice, Particular, PostalCode, State, Taluk
 from models.members import Member
 from models.notifications import NotificationTemplate
 from models.receipts import (
@@ -58,11 +60,25 @@ ENTITIES = {
                lambda r: r.template_name or f"Template #{r.id}", (NotificationTemplate.template_name,)),
         Entity("state", "State", State, lambda r: r.name_en or f"State #{r.id}", (State.name_en,)),
         Entity("district", "District", District, lambda r: r.name_en or f"District #{r.id}", (District.name_en,)),
+        Entity("postal_code", "PIN Code", PostalCode,
+               lambda r: _join(r.pincode, r.post_office_name) or f"PIN #{r.id}", (PostalCode.pincode, PostalCode.post_office_name)),
         Entity("taluk", "Taluk", Taluk, lambda r: r.name_en or f"Taluk #{r.id}", (Taluk.name_en,)),
     )
 }
 
 PER_TYPE_LIMIT = 2000
+logger = logging.getLogger("hms.recycle_bin")
+
+
+def _why_not_deleted(exc: Exception) -> str:
+    """Say what blocks the delete, from the database's own message."""
+    text = str(getattr(exc, "orig", exc))
+    tables = re.findall(r'on table "?(\w+)"?', text)  # Postgres names the parent first, then the table that still points at it
+    if isinstance(exc, IntegrityError) and tables:
+        return f"Still used by records in '{tables[-1].replace('_', ' ')}'. Delete or restore those first."
+    if isinstance(exc, IntegrityError):
+        return "Still used by other records, so it cannot be deleted permanently."
+    return f"Could not be deleted: {text.strip().splitlines()[0][:160] if text.strip() else type(exc).__name__}"
 
 
 def _deleted(model):
@@ -154,8 +170,37 @@ def _purge_row(db: Session, e: Entity, row) -> None:
     if isinstance(row, Receipt):
         for m in (ReceiptItem, ReceiptAllocation, PaymentTransaction, ReceiptCancellation, RefundTransaction):
             db.query(m).filter(m.receipt_id == row.id).delete(synchronize_session=False)
+    _purge_dependents(db, row)
     db.delete(row)
     db.flush()
+
+
+def _gone(model, *conds):
+    """Rows already in the recycle bin (soft-deleted), matching the conditions."""
+    return (model.is_deleted == True,) + conds  # noqa: E712
+
+
+def _purge_dependents(db: Session, row) -> None:
+    """Remove what only exists for this record, so it can go: its price history, and the
+    soft-deleted locations under it. Active records that still use it are left alone and the
+    database refuses the delete (the message names them)."""
+    def drop(model, *conds):
+        db.query(model).filter(*conds).delete(synchronize_session=False)
+
+    if isinstance(row, MembershipType):
+        drop(MembershipTypePrice, MembershipTypePrice.membership_type_id == row.id)
+    elif isinstance(row, Taluk):
+        drop(PostalCode, *_gone(PostalCode, PostalCode.taluk_id == row.id))
+    elif isinstance(row, District):
+        drop(PostalCode, *_gone(PostalCode, PostalCode.district_id == row.id))
+        for (tid,) in db.query(Taluk.id).filter(*_gone(Taluk, Taluk.district_id == row.id)).all():
+            drop(PostalCode, *_gone(PostalCode, PostalCode.taluk_id == tid))
+        drop(Taluk, *_gone(Taluk, Taluk.district_id == row.id))
+    elif isinstance(row, State):
+        drop(PostalCode, *_gone(PostalCode, PostalCode.state_id == row.id))
+        for (did,) in db.query(District.id).filter(*_gone(District, District.state_id == row.id)).all():
+            _purge_dependents(db, db.get(District, did))
+        drop(District, *_gone(District, District.state_id == row.id))
 
 
 def purge(db: Session, items: list) -> dict:
@@ -170,10 +215,10 @@ def purge(db: Session, items: list) -> dict:
             with db.begin_nested():
                 _purge_row(db, e, row)
             done += 1
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
             db.expire_all()
-            failed.append({"key": f"{it['entity']}:{it['id']}", "name": label,
-                           "error": "Still used by other records, so it cannot be deleted permanently."})
+            logger.warning("recycle bin purge of %s #%s failed: %s", it["entity"], it["id"], exc)
+            failed.append({"key": f"{it['entity']}:{it['id']}", "name": label, "error": _why_not_deleted(exc)})
     db.commit()
     return {"deleted": done, "failed": failed}
 

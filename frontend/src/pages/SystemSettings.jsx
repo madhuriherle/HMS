@@ -12,7 +12,7 @@ const CARDS = [
     title: 'Organisation Identity',
     text: 'Manage name, address, logo and contact info for receipts and reports.',
     action: 'Configure',
-    allowed: ({ hasPermission }) => hasPermission('system.read'),
+    allowed: ({ hasPermission }) => hasPermission('masters.organisation.read'),
   },
   {
     to: '/dashboard/system/number-formats',
@@ -45,7 +45,7 @@ export default function SystemSettings() {
   const cards = CARDS.filter((c) => c.allowed(auth));
 
   return (
-    <PermissionGate required="system.read">
+    <PermissionGate required={['masters.organisation.read', 'system.number_formats.read', 'system.recycle_bin.read', 'system.cleanup.read']}>
       <div className="space-y-6">
         <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">System Settings</h1>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

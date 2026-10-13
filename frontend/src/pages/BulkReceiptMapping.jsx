@@ -568,10 +568,6 @@ export default function BulkReceiptMapping() {
                               <Check className="w-3 h-3" />
                               Exact Match
                             </span>
-                          ) : cand.match_type === 'MOBILE' ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                              Phone Match
-                            </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-300">
                               Unmatched

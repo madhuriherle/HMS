@@ -118,10 +118,10 @@ def test_lookup_does_not_search_by_name_or_mobile(client, admin_headers):
         assert mid not in [m["id"] for m in res["matches"]]
 
 
-def test_lookup_by_plain_member_id(client, admin_headers):
+def test_a_plain_member_id_is_not_a_membership_number(client, admin_headers):
+    """The MID is the primary key; the Membership No. box only knows membership numbers."""
     h = admin_headers
     m = client.post(f"{API}/members/", headers=h, json=_payload(_sfx())).json()
     for typed in (str(m["id"]), f" {m['id']} "):
         r = _lookup(client, h, typed)
-        assert r["found"] and r["matches"][0]["id"] == m["id"], typed
-        assert r["matches"][0]["registration_number"] == str(m["id"])
+        assert not r["found"] and r["matches"] == [], typed

@@ -121,3 +121,30 @@ def test_modules_seeded_and_gated(client, admin_headers):
 
     assert "/dashboard/membership/import" in routes
     assert "/dashboard/receipts/bulk-mapping" in routes
+
+
+def test_bulk_mapping_ignores_the_mobile_number(client, admin_headers):
+    """A receipt is matched on the membership number only: a member with the same mobile is not a match."""
+    import uuid
+
+    mobile = "9" + str(uuid.uuid4().int)[:9]
+    member = client.post(
+        "/api/v1/members/", headers=admin_headers,
+        json={"first_name_en": "Same", "last_name_en": "Mobile", "mobile": mobile, "gender": "Male"},
+    )
+    assert member.status_code in (200, 201), member.text
+    tag = "NOMATCH-" + uuid.uuid4().hex[:6].upper()
+    receipt = client.post(
+        "/api/v1/receipts/", headers=admin_headers,
+        json={
+            "receipt_date": "2026-10-13", "receipt_type": "MEMBERSHIP", "payer_name": "Someone Else",
+            "payment_mode": "CASH", "gross_amount": 100, "net_amount": 100,
+            "payer_membership_no": tag, "payer_mobile": mobile,
+            "items": [{"item_type": "MEMBERSHIP", "amount": 100}],
+        },
+    )
+    assert receipt.status_code in (200, 201), receipt.text
+    rid = receipt.json()["id"]
+    cands = client.get("/api/v1/receipts/unassigned-candidates", headers=admin_headers, params={"search": tag}).json()
+    found = [c for c in cands["candidates"] if c["receipt_id"] == rid][0]
+    assert found["match_type"] == "NONE" and found["matched_member"] is None

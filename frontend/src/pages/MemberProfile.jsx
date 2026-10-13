@@ -95,7 +95,251 @@ function Loading({ state, children }) {
   return children(state.data);
 }
 
+// The credit and next-milestone box.
+function CreditBanner({ credit }) {
+  if (!credit) return null;
+  return (
+              <div className="bg-gradient-to-br from-[#FAF7F2] to-white rounded-2xl p-5 border border-[#510601]/20 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-[#510601] text-white">
+                      <TrendingUp className="w-4 h-4" />
+                    </div>
+                    <span className="font-bold text-xs uppercase tracking-wider text-[#510601]">
+                      Cumulative Membership Milestone & Credit
+                    </span>
+                  </div>
+                  {credit.upgrade_pending && (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                      Eligible for Upgrade
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                  <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
+                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Total Credit</span>
+                    <p className="font-mono font-bold text-base text-[#510601] mt-0.5">{inr(credit.credit_total)}</p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
+                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Membership Type</span>
+                    <p className="font-bold text-sm text-[#180200] mt-0.5 flex items-center gap-1">
+                      <Award className="w-3.5 h-3.5 text-[#510601] shrink-0" />
+                      <span>{credit.current_type?.name_en || credit.qualified_type?.name_en || 'Basic'}</span>
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
+                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Next Milestone</span>
+                    <p className="font-bold text-xs text-[#180200] mt-0.5">
+                      {credit.target_type ? (
+                        <span>{credit.target_type.name_en} ({inr(credit.target_type.price)})</span>
+                      ) : (
+                        <span className="text-emerald-700 font-semibold">Highest Tier Achieved</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
+                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Remaining to Next</span>
+                    <p className="font-mono font-bold text-sm text-[#863221] mt-0.5">
+                      {credit.amount_to_target ? inr(credit.amount_to_target) : formatMoney(0)}
+                    </p>
+                  </div>
+                </div>
+
+                {credit.target_type && (
+                  <div className="space-y-1 pt-1">
+                    <div className="flex justify-between text-[10px] text-[#863221]">
+                      <span>Progress to {credit.target_type.name_en}</span>
+                      <span className="font-mono font-semibold">
+                        {Math.min(100, Math.round((credit.credit_total / credit.target_type.price) * 100))}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-[#510601] h-1.5 rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(100, (credit.credit_total / credit.target_type.price) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            
+  );
+}
+
 // ── tabs ──
+
+function OverviewCard({ icon: Icon, title, tab, onOpen, children }) {
+  return (
+    <section className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm flex flex-col">
+      <header className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[#E8DFD8] bg-[#FAF7F2]/60 rounded-t-2xl">
+        <span className="flex items-center gap-2">
+          <Icon className="w-4 h-4 text-[#863221]" />
+          <h2 className="text-sm font-bold text-[#180200]">{title}</h2>
+        </span>
+        {tab && (
+          <button type="button" onClick={() => onOpen(tab)} className="text-[11px] font-semibold text-[#510601] hover:underline cursor-pointer">
+            View all
+          </button>
+        )}
+      </header>
+      <div className="p-4 flex-1">{children}</div>
+    </section>
+  );
+}
+
+const NotRecorded = () => <Empty>Not recorded yet.</Empty>;
+
+const FamilyLine = ({ label, value }) =>
+  value ? (
+    <div>
+      <span className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mr-2">{label}</span>
+      {value}
+    </div>
+  ) : null;
+
+function OverviewTab({ id, onOpen }) {
+  const state = useSection(id, 'overview');
+  return (
+    <Loading state={state}>
+      {(d) => {
+        const b = d.basic;
+        const c = d.contact;
+        const m = d.membership;
+        const f = d.family;
+        const hasBasic = Object.values(b).some(Boolean);
+        const hasContact = c.mobile || c.whatsapp_number || c.email || c.address;
+        const hasFamily = f.father_name || f.mother_name || f.spouse_name || f.children_count > 0;
+        const hasMagazine = d.magazine.subscriptions.length > 0 || d.magazine.services.length > 0 || d.magazine.magazine_needed;
+        const credit = m.credit;
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <OverviewCard icon={User} title="Basic details" tab="personal" onOpen={onOpen}>
+              {!hasBasic ? (
+                <NotRecorded />
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Gender" value={b.gender} />
+                  <Field label="Date of birth" value={b.date_of_birth ? formatDate(b.date_of_birth) : ''} />
+                  <Field label="Blood group" value={b.blood_group} />
+                  <Field label="Gotra" value={b.gotra} />
+                  <Field label="Qualification" value={b.qualification} />
+                  <Field label="Occupation" value={b.occupation} />
+                  <Field label="Native place" value={b.native_place} />
+                </div>
+              )}
+            </OverviewCard>
+
+            <OverviewCard icon={Phone} title="Contact & address" tab="contact" onOpen={onOpen}>
+              {!hasContact ? (
+                <NotRecorded />
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Mobile" value={phone(c.mobile_country_code, c.mobile)} />
+                    <Field label="WhatsApp" value={phone(c.whatsapp_country_code, c.whatsapp_number)} />
+                  </div>
+                  <Field label="Email" value={c.email} />
+                  <Field label="Address" value={c.address} />
+                </div>
+              )}
+            </OverviewCard>
+
+            <OverviewCard icon={CreditCard} title="Membership" tab="membership" onOpen={onOpen}>
+              {!m.current ? (
+                <Empty>No membership yet.</Empty>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Type" value={m.current.type_name_en} />
+                    <Field label="Status" value={m.current.status} />
+                    <Field label="Number" value={m.current.membership_number || 'No number yet'} />
+                    <Field label="Valid till" value={m.current.expires_at ? formatDate(m.current.expires_at) : ''} />
+                  </div>
+                  {credit && (
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#E8DFD8]/70">
+                      <Field label="Total credit" value={inr(credit.credit_total)} />
+                      <Field
+                        label="Next milestone"
+                        value={credit.target_type ? `${credit.target_type.name_en} (${inr(credit.amount_to_target || 0)} to go)` : 'Highest tier reached'}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </OverviewCard>
+
+            <OverviewCard icon={Users} title="Family" tab="family" onOpen={onOpen}>
+              {!hasFamily ? (
+                <NotRecorded />
+              ) : (
+                <div className="space-y-2 text-sm">
+                  <FamilyLine label="Father" value={f.father_name} />
+                  <FamilyLine label="Mother" value={f.mother_name} />
+                  <FamilyLine label="Spouse" value={f.spouse_name} />
+                  <FamilyLine label="Children" value={f.children_count > 0 ? String(f.children_count) : ''} />
+                </div>
+              )}
+            </OverviewCard>
+
+            <OverviewCard icon={FileText} title={`Receipts (${d.receipts.total})`} tab="receipts" onOpen={onOpen}>
+              {d.receipts.latest.length === 0 ? (
+                <Empty>No receipts mapped to this member.</Empty>
+              ) : (
+                <div className="space-y-1.5 text-xs">
+                  {d.receipts.latest.map((r) => (
+                    <div key={r.receipt_id} className="flex justify-between gap-3">
+                      <span>
+                        <b className="font-mono">{r.receipt_number}</b>
+                        <span className="text-[#863221]"> · {formatDate(r.receipt_date)}</span>
+                      </span>
+                      <span className="font-mono font-bold">{inr(r.allocated_amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </OverviewCard>
+
+            <OverviewCard icon={BookOpen} title="Magazine & services" tab="magazine" onOpen={onOpen}>
+              {!hasMagazine ? (
+                <Empty>No magazine subscription or services.</Empty>
+              ) : (
+                <div className="space-y-1.5 text-sm">
+                  {d.magazine.magazine_needed && <div>Magazine needed: <b>{d.magazine.magazine_needed}</b></div>}
+                  {d.magazine.subscriptions.map((st, i) => (
+                    <div key={`s${i}`}>Magazine subscription: <b>{st}</b></div>
+                  ))}
+                  {d.magazine.services.map((sv, i) => (
+                    <div key={`v${i}`}>{sv}</div>
+                  ))}
+                </div>
+              )}
+            </OverviewCard>
+
+            <div className="md:col-span-2 xl:col-span-3">
+              <OverviewCard icon={History} title="Recent activity" tab="activity" onOpen={onOpen}>
+                {d.activity.length === 0 ? (
+                  <Empty>No activity recorded yet.</Empty>
+                ) : (
+                  <ul className="space-y-1.5 text-xs">
+                    {d.activity.map((e) => (
+                      <li key={e.id} className="flex justify-between gap-3">
+                        <span className="text-[#180200]">{e.description}</span>
+                        <span className="text-[#863221] whitespace-nowrap">
+                          {e.acted_by_name || 'System'} · {e.created_at ? formatDateTime(e.created_at) : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </OverviewCard>
+            </div>
+          </div>
+        );
+      }}
+    </Loading>
+  );
+}
 function PersonalTab({ id }) {
   const state = useSection(id, 'personal');
   return (
@@ -257,6 +501,7 @@ function MembershipTab({ id }) {
     <Loading state={state}>
       {(d) => (
         <div className="space-y-5">
+          <CreditBanner credit={d.membership_credit} />
           <Card icon={CreditCard} title="Memberships">
             {d.memberships.length === 0 ? (
               <Empty>No membership yet.</Empty>
@@ -558,6 +803,7 @@ function ActivityTab({ id }) {
 }
 
 const TABS = [
+  { key: 'overview', label: 'Overview', icon: User, Component: OverviewTab },
   { key: 'personal', label: 'Personal', icon: User, Component: PersonalTab },
   { key: 'contact', label: 'Contact & Address', icon: Phone, Component: ContactTab },
   { key: 'family', label: 'Family', icon: Users, Component: FamilyTab, count: 'family' },
@@ -576,7 +822,7 @@ export default function MemberProfile() {
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState('');
 
-  const tabKey = TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'personal';
+  const tabKey = TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'overview';
   const ActiveTab = TABS.find((t) => t.key === tabKey).Component;
   const openTab = useCallback(
     (key) => setSearchParams({ tab: key }, { replace: true }),
@@ -615,7 +861,6 @@ export default function MemberProfile() {
 
   const s = summary;
   const fullName = s ? [s.name_title, s.first_name_en, s.middle_name_en, s.last_name_en].filter(Boolean).join(' ') : '';
-  const credit = s?.membership_credit;
 
   return (
     <PermissionGate required="members.list.read">
@@ -678,74 +923,6 @@ export default function MemberProfile() {
               </div>
             </div>
 
-            {/* Milestone & Credit */}
-            {credit && (
-              <div className="bg-gradient-to-br from-[#FAF7F2] to-white rounded-2xl p-5 border border-[#510601]/20 shadow-sm space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-lg bg-[#510601] text-white">
-                      <TrendingUp className="w-4 h-4" />
-                    </div>
-                    <span className="font-bold text-xs uppercase tracking-wider text-[#510601]">
-                      Cumulative Membership Milestone & Credit
-                    </span>
-                  </div>
-                  {credit.upgrade_pending && (
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                      Eligible for Upgrade
-                    </span>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                  <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
-                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Total Credit</span>
-                    <p className="font-mono font-bold text-base text-[#510601] mt-0.5">{inr(credit.credit_total)}</p>
-                  </div>
-                  <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
-                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Membership Type</span>
-                    <p className="font-bold text-sm text-[#180200] mt-0.5 flex items-center gap-1">
-                      <Award className="w-3.5 h-3.5 text-[#510601] shrink-0" />
-                      <span>{credit.current_type?.name_en || credit.qualified_type?.name_en || 'Basic'}</span>
-                    </p>
-                  </div>
-                  <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
-                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Next Milestone</span>
-                    <p className="font-bold text-xs text-[#180200] mt-0.5">
-                      {credit.target_type ? (
-                        <span>{credit.target_type.name_en} ({inr(credit.target_type.price)})</span>
-                      ) : (
-                        <span className="text-emerald-700 font-semibold">Highest Tier Achieved</span>
-                      )}
-                    </p>
-                  </div>
-                  <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
-                    <span className="text-[10px] uppercase font-bold text-[#863221] block">Remaining to Next</span>
-                    <p className="font-mono font-bold text-sm text-[#863221] mt-0.5">
-                      {credit.amount_to_target ? inr(credit.amount_to_target) : formatMoney(0)}
-                    </p>
-                  </div>
-                </div>
-
-                {credit.target_type && (
-                  <div className="space-y-1 pt-1">
-                    <div className="flex justify-between text-[10px] text-[#863221]">
-                      <span>Progress to {credit.target_type.name_en}</span>
-                      <span className="font-mono font-semibold">
-                        {Math.min(100, Math.round((credit.credit_total / credit.target_type.price) * 100))}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className="bg-[#510601] h-1.5 rounded-full transition-all duration-500"
-                        style={{ width: `${Math.min(100, (credit.credit_total / credit.target_type.price) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Tabs */}
             <div className="border-b border-[#E8DFD8] overflow-x-auto">
               <div role="tablist" className="flex gap-1 min-w-max">
@@ -778,7 +955,7 @@ export default function MemberProfile() {
               </div>
             </div>
 
-            <ActiveTab key={`${id}-${tabKey}`} id={id} />
+            <ActiveTab key={`${id}-${tabKey}`} id={id} onOpen={openTab} />
           </>
         )}
       </div>

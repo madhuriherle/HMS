@@ -201,26 +201,6 @@ def create_member(
     db.add(db_obj)
     db.flush()
 
-    # ── Provision the member's login account (spec: 'a user with a membership
-    # role will be created'). Uses mobile as username; skip silently when the
-    # username is taken (member accounts can also be created later).
-    login_username = member_in.mobile or f"member{db_obj.id}"
-    if not db.query(UserModel).filter(UserModel.username == login_username).first():
-        import secrets
-        temp_password = secrets.token_urlsafe(12)
-        from services.permissions import get_role_by_code
-        member_role = get_role_by_code(db, "MEMBER")
-        db.add(UserModel(
-            name=f"{member_in.first_name_en} {member_in.last_name_en or ''}".strip(),
-            username=login_username,
-            mobile=member_in.mobile,
-            password_hash=get_password_hash(temp_password),
-            user_type="MEMBER",
-            role_id=member_role.id if member_role else None,
-            member_id=db_obj.id,
-            created_by=current_user.id,
-        ))
-
     db.commit()
     db.refresh(db_obj)
     return db_obj
@@ -369,23 +349,6 @@ def public_register_member(
     )
     db.add(db_obj)
     db.flush()
-
-    # MEMBER login account, same as staff registration (mobile-as-username).
-    login_username = member_in.mobile or f"member{db_obj.id}"
-    if not db.query(UserModel).filter(UserModel.username == login_username).first():
-        import secrets
-        temp_password = secrets.token_urlsafe(12)
-        member_role = get_role_by_code(db, "MEMBER")
-        db.add(UserModel(
-            name=f"{member_in.first_name_en} {member_in.last_name_en or ''}".strip(),
-            username=login_username,
-            mobile=member_in.mobile,
-            password_hash=get_password_hash(temp_password),
-            user_type="MEMBER",
-            role_id=member_role.id if member_role else None,
-            member_id=db_obj.id,
-            created_by=None,
-        ))
 
     db.commit()
     db.refresh(db_obj)
@@ -1710,6 +1673,7 @@ def read_member_profile(
                 for c in Member.__table__.columns
                 if c.name not in ("is_deleted", "deleted_by", "deleted_at")
             },
+            "member_code": member.membership_number,  # the same number, under its old name
             **_location_names(db, member),
         },
         "memberships": membership_list,
@@ -1863,7 +1827,7 @@ def read_member_profile(
 # GET /members/{id}/profile/{section} returns only that tab's data, so the screen loads what is open and nothing
 # else. "summary" is the header (name, photo, status, credit and a count for each tab).
 PROFILE_SECTIONS = (
-    "summary", "personal", "contact", "family", "membership", "receipts", "magazine", "events", "history",
+    "summary", "overview", "personal", "contact", "family", "membership", "receipts", "magazine", "events", "history",
 )
 
 
@@ -2197,6 +2161,55 @@ def _profile_history(db: Session, member: Member) -> dict:
     }
 
 
+def _profile_overview(db: Session, member: Member, current_user: User) -> dict:
+    """The key facts from the other tabs on one screen: nothing more than the Overview cards show."""
+    from api.v1.endpoints.activity import read_member_timeline
+
+    personal = _profile_personal(db, member)
+    contact = _profile_contact(db, member)
+    family = _profile_family(db, member)
+    membership = _profile_membership(db, member)
+    magazine = _profile_magazine(db, member)
+    recent = _profile_receipts(db, member, 1, 3)
+    timeline = read_member_timeline(db=db, current_user=current_user, member_id=member.id, page=1, limit=5)
+    current = next((m for m in membership["memberships"] if m["status"] == "ACTIVE"), None) or (
+        membership["memberships"][0] if membership["memberships"] else None
+    )
+    address = ", ".join(
+        str(v) for v in (
+            contact["address_line1"], contact["address_line2"], contact["locality"], contact["city"],
+            contact["taluk_name"], contact["district_name"], contact["state_name"], contact["pincode"],
+        ) if v
+    )
+    return {
+        "basic": {k: personal[k] for k in (
+            "gender", "date_of_birth", "blood_group", "gotra", "qualification", "occupation", "native_place")},
+        "contact": {
+            "mobile": contact["mobile"], "mobile_country_code": contact["mobile_country_code"],
+            "whatsapp_number": contact["whatsapp_number"], "whatsapp_country_code": contact["whatsapp_country_code"],
+            "email": contact["email"], "address": address,
+        },
+        "membership": {"current": current, "credit": membership["membership_credit"]},
+        "family": {
+            "father_name": family["father_name"], "father_membership_number": family["father_membership_number"],
+            "mother_name": family["mother_name"], "mother_membership_number": family["mother_membership_number"],
+            "spouse_name": family["spouse_name"], "spouse_membership_number": family["spouse_membership_number"],
+            "children_count": len(family["children"]),
+        },
+        "receipts": {"total": recent["total"], "latest": recent["data"]},
+        "magazine": {
+            "magazine_needed": magazine["magazine_needed"],
+            "subscriptions": [x["delivery_status"] for x in magazine["subscriptions"]],
+            "services": [x["service_name_en"] for x in magazine["services"]],
+        },
+        "activity": [
+            {"id": e["id"], "description": (e.get("details") or {}).get("description") or e.get("action"),
+             "acted_by_name": e.get("acted_by_name"), "created_at": e.get("created_at")}
+            for e in timeline["data"]
+        ],
+    }
+
+
 @router.get("/{id}/profile/{section}")
 def read_member_profile_section(
     *,
@@ -2218,6 +2231,8 @@ def read_member_profile_section(
     limit = min(max(limit, 1), 100)
     if section == "receipts":
         return _profile_receipts(db, member, page, limit)
+    if section == "overview":
+        return _profile_overview(db, member, current_user)
     builders = {
         "summary": _profile_summary, "personal": _profile_personal, "contact": _profile_contact,
         "family": _profile_family, "membership": _profile_membership, "magazine": _profile_magazine,

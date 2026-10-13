@@ -44,7 +44,7 @@ export default function UserManagement() {
   const rules = useRules(); // formats and limits from the server
   // Roles weaker than mine, or my own rank (not Rank 1) can be assigned — mirrors the backend rule.
   const sameRankOk = (rank) => rank > myRank || (rank === myRank && myRank !== 1);
-  const availableRoles = roles => roles.filter(r => sameRankOk(r.rank_level ?? 99));
+  const availableRoles = roles => roles.filter(r => r.code !== 'MEMBER' && r.name?.toLowerCase() !== 'member' && sameRankOk(r.rank_level ?? 99));
   const getUserRank = (user) => {
     const direct = user?.role_rank_level;
     if (direct != null) return Number(direct);
@@ -68,15 +68,21 @@ export default function UserManagement() {
       try {
         setLoading(true);
         const usersResponse = await api.get('/users/', { params: { limit: 500 } });
-        const userRows = Array.isArray(usersResponse.data)
+        const rawUserRows = Array.isArray(usersResponse.data)
           ? usersResponse.data
           : (usersResponse.data?.data || usersResponse.data?.items || []);
+        const userRows = rawUserRows.filter(
+          (u) => u.user_type !== 'MEMBER' && !u.member_id && u.role_name !== 'Member'
+        );
         setUsers(userRows);
 
         const rolesResponse = await api.get('/users/roles', { params: { limit: 500, assignable: true } });
-        const roleRows = Array.isArray(rolesResponse.data)
+        const rawRoleRows = Array.isArray(rolesResponse.data)
           ? rolesResponse.data
           : (rolesResponse.data?.data || rolesResponse.data?.items || []);
+        const roleRows = rawRoleRows.filter(
+          (r) => r.code !== 'MEMBER' && r.name?.toLowerCase() !== 'member'
+        );
         setRoles(roleRows);
       } catch (error) {
         console.error("API Fetch Error:", error); showToast(error.response?.data?.detail || 'Could not load data from the server.', 'error');

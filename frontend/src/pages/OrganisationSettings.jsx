@@ -330,7 +330,7 @@ export default function OrganisationSettings() {
   };
 
   return (
-    <PermissionGate required="system.read">
+    <PermissionGate required="masters.organisation.read">
     <div className="space-y-6 pb-20 font-sans">
       {/* ---------------------------------------------------- */}
       {/* Toast Notification Alert                            */}
@@ -382,8 +382,8 @@ export default function OrganisationSettings() {
             <button
               type="button"
               onClick={handleSave}
-              disabled={!hasPermission('system.write')}
-              title={!hasPermission('system.write') ? 'You need the system.write permission' : 'Save Changes'}
+              disabled={!hasPermission('masters.organisation.write')}
+              title={!hasPermission('masters.organisation.write') ? 'You need the masters.organisation.write permission' : 'Save Changes'}
               className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-2 cursor-pointer"
             >
               <Save className="w-4 h-4" />
@@ -503,8 +503,8 @@ export default function OrganisationSettings() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={!hasPermission('system.write')}
-                    title={!hasPermission('system.write') ? 'You need the system.write permission' : settings.profile.logo ? 'Change Logo' : 'Upload Logo'}
+                    disabled={!hasPermission('masters.organisation.write')}
+                    title={!hasPermission('masters.organisation.write') ? 'You need the masters.organisation.write permission' : settings.profile.logo ? 'Change Logo' : 'Upload Logo'}
                     className="px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
                   >
                     <Upload className="w-3.5 h-3.5" />
@@ -1574,8 +1574,8 @@ export default function OrganisationSettings() {
           <button
             type="button"
             onClick={handleSave}
-            disabled={!hasPermission('system.write')}
-            title={!hasPermission('system.write') ? 'You need the system.write permission' : 'Save Changes'}
+            disabled={!hasPermission('masters.organisation.write')}
+            title={!hasPermission('masters.organisation.write') ? 'You need the masters.organisation.write permission' : 'Save Changes'}
             className="flex-1 sm:flex-none px-6 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             <Save className="w-4 h-4" />

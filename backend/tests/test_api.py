@@ -2254,15 +2254,14 @@ def test_offline_registration_bilingual_and_duplicates(client, admin_headers):
     )
     assert ok_kn.status_code == 201, ok_kn.text
 
-    # a MEMBER login account was provisioned with mobile as username
+    # no MEMBER login account is made at registration
     from db.session import SessionLocal
     from models.users import User as UserModel
 
     with SessionLocal() as db:
         login = db.query(UserModel).filter(UserModel.username == "9330000001").first()
-        assert login is not None, "member login account was not provisioned"
-        assert login.user_type == "MEMBER"
-        assert login.member_id == member["id"]
+        # registering a member no longer creates a login account (members do not sign in to the admin panel)
+        assert login is None
 
     # validation: bad gender, future dob, bad mobile
     assert client.post(
@@ -6612,6 +6611,10 @@ def test_member_profile_comes_one_tab_at_a_time(client, admin_headers):
     assert body["id"] == mid and body["first_name_en"] == "Tabbed Person" and set(body["counts"]) == {
         "family", "membership", "receipts", "magazine", "events"}
     assert body["membership_credit"] is not None and body["paid_so_far"] == 0
+    ov = client.get(f"/api/v1/members/{mid}/profile/overview", headers=H)
+    assert ov.status_code == 200, ov.text
+    assert set(ov.json()) == {"basic", "contact", "membership", "family", "receipts", "magazine", "activity"}
+    assert ov.json()["receipts"]["total"] == 0 and isinstance(ov.json()["activity"], list)
     for section in ("personal", "contact", "family", "membership", "magazine", "events", "history"):
         r = client.get(f"/api/v1/members/{mid}/profile/{section}", headers=H)
         assert r.status_code == 200, (section, r.text)

@@ -739,7 +739,8 @@ def lookup_member_for_receipt(
     """Who is this number? Backs the Membership No. box of Receipt Entry.
 
     Accepts a member code, a membership number (e.g. HMSM-000123) or an applicant's registration number
-    (REG-2026-0007, as shown on the screens). Matching is exact and ignores case.
+    (REG-2026-0007, as shown on the screens). Matching is exact and ignores case. A bare number such as 7 is
+    the member's id (MID), which is not a membership number, so it finds nobody.
     """
     import re
 
@@ -763,8 +764,6 @@ def lookup_member_for_receipt(
         .filter(live, MemberMembership.is_deleted == False, func.upper(MemberMembership.membership_number) == upper)  # noqa: E712
         .limit(5)
     )
-    if raw.isdigit() and len(raw) <= 9:  # the plain MID (the member's id)
-        add(db.query(Member.id).filter(live, Member.id == int(raw)).limit(1))
     reg = re.fullmatch(r"REG-(\d{4})-(\d+)", raw, flags=re.IGNORECASE)
     if reg:
         add(
@@ -842,9 +841,8 @@ def get_unassigned_candidates(
 
     receipts = q.order_by(Receipt.id.desc()).limit(limit).all()
 
-    # Pre-fetch candidate members by membership numbers & mobiles
+    # Pre-fetch candidate members by the membership number written on the receipt (the only thing matched on)
     mem_nums = {r.payer_membership_no.strip().upper() for r in receipts if r.payer_membership_no and r.payer_membership_no.strip()}
-    mobiles = {r.payer_mobile.strip() for r in receipts if r.payer_mobile and r.payer_mobile.strip()}
 
     matched_by_num = {}
     if mem_nums:
@@ -862,27 +860,11 @@ def get_unassigned_candidates(
             key = mm.membership_number.strip().upper()
             matched_by_num[key] = (m, mm)
 
-    matched_by_mob = {}
-    if mobiles:
-        mob_rows = (
-            db.query(Member, MemberMembership)
-            .outerjoin(MemberMembership, (MemberMembership.member_id == Member.id) & (MemberMembership.is_deleted == False))
-            .filter(
-                Member.is_deleted == False,
-                Member.mobile.in_(mobiles),
-            )
-            .all()
-        )
-        for m, mm in mob_rows:
-            if m.mobile:
-                matched_by_mob[m.mobile.strip()] = (m, mm)
-
     candidates = []
     total_matched = 0
 
     for r in receipts:
         r_num = (r.payer_membership_no or "").strip().upper()
-        r_mob = (r.payer_mobile or "").strip()
 
         matched_m = None
         matched_mm = None
@@ -891,9 +873,6 @@ def get_unassigned_candidates(
         if r_num and r_num in matched_by_num:
             matched_m, matched_mm = matched_by_num[r_num]
             match_type = "EXACT_NUMBER"
-        elif r_mob and r_mob in matched_by_mob:
-            matched_m, matched_mm = matched_by_mob[r_mob]
-            match_type = "MOBILE"
 
         if match_type != "NONE":
             total_matched += 1

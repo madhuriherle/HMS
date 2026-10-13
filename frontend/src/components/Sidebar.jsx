@@ -25,16 +25,26 @@ const leaves = (node) => {
   return kids.length ? kids.flatMap(leaves) : isPanelRoute(node.route) ? [node] : [];
 };
 
+// One entry of a group. A page that has pages of its own below it (System Settings) stays a link and
+// shows them indented underneath; a heading without a page of its own just passes its pages up.
+const entries = (node) => {
+  const kids = (node.submodules || []).flatMap(leaves);
+  if (isPanelRoute(node.route) && kids.length) {
+    return [{ name: node.name, path: node.route, children: kids.map((c) => ({ name: c.name, path: c.route })) }];
+  }
+  return kids.length ? kids.map((c) => ({ name: c.name, path: c.route })) : isPanelRoute(node.route) ? [{ name: node.name, path: node.route }] : [];
+};
+
 const toMenuItems = (nodes) =>
   (nodes || [])
     .map((node) => {
       const Icon = ICONS[node.icon] || Circle;
-      const children = (node.submodules || []).flatMap(leaves);
+      const children = (node.submodules || []).flatMap(entries);
       if (children.length) {
         return {
           name: node.name,
           icon: Icon,
-          submenus: children.map((c) => ({ name: c.name, path: c.route })),
+          submenus: children,
         };
       }
       return isPanelRoute(node.route) ? { name: node.name, icon: Icon, path: node.route } : null;
@@ -85,22 +95,19 @@ export default function Sidebar({ isOpen, onClose }) {
     const activeParent = visibleMenuItems.find(
       (item) =>
         item.submenus &&
-        item.submenus.some((sub) => isPathActive(location.pathname, sub.path))
+        item.submenus.some((sub) => isPathActive(location.pathname, sub.path) || (sub.children || []).some((c) => isPathActive(location.pathname, c.path)))
     );
 
     if (activeParent) {
-      setExpandedMenus((prev) => ({
-        ...prev,
+      setExpandedMenus({
         [activeParent.name]: true,
-      }));
+      });
     }
   }, [location.pathname, visibleMenuItems]);
 
+  // Accordion behavior: clicking one closes previous and opens current
   const toggleSubmenu = (menuName) => {
-    setExpandedMenus((prev) => ({
-      ...prev,
-      [menuName]: !prev[menuName],
-    }));
+    setExpandedMenus((prev) => (prev[menuName] ? {} : { [menuName]: true }));
   };
 
   const handleNavClick = () => {
@@ -113,7 +120,7 @@ export default function Sidebar({ isOpen, onClose }) {
   return (
     <aside
       className={clsx(
-        'w-64 shrink-0 flex flex-col bg-[#200200] text-[#FAF7F2] select-none z-30 transition-transform duration-300 ease-in-out',
+        'w-72 shrink-0 flex flex-col bg-[#200200] text-[#FAF7F2] select-none z-30 transition-transform duration-300 ease-in-out',
         // Desktop: Fixed/static expanded sidebar
         'lg:static lg:inset-auto lg:translate-x-0 lg:h-screen lg:shadow-none',
         // Mobile: Off-canvas slide-over drawer
@@ -158,7 +165,7 @@ export default function Sidebar({ isOpen, onClose }) {
         {visibleMenuItems.map((item) => {
           const isParentActive =
             item.submenus?.some((sub) =>
-              isPathActive(location.pathname, sub.path)
+              isPathActive(location.pathname, sub.path) || (sub.children || []).some((c) => isPathActive(location.pathname, c.path))
             ) ?? false;
 
           const isSingleActive =
@@ -209,22 +216,31 @@ export default function Sidebar({ isOpen, onClose }) {
                   {isItemExpanded && (
                     <div className="space-y-1 py-1 pl-6 pr-1 animate-in fade-in-50 duration-200">
                       {item.submenus.map((sub) => {
-                        const isSubActive = isPathActive(location.pathname, sub.path);
-
-                        return (
+                        // the page itself is only "active" when none of its own pages below it is the open one
+                        const childActive = (sub.children || []).some((c) => isPathActive(location.pathname, c.path));
+                        const isSubActive = isPathActive(location.pathname, sub.path) && !childActive;
+                        const link = (entry, active, nested) => (
                           <NavLink
-                            key={sub.path}
-                            to={sub.path}
+                            key={entry.path}
+                            to={entry.path}
                             onClick={handleNavClick}
                             className={clsx(
-                              'relative block rounded-lg px-3 py-2 text-sm transition-all truncate group',
-                              isSubActive
+                              'relative block rounded-lg px-3 py-2 transition-all truncate group',
+                              nested ? 'text-[13px] ml-4' : 'text-sm',
+                              active
                                 ? 'bg-[#863221] text-white font-bold ring-1 ring-[#FFC107]/50 shadow-xs'
                                 : 'text-[#FAF7F2]/80 font-medium hover:bg-[#8C1801]/60 hover:text-white'
                             )}
                           >
-                            <span className="truncate">{sub.name}</span>
+                            <span className="truncate">{entry.name}</span>
                           </NavLink>
+                        );
+
+                        return (
+                          <React.Fragment key={sub.path}>
+                            {link(sub, isSubActive, false)}
+                            {(sub.children || []).map((c) => link(c, isPathActive(location.pathname, c.path), true))}
+                          </React.Fragment>
                         );
                       })}
                     </div>

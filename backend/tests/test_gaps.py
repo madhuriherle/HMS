@@ -91,21 +91,18 @@ def test_public_register_duplicate_mobile(client):
     assert "already registered" in second.json()["detail"]
 
 
-def test_public_register_provisions_member_login(client, admin_headers):
+def test_public_register_makes_no_member_login(client, admin_headers):
     response = client.post(
         "/api/v1/members/public-register",
         json={"first_name_en": "LoginHolder", "mobile": "9340000905"},
     )
     assert response.status_code == 201, response.text
 
-    # The username exists as a MEMBER account (same provisioning as staff
-    # registration); the password is server-generated and never returned.
+    # Website sign-ups do not get a login account, and member accounts never appear in User Management.
     users = client.get(
         "/api/v1/users", headers=admin_headers, params={"search": "9340000905"}
     ).json()
-    assert users["total"] >= 1
-    account = next(u for u in users["data"] if u["username"] == "9340000905")
-    assert "password" not in str(account).lower() or account.get("password_hash") is None
+    assert users["total"] == 0
 
 
 def test_public_register_geo_cross_checks(client, admin_headers):

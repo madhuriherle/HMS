@@ -68,7 +68,12 @@ def read_users(
     q = (
         db.query(User)
         .join(Role, Role.id == User.role_id)
-        .filter(User.is_deleted == False, Role.rank_level >= my_rank if my_rank > 1 else Role.rank_level > 1)  # noqa: E712
+        .filter(
+            User.is_deleted == False,
+            User.user_type != "MEMBER",
+            Role.code != "MEMBER",
+            Role.rank_level >= my_rank if my_rank > 1 else Role.rank_level > 1,
+        )  # noqa: E712
     )
     if search:
         like = f"%{search}%"
@@ -571,6 +576,7 @@ def read_roles(
     my_rank = deps.user_rank(db, current_user)
     q = db.query(Role).filter(Role.is_deleted == False)  # noqa: E712
     if assignable:
+        q = q.filter(Role.code != "MEMBER")
         q = q.filter(Role.rank_level >= my_rank) if my_rank > 1 else q.filter(Role.rank_level > 1)
     elif my_rank > 1:
         q = q.filter(Role.rank_level > my_rank)

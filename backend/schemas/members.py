@@ -289,7 +289,8 @@ class MemberUpdate(BaseModel):
 
 class MemberInDBBase(MemberBase):
     id: int
-    member_code: Optional[str] = None
+    membership_number: Optional[str] = None
+    member_code: Optional[str] = None  # the same number, under its old name
     registration_status: str
     approval_status: str
     member_status: str
