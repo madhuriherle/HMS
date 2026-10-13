@@ -90,9 +90,12 @@ export default function RolesAndPrivileges() {
         const matrixRows = [];
         const offIds = [];
 
-        const traverse = (modList, path = "", depth = 0, parentOff = false) => {
+        const traverse = (modList, path = "", depth = 0, parentOff = false, parentRank = null) => {
            for (const mod of modList) {
               const off = parentOff || mod.status === false;
+              // a module is only as reachable as every module above it: the strictest (smallest) rank wins
+              const ranks = [parentRank, mod.min_rank_level].filter((r) => r != null);
+              const effRank = ranks.length ? Math.min(...ranks) : null;
               const currentPath = path ? `${path} > ${mod.name}` : mod.name;
               // one table row per module: Read / Write / Delete cells, anything else goes to "Other"
               const cells = { read: null, write: null, delete: null };
@@ -104,7 +107,7 @@ export default function RolesAndPrivileges() {
               }
               if ((mod.privileges && mod.privileges.length > 0) || (mod.submodules && mod.submodules.length > 0)) {
                 matrixRows.push({
-                  code: mod.code, name: mod.name, depth, min_rank_level: mod.min_rank_level ?? null, disabled: off,
+                  code: mod.code, name: mod.name, depth, min_rank_level: effRank, disabled: off,
                   cells, other, hasChildren: Boolean(mod.submodules && mod.submodules.length > 0)
                 });
               }
@@ -118,13 +121,13 @@ export default function RolesAndPrivileges() {
                  }));
                formattedGroups.push({
                   module: currentPath,
-                  min_rank_level: mod.min_rank_level ?? null,
+                  min_rank_level: effRank,
                   privileges: formattedPrivs
                });
                  allIds.push(...formattedPrivs.map(p => p.id));
               }
               if (mod.submodules && mod.submodules.length > 0) {
-                 traverse(mod.submodules, currentPath, depth + 1, off);
+                 traverse(mod.submodules, currentPath, depth + 1, off, effRank);
               }
            }
         };
