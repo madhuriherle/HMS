@@ -2,7 +2,7 @@
                     HMS CORE ARCHITECTURAL & DATA RULES
                          (DO NOT VIOLATE OR MODIFY)
 ================================================================================
-Last Updated: 13-October-2026 (rules 6-15 added)
+Last Updated: 13-October-2026 (rules 6-15 added, 8.4 / 11.7-11.8 / 12.9-12.11 added)
 
 --------------------------------------------------------------------------------
 RULE 1: MEMBER RECORD ID (id) vs. PERMANENT MEMBERSHIP NUMBER (member_code)
@@ -134,6 +134,12 @@ RULE 8: MEMBERSHIP TYPE AND CREDIT
      deleted receipt). Moving down is a manual, reviewed change.
 8.3  Deleting a receipt that is assigned to a member removes its allocation from the
      member's history and lowers their credit; it does not change their type.
+8.4  MEMBERSHIP TYPE PRICE: a type's price is a history of rows (MembershipTypePrice), not a
+     field. The Amount on the Edit form and the Update Price screen use the SAME call
+     (POST /masters/membership-types/{id}/prices): a changed amount is a new revision with a
+     reason. Never save a type and silently drop its amount. A second change on the same day
+     corrects that day's row and keeps a trail in the reason ("... (was 250.00)"). The list
+     sends price_count so the revision badge shows the real number (1 = base price only).
 
 --------------------------------------------------------------------------------
 RULE 9: DATA COMES FROM THE SERVER, NOT FROM THE FRONTEND
@@ -182,6 +188,10 @@ RULE 11: HOW WE WORK (ALL AGENTS)
      yes. Reference screenshots are for ideas: do not copy them exactly.
 11.6 Other agents edit files at the same time. Never revert or reformat a file you did not
      change for the task; edit only the lines you need.
+11.7 When the user pastes another agent's summary, it means: read the changes, run the checks,
+     commit it and deploy it to UAT. Push to GitHub only when the user says push.
+11.8 The top header of every panel page is layouts/MainLayout.jsx. components/Navbar.jsx is
+     NOT used: a change to the signed-in user box (Profile, Log Out) goes in MainLayout.
 
 --------------------------------------------------------------------------------
 RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
@@ -232,6 +242,14 @@ RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
      #FAF7F2, borders #E8DFD8, danger #ED4636. Do not introduce new accent colours.
 12.8 SMALL SCREENS: layouts stack to one column, tab bars scroll sideways, no horizontal
      page scroll.
+12.9 EVERY POPUP HAS A HEADER BAR, EVEN A READ-ONLY ONE: title on the left, close X on the
+     right, same height as the footer bar (h-14). A view popup ends with the shared
+     ModalFooter (Close only). Never a bare card with the title inside the body.
+12.10 DROPDOWN LISTS OPEN DOWNWARD and are only as tall as the room left below the field
+     (they scroll inside). Do not flip a list upward.
+12.11 PROFILE OVERVIEW (member profile): a strip of key facts, then the details as small
+     label-over-value items. Empty fields are not drawn; one quiet line lists what was not
+     provided. No "View all" links (the tabs are right above) and no boxes inside boxes.
 
 --------------------------------------------------------------------------------
 RULE 13: PERMISSIONS AND ACCESS
@@ -351,8 +369,8 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
 15.2 A membership type has no "Online List" setting (it was never saved or used). Add one
      only if the server enforces it.
 15.3 Particulars and Sub-Type are ONE picker (components/ParticularPicker.jsx): a single
-     list; a particular with sub-types opens in place with its sub-types indented beneath it;
-     one with none is chosen with one click. On Receipt Entry it opens across the whole row
+     list; a particular with sub-types shows its sub-types indented beneath it, all open by
+     default (the arrow folds one away); one with none is chosen with one click. On Receipt Entry it opens across the whole row
      (spread, the row is relative), names wrap and are never cut with "...". No separate
      Sub-Type box and no side pane. Others with no sub-types asks for a description beside
      the amount.
