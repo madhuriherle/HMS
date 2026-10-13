@@ -33,7 +33,8 @@ import {
   Award,
   TrendingUp,
   Coins,
-  Receipt
+  Receipt,
+  CheckSquare
 } from 'lucide-react';
 import { calculateMemberMembershipStatus } from '../utils/displayHelpers';
 import {
@@ -137,6 +138,7 @@ export default function MembershipList() {
 
   // Row Selection (Set of Selected Members)
   const [selectedMemberIds, setSelectedMemberIds] = useState(new Set());
+  const [selectionMode, setSelectionMode] = useState(false); // checkboxes show only after the Select button is pressed
 
   // ----------------------------------------------------
   // MODAL STATES
@@ -701,6 +703,20 @@ export default function MembershipList() {
         onResetFilters={handleClearFilters}
         rightSlot={
           <>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectionMode((on) => !on);
+                setSelectedMemberIds(new Set());
+              }}
+              className={`flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl border transition-colors cursor-pointer shrink-0 ${
+                selectionMode ? 'text-white bg-[#510601] border-[#510601]' : 'bg-white border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2]'
+              }`}
+              title="Select members to print address labels"
+            >
+              <CheckSquare className="w-4 h-4" />
+              <span>{selectionMode ? 'Done' : 'Select'}</span>
+            </button>
             {selectedMemberIds.size > 0 && (
               <>
                 <button
@@ -814,7 +830,7 @@ export default function MembershipList() {
           <table className="w-full text-left border-collapse text-xs">
             <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="py-3 px-4 w-10 text-center">
+                {selectionMode && <th className="py-3 px-4 w-10 text-center">
                   <input
                     type="checkbox"
                     checked={isAllPaginatedSelected}
@@ -822,7 +838,7 @@ export default function MembershipList() {
                     className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer accent-[#510601]"
                     title="Select All on page"
                   />
-                </th>
+                </th>}
                 <th className="py-3 px-4">Member No.</th>
                 <th className="py-3 px-4">Name</th>
                 <th className="py-3 px-4">Contact</th>
@@ -856,14 +872,14 @@ export default function MembershipList() {
                         }`}
                     >
                       {/* Checkbox */}
-                      <td className="py-3 px-4 text-center">
+                      {selectionMode && <td className="py-3 px-4 text-center">
                         <input
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => handleToggleSelectRow(m.id)}
                           className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer accent-[#510601]"
                         />
-                      </td>
+                      </td>}
 
                       {/* Membership No. */}
                       <td className="py-3 px-4 font-mono font-bold text-xs text-[#510601] whitespace-nowrap">

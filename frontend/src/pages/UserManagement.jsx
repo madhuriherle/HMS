@@ -666,7 +666,7 @@ export default function UserManagement() {
 
                       {/* Mobile */}
                       <td className="px-6 py-4 font-mono text-xs text-[#180200]/90">
-                        {user.mobile_country_code || '+91'} {user.mobile}
+                        {user.mobile ? `${user.mobile_country_code || '+91'} ${user.mobile}` : '—'}
                       </td>
 
                       {/* Role */}
@@ -710,7 +710,7 @@ export default function UserManagement() {
 
                       {/* Last Login */}
                       <td className="px-6 py-4 text-xs text-[#863221]/80 font-medium">
-                        {formatDateTime(user.lastLogin, 'Never', false)}
+                        {formatDateTime(user.last_login_at ?? user.lastLogin, 'Never', false)}
                       </td>
 
                       {/* Actions */}
@@ -1263,38 +1263,43 @@ export default function UserManagement() {
                 <div>
                   <p className="text-[#863221] font-semibold uppercase">Mobile Number</p>
                   <p className="text-[#180200] font-mono font-medium mt-0.5">
-                    {viewingUser.mobile_country_code || '+91'} {viewingUser.mobile}
+                    {viewingUser.mobile ? `${viewingUser.mobile_country_code || '+91'} ${viewingUser.mobile}` : '—'}
                   </p>
                 </div>
 
                 <div>
                   <p className="text-[#863221] font-semibold uppercase">Created Date</p>
-                  <p className="text-[#180200] font-medium mt-0.5">{formatDate(viewingUser.createdAt)}</p>
+                  <p className="text-[#180200] font-medium mt-0.5">{formatDate(viewingUser.created_at ?? viewingUser.createdAt)}</p>
                 </div>
 
                 <div>
                   <p className="text-[#863221] font-semibold uppercase">Last Login</p>
-                  <p className="text-[#180200] font-medium mt-0.5">{formatDateTime(viewingUser.lastLogin, 'Never', false)}</p>
+                  <p className="text-[#180200] font-medium mt-0.5">{formatDateTime(viewingUser.last_login_at ?? viewingUser.lastLogin, 'Never', false)}</p>
                 </div>
               </div>
 
               {/* Role & Access Info */}
               {(() => {
+                // the role list holds only roles you may assign, so the Super Admin's own role is not in it:
+                // fall back to what the user row says
                 const userRole = getRoleById(viewingUser.role_id ?? viewingUser.roleId);
+                const roleName = userRole?.name || viewingUser.role_name;
+                const roleRank = userRole?.rank_level ?? viewingUser.role_rank_level;
+                const fullAccess = !userRole && roleRank === 1;
                 return (
                   <div className="p-3.5 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8] space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-[#180200] flex items-center gap-1.5">
                         <Shield className="w-3.5 h-3.5 text-[#510601]" />
-                        Assigned Role: {userRole?.name || 'Unassigned'}
-                        {userRole?.rank_level != null && (
+                        Assigned Role: {roleName || 'Unassigned'}
+                        {roleRank != null && (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 bg-[#510601]/10 text-[#510601] rounded-full">
-                            Rank {userRole.rank_level}
+                            Rank {roleRank}
                           </span>
                         )}
                       </span>
                       <span className="text-[10px] font-bold px-2 py-0.5 bg-[#510601]/10 text-[#510601] rounded-full">
-                        {userRole?.privileges?.length || 0} Privileges
+                        {fullAccess ? 'All privileges' : `${userRole?.privileges?.length || 0} Privileges`}
                       </span>
                     </div>
 
@@ -1307,6 +1312,11 @@ export default function UserManagement() {
                         Accessible Modules
                       </span>
                       <div className="flex flex-wrap gap-1">
+                        {fullAccess && (
+                          <span className="px-2 py-0.5 bg-white border border-[#E8DFD8] rounded text-[10px] text-[#180200] font-medium">
+                            Every module
+                          </span>
+                        )}
                         {allPrivileges.map(mod => {
                           const hasPrivs = mod.privileges.some(p =>
                             userRole?.privileges?.includes(p.id)

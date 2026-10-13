@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Award, TrendingUp, CalendarDays } from 'lucide-react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Award, TrendingUp, CalendarDays } from 'lucide-react';
 import PermissionGate from '../components/PermissionGate';
 import api from '../api';
 import { formatDate, formatDateTime } from '../utils/dateUtils';
@@ -815,7 +815,6 @@ const TABS = [
 
 export default function MemberProfile() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -864,16 +863,6 @@ export default function MemberProfile() {
   return (
     <PermissionGate required="members.list.read">
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#863221] hover:text-[#510601] cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back
-          </button>
-        </div>
-
         {loading && <Empty>Loading profile…</Empty>}
         {!loading && !s && <Empty>This member could not be loaded.</Empty>}
 

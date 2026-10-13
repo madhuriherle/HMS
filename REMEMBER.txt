@@ -1,0 +1,319 @@
+================================================================================
+                    HMS CORE ARCHITECTURAL & DATA RULES
+                         (DO NOT VIOLATE OR MODIFY)
+================================================================================
+Last Updated: 13-October-2026 (rules 6-15 added)
+
+--------------------------------------------------------------------------------
+RULE 1: MEMBER RECORD ID (id) vs. PERMANENT MEMBERSHIP NUMBER (member_code)
+--------------------------------------------------------------------------------
+1.1  DATABASE RECORD ID (Member.id):
+     - An internal auto-increment primary key (e.g., 1, 2, 7, 9).
+     - Used ONLY for foreign keys, internal database lookups, and identifying
+       unapproved applicants in the review queue (labeled strictly as "ID: 7" or
+       "App ID #7").
+     - NEVER display, label, or treat Member.id as "Membership No", "Member ID",
+       "MID", or "Member Code".
+     - NEVER fall back to Member.id if a member has no membership number.
+       If a member is not approved or has no code, the membership number is EMPTY.
+
+1.2  PERMANENT MEMBERSHIP NUMBER (Member.member_code / Member.membership_number):
+     - The official, permanent Sabha membership code (e.g., "12345", "LM-007", "HM-2026").
+     - Given ONLY upon official approval or through historical CSV/migration import.
+     - Stored in Member.membership_number (with member_code as alias/synonym) and
+       MemberMembership.membership_number.
+     - Online / Unapproved applicants DO NOT have a permanent membership number
+       until they are approved!
+
+1.3  FRONTEND API ADAPTER RULE:
+     - In normalizeMember (frontend/src/utils/apiAdapters.js):
+       membershipNumber MUST strictly be:
+       firstDefined(member.member_code, member.membership_number, member.membershipNumber, '')
+       NEVER append `, member.id` as a fallback!
+
+--------------------------------------------------------------------------------
+RULE 2: MEMBER vs. USER SEPARATION
+--------------------------------------------------------------------------------
+2.1  A MEMBER IS NOT A SYSTEM USER:
+     - A "User" is an administrative person logging into this back-office system
+       (Super Admin, Admin, Manager, Accountant, Operator, Data Entry).
+     - A "Member" is a registered community person in the Sabha directory.
+     - Members DO NOT have portal login access or user accounts created for them.
+     - NEVER auto-provision a User record when registering or approving a Member.
+     - In User Management, NEVER display Members or assign them back-office roles.
+
+--------------------------------------------------------------------------------
+RULE 3: RECEIPT ENTRY & ALLOCATION (LINKING)
+--------------------------------------------------------------------------------
+3.1  DIRECT LINKING ON RECEIPT ENTRY:
+     - If a member is selected or an entered member exists in Receipt Entry:
+       The receipt MUST be directly linked via ReceiptAllocation on Save.
+     - NEVER discard the member allocation based on route source.
+     - An unapproved applicant is linked via member_id (ReceiptAllocation.member_id = 7).
+       Their Membership No box remains BLANK because they do not have a permanent
+       membership number yet.
+     - Once linked:
+       * If applicant is unapproved -> Receipt status = "ASSIGNED"
+       * If member is approved     -> Receipt status = "APPROVED"
+     - A receipt linked at entry MUST NEVER be left as "UNASSIGNED".
+
+--------------------------------------------------------------------------------
+RULE 4: BULK RECEIPT AUTO-MAPPING RULES
+--------------------------------------------------------------------------------
+4.1  PURPOSE OF BULK AUTO-MAPPING:
+     - The Bulk Auto-Mapping queue is STRICTLY for unassigned receipts (e.g., legacy
+       receipt imports, bank reconciliation deposits) that have NO member link yet.
+     - Receipts already linked to a member MUST NOT appear in this queue.
+
+4.2  STRICT MATCHING RULE:
+     - Matching is strictly:
+       Receipt.payer_membership_no  <===>  Member.member_code (Permanent Membership No)
+     - NEVER match Receipt.payer_membership_no against Member.id (database primary key)!
+     - If receipt has entered member number "12345", it matches ONLY members whose
+       permanent membership number is "12345".
+     - Do not use fuzzy guessing (no multi-tier phone/name auto-linking). Matching
+       is exact on the official permanent member code.
+
+4.3  MANUAL "PICK MEMBER" MODAL:
+     - If a receipt cannot be auto-matched, clicking "Pick Member" allows the admin
+       to search live members by name, phone, or member code via /api/v1/members/?search=...
+     - When a member is picked, display their permanent Member Code, NEVER fallback
+       to "MID #id".
+
+--------------------------------------------------------------------------------
+RULE 5: UI & DISPLAY STANDARDS
+--------------------------------------------------------------------------------
+5.1  LABELS AND TEXT:
+     - Unapproved list: Label as "ID: 7" (Application sequence/record).
+     - Approved list: Label as "#12345" (Permanent Membership Number).
+     - Never use the term "MID" as it confuses users between "Member ID" and
+       "Membership Number".
+     - In receipt printouts / PDFs: If unapproved, do not print a fake membership
+       number; print Membership No only when Member.member_code exists.
+
+5.2  SELECTION MODE IN TABLES:
+     - Do not permanently clutter tables with empty checkbox columns when users
+       are doing row-by-row actions.
+     - Keep tables clean with dedicated action buttons (View, Edit, Approve, Reject).
+     - Provide a "Select" toggle button in the header bar to activate checkboxes
+       for batch operations when needed.
+
+--------------------------------------------------------------------------------
+RULE 6: NUMBERING (RECEIPTS AND MEMBERSHIP NUMBERS)
+--------------------------------------------------------------------------------
+6.1  RECEIPT NUMBER:
+     - Default format is a plain 4-digit running number (0001, 0002 ...) with no year
+       in it, restarting every financial year. The format is a setting (Number Formats);
+       never hard-code a receipt number pattern in the frontend.
+     - The financial year always comes from the RECEIPT DATE (1 April - 31 March). There
+       is no separate FY setting.
+     - A receipt number is unique per (financial_year, receipt_number) among live rows
+       (index uq_receipts_fy_number_active). The same number may exist in different years.
+     - Receipt Entry checks the typed number as the person types (GET /receipts/number-check)
+       and again when the date changes; the server check on save is the final guard.
+6.2  MEMBERSHIP NUMBER: one permanent number per member, minted at approval from
+     Number Formats (MEMBER_CODE). It is copied to MemberMembership.membership_number.
+
+--------------------------------------------------------------------------------
+RULE 7: LOOKUPS
+--------------------------------------------------------------------------------
+7.1  Every "verify / find by number" lookup (/members/lookup, /receipts/member-lookup,
+     family and referral number checks, Receipt Entry Membership No. box) accepts the
+     REAL MEMBERSHIP NUMBER ONLY. A bare id (7), a REG-2026-0007 style number or a
+     mobile number must find nobody.
+7.2  An unapproved applicant has no membership number, so they are picked from the lists
+     and linked by member id; they cannot be found by typing a number.
+
+--------------------------------------------------------------------------------
+RULE 8: MEMBERSHIP TYPE AND CREDIT
+--------------------------------------------------------------------------------
+8.1  Only money paid for the membership counts toward a member's type: receipt types
+     MEMBERSHIP and TYPE_CHANGE (setting membership_credit.receipt_types). Donations,
+     P.Nidhi, scholarship, magazine and event receipts NEVER change the membership type.
+8.2  The type only moves UP automatically, never down (not on a refund, cancellation or
+     deleted receipt). Moving down is a manual, reviewed change.
+8.3  Deleting a receipt that is assigned to a member removes its allocation from the
+     member's history and lowers their credit; it does not change their type.
+
+--------------------------------------------------------------------------------
+RULE 9: DATA COMES FROM THE SERVER, NOT FROM THE FRONTEND
+--------------------------------------------------------------------------------
+9.1  No hard-coded dropdown lists, rules or sample data in the frontend. Fixed lists live
+     in the lookup_values table (GET /meta/lists); limits and formats come from
+     core/rules.py (GET /meta/rules); PIN prefixes from /meta/pin-prefixes; import
+     templates from /meta/import-template/{kind}. No localStorage data, no fallbacks.
+9.2  Phone numbers: digits allowed per country come from the phone_lengths list. India is
+     exactly 10 digits and starts with 6, 7, 8 or 9. The field stops accepting digits at
+     the country's maximum.
+9.3  Dates are shown DD-MM-YYYY (formatDate) and times 24-hour HH:MM; money as
+     ₹1,234.00 via formatMoney (rupee sign, Indian grouping, two decimals).
+     Downloads keep amounts as plain numbers.
+
+--------------------------------------------------------------------------------
+RULE 10: MASTERS AND SCREENS
+--------------------------------------------------------------------------------
+10.1 There is NO separate Bank Master screen. Banks are created and listed from Payment
+     Mode Setup, under its own privileges (masters.payment_modes.read / write / delete).
+     A screen must never break because an unrelated module is switched off.
+10.2 A disabled module is hidden from the sidebar and blocks its API for everyone.
+10.3 The member profile loads one tab at a time: GET /members/{id}/profile/{section}
+     (summary, overview, personal, contact, family, membership, receipts, magazine,
+     events, history). Do not load everything in one call for the new screens.
+10.4 Page layout: plain h1 heading (text-xl sm:text-2xl font-bold), no Back buttons, no
+     big decorative icon blocks, normal site font sizes (text-xs / text-sm), no
+     "card inside card" clutter. Registration amount and receipt date on a new
+     registration are read-only (the amount follows the chosen membership type).
+
+--------------------------------------------------------------------------------
+RULE 11: HOW WE WORK (ALL AGENTS)
+--------------------------------------------------------------------------------
+11.1 Deploy to UAT only when the user asks. Never touch production. Push to GitHub only
+     when the user says push.
+11.2 Alembic revisions are numbered in sequence and other agents add migrations at the
+     same time: before creating one, list alembic/versions, take the next free number
+     and confirm there is a single head (ScriptDirectory.get_heads()).
+11.3 Run the backend tests (python -m pytest -q in backend) and the frontend checks
+     (node scripts/check-undefined.mjs, node scripts/render-smoke.mjs, a vite build)
+     before committing. Report failures honestly.
+11.4 Never use git stash in the shared working tree. Preserve CRLF line endings when
+     editing existing files.
+11.5 When the user writes "tell me idea" (or asks "why / what / how"), answer with the
+     proposal or the explanation FIRST, in short plain words, and build only after they say
+     yes. Reference screenshots are for ideas: do not copy them exactly.
+11.6 Other agents edit files at the same time. Never revert or reformat a file you did not
+     change for the task; edit only the lines you need.
+
+--------------------------------------------------------------------------------
+RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
+--------------------------------------------------------------------------------
+12.1 PAGE HEADING AND FRAME:
+     - Every page starts with ONE plain heading in the same place and size:
+       <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">.
+       No breadcrumb, no icon tile, no big sub-heading, no description block. At most one
+       small text-xs line under it when the page really needs a warning.
+     - The page wrapper is a single column with space-y-6. No Back button on a page: the
+       sidebar and the parent page already lead back.
+     - Action buttons for the page (Add, Export, Day Book ...) sit on the right of the
+       heading row. The search box also goes in that row when the page has one
+       (SearchFilterBar with searchInHeader). Filters sit in one row below it with a
+       Reset Filters button.
+12.2 FONTS: normal site sizes only. Body and table text text-sm or text-xs, labels and help
+     text text-xs, table headers text-[10px] uppercase tracking-wider. Never enlarge a
+     font to fill space. Page headings are the only large text.
+12.3 POPUPS (MODALS):
+     - Use components/Modal.jsx. The header bar and the footer bar are the same height
+       (h-14). The footer is ALWAYS components/ModalFooter.jsx, never hand-made buttons.
+     - Footer = Cancel (outline) on the left of ONE main button, equal size, text only,
+       right-aligned. The main button label follows the kind: add -> Save, edit ->
+       Update, delete -> Delete (red), confirm -> Confirm. A view-only popup has a single
+       Close button. A special verb (Restore, Generate ...) uses submitLabel.
+     - While saving the main button shows its busy label (Saving..., Updating...) and both
+       buttons are disabled.
+12.4 CONFIRMATIONS: every action that changes data asks for a confirmation and a reason
+     (SweetAlert, class hms-mini-swal) through the shared api client; the reason goes to
+     the activity log. Destructive actions use the red button. Irreversible bulk actions
+     (Data Cleanup) also need the confirm word typed. Do NOT add success popups after
+     routine actions (Assign, Unassign): use a short toast (utils/notify) or nothing.
+12.5 BOTTOM ACTION BARS AND FORM BUTTONS:
+     - Form buttons are right-aligned at the bottom: Reset (not Cancel) on entry forms,
+       then Save, with Save & New / Save & Close where the flow needs them. No Save & Print.
+     - A long selection page (Data Cleanup) keeps its action bar sticky at the bottom, with
+       the selected count on the left of the main button.
+12.6 TABLES AND LISTS:
+     - Counts, statuses and flags are small chips (chip, chip-on, chip-warn, chip-bad,
+       chip-brand, chip-off), never long sentences.
+     - A missing value shows a faint dash or "Not recorded yet". Never invent a value such
+       as "Standard", "Member", "Cash" or "Online" to fill a gap.
+     - Empty state is one short line. Rows with nothing to act on are greyed and their
+       checkbox disabled.
+     - Batch checkboxes follow rule 5.2 (a Select toggle), except pages that are selection
+       pages by nature (Data Cleanup, Recycle Bin).
+12.7 COLOURS: primary maroon #510601 (hover #8C1801), secondary text #863221, page tint
+     #FAF7F2, borders #E8DFD8, danger #ED4636. Do not introduce new accent colours.
+12.8 SMALL SCREENS: layouts stack to one column, tab bars scroll sideways, no horizontal
+     page scroll.
+
+--------------------------------------------------------------------------------
+RULE 13: PERMISSIONS AND ACCESS
+--------------------------------------------------------------------------------
+13.1 EVERY API ROUTE CHECKS A PRIVILEGE. tests/test_every_route_is_guarded.py calls all
+     routes as a user with no privileges and expects 403, except an allow-list (docs, login,
+     own account, token links, sidebar menu, /meta lists, the mobile-app requests). A new
+     route that is open on purpose goes into that list with the reason; otherwise it must
+     use require_permission.
+13.2 THE SCREENS HIDE, THEY DO NOT GREY OUT. A button or link the role has no privilege for
+     is removed ({hasPermission('x') && ...}), not shown disabled with a tooltip. The save
+     handlers also check the privilege, because Enter inside a field still submits a form.
+13.3 STATUS (ACTIVE / INACTIVE) PILLS stay visible but cannot be clicked without the
+     screen's .write privilege. There is no separate status privilege.
+13.4 SIDEBAR: a page shows only when the role holds its privilege; a group (Masters,
+     Receipts ...) shows only when at least one page inside it shows. A parent follows its
+     children automatically. A disabled module is hidden for everyone.
+13.5 SUPER ADMIN ONLY AREAS (rank 1) stay rank-gated and get NO grantable privilege: the
+     Modules page, Menu Arranger, and the Settings group (min_rank_level 1). Do not add
+     privileges for them. Data Cleanup has privileges (system.cleanup.read / write) but is
+     also locked to rank 1 roles.
+13.6 USERS AND ROLES (rank 1 = top, bigger = weaker):
+     - User Management lists every staff account (members are never users), the Super Admin
+       included.
+     - Changing a user (edit, status, delete) needs the target to be weaker; the same rank
+       is allowed except at rank 1. Locked rows show locked buttons.
+     - Roles list and edit only roles strictly weaker than yours, never your own rank.
+     - Nobody changes their own role. The built-in admin account is changed only by the
+       Super Admin, and the last active top-rank holder cannot be removed.
+13.7 PRIVILEGE CODES OF THE SETTINGS TOOLS: masters.organisation.read/write (Organisation
+     Settings), system.number_formats.read/write, system.recycle_bin.read/write,
+     system.cleanup.read/write. Each is also a sub-module in services/permission_areas via
+     SUB_MODULE_AREAS in db/seed_defaults.py.
+13.8 ADDING A SCREEN (checklist, always all of it):
+     a. Sidebar page: a row in MENU_PAGE_CATALOG (db/seed_defaults.py) with its parent,
+        route, icon (a name from utils/menuIcons.js), order and the privilege that shows it.
+        A tool reached only from another page (Recycle Bin) is a module row with no route.
+     b. Privileges: the screen's own read / write (/ delete) in SUB_MODULE_AREAS with its API
+        path prefix, plus AREA_ACTIONS when it does not have all three. The routes keep
+        asking for the module code (system.read); services/permission_areas maps it.
+     c. A migration that seeds the modules, menu pages and privileges for existing databases
+        and, when the screen replaces an older privilege, grants the new one to the roles
+        that held the old one (see 20261013_0055 and 0057). Take the next free number.
+     d. Frontend: the route in App.jsx wrapped in PermissionGate (page) and hasPermission
+        on every action (rule 13.2).
+     e. Tests: the privilege tree shows the new codes, the sidebar shows or hides the page,
+        and test_every_route_is_guarded still passes.
+
+--------------------------------------------------------------------------------
+RULE 14: SETTINGS AND ADMIN TOOLS
+--------------------------------------------------------------------------------
+14.1 SYSTEM SETTINGS is a card page (/dashboard/settings): Organisation Identity, Receipt
+     Settings (Number Formats), Recycle Bin, Data Cleanup. Cards the role cannot open are
+     not shown. In the sidebar, Organisation Settings and Number Formats sit nested under
+     System Settings.
+14.2 RECYCLE BIN lists soft-deleted records (members, receipts, particulars, membership
+     types, banks, users, events, affiliations, associates, press, templates, locations).
+     Permanent delete removes only what exists for the record (price history, its own
+     soft-deleted locations); an active record that still uses it blocks the delete and the
+     message names the table. No description text under the title.
+14.3 DATA CLEANUP clears operational records only, never master setup. Groups and the
+     groups they need (members need receipts) come from services/data_cleanup.py; every
+     table must belong to a group or be a protected master. It shows row counts, needs the
+     word CLEAR typed plus a reason, offers a CSV backup zip first, deletes the uploaded
+     files of the cleared rows, restarts the affected numbers and leaves one line in the
+     activity log. A new operational table must be added to a group.
+14.4 MY PROFILE (/dashboard/profile, from the top-right menu): the person edits name,
+     username, email and mobile and can change their password. Role, rank and status are
+     read-only. Saving signs the person out of every session.
+
+--------------------------------------------------------------------------------
+RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
+--------------------------------------------------------------------------------
+15.1 Membership does NOT expire: no "renewals due" list, panel, reminder button or count.
+15.2 A membership type has no "Online List" setting (it was never saved or used). Add one
+     only if the server enforces it.
+15.3 Particulars and Sub-Type are ONE picker (components/ParticularPicker.jsx): left list
+     of particulars, right list of the highlighted one's sub-types. No separate Sub-Type
+     box. Others with no sub-types asks for a description beside the amount.
+15.4 Editing a receipt uses the Receipt Entry screen (/dashboard/receipts/edit/:id), not a
+     separate popup. Receipt Tracking has no Print buttons.
+15.5 The Membership List panel on Receipt Entry is one compact line per member:
+     #000001 | name | mobile | location, with a small Assign button.
+15.6 Receipt Tracking's search sits in the header row (searchInHeader).
+================================================================================

@@ -2567,7 +2567,7 @@ export default function ReceiptEntry() {
                             {member.fullName || member.name}
                           </div>
                           <div className="font-mono text-[11px] text-[#510601] mt-0.5">
-                            MID: #{member.registrationNumber || member.id || '—'}
+                            ID: {member.registrationNumber || member.id || '—'}
                           </div>
                         </td>
 

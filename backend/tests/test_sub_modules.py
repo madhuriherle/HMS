@@ -32,7 +32,7 @@ def test_privilege_tree_lists_every_masters_page_with_read_write_delete(client, 
 
     masters = find(tree, "masters")
     subs = {s["code"]: s for s in masters["submodules"]}
-    for code in ("masters.location", "masters.membership_types", "masters.particulars", "masters.payment_modes", "masters.banks"):
+    for code in ("masters.location", "masters.membership_types", "masters.particulars", "masters.payment_modes"):
         assert {p["code"] for p in subs[code]["privileges"]} == {f"{code}.read", f"{code}.write", f"{code}.delete"}, code
     eng = find(tree, "engagements")
     assert {s["code"] for s in eng["submodules"]} == {
@@ -40,15 +40,15 @@ def test_privilege_tree_lists_every_masters_page_with_read_write_delete(client, 
 
 
 def test_one_masters_page_does_not_open_the_others(client, admin_headers):
-    banks_only = _role_user(client, admin_headers, ["masters.banks.read", "masters.banks.write"])
+    banks_only = _role_user(client, admin_headers, ["masters.payment_modes.read", "masters.payment_modes.write"])
     assert client.get(f"{API}/masters/banks", headers=banks_only).status_code == 200
     created = client.post(f"{API}/masters/banks", headers=banks_only, json={"code": "SUBB1", "name_en": "Sub Bank One"})
     assert created.status_code in (200, 201), created.text
     # every other Masters page stays closed, reads and writes
-    for path in ("/masters/states", "/masters/payment-modes", "/masters/particulars", "/masters/membership-types", "/masters/document-types"):
+    for path in ("/masters/states", "/masters/particulars", "/masters/membership-types", "/masters/document-types"):
         assert client.get(f"{API}{path}", headers=banks_only).status_code == 403, path
     assert client.post(f"{API}/masters/states", headers=banks_only, json={"name_en": "Nope"}).status_code == 403
-    # and Bank Master has no delete until it is ticked
+    # and Payment Mode Setup (which also holds the banks) has no delete until it is ticked
     assert client.delete(f"{API}/masters/banks/{created.json()['id']}", headers=banks_only).status_code == 403
 
 
@@ -59,10 +59,10 @@ def test_module_level_masters_privilege_still_covers_the_other_masters(client, a
 
 
 def test_needs_approval_is_decided_per_page(client, admin_headers):
-    # banks.write needs approval; location.write does not
+    # payment_modes.write needs approval; location.write does not
     user = _role_user(client, admin_headers,
-                      ["masters.banks.read", "masters.banks.write", "masters.location.read", "masters.location.write"],
-                      approval_codes=["masters.banks.write"])
+                      ["masters.payment_modes.read", "masters.payment_modes.write", "masters.location.read", "masters.location.write"],
+                      approval_codes=["masters.payment_modes.write"])
     bank = client.post(f"{API}/masters/banks", headers=user, json={"code": "SUBB2", "name_en": "Needs Approval Bank"})
     assert bank.status_code in (200, 201, 202) and bank.json().get("status") == "PENDING", bank.text
     state = client.post(f"{API}/masters/states", headers=user, json={"name_en": "Direct Nadu"})
@@ -77,7 +77,7 @@ def test_engagements_areas_are_separate(client, admin_headers):
 
 
 def test_masters_menu_pages_follow_their_own_read_privilege(client, admin_headers):
-    banks_only = _role_user(client, admin_headers, ["masters.banks.read"])
+    banks_only = _role_user(client, admin_headers, ["masters.payment_modes.read"])
     menu = client.get(f"{API}/users/modules/menu", headers=banks_only).json()
     names = set()
 
@@ -86,7 +86,7 @@ def test_masters_menu_pages_follow_their_own_read_privilege(client, admin_header
             names.add(n["name"])
             walk(n.get("submodules", []))
     walk(menu)
-    assert "Bank Master" in names and "Location Setup" not in names and "Payment Mode Setup" not in names
+    assert "Payment Mode Setup" in names and "Location Setup" not in names and "Bank Master" not in names
 
 
 def test_migration_carries_existing_role_grants_over(client, admin_headers):
@@ -108,7 +108,7 @@ def test_migration_carries_existing_role_grants_over(client, admin_headers):
         db.add(RolePermission(role_id=role.id, permission_id=by_code["masters.write"].id, requires_approval=True))
         db.add(RolePermission(role_id=role.id, permission_id=by_code["engagements.read"].id, requires_approval=False))
         # an old-style menu page, still pointing at the shared Masters read privilege
-        page = db.query(Module).filter(Module.code == "masters.banks").first()
+        page = db.query(Module).filter(Module.code == "masters.payment_modes").first()
         page.permission_code = "masters.read"
         db.commit()
         role_id = role.id
@@ -130,8 +130,8 @@ def test_migration_carries_existing_role_grants_over(client, admin_headers):
             .filter(RolePermission.role_id == role_id, RolePermission.is_deleted == False).all()  # noqa: E712
         }
         codes = {c for c, _ in grants}
-        assert {"masters.banks.read", "masters.location.read", "masters.payment_modes.read"} <= codes
-        assert ("masters.banks.write", True) in grants and ("masters.location.write", True) in grants, "approval flag carried over"
-        assert "masters.banks.delete" not in codes, "only what the role held"
+        assert {"masters.payment_modes.read", "masters.location.read", "masters.payment_modes.read"} <= codes
+        assert ("masters.payment_modes.write", True) in grants and ("masters.location.write", True) in grants, "approval flag carried over"
+        assert "masters.payment_modes.delete" not in codes, "only what the role held"
         assert {"engagements.committee.read", "engagements.affiliations.read"} <= codes
-        assert db.query(Module).filter(Module.code == "masters.banks").first().permission_code == "masters.banks.read"
+        assert db.query(Module).filter(Module.code == "masters.payment_modes").first().permission_code == "masters.payment_modes.read"

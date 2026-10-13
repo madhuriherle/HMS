@@ -136,6 +136,6 @@ def test_module_link_privileges_and_new_menu_pages(client, admin_headers):
     menu = _flat_menu(client.get(f"{API}/users/modules/menu", headers=h).json())
     for name, route in (
         ("Approval Requests", "/dashboard/approvals"),
-        ("Bank Master", "/dashboard/master/banks"),
+        ("Payment Mode Setup", "/dashboard/master/payment-modes"),
     ):
         assert menu.get(name, {}).get("route") == route, (name, menu.get(name))

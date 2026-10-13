@@ -111,10 +111,10 @@ export default function Navbar({ onToggleSidebar }) {
             aria-haspopup="true"
           >
             <div className="h-8 w-8 rounded-full bg-[#510601] flex items-center justify-center text-white font-bold text-sm shadow-xs">
-              A
+              {String(displayName).charAt(0).toUpperCase()}
             </div>
             <span className="text-sm font-bold text-[#180200] hidden sm:block group-hover:text-[#510601] transition-colors">
-              Admin
+              {displayName}
             </span>
             <ChevronDown className={`h-4 w-4 text-[#863221] hidden sm:block transition-transform duration-200 group-hover:text-[#510601] ${profileOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -125,13 +125,16 @@ export default function Navbar({ onToggleSidebar }) {
                 <p className="text-sm font-medium text-[#180200] truncate" title={displayName}>{displayName}</p>
                 <p className="text-xs text-[#863221] truncate" title={displayEmail}>{displayEmail}</p>
               </div>
-              <a 
-                href="#profile" 
-                onClick={() => setProfileOpen(false)}
-                className="flex items-center gap-2 px-4 py-2 text-sm text-[#180200] hover:bg-[#FAF7F2] transition-colors"
+              <button
+                type="button"
+                onClick={() => {
+                  setProfileOpen(false);
+                  navigate('/dashboard/profile');
+                }}
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-[#180200] hover:bg-[#FAF7F2] transition-colors text-left cursor-pointer"
               >
                 <User className="h-4 w-4 text-[#863221]" /> Profile
-              </a>
+              </button>
               <button 
                 type="button"
                 onClick={() => {

@@ -48,5 +48,5 @@ def test_summaries_belong_to_location_setup(client, admin_headers):
     location_only = _role_user(client, admin_headers, ["masters.location.read"])
     for path, params in (("/masters/states-summary", {}), ("/masters/districts-summary", {"state_id": 1}), ("/masters/taluks-summary", {"district_id": 1})):
         assert client.get(f"{API}{path}", headers=location_only, params=params).status_code == 200, path
-    banks_only = _role_user(client, admin_headers, ["masters.banks.read"])
+    banks_only = _role_user(client, admin_headers, ["masters.payment_modes.read"])
     assert client.get(f"{API}/masters/districts-summary", headers=banks_only, params={"state_id": 1}).status_code == 403

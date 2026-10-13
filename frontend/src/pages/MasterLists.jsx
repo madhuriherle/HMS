@@ -241,35 +241,6 @@ function MasterTable({ title, subtitle, endpoint, fields, columns, withCode, pag
   );
 }
 
-// ───────────── Bank master ─────────────
-export function BankMaster() {
-  return (
-    <PermissionGate required="masters.banks.read">
-      <div className="space-y-6">
-        <MasterTable
-          permBase="masters.banks"
-          pageTitle="Bank Master"
-          title="Bank"
-          endpoint="/masters/banks"
-          withCode
-          fields={[
-            { name: 'name_en', label: 'Bank name', required: true },
-            { name: 'branch_name', label: 'Branch' },
-            { name: 'ifsc_code', label: 'IFSC code' },
-            { name: 'account_number', label: 'Account number' }
-          ]}
-          columns={[
-            { label: 'Bank', render: (r) => r.name_en },
-            { label: 'Branch', render: (r) => r.branch_name },
-            { label: 'IFSC', render: (r) => r.ifsc_code },
-            { label: 'Account no.', render: (r) => r.account_number }
-          ]}
-        />
-      </div>
-    </PermissionGate>
-  );
-}
-
 // ───────────── Personal masters: gotra, qualification, native place ─────────────
 export default function PersonalMasters() {
   const [tab, setTab] = useState('gotras');

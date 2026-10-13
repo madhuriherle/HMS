@@ -20,6 +20,7 @@ import AssignedApprovals from './pages/AssignedApprovals';
 import OrganisationSettings from './pages/OrganisationSettings';
 import NumberFormats from './pages/NumberFormats';
 import SystemSettings from './pages/SystemSettings';
+import MyProfile from './pages/MyProfile';
 import RecycleBin from './pages/RecycleBin';
 import DataCleanup from './pages/DataCleanup';
 import BankDetailsManagement from './pages/BankDetailsManagement';
@@ -28,11 +29,10 @@ import RegisterNewMember from './pages/RegisterNewMember';
 import MemberProfile from './pages/MemberProfile';
 import ActivityLogs from './pages/ActivityLogs';
 import FormModalHost from './components/FormModalHost';
-import { BankMaster } from './pages/MasterLists';
 import MemberImport from './pages/MemberImport';
 import BulkReceiptMapping from './pages/BulkReceiptMapping';
 // Personal Masters (gotra / qualification / native place) screen is switched off for now:
-// import PersonalMasters, { BankMaster } from './pages/MasterLists';
+// import PersonalMasters from './pages/MasterLists';
 
 // Anyone without a login is sent to the sign-in page before any panel screen renders
 const RequireLogin = ({ children }) => {
@@ -94,11 +94,11 @@ function App() {
           <Route path="system/number-formats" element={<NumberFormats />} />
           <Route path="master/organisation" element={<OrganisationSettings />} />
           <Route path="settings/organisation" element={<OrganisationSettings />} />
+          <Route path="profile" element={<MyProfile />} />
           <Route path="settings" element={<SystemSettings />} />
           <Route path="settings/recycle-bin" element={<RecycleBin />} />
           <Route path="settings/cleanup" element={<DataCleanup />} />
           <Route path="master/payment-modes" element={<BankDetailsManagement />} />
-          <Route path="master/banks" element={<BankMaster />} />
           {/* <Route path="master/personal-masters" element={<PersonalMasters />} /> */}
           <Route path="approvals" element={<Approvals />} />
           <Route path="masters/payment-modes" element={<BankDetailsManagement />} />

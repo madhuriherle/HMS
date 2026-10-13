@@ -5,7 +5,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Search,
-  ArrowLeft,
+  CheckSquare,
   Loader2,
   Check,
   User,
@@ -42,6 +42,7 @@ export default function BulkReceiptMapping() {
 
   // Selection for batch actions
   const [selectedReceiptIds, setSelectedReceiptIds] = useState(new Set());
+  const [selectionMode, setSelectionMode] = useState(false); // checkboxes show only after the Select button is pressed
   const [isAllocating, setIsAllocating] = useState(false);
 
   // Manual Member Selection Modal for unmatched receipts
@@ -271,11 +272,24 @@ export default function BulkReceiptMapping() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectionMode((on) => !on);
+                setSelectedReceiptIds(new Set());
+              }}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border cursor-pointer transition-colors ${
+                selectionMode ? 'text-white bg-[#510601] border-[#510601]' : 'text-[#863221] bg-white border-[#E8DFD8] hover:bg-[#FAF7F2]'
+              }`}
+              title="Select receipts to map one by one"
+            >
+              <CheckSquare className="w-4 h-4" />
+              {selectionMode ? 'Done' : 'Select'}
+            </button>
             <Link
               to="/dashboard/receipts/tracking"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] transition-colors"
             >
-              <ArrowLeft className="w-4 h-4" />
               Receipt Tracking
             </Link>
             <Link
@@ -402,7 +416,7 @@ export default function BulkReceiptMapping() {
                 )
               )}
 
-              {canWrite && selectedReceiptIds.size > 0 && (
+              {canWrite && selectionMode && selectedReceiptIds.size > 0 && (
                 <button
                   type="button"
                   disabled={isAllocating}
@@ -419,6 +433,7 @@ export default function BulkReceiptMapping() {
           {candidates.length > 0 && (
             <div className="flex items-center justify-between text-xs text-[#863221] pt-1 border-t border-[#E8DFD8]/60">
               <div className="flex items-center gap-3">
+                {selectionMode && (<>
                 <button
                   type="button"
                   onClick={handleSelectAllMatched}
@@ -434,6 +449,7 @@ export default function BulkReceiptMapping() {
                 >
                   Clear selection
                 </button>
+                </>)}
               </div>
 
               <span>
@@ -469,9 +485,9 @@ export default function BulkReceiptMapping() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#180200] font-bold">
                   <tr>
-                    <th className="py-3 px-3 w-10 text-center">
+                    {selectionMode && <th className="py-3 px-3 w-10 text-center">
                       <span className="sr-only">Select</span>
-                    </th>
+                    </th>}
                     <th className="py-3 px-3">Receipt Details</th>
                     <th className="py-3 px-3">Entered Member No</th>
                     <th className="py-3 px-3">Payer on Receipt</th>
@@ -494,7 +510,7 @@ export default function BulkReceiptMapping() {
                         }`}
                       >
                         {/* Checkbox */}
-                        <td className="py-3 px-3 text-center">
+                        {selectionMode && <td className="py-3 px-3 text-center">
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -502,7 +518,7 @@ export default function BulkReceiptMapping() {
                             onChange={() => toggleSelectReceipt(cand.receipt_id)}
                             className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] disabled:opacity-30 cursor-pointer"
                           />
-                        </td>
+                        </td>}
 
                         {/* Receipt Details */}
                         <td className="py-3 px-3">

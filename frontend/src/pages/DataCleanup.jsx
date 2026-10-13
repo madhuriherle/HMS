@@ -109,7 +109,6 @@ export default function DataCleanup() {
       <div className="space-y-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Data Cleanup</h1>
-          <p className="mt-1 text-xs text-[#863221]">Clears operational records only. Master setup data stays protected. Cleared rows cannot be brought back.</p>
         </div>
 
         {error && <p className="text-xs font-semibold text-red-700">{error}</p>}

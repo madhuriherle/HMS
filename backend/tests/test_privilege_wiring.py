@@ -50,7 +50,7 @@ def test_login_landing_follows_the_menu(client, admin_headers):
     """The login redirect lands on the first page the role can actually open:
     the menu returns only entitled pages, so the first route in it is home."""
     _, _, h = _staff_with_role(client, admin_headers, "landing_user", "Landing Role", "LANDING_ROLE",
-                               permission_grants=[("masters.banks.read", False)])
+                               permission_grants=[("masters.payment_modes.read", False)])
     menu = client.get(f"{API}/users/modules/menu", headers=h).json()
 
     def first_route(nodes):
@@ -70,4 +70,4 @@ def test_login_landing_follows_the_menu(client, admin_headers):
         return out
 
     assert "dashboard" not in codes(menu)
-    assert first_route(menu) == "/dashboard/master/banks"
+    assert first_route(menu) == "/dashboard/master/payment-modes"

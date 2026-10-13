@@ -22,7 +22,8 @@ import {
   RotateCcw,
   FileText,
   Building,
-  CreditCard
+  CreditCard,
+  CheckSquare
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import { isReceiptUnmapped } from '../utils/displayHelpers';
@@ -102,6 +103,7 @@ export default function ReceiptTracking() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [selectionMode, setSelectionMode] = useState(false); // checkboxes show only after the Select button is pressed
   const [dayBook, setDayBook] = useState(null); // { date, data }
 
   // Modals State
@@ -541,6 +543,20 @@ export default function ReceiptTracking() {
             )}
             <button
               type="button"
+              onClick={() => {
+                setSelectionMode((on) => !on);
+                setSelectedIds(new Set());
+              }}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border cursor-pointer ${
+                selectionMode ? 'text-white bg-[#510601] border-[#510601]' : 'text-[#510601] bg-white border-[#E8DFD8] hover:bg-[#FAF7F2]'
+              }`}
+              title="Select receipts to map in bulk"
+            >
+              <CheckSquare className="w-4 h-4" />
+              {selectionMode ? 'Done' : 'Select'}
+            </button>
+            <button
+              type="button"
               onClick={() => loadDayBook(new Date().toISOString().slice(0, 10))}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
             >
@@ -674,7 +690,7 @@ export default function ReceiptTracking() {
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                {unmapped && (
+                {unmapped && selectionMode && (
                   <label className="mr-auto inline-flex items-center gap-1.5 text-[11px] text-[#863221]">
                     <input
                       type="checkbox"
@@ -709,7 +725,7 @@ export default function ReceiptTracking() {
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
-                <th className="py-3.5 pl-4 pr-0 w-8">
+                {selectionMode && <th className="py-3.5 pl-4 pr-0 w-8">
                   <input
                     type="checkbox"
                     title="Select all unassigned receipts shown"
@@ -718,7 +734,7 @@ export default function ReceiptTracking() {
                     onChange={(e) => setSelectedIds(e.target.checked ? new Set(unassignedVisible.map((r) => r.id)) : new Set())}
                     className="cursor-pointer accent-[#510601]"
                   />
-                </th>
+                </th>}
                 <th className="py-3.5 px-4 whitespace-nowrap">Receipt No.</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Date</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Name</th>
@@ -751,7 +767,7 @@ export default function ReceiptTracking() {
                       key={receipt.id}
                       className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]"
                     >
-                      <td className="py-3.5 pl-4 pr-0 w-8">
+                      {selectionMode && <td className="py-3.5 pl-4 pr-0 w-8">
                         {isUnmapped && (
                           <input
                             type="checkbox"
@@ -760,7 +776,7 @@ export default function ReceiptTracking() {
                             className="cursor-pointer accent-[#510601]"
                           />
                         )}
-                      </td>
+                      </td>}
                       {/* Column 1: Receipt Number */}
                       <td className="py-3.5 px-4 font-mono font-bold text-xs">
                         <span className="text-[#510601] tracking-wider">#{receipt.receiptNumber}</span>

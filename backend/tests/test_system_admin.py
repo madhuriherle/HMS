@@ -206,8 +206,8 @@ def test_sidebar_shows_only_what_the_role_may_open_and_parents_follow_their_chil
         return out
 
     # a role with one page privilege: that page and its parent group, nothing else
-    banks = names(_role_user(client, admin_headers, ["masters.banks.read"]))
-    assert banks.get("Masters") == ["Bank Master"]
+    banks = names(_role_user(client, admin_headers, ["masters.payment_modes.read"]))
+    assert banks.get("Masters") == ["Payment Mode Setup"]
     assert "Receipts" not in banks and "Users" not in banks and "Settings" not in banks
 
     # a role with no page privileges sees no groups at all
@@ -215,5 +215,23 @@ def test_sidebar_shows_only_what_the_role_may_open_and_parents_follow_their_chil
     assert "Masters" not in nothing and "Receipts" not in nothing
 
     # two pages in different groups: both groups appear, each with only its own page
-    two = names(_role_user(client, admin_headers, ["masters.banks.read", "receipts.tracking.read"]))
-    assert two["Masters"] == ["Bank Master"] and two["Receipts"] == ["Receipt Tracking", "Bulk Receipt Mapping"]  # Bulk Mapping is opened by the same privilege
+    two = names(_role_user(client, admin_headers, ["masters.payment_modes.read", "receipts.tracking.read"]))
+    assert two["Masters"] == ["Payment Mode Setup"] and two["Receipts"] == ["Receipt Tracking", "Bulk Receipt Mapping"]  # Bulk Mapping is opened by the same privilege
+
+
+def test_my_profile_returns_contact_and_login_details_and_can_be_edited(client, admin_headers):
+    from test_sub_modules import _role_user
+
+    me = client.get(f"{API}/auth/me", headers=admin_headers).json()
+    assert {"mobile", "mobile_country_code", "last_login_at", "created_at"} <= set(me)
+
+    h = _role_user(client, admin_headers, ["masters.particulars.read"])  # any signed-in user may open their own profile
+    mine = client.get(f"{API}/auth/me", headers=h).json()
+    assert mine["username"].startswith("subm")
+    saved = client.put(f"{API}/auth/me", headers=h, json={"name": "Renamed Self", "mobile": "9876501234", "mobile_country_code": "+91"})
+    assert saved.status_code == 200, saved.text
+    # the edit signs the old session out; log in again with the same password to see the change
+    from test_api import STAFF_PW
+    tok = client.post(f"{API}/auth/login", data={"username": mine["username"], "password": STAFF_PW}).json()["access_token"]
+    after = client.get(f"{API}/auth/me", headers={"Authorization": f"Bearer {tok}"}).json()
+    assert after["name"] == "Renamed Self" and after["mobile"] == "9876501234"

@@ -36,8 +36,8 @@ SUB_MODULE_AREAS = {
         ("masters.location", "Location Setup", ["/masters/states", "/masters/districts", "/masters/taluks", "/masters/postal-codes", "/masters/states-summary", "/masters/districts-summary", "/masters/taluks-summary"]),
         ("masters.membership_types", "Membership Types", ["/masters/membership-types", "/masters/membership-credit-settings"]),
         ("masters.particulars", "Particulars Master", ["/masters/particulars", "/masters/service-types"]),
-        ("masters.payment_modes", "Payment Mode Setup", ["/masters/payment-modes"]),
-        ("masters.banks", "Bank Master", ["/masters/banks"]),
+        # banks are made and listed from the Payment Mode Setup screen; there is no separate Bank Master screen
+        ("masters.payment_modes", "Payment Mode Setup", ["/masters/payment-modes", "/masters/banks"]),
     ],
     # A rule is a path prefix, or (methods, path-regex[, query]) where query is "unapproved" / "not-unapproved"
     # (the approval_status filter of the member list). Paths are relative to /api/v1.
@@ -304,7 +304,6 @@ MENU_PAGE_CATALOG = [
     ("system.number_formats", "Number Formats", "system.hub", "/dashboard/system/number-formats", "list-checks", 2, "system.number_formats.read", None),
     ("masters.organisation", "Organisation Settings", "system.hub", "/dashboard/master/organisation-settings", "building", 1, "system.read", None),
     ("masters.payment_modes", "Payment Mode Setup", "masters", "/dashboard/master/payment-modes", "credit-card", 5, "masters.payment_modes.read", None),
-    ("masters.banks", "Bank Master", "masters", "/dashboard/master/banks", "building", 6, "masters.banks.read", None),
     # Personal Masters screen is switched off for now (also switched off in migration 0025):
     # ("masters.personal", "Personal Masters", "masters", "/dashboard/master/personal-masters", "list-checks", 7, "masters.read", None),
     # parent may list alternatives ("a|b"): the first module code that exists is used

@@ -8,7 +8,6 @@ import {
   AlertTriangle,
   AlertCircle,
   Users,
-  ArrowLeft,
   Loader2,
   RefreshCw,
   FileText,
@@ -224,7 +223,6 @@ export default function MemberImport() {
               to="/dashboard/membership/list"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] transition-colors"
             >
-              <ArrowLeft className="w-4 h-4" />
               Member Directory
             </Link>
             <button

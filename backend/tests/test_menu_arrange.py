@@ -52,7 +52,7 @@ def test_reorder_changes_the_sidebar_and_can_be_restored(client, admin_headers):
 def test_reorder_rejects_bad_requests(client, admin_headers):
     h = admin_headers
     mods = _modules(client, h)
-    masters, banks = mods["masters"], mods["masters.banks"]
+    masters, banks = mods["masters"], mods["masters.payment_modes"]
     # a module cannot go inside its own sub-module, or itself
     assert client.put(f"{API}/users/modules/reorder", headers=h,
                       json={"items": [{"id": masters["id"], "parent_id": banks["id"], "display_order": 1}]}).status_code == 400
@@ -69,9 +69,9 @@ def test_reorder_rejects_bad_requests(client, admin_headers):
 
 def test_only_super_admin_can_rearrange(client, admin_headers):
     mods = _modules(client, admin_headers)
-    someone = _role_user(client, admin_headers, ["masters.banks.read"])
+    someone = _role_user(client, admin_headers, ["masters.payment_modes.read"])
     r = client.put(f"{API}/users/modules/reorder", headers=someone,
-                   json={"items": [{"id": mods["masters.banks"]["id"], "parent_id": mods["masters"]["id"], "display_order": 1}]})
+                   json={"items": [{"id": mods["masters.payment_modes"]["id"], "parent_id": mods["masters"]["id"], "display_order": 1}]})
     assert r.status_code == 403
 
 
