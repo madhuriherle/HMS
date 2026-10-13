@@ -195,6 +195,8 @@ export default function RegisterNewMember() {
 
   // PIN code autocomplete suggestions
   const [pinSuggestions, setPinSuggestions] = useState([]);
+  // the locality last filled in from a PIN code, so it can be cleared again when the PIN changes (a typed one is kept)
+  const autoLocality = useRef('');
   const [isPinSuggestionsOpen, setIsPinSuggestionsOpen] = useState(false);
 
   // Click outside listener for PIN suggestion dropdown
@@ -465,6 +467,11 @@ export default function RegisterNewMember() {
     }
   };
 
+  // The amount is the price of the membership type chosen in step 1, so it is not typed here (a type with
+  // no price, such as an honorary one, still lets the amount be entered). The receipt date of a new registration is today.
+  const chosenType = membershipTypes.find((mt) => String(mt.id) === String(formData.membershipTypeId));
+  const amountIsFixed = !isViewMode && Number(chosenType?.currentPrice) > 0;
+
   const handleMembershipTypeSelect = (typeId) => {
     const tObj = membershipTypes.find((mt) => String(mt.id) === String(typeId));
     setFormData((prev) => ({
@@ -593,10 +600,19 @@ export default function RegisterNewMember() {
 
   const handlePinChange = async (val) => {
     const cleanVal = val.replace(/\D/g, '').slice(0, 6);
-    setFormData((prev) => ({
-      ...prev,
-      postalCode: cleanVal
-    }));
+    // a PIN that is being changed or cleared no longer describes the places filled in from the old one
+    setFormData((prev) => {
+      if (cleanVal.length === 6 || prev.postalCode === cleanVal) return { ...prev, postalCode: cleanVal };
+      const keepLocality = prev.locality && prev.locality !== autoLocality.current;
+      return {
+        ...prev,
+        postalCode: cleanVal,
+        locality: keepLocality ? prev.locality : '',
+        taluk: '',
+        district: '',
+        state: ''
+      };
+    });
     if (formErrors.postalCode) setFormErrors((prev) => ({ ...prev, postalCode: '' }));
 
     if (cleanVal.length >= 2) {
@@ -612,9 +628,11 @@ export default function RegisterNewMember() {
       // 1. Try local data first
       const matchInfo = findLocationByPin(postalCodes, cleanVal);
       if (matchInfo.found) {
+        const wasAuto = autoLocality.current;
+        autoLocality.current = matchInfo.area || '';
         setFormData((prev) => ({
           ...prev,
-          locality: prev.locality || matchInfo.area || '',
+          locality: prev.locality && prev.locality !== wasAuto ? prev.locality : matchInfo.area || '',
           taluk: matchInfo.talukName || '',
           district: matchInfo.districtName || '',
           state: matchInfo.stateName || ''
@@ -628,9 +646,11 @@ export default function RegisterNewMember() {
             const data = res.data;
             if (data.found) {
               const postOffice = { Name: data.area, Block: data.taluk, District: data.district, State: data.state };
+              const wasAuto = autoLocality.current;
+              autoLocality.current = postOffice.Name || '';
               setFormData((prev) => ({
                 ...prev,
-                locality: prev.locality || postOffice.Name || '',
+                locality: prev.locality && prev.locality !== wasAuto ? prev.locality : postOffice.Name || '',
                 taluk: postOffice.Block || '',
                 district: postOffice.District || '',
                 state: postOffice.State || ''
@@ -645,6 +665,7 @@ export default function RegisterNewMember() {
   };
 
   const handleSelectPostalSuggestion = (item) => {
+    autoLocality.current = item.area || '';
     setFormData((prev) => ({
       ...prev,
       postalCode: item.postalCode,
@@ -886,6 +907,11 @@ export default function RegisterNewMember() {
 
   const handleSaveMember = async (e) => {
     e.preventDefault();
+    // Enter inside a field submits the form even when the Save buttons are hidden
+    if (!hasPermission(isEditMode ? 'members.list.write' : 'members.register.write')) {
+      showToast('You do not have permission to save members.', 'error');
+      return;
+    }
     if (!validateForm()) {
       showToast('Please fix the required fields marked with *.', 'error');
       setActiveFormSection('membershipDetails');
@@ -2035,7 +2061,7 @@ export default function RegisterNewMember() {
                     <span>{isViewMode ? 'Back' : 'Cancel'}</span>
                   </button>
                   <div className="flex items-center gap-3">
-                    {isEditMode && (
+                    {isEditMode && hasPermission('members.list.write') && (
                       <button
                         type="submit"
                         className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] text-white font-bold text-sm rounded-lg shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5"
@@ -2104,14 +2130,17 @@ export default function RegisterNewMember() {
                       type="text"
                       inputMode="numeric"
                       disabled={isViewMode}
+                      readOnly={amountIsFixed}
+                      title={amountIsFixed ? 'Taken from the membership type chosen in step 1' : undefined}
                       value={formData.amount}
                       onChange={(e) => {
+                        if (amountIsFixed) return;
                         const val = e.target.value.replace(/[^\d.]/g, '');
                         setFormData({ ...formData, amount: val });
                       }}
                       onWheel={(e) => e.target.blur()}
 
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm font-semibold text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all disabled:opacity-90 disabled:cursor-not-allowed"
+                      className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm font-semibold text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all disabled:opacity-90 disabled:cursor-not-allowed ${amountIsFixed ? 'cursor-not-allowed opacity-90' : ''}`}
                     />
                   </div>
 
@@ -2121,7 +2150,7 @@ export default function RegisterNewMember() {
                       Receipt Date: {!isViewMode && <span className="text-red-600">*</span>}
                     </label>
                     <DateInput
-                      disabled={isViewMode}
+                      disabled={isViewMode || !isEditMode}
                       value={formData.receiptDate}
                       onChange={(e) => setFormData({ ...formData, receiptDate: e.target.value })}
                       name="receiptDate"
@@ -2216,15 +2245,16 @@ export default function RegisterNewMember() {
                         <span>Back</span>
                       </button>
                     ) : (
-                      <button
-                        type="submit"
-                        disabled={saving || !hasPermission(isEditMode ? 'members.list.write' : 'members.register.write')}
-                        title={!hasPermission(isEditMode ? 'members.list.write' : 'members.register.write') ? `Requires ${isEditMode ? 'members.list.write' : 'members.register.write'} permission` : undefined}
-                        className="disabled:opacity-50 px-6 py-2.5 bg-[#510601] hover:bg-[#8C1801] text-white font-bold text-xs sm:text-sm rounded-lg shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                      >
-                        <Save className="w-4 h-4" />
-                        <span>{isEditMode ? 'Update Member' : 'Register Member'}</span>
-                      </button>
+                      hasPermission(isEditMode ? 'members.list.write' : 'members.register.write') && (
+                        <button
+                          type="submit"
+                          disabled={saving}
+                          className="disabled:opacity-50 px-6 py-2.5 bg-[#510601] hover:bg-[#8C1801] text-white font-bold text-xs sm:text-sm rounded-lg shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                        >
+                          <Save className="w-4 h-4" />
+                          <span>{isEditMode ? 'Update Member' : 'Register Member'}</span>
+                        </button>
+                      )
                     )}
                   </div>
                 </div>

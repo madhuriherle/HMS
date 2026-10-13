@@ -193,3 +193,27 @@ def test_organisation_settings_has_its_own_privileges(client, admin_headers):
     assert {p["code"] for p in org["privileges"]} == {"masters.organisation.read", "masters.organisation.write"}
     assert org["permission_code"] == "masters.organisation.read"
     assert client.get(f"{API}/system/settings", headers=admin_headers).status_code == 200
+
+
+def test_sidebar_shows_only_what_the_role_may_open_and_parents_follow_their_children(client, admin_headers):
+    from test_sub_modules import _role_user
+
+    def names(headers):
+        menu = client.get(f"{API}/users/modules/menu", headers=headers).json()
+        out = {}
+        for top in menu:
+            out[top["name"]] = [c["name"] for c in top.get("submodules", [])]
+        return out
+
+    # a role with one page privilege: that page and its parent group, nothing else
+    banks = names(_role_user(client, admin_headers, ["masters.banks.read"]))
+    assert banks.get("Masters") == ["Bank Master"]
+    assert "Receipts" not in banks and "Users" not in banks and "Settings" not in banks
+
+    # a role with no page privileges sees no groups at all
+    nothing = names(_role_user(client, admin_headers, ["activity.read"]))
+    assert "Masters" not in nothing and "Receipts" not in nothing
+
+    # two pages in different groups: both groups appear, each with only its own page
+    two = names(_role_user(client, admin_headers, ["masters.banks.read", "receipts.tracking.read"]))
+    assert two["Masters"] == ["Bank Master"] and two["Receipts"] == ["Receipt Tracking", "Bulk Receipt Mapping"]  # Bulk Mapping is opened by the same privilege

@@ -40,6 +40,7 @@ import { currentRules } from '../hooks/useRules';
 import { useList } from '../hooks/useLists';
 import { formatMoney } from '../utils/money';
 
+import ModalFooter from '../components/ModalFooter';
 // Financial year (April-March) of an ISO date: 2026-10-12 -> 2026-27
 const fyOf = (iso) => {
   if (!iso || String(iso).length < 7) return '';
@@ -631,15 +632,16 @@ export default function ReceiptTracking() {
             >
               Clear
             </button>
-            <button
-              type="button"
-              onClick={handleBulkMap}
-              disabled={!hasPermission('receipts.tracking.write')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 font-bold text-white bg-[#510601] rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <LinkIcon className="w-3.5 h-3.5" />
-              Map to a member
-            </button>
+            {hasPermission('receipts.tracking.write') && (
+              <button
+                type="button"
+                onClick={handleBulkMap}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 font-bold text-white bg-[#510601] rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <LinkIcon className="w-3.5 h-3.5" />
+                Map to a member
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -684,16 +686,17 @@ export default function ReceiptTracking() {
                   </label>
                 )}
                 <button type="button" onClick={() => setViewingReceipt(receipt)} className="btn-act" title="View"><Eye className="w-3.5 h-3.5" /><span>View</span></button>
-                <button
-                  type="button"
-                  onClick={() => handleOpenEdit(receipt)}
-                  disabled={!hasPermission('receipts.tracking.write')}
-                  className="btn-act"
-                  title="Edit"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span>Edit</span>
-                </button>
+                {hasPermission('receipts.tracking.write') && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(receipt)}
+                    className="btn-act"
+                    title="Edit"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>Edit</span>
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -815,28 +818,30 @@ export default function ReceiptTracking() {
                           </button>
 
                           {/* Edit Action */}
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEdit(receipt)}
-                            disabled={!hasPermission('receipts.tracking.write')}
-                            className="btn-act"
-                            title={!hasPermission('receipts.tracking.write') ? 'Requires receipts.tracking.write permission' : 'Edit Receipt'}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                            <span>Edit</span>
-                          </button>
+                          {hasPermission('receipts.tracking.write') && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(receipt)}
+                              className="btn-act"
+                              title={'Edit Receipt'}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+                          )}
 
                           {/* Delete Action */}
-                          <button
-                            type="button"
-                            onClick={() => setDeletingReceipt(receipt)}
-                            disabled={!hasPermission('receipts.tracking.delete')}
-                            className="btn-act btn-act-danger"
-                            title={!hasPermission('receipts.tracking.delete') ? 'Requires receipts.tracking.delete permission' : 'Delete Receipt'}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Delete</span>
-                          </button>
+                          {hasPermission('receipts.tracking.delete') && (
+                            <button
+                              type="button"
+                              onClick={() => setDeletingReceipt(receipt)}
+                              className="btn-act btn-act-danger"
+                              title={'Delete Receipt'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -873,7 +878,7 @@ export default function ReceiptTracking() {
         {viewingReceipt && (
           <div className="bg-white rounded-2xl max-w-3xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold">
                   <FileText className="w-4 h-4" />
@@ -1012,8 +1017,8 @@ export default function ReceiptTracking() {
                     <span className="text-[10px] uppercase font-bold text-[#863221]">Period</span>
                     <p className="mt-0.5 text-[#180200]">
                       {[
-                        [viewingReceipt.periodFromDate, viewingReceipt.periodToDate].filter(Boolean).join(' to '),
-                        [viewingReceipt.periodFromTime, viewingReceipt.periodToTime].filter(Boolean).join(' to ')
+                        [viewingReceipt.periodFromDate, viewingReceipt.periodToDate].filter(Boolean).map(formatDate).join(' to '),
+                        [viewingReceipt.periodFromTime, viewingReceipt.periodToTime].filter(Boolean).map((t) => String(t).slice(0, 5)).join(' to ')
                       ].filter(Boolean).join(', ')}
                     </p>
                   </div>
@@ -1029,15 +1034,7 @@ export default function ReceiptTracking() {
             </div>
 
             {/* Read-only footer */}
-            <div className="flex flex-wrap items-center justify-end gap-2 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
-              <button
-                type="button"
-                onClick={() => setViewingReceipt(null)}
-                className="px-5 py-2 bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#863221] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
+            <ModalFooter kind="view" onCancel={() => setViewingReceipt(null)} />
           </div>
         )}
       </Modal>
@@ -1083,13 +1080,7 @@ export default function ReceiptTracking() {
                 ))}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setDayBook(null)}
-              className="mt-5 w-full py-2.5 border border-[#E8DFD8] text-xs font-semibold text-[#863221] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
-            >
-              Close
-            </button>
+            <ModalFooter kind="view" onCancel={() => setDayBook(null)} inForm />
           </div>
         )}
       </Modal>

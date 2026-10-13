@@ -169,34 +169,30 @@ function CreditBanner({ credit }) {
 
 // ── tabs ──
 
-function OverviewCard({ icon: Icon, title, tab, onOpen, children }) {
+// ── Overview: one profile sheet (no boxes inside it) ──
+function SheetSection({ title, tab, onOpen, children, className = '' }) {
   return (
-    <section className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm flex flex-col">
-      <header className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[#E8DFD8] bg-[#FAF7F2]/60 rounded-t-2xl">
-        <span className="flex items-center gap-2">
-          <Icon className="w-4 h-4 text-[#863221]" />
-          <h2 className="text-sm font-bold text-[#180200]">{title}</h2>
-        </span>
+    <section className={`px-5 py-4 ${className}`}>
+      <div className="flex items-center justify-between mb-2.5">
+        <h2 className="text-[11px] font-bold uppercase tracking-widest text-[#863221]">{title}</h2>
         {tab && (
           <button type="button" onClick={() => onOpen(tab)} className="text-[11px] font-semibold text-[#510601] hover:underline cursor-pointer">
-            View all
+            View all →
           </button>
         )}
-      </header>
-      <div className="p-4 flex-1">{children}</div>
+      </div>
+      {children}
     </section>
   );
 }
 
-const NotRecorded = () => <Empty>Not recorded yet.</Empty>;
-
-const FamilyLine = ({ label, value }) =>
-  value ? (
-    <div>
-      <span className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mr-2">{label}</span>
-      {value}
-    </div>
-  ) : null;
+// label and value on one line; a missing value is a faint dash
+const Row = ({ label, value }) => (
+  <div className="flex gap-3 py-1 text-sm">
+    <span className="w-28 shrink-0 text-xs text-[#863221]">{label}</span>
+    <span className={`min-w-0 break-words ${value ? 'text-[#180200]' : 'text-[#863221]/40'}`}>{value || '—'}</span>
+  </div>
+);
 
 function OverviewTab({ id, onOpen }) {
   const state = useSection(id, 'overview');
@@ -207,139 +203,142 @@ function OverviewTab({ id, onOpen }) {
         const c = d.contact;
         const m = d.membership;
         const f = d.family;
-        const hasBasic = Object.values(b).some(Boolean);
-        const hasContact = c.mobile || c.whatsapp_number || c.email || c.address;
+        const credit = m.credit;
         const hasFamily = f.father_name || f.mother_name || f.spouse_name || f.children_count > 0;
         const hasMagazine = d.magazine.subscriptions.length > 0 || d.magazine.services.length > 0 || d.magazine.magazine_needed;
-        const credit = m.credit;
+        const target = credit?.target_type;
+        const pct = target?.price ? Math.min(100, Math.round((credit.credit_total / target.price) * 100)) : 100;
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            <OverviewCard icon={User} title="Basic details" tab="personal" onOpen={onOpen}>
-              {!hasBasic ? (
-                <NotRecorded />
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Gender" value={b.gender} />
-                  <Field label="Date of birth" value={b.date_of_birth ? formatDate(b.date_of_birth) : ''} />
-                  <Field label="Blood group" value={b.blood_group} />
-                  <Field label="Gotra" value={b.gotra} />
-                  <Field label="Qualification" value={b.qualification} />
-                  <Field label="Occupation" value={b.occupation} />
-                  <Field label="Native place" value={b.native_place} />
-                </div>
-              )}
-            </OverviewCard>
-
-            <OverviewCard icon={Phone} title="Contact & address" tab="contact" onOpen={onOpen}>
-              {!hasContact ? (
-                <NotRecorded />
-              ) : (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Mobile" value={phone(c.mobile_country_code, c.mobile)} />
-                    <Field label="WhatsApp" value={phone(c.whatsapp_country_code, c.whatsapp_number)} />
-                  </div>
-                  <Field label="Email" value={c.email} />
-                  <Field label="Address" value={c.address} />
-                </div>
-              )}
-            </OverviewCard>
-
-            <OverviewCard icon={CreditCard} title="Membership" tab="membership" onOpen={onOpen}>
+          <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm divide-y divide-[#E8DFD8]">
+            {/* Membership strip */}
+            <SheetSection title="Membership" tab="membership" onOpen={onOpen}>
               {!m.current ? (
                 <Empty>No membership yet.</Empty>
               ) : (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Type" value={m.current.type_name_en} />
-                    <Field label="Status" value={m.current.status} />
-                    <Field label="Number" value={m.current.membership_number || 'No number yet'} />
-                    <Field label="Valid till" value={m.current.expires_at ? formatDate(m.current.expires_at) : ''} />
+                <>
+                  <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+                    <span className="text-lg font-bold text-[#180200]">
+                      {m.current.type_name_en}
+                      <span className="ml-2 text-xs font-semibold text-emerald-700">{m.current.status}</span>
+                    </span>
+                    <span className="text-xs text-[#863221]">
+                      No. <span className="font-mono text-[#180200]">{m.current.membership_number || 'given on approval'}</span>
+                    </span>
+                    {m.current.expires_at && (
+                      <span className="text-xs text-[#863221]">Valid till {formatDate(m.current.expires_at)}</span>
+                    )}
+                    {credit && <span className="text-xs text-[#863221]">Credit <b className="font-mono text-[#180200]">{inr(credit.credit_total)}</b></span>}
                   </div>
                   {credit && (
-                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#E8DFD8]/70">
-                      <Field label="Total credit" value={inr(credit.credit_total)} />
-                      <Field
-                        label="Next milestone"
-                        value={credit.target_type ? `${credit.target_type.name_en} (${inr(credit.amount_to_target || 0)} to go)` : 'Highest tier reached'}
-                      />
+                    <div className="mt-2.5">
+                      <div className="w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-[#510601] h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="mt-1 text-[11px] text-[#863221]">
+                        {target
+                          ? `${inr(credit.credit_total)} of ${inr(target.price)} to ${target.name_en} (${pct}%) — ${inr(credit.amount_to_target || 0)} to go`
+                          : 'Highest tier reached'}
+                      </div>
                     </div>
                   )}
-                </div>
+                </>
               )}
-            </OverviewCard>
+            </SheetSection>
 
-            <OverviewCard icon={Users} title="Family" tab="family" onOpen={onOpen}>
-              {!hasFamily ? (
-                <NotRecorded />
-              ) : (
-                <div className="space-y-2 text-sm">
-                  <FamilyLine label="Father" value={f.father_name} />
-                  <FamilyLine label="Mother" value={f.mother_name} />
-                  <FamilyLine label="Spouse" value={f.spouse_name} />
-                  <FamilyLine label="Children" value={f.children_count > 0 ? String(f.children_count) : ''} />
-                </div>
-              )}
-            </OverviewCard>
+            {/* Personal | Contact */}
+            <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-[#E8DFD8] max-md:divide-y">
+              <SheetSection title="Personal" tab="personal" onOpen={onOpen}>
+                <Row label="Gender" value={b.gender} />
+                <Row label="Born" value={b.date_of_birth ? formatDate(b.date_of_birth) : ''} />
+                <Row label="Blood group" value={b.blood_group} />
+                <Row label="Gotra" value={b.gotra} />
+                <Row label="Qualification" value={b.qualification} />
+                <Row label="Occupation" value={b.occupation} />
+                <Row label="Native place" value={b.native_place} />
+              </SheetSection>
+              <SheetSection title="Contact" tab="contact" onOpen={onOpen}>
+                <Row label="Mobile" value={phone(c.mobile_country_code, c.mobile)} />
+                <Row label="WhatsApp" value={phone(c.whatsapp_country_code, c.whatsapp_number)} />
+                <Row label="Email" value={c.email} />
+                <Row label="Address" value={c.address} />
+              </SheetSection>
+            </div>
 
-            <OverviewCard icon={FileText} title={`Receipts (${d.receipts.total})`} tab="receipts" onOpen={onOpen}>
+            {/* Family | Magazine & services */}
+            <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-[#E8DFD8] max-md:divide-y">
+              <SheetSection title="Family" tab="family" onOpen={onOpen}>
+                {!hasFamily ? (
+                  <p className="text-xs text-[#863221]/60">Not recorded yet.</p>
+                ) : (
+                  <>
+                    <Row label="Father" value={f.father_name} />
+                    <Row label="Mother" value={f.mother_name} />
+                    <Row label="Spouse" value={f.spouse_name} />
+                    <Row label="Children" value={f.children_count > 0 ? String(f.children_count) : ''} />
+                  </>
+                )}
+              </SheetSection>
+              <SheetSection title="Magazine & services" tab="magazine" onOpen={onOpen}>
+                {!hasMagazine ? (
+                  <p className="text-xs text-[#863221]/60">No magazine subscription or services.</p>
+                ) : (
+                  <>
+                    <Row label="Magazine needed" value={d.magazine.magazine_needed} />
+                    {d.magazine.subscriptions.map((st, i) => (
+                      <Row key={`s${i}`} label="Subscription" value={st} />
+                    ))}
+                    {d.magazine.services.map((sv, i) => (
+                      <Row key={`v${i}`} label="Service" value={sv} />
+                    ))}
+                  </>
+                )}
+              </SheetSection>
+            </div>
+
+            {/* Latest receipts */}
+            <SheetSection title={`Latest receipts (${d.receipts.total})`} tab="receipts" onOpen={onOpen}>
               {d.receipts.latest.length === 0 ? (
-                <Empty>No receipts mapped to this member.</Empty>
+                <p className="text-xs text-[#863221]/60">No receipts mapped to this member.</p>
               ) : (
-                <div className="space-y-1.5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-1 text-sm">
                   {d.receipts.latest.map((r) => (
-                    <div key={r.receipt_id} className="flex justify-between gap-3">
+                    <div key={r.receipt_id} className="flex items-baseline justify-between gap-3">
                       <span>
                         <b className="font-mono">{r.receipt_number}</b>
-                        <span className="text-[#863221]"> · {formatDate(r.receipt_date)}</span>
+                        <span className="ml-2 text-xs text-[#863221]">{formatDate(r.receipt_date)}</span>
                       </span>
-                      <span className="font-mono font-bold">{inr(r.allocated_amount)}</span>
+                      <span className="font-mono font-semibold">{inr(r.allocated_amount)}</span>
                     </div>
                   ))}
                 </div>
               )}
-            </OverviewCard>
+            </SheetSection>
 
-            <OverviewCard icon={BookOpen} title="Magazine & services" tab="magazine" onOpen={onOpen}>
-              {!hasMagazine ? (
-                <Empty>No magazine subscription or services.</Empty>
+            {/* Recent activity */}
+            <SheetSection title="Recent activity" tab="activity" onOpen={onOpen}>
+              {d.activity.length === 0 ? (
+                <p className="text-xs text-[#863221]/60">No activity recorded yet.</p>
               ) : (
-                <div className="space-y-1.5 text-sm">
-                  {d.magazine.magazine_needed && <div>Magazine needed: <b>{d.magazine.magazine_needed}</b></div>}
-                  {d.magazine.subscriptions.map((st, i) => (
-                    <div key={`s${i}`}>Magazine subscription: <b>{st}</b></div>
+                <ul className="space-y-1 text-sm">
+                  {d.activity.map((e) => (
+                    <li key={e.id} className="flex items-baseline gap-2">
+                      <span className="text-[#510601]">●</span>
+                      <span className="text-[#180200]">{e.description}</span>
+                      <span className="text-xs text-[#863221]">
+                        — {e.acted_by_name || 'System'}, {e.created_at ? formatDateTime(e.created_at) : ''}
+                      </span>
+                    </li>
                   ))}
-                  {d.magazine.services.map((sv, i) => (
-                    <div key={`v${i}`}>{sv}</div>
-                  ))}
-                </div>
+                </ul>
               )}
-            </OverviewCard>
-
-            <div className="md:col-span-2 xl:col-span-3">
-              <OverviewCard icon={History} title="Recent activity" tab="activity" onOpen={onOpen}>
-                {d.activity.length === 0 ? (
-                  <Empty>No activity recorded yet.</Empty>
-                ) : (
-                  <ul className="space-y-1.5 text-xs">
-                    {d.activity.map((e) => (
-                      <li key={e.id} className="flex justify-between gap-3">
-                        <span className="text-[#180200]">{e.description}</span>
-                        <span className="text-[#863221] whitespace-nowrap">
-                          {e.acted_by_name || 'System'} · {e.created_at ? formatDateTime(e.created_at) : ''}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </OverviewCard>
-            </div>
+            </SheetSection>
           </div>
         );
       }}
     </Loading>
   );
 }
+
 function PersonalTab({ id }) {
   const state = useSection(id, 'personal');
   return (

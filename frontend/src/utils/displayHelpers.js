@@ -44,7 +44,6 @@ export const calculateMemberMembershipStatus = (
     memberId = memberOrIdentifier.id || null;
     memberNo =
       memberOrIdentifier.membershipNumber ||
-      memberOrIdentifier.registrationNumber ||
       memberOrIdentifier.membershipNo ||
       null;
     memberMobile =

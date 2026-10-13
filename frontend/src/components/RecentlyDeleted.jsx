@@ -6,6 +6,7 @@ import { apiErrorMessage } from '../utils/apiError';
 import { notify } from '../utils/notify';
 import { formatDateTime } from '../utils/dateUtils';
 
+import ModalFooter from './ModalFooter';
 // "Recently deleted" for a master (kind = particulars | membership-types | banks | ...): list + restore.
 export default function RecentlyDeleted({ kind, label = 'items', onRestored, disabled = false }) {
   const [open, setOpen] = useState(false);
@@ -80,13 +81,7 @@ export default function RecentlyDeleted({ kind, label = 'items', onRestored, dis
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="mt-5 w-full py-2.5 border border-[#E8DFD8] text-xs font-semibold text-[#863221] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
-            >
-              Close
-            </button>
+            <ModalFooter kind="view" onCancel={() => setOpen(false)} inForm />
           </div>
         )}
       </Modal>

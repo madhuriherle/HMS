@@ -115,10 +115,12 @@ export default function RecycleBin() {
               <p className="text-sm text-[#863221]">View, restore, or permanently delete soft-deleted records.</p>
             </div>
           </div>
-          <button type="button" onClick={empty} disabled={!canWrite || busy || total === 0}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#ED4636] text-white text-sm font-bold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed">
-            <Trash2 className="w-4 h-4" /> Empty Recycle Bin
-          </button>
+          {canWrite && (
+            <button type="button" onClick={empty} disabled={busy || total === 0}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#ED4636] text-white text-sm font-bold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed">
+              <Trash2 className="w-4 h-4" /> Empty Recycle Bin
+            </button>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl border border-[#E8DFD8] p-3 flex flex-wrap items-center gap-3">
@@ -170,16 +172,18 @@ export default function RecycleBin() {
                   <td className="p-3 whitespace-nowrap">{r.deleted_at ? formatDateTime(r.deleted_at) : '-'}</td>
                   <td className="p-3">{r.deleted_by || '-'}</td>
                   <td className="p-3">
-                    <div className="flex justify-end gap-2">
-                      <button type="button" disabled={!canWrite || busy} onClick={() => restore([{ entity: r.entity, id: r.entity_id }])}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 text-xs font-bold cursor-pointer">
-                        <RotateCcw className="w-3.5 h-3.5" /> Restore
-                      </button>
-                      <button type="button" disabled={!canWrite || busy} onClick={() => purge([{ entity: r.entity, id: r.entity_id }])}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-bold cursor-pointer">
-                        <Trash2 className="w-3.5 h-3.5" /> Delete
-                      </button>
-                    </div>
+                    {canWrite && (
+                      <div className="flex justify-end gap-2">
+                        <button type="button" disabled={busy} onClick={() => restore([{ entity: r.entity, id: r.entity_id }])}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-emerald-600 text-emerald-700 text-xs font-bold cursor-pointer">
+                          <RotateCcw className="w-3.5 h-3.5" /> Restore
+                        </button>
+                        <button type="button" disabled={busy} onClick={() => purge([{ entity: r.entity, id: r.entity_id }])}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 text-red-600 text-xs font-bold cursor-pointer">
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

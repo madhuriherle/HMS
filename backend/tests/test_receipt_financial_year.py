@@ -13,7 +13,7 @@ def fy_receipt_format(client, admin_headers):
     """This test is about the year-wise format (2019-20/0001); the default is a plain 0001 counter."""
     url = f"{API}/system/number-formats/RECEIPT"
     fy = dict(prefix="", date_part="FY", separator="/", digits=4, start_value=1, restart="FY", suffix="", allow_manual=True)
-    plain = dict(fy, date_part="NONE", separator="", restart="NEVER")
+    plain = dict(fy, date_part="NONE", separator="")
     assert client.put(url, headers=admin_headers, json=fy).status_code == 200
     yield
     client.put(url, headers=admin_headers, json=plain)

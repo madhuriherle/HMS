@@ -191,26 +191,28 @@ export default function Approvals() {
                       <td className="py-3 px-4">
                         {r.status === 'PENDING' ? (
                           <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => approve(r)}
-                              disabled={!hasPermission('approvals.write')}
-                              title={!hasPermission('approvals.write') ? 'Requires approvals.write permission' : 'Approve'}
-                              className="btn-act btn-act-ok"
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Approve</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => reject(r)}
-                              disabled={!hasPermission('approvals.write')}
-                              title={!hasPermission('approvals.write') ? 'Requires approvals.write permission' : 'Reject'}
-                              className="btn-act btn-act-danger"
-                            >
-                              <XCircle className="w-3.5 h-3.5" />
-                              <span>Reject</span>
-                            </button>
+                            {hasPermission('approvals.write') && (
+                              <button
+                                type="button"
+                                onClick={() => approve(r)}
+                                title={'Approve'}
+                                className="btn-act btn-act-ok"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Approve</span>
+                              </button>
+                            )}
+                            {hasPermission('approvals.write') && (
+                              <button
+                                type="button"
+                                onClick={() => reject(r)}
+                                title={'Reject'}
+                                className="btn-act btn-act-danger"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                <span>Reject</span>
+                              </button>
+                            )}
                           </div>
                         ) : (
                           <div className="text-right text-[#863221]/70">{r.review_note || ''}</div>

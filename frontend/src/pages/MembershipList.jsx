@@ -58,6 +58,7 @@ import {
 import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
 import { formatMoney } from '../utils/money';
 
+import ModalFooter from '../components/ModalFooter';
 const toId = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? v : Number(v));
 
 
@@ -269,7 +270,7 @@ export default function MembershipList() {
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
         const memberName = (m.fullName || m.name || '').toLowerCase();
-        const memberNo = (m.membershipNumber || m.id || '').toLowerCase();
+        const memberNo = String(m.membershipNumber || '').toLowerCase();
         const mobile = (m.mobile || m.mobileNumber || '').toLowerCase();
         const email = (m.email || '').toLowerCase();
         const city = (m.city || m.place || m.talukName || '').toLowerCase();
@@ -659,7 +660,7 @@ export default function MembershipList() {
     () => setDeleteDialog(null),
     (m) => ({
       title: 'Delete membership?',
-      text: `Are you sure you want to delete ${m.fullName || m.name} (#${m.membershipNumber || m.id})?`,
+      text: `Are you sure you want to delete ${m.fullName || m.name} (${m.membershipNumber ? `#${m.membershipNumber}` : `MID ${m.id}`})?`,
       confirmText: 'Yes, delete',
       danger: true,
     }),
@@ -731,16 +732,17 @@ export default function MembershipList() {
                 <span>Import Members</span>
               </Link>
             )}
-            <button
-              type="button"
-              onClick={handleOpenAddModal}
-              disabled={!hasPermission('members.list.write')}
-              title={!hasPermission('members.list.write') ? 'Requires members.list.write permission' : undefined}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#510601] hover:bg-[#863221] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-sm cursor-pointer hover:shadow-md shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Membership</span>
-            </button>
+            {hasPermission('members.list.write') && (
+              <button
+                type="button"
+                onClick={handleOpenAddModal}
+
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#510601] hover:bg-[#863221] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-sm cursor-pointer hover:shadow-md shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Membership</span>
+              </button>
+            )}
           </>
         }
       >
@@ -917,26 +919,28 @@ export default function MembershipList() {
                             <Eye className="w-3.5 h-3.5" />
                             <span>View</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditModal(m)}
-                            disabled={!hasPermission('members.list.write')}
-                            className="btn-act"
-                            title={!hasPermission('members.list.write') ? 'Requires members.list.write permission' : 'Edit Member'}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                            <span>Edit</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setDeleteReason(''); setDeleteDialog(m); }}
-                            disabled={!hasPermission('members.list.delete')}
-                            className="btn-act btn-act-danger"
-                            title={!hasPermission('members.list.delete') ? 'Requires members.list.delete permission' : 'Delete Member'}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Delete</span>
-                          </button>
+                          {hasPermission('members.list.write') && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditModal(m)}
+                              className="btn-act"
+                              title={'Edit Member'}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                          {hasPermission('members.list.delete') && (
+                            <button
+                              type="button"
+                              onClick={() => { setDeleteReason(''); setDeleteDialog(m); }}
+                              className="btn-act btn-act-danger"
+                              title={'Delete Member'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1015,7 +1019,7 @@ export default function MembershipList() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold text-base">
                   {(viewingMember.fullName || viewingMember.name || 'M').charAt(0).toUpperCase()}
@@ -1370,29 +1374,23 @@ export default function MembershipList() {
 
             {/* Footer */}
             </div>
-            <div className="shrink-0 flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/60">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedMemberIds(new Set([viewingMember.id]));
-                  setIsLabelPreviewOpen(true);
-                  setViewingMember(null);
-                }}
-                className="flex items-center gap-1.5 py-2 px-3.5 bg-white border border-[#510601] text-[#510601] text-xs font-semibold rounded-xl hover:bg-[#FAF7F2] transition-colors cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Preview Label</span>
-              </button>
-              <div className="flex items-center gap-2">
+            <ModalFooter
+              kind="view"
+              onCancel={() => setViewingMember(null)}
+              left={
                 <button
                   type="button"
-                  onClick={() => setViewingMember(null)}
-                  className="py-2 px-4 border border-[#E8DFD8] text-[#863221] hover:bg-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                  onClick={() => {
+                    setSelectedMemberIds(new Set([viewingMember.id]));
+                    setIsLabelPreviewOpen(true);
+                    setViewingMember(null);
+                  }}
+                  className="text-sm font-semibold text-[#510601] hover:text-[#8C1801] cursor-pointer"
                 >
-                  Close
+                  Preview Label
                 </button>
-              </div>
-            </div>
+              }
+            />
           </div>
       )}
 
@@ -1405,7 +1403,7 @@ export default function MembershipList() {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2] print:hidden no-print">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] print:hidden no-print">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <Printer className="w-5 h-5" />
@@ -1457,7 +1455,7 @@ export default function MembershipList() {
                       Akhila Havyaka Mahasabha
                     </span>
                     <span className="font-mono text-[10px] font-bold bg-[#FAF7F2] text-[#510601] px-1.5 py-0.5 rounded border border-[#E8DFD8]">
-                      #{m.membershipNumber || m.id}
+                      {m.membershipNumber ? `#${m.membershipNumber}` : `MID ${m.id}`}
                     </span>
                   </div>
 
@@ -1493,28 +1491,15 @@ export default function MembershipList() {
           </div>
 
           {/* Modal Footer */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] print:hidden no-print">
-            <span className="text-xs text-[#863221]">
-              Showing {selectedMembersForLabels.length} printable label cards
-            </span>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsLabelPreviewOpen(false)}
-                className="py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Close Preview
-              </button>
-              <button
-                type="button"
-                onClick={handleTriggerPrint}
-                className="flex items-center gap-1.5 py-2.5 px-5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Print Labels</span>
-              </button>
-            </div>
-          </div>
+          <ModalFooter
+            kind="confirm"
+            cancelLabel="Close"
+            submitLabel="Print Labels"
+            onCancel={() => setIsLabelPreviewOpen(false)}
+            onSubmit={handleTriggerPrint}
+            className="print:hidden no-print"
+            left={<span className="text-xs text-[#863221]">Showing {selectedMembersForLabels.length} printable label cards</span>}
+          />
         </div>
       </Modal>
 

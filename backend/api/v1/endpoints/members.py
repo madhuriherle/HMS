@@ -498,11 +498,12 @@ def duplicate_check(
 
 @router.get("/lookup")
 def lookup_member(
-    number: str = Query(..., description="Membership number, member code, registration number, or mobile"),
+    number: str = Query(..., description="The member's membership number (never the member id, registration number or mobile)"),
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    """Lookup a member by code, membership number, registration number, or mobile number."""
+    """Look a member up by their membership number only. The member id (MID), the registration number and the
+    mobile are not membership numbers, so they find nobody."""
     import re
     raw = (number or "").strip()
     if len(raw) < 3 and not raw.isdigit():
@@ -524,18 +525,6 @@ def lookup_member(
         .filter(live, MemberMembership.is_deleted == False, func.upper(MemberMembership.membership_number) == upper)  # noqa: E712
         .limit(5)
     )
-    if raw.isdigit() and len(raw) <= 9:  # the plain MID (the member's id)
-        add(db.query(Member.id).filter(live, Member.id == int(raw)).limit(1))
-    reg = re.fullmatch(r"REG-(\d{4})-(\d+)", raw, flags=re.IGNORECASE)
-    if reg:
-        add(
-            db.query(Member.id)
-            .filter(live, Member.id == int(reg.group(2)), func.extract("year", Member.created_at) == int(reg.group(1)))
-            .limit(1)
-        )
-    digits = re.sub(r"\D", "", raw)
-    if len(digits) >= 10:
-        add(db.query(Member.id).filter(live, Member.mobile.in_({digits, digits[-10:]})).limit(5))
 
     members = db.query(Member).filter(live, Member.id.in_(ids[:5])).all() if ids else []
     members.sort(key=lambda m: ids.index(m.id))

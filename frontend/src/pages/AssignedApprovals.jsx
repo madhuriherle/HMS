@@ -119,16 +119,18 @@ export default function AssignedApprovals() {
                 className="w-full pl-9 pr-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
               />
             </div>
-            <button
-              type="button"
-              onClick={() => approve(chosen)}
-              disabled={!canApprove || chosen.length === 0 || busy}
-              title={canApprove ? 'Approve the ticked members' : 'Requires members.unapproved.write permission'}
-              className="disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 rounded-xl bg-[#510601] hover:bg-[#8C1801] text-white text-xs sm:text-sm font-bold shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5 shrink-0"
-            >
-              <Check className="w-3.5 h-3.5" />
-              <span>Approve selected{chosen.length ? ` (${chosen.length})` : ''}</span>
-            </button>
+            {canApprove && (
+              <button
+                type="button"
+                onClick={() => approve(chosen)}
+                disabled={chosen.length === 0 || busy}
+                title={'Approve the ticked members'}
+                className="disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 rounded-xl bg-[#510601] hover:bg-[#8C1801] text-white text-xs sm:text-sm font-bold shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Approve selected{chosen.length ? ` (${chosen.length})` : ''}</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -190,26 +192,29 @@ export default function AssignedApprovals() {
                           <Eye className="w-3.5 h-3.5" />
                           <span>View</span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/dashboard/membership/edit/${m.id}`, { state: { returnPath: '/dashboard/membership/assigned' } })}
-                          disabled={!hasPermission('members.list.write')}
-                          className="btn-act"
-                          title={hasPermission('members.list.write') ? 'Edit Application' : 'Requires members.list.write permission'}
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => approve([m])}
-                          disabled={!canApprove || busy}
-                          title={canApprove ? 'Approve and give the permanent membership number' : 'Requires members.unapproved.write permission'}
-                          className="btn-act btn-act-ok"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Approve</span>
-                        </button>
+                        {hasPermission('members.list.write') && (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/dashboard/membership/edit/${m.id}`, { state: { returnPath: '/dashboard/membership/assigned' } })}
+                            className="btn-act"
+                            title={hasPermission('members.list.write') ? 'Edit Application' : 'Requires members.list.write permission'}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                          </button>
+                        )}
+                        {canApprove && (
+                          <button
+                            type="button"
+                            onClick={() => approve([m])}
+                            disabled={busy}
+                            title={'Approve and give the permanent membership number'}
+                            className="btn-act btn-act-ok"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Approve</span>
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))

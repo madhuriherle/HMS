@@ -30,6 +30,9 @@ class Token(BaseModel):
 class RefreshRequest(BaseModel):
     refresh_token: str
 
+class LogoutRequest(BaseModel):
+    refresh_token: Optional[str] = None
+
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
@@ -114,7 +117,7 @@ def logout(
     request: Request,
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
-    payload: Optional[RefreshRequest] = None,
+    payload: Optional[LogoutRequest] = None,
 ) -> Any:
     """Logout: records the LOGOUT activity and revokes the refresh token when
     one is supplied (access tokens simply expire)."""

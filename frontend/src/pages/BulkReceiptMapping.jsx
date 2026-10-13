@@ -26,6 +26,7 @@ import Modal from '../components/Modal';
 import { formatMoney } from '../utils/money';
 
 
+import ModalFooter from '../components/ModalFooter';
 export default function BulkReceiptMapping() {
   const { hasPermission } = useAuth();
   const canWrite = hasPermission('receipts.tracking.write') || hasPermission('receipts.write');
@@ -194,15 +195,15 @@ export default function BulkReceiptMapping() {
 
   // Manual member search
   const searchMembers = async (q) => {
-    if (!q || q.trim().length < 2) {
+    if (!q || q.trim().length < 1) {
       setMemberSearchResults([]);
       return;
     }
     setSearchingMembers(true);
     try {
-      const { data } = await api.get('/members/lookup', { params: { q: q.trim() } });
-      const list = data?.data || data || [];
-      setMemberSearchResults(list);
+      const { data } = await api.get('/members/', { params: { search: q.trim(), limit: 10 } });
+      const list = data?.data || data?.members || data || [];
+      setMemberSearchResults(Array.isArray(list) ? list : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -383,23 +384,25 @@ export default function BulkReceiptMapping() {
             {/* Primary Action Button: 1-Click Auto Map All Matches */}
             <div className="flex items-center gap-2">
               {totalMatched > 0 && (
-                <button
-                  type="button"
-                  disabled={isAllocating || !canWrite}
-                  onClick={handleBulkAutoMapAll}
-                  title={!canWrite ? "Requires receipts.tracking.write permission" : "Auto-map all matched receipts"}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#3D705C] hover:bg-[#2d5445] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {isAllocating ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="w-4 h-4 text-emerald-200" />
-                  )}
-                  ⚡ Auto-Map All {totalMatched} Matched Receipts ({formatMoney(matchedAmount)})
-                </button>
+                canWrite && (
+                  <button
+                    type="button"
+                    disabled={isAllocating}
+                    onClick={handleBulkAutoMapAll}
+                    title={"Auto-map all matched receipts"}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#3D705C] hover:bg-[#2d5445] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isAllocating ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 text-emerald-200" />
+                    )}
+                    ⚡ Auto-Map All {totalMatched} Matched Receipts ({formatMoney(matchedAmount)})
+                  </button>
+                )
               )}
 
-              {selectedReceiptIds.size > 0 && (
+              {canWrite && selectedReceiptIds.size > 0 && (
                 <button
                   type="button"
                   disabled={isAllocating}
@@ -547,7 +550,7 @@ export default function BulkReceiptMapping() {
                               </span>
                               <div className="flex items-center gap-2 text-[11px] text-[#863221]">
                                 <span className="font-mono font-semibold">
-                                  No: {cand.matched_member.membership_number || `#${cand.matched_member.id}`}
+                                  No: {cand.matched_member.membership_number || `MID #${cand.matched_member.id}`}
                                 </span>
                                 {cand.matched_member.mobile && (
                                   <span>· {cand.matched_member.mobile}</span>
@@ -578,27 +581,31 @@ export default function BulkReceiptMapping() {
                         {/* Actions */}
                         <td className="py-3 px-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            {hasMatch ? (
-                              <button
-                                type="button"
-                                disabled={isAllocating || !canWrite}
-                                onClick={() => handleMapSingle(cand)}
-                                title={!canWrite ? "Requires receipts.tracking.write permission" : "Map to this member"}
-                                className="px-3 py-1.5 bg-[#3D705C] hover:bg-[#2d5445] text-white font-bold rounded-lg text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                              >
-                                Map
-                              </button>
+                            {canWrite && (hasMatch ? (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={isAllocating}
+                                  onClick={() => handleMapSingle(cand)}
+                                  title={"Map to this member"}
+                                  className="px-3 py-1.5 bg-[#3D705C] hover:bg-[#2d5445] text-white font-bold rounded-lg text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  Map
+                                </button>
+                              </>
                             ) : (
-                              <button
-                                type="button"
-                                disabled={isAllocating || !canWrite}
-                                onClick={() => handleOpenManualModal(cand)}
-                                title={!canWrite ? "Requires receipts.tracking.write permission" : "Search and select member"}
-                                className="px-2.5 py-1.5 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] font-semibold rounded-lg text-[11px] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                              >
-                                Pick Member
-                              </button>
-                            )}
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={isAllocating}
+                                  onClick={() => handleOpenManualModal(cand)}
+                                  title={"Search and select member"}
+                                  className="px-2.5 py-1.5 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] font-semibold rounded-lg text-[11px] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  Pick Member
+                                </button>
+                              </>
+                            ))}
                           </div>
                         </td>
                       </tr>
@@ -616,7 +623,7 @@ export default function BulkReceiptMapping() {
             className="bg-white rounded-2xl max-w-xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
               <div>
                 <h3 className="text-base font-bold text-[#180200]">
                   Map Receipt #{activeReceiptForManual?.receipt_number}
@@ -672,20 +679,22 @@ export default function BulkReceiptMapping() {
                         {m.name || m.first_name_en} {m.last_name_en || ''}
                       </h4>
                       <p className="text-[11px] text-[#863221]">
-                        No: <span className="font-mono font-semibold">{m.membership_number || m.member_code || `#${m.id}`}</span>
+                        No: <span className="font-mono font-semibold">{m.membership_number || m.member_code || '—'}</span>
                         {m.mobile ? ` · 📞 ${m.mobile}` : ''}
                         {m.city ? ` · 📍 ${m.city}` : ''}
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      disabled={isAllocating}
-                      onClick={() => handleAssignManualMember(m)}
-                      className="px-3 py-1.5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-lg shadow-sm transition-colors cursor-pointer"
-                    >
-                      Map to this Member
-                    </button>
+                    {canWrite && (
+                      <button
+                        type="button"
+                        disabled={isAllocating}
+                        onClick={() => handleAssignManualMember(m)}
+                        className="px-3 py-1.5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-lg shadow-sm transition-colors cursor-pointer"
+                      >
+                        Map to this Member
+                      </button>
+                    )}
                   </div>
                 ))}
                 {!searchingMembers && memberSearchQuery && memberSearchResults.length === 0 && (
@@ -696,15 +705,7 @@ export default function BulkReceiptMapping() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end px-6 py-3 border-t border-[#E8DFD8] bg-[#FAF7F2]">
-              <button
-                type="button"
-                onClick={() => setManualModalOpen(false)}
-                className="px-4 py-2 text-xs font-semibold rounded-xl border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-white"
-              >
-                Cancel
-              </button>
-            </div>
+            <ModalFooter kind="view" onCancel={() => setManualModalOpen(false)} />
           </div>
         </Modal>
       </div>

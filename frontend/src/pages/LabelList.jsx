@@ -32,6 +32,7 @@ import api from '../api';
 import { askForm } from '../utils/dialogs';
 import useAuth from '../hooks/useAuth';
 
+import ModalFooter from '../components/ModalFooter';
 export default function LabelList() {
   const { hasPermission } = useAuth();
   // Synchronized stores
@@ -268,16 +269,17 @@ export default function LabelList() {
             <span>Membership List</span>
           </Link>
 
-          <button
-            type="button"
-            onClick={handleGenerateBatch}
-            disabled={!hasPermission('magazines.write')}
-            title={!hasPermission('magazines.write') ? 'Requires magazines.write permission' : 'Generate a label batch (PDF) for paid members'}
-            className="inline-flex items-center gap-2 rounded-lg border border-[#E8DFD8] bg-white px-4 py-2 text-sm font-medium text-[#510601] shadow-sm hover:bg-[#FAF7F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <Printer className="h-4 w-4" />
-            <span>Generate Batch (PDF)</span>
-          </button>
+          {hasPermission('magazines.write') && (
+            <button
+              type="button"
+              onClick={handleGenerateBatch}
+              title={'Generate a label batch (PDF) for paid members'}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#E8DFD8] bg-white px-4 py-2 text-sm font-medium text-[#510601] shadow-sm hover:bg-[#FAF7F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Printer className="h-4 w-4" />
+              <span>Generate Batch (PDF)</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -662,28 +664,15 @@ export default function LabelList() {
           </div>
 
           {/* Modal Actions */}
-          <div className="flex items-center justify-between border-t border-stone-200 bg-white px-6 py-4 print:hidden no-print">
-            <span className="text-xs text-gray-500">
-              Total {itemsToPrint.length} label{itemsToPrint.length !== 1 ? 's' : ''} to print
-            </span>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setIsPrintModalOpen(false)}
-                className="rounded-lg border border-stone-200 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-stone-50"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={handleTriggerPrint}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#8C1801] px-5 py-2 text-xs font-medium text-white hover:bg-[#510601] shadow-sm transition-colors"
-              >
-                <Printer className="h-4 w-4" />
-                <span>Send to Printer</span>
-              </button>
-            </div>
-          </div>
+          <ModalFooter
+            kind="confirm"
+            cancelLabel="Close"
+            submitLabel="Send to Printer"
+            onCancel={() => setIsPrintModalOpen(false)}
+            onSubmit={handleTriggerPrint}
+            className="print:hidden no-print"
+            left={<span className="text-xs text-[#863221]">Total {itemsToPrint.length} label{itemsToPrint.length !== 1 ? 's' : ''} to print</span>}
+          />
         </div>
       </Modal>
 

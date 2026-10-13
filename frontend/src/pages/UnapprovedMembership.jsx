@@ -29,7 +29,8 @@ import {
   ShieldAlert,
   Sparkles,
   ArrowRight,
-  XCircle
+  XCircle,
+  CheckSquare
 } from 'lucide-react';
 import api from '../api';
 import { formatDate } from '../utils/dateUtils';
@@ -46,6 +47,7 @@ import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import { formatMoney } from '../utils/money';
 
+import ModalFooter from '../components/ModalFooter';
 // assignedOnly: the final-approval queue (members whose receipt is already assigned)
 export default function UnapprovedMembership({ assignedOnly = false }) {
   const navigate = useNavigate();
@@ -99,6 +101,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [pageSize, setPageSize] = useState(10);
 
   // Row Selection
+  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   // ----------------------------------------------------
@@ -288,6 +291,35 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     setApproveDialog(null);
   };
 
+  // Bulk Approval for selected items in selection mode
+  const handleBulkApprove = async () => {
+    const selectedMembers = unapprovedMembers.filter((m) => selectedIds.has(m.id));
+    if (selectedMembers.length === 0) return;
+
+    const unassigned = selectedMembers.filter((m) => m.receiptStatus !== 'Assigned');
+    if (unassigned.length > 0) {
+      showToast(
+        `${unassigned.length} selected applicant(s) do not have a receipt assigned yet. Only applicants with assigned receipts can be approved.`,
+        'error'
+      );
+      return;
+    }
+
+    let approvedCount = 0;
+    for (const m of selectedMembers) {
+      try {
+        await api.put(`/members/${m.id}/approve`, null, { params: { reason: 'Bulk approved via UI' } });
+        approvedCount++;
+      } catch (err) {
+        console.error(`Failed to approve member ${m.id}`, err);
+      }
+    }
+    showToast(`Successfully approved ${approvedCount} member(s)!`, 'success');
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+    await reloadData();
+  };
+
   // Metric counts
   const countTotal = unapprovedMembers.length;
   const countPendingReceipt = unapprovedMembers.filter((m) => m.receiptStatus === 'Pending').length;
@@ -336,6 +368,50 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           (receiptStatusFilter !== 'ALL' ? 1 : 0)
         }
         onResetFilters={handleClearFilters}
+        rightSlot={
+          !selectionMode ? (
+            <button
+              type="button"
+              onClick={() => setSelectionMode(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#863221] hover:text-[#510601] text-xs sm:text-sm font-bold rounded-xl transition-all shadow-2xs cursor-pointer shrink-0"
+              title="Select multiple applications"
+            >
+              <CheckSquare className="w-4 h-4" />
+              <span>Select</span>
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-[#510601] bg-[#FAF7F2] px-2.5 py-1.5 rounded-lg border border-[#E8DFD8]">
+                {selectedIds.size} selected
+              </span>
+              {selectedIds.size > 0 && (
+                hasPermission('members.unapproved.write') && (
+                  <button
+                    type="button"
+                    onClick={handleBulkApprove}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-40"
+                    title="Approve selected members"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Approve Selected</span>
+                  </button>
+                )
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectionMode(false);
+                  setSelectedIds(new Set());
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-white border border-[#E8DFD8] text-[#863221] hover:text-[#180200] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                title="Cancel selection mode"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Cancel</span>
+              </button>
+            </div>
+          )
+        }
       >
         {/* 1. Membership Type */}
         <FilterSelect
@@ -404,20 +480,20 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           <table className="w-full text-left border-collapse text-xs">
             <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="py-3 px-4 w-10 text-center">
-                  <input
-                    type="checkbox"
-                    checked={isAllPaginatedSelected}
-                    onChange={handleToggleSelectAll}
-                    className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer accent-[#510601]"
-                    title="Select All on page"
-                  />
-                </th>
+                {selectionMode && (
+                  <th className="py-3 px-4 w-10 text-center">
+                    <input
+                      type="checkbox"
+                      checked={isAllPaginatedSelected}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer accent-[#510601]"
+                      title="Select All on page"
+                    />
+                  </th>
+                )}
                 <th className="py-3 px-4">Applicant</th>
                 <th className="py-3 px-4">Contact</th>
                 <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4">Location</th>
-                <th className="py-3 px-4">Applied On</th>
                 <th className="py-3 px-4 text-center">Receipt</th>
                 <th className="py-3 px-4 text-right min-w-[220px]">Actions</th>
               </tr>
@@ -425,7 +501,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
             <tbody className="divide-y divide-[#E8DFD8]">
               {paginatedList.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-[#863221]">
+                  <td colSpan={selectionMode ? 6 : 5} className="py-12 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center">
                       <CheckCircle2 className="w-8 h-8 text-[#3D705C]/50 mb-2" />
                       <p className="font-semibold text-sm text-[#180200]">No unapproved memberships</p>
@@ -446,15 +522,17 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                       className={`transition-colors ${isSelected ? 'bg-[#FAF7F2]' : 'bg-white hover:bg-[#FAF7F2]'
                         }`}
                     >
-                      {/* Checkbox */}
-                      <td className="py-3.5 px-4 text-center">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleToggleSelectRow(m.id)}
-                          className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer accent-[#510601]"
-                        />
-                      </td>
+                      {/* Checkbox (only in selection mode) */}
+                      {selectionMode && (
+                        <td className="py-3.5 px-4 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleToggleSelectRow(m.id)}
+                            className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer accent-[#510601]"
+                          />
+                        </td>
+                      )}
 
                       {/* Name & Source */}
                       <td className="py-3.5 px-4">
@@ -472,21 +550,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
                       {/* Membership Type */}
                       <td className="py-3.5 px-4 text-xs font-semibold text-[#510601]">{m.membershipType || '—'}</td>
-
-                      {/* State & District */}
-                      <td className="py-3.5 px-4 text-[#863221]">
-                        <div className="font-medium text-[#180200] text-xs">
-                          {m.districtName || '—'}
-                        </div>
-                        <div className="text-[11px] text-[#863221]/80 mt-0.5">
-                          {m.stateName || ''}
-                        </div>
-                      </td>
-
-                      {/* Registration Date */}
-                      <td className="py-3.5 px-4 font-mono text-xs text-[#180200]">
-                        {formatDate(m.registrationDate)}
-                      </td>
 
                       {/* Receipt Status Badge */}
                       <td className="py-3.5 px-4 text-center">
@@ -526,45 +589,48 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           </button>
 
                           {/* Edit is its own action, not part of View */}
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/dashboard/membership/edit/${m.id}`, { state: { returnPath: '/dashboard/membership/unapproved' } })}
-                            disabled={!hasPermission('members.list.write')}
-                            className="btn-act"
-                            title={!hasPermission('members.list.write') ? 'Requires members.list.write permission' : 'Edit Application'}
-                          >
-                            <span>Edit</span>
-                          </button>
+                          {hasPermission('members.list.write') && (
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/dashboard/membership/edit/${m.id}`, { state: { returnPath: '/dashboard/membership/unapproved' } })}
+                              className="btn-act"
+                              title={'Edit Application'}
+                            >
+                              <span>Edit</span>
+                            </button>
+                          )}
 
                           {/* 3. Approve Action */}
-                          <button
-                            type="button"
-                            onClick={() => handleInitiateApprove(m)}
-                            disabled={!hasPermission('members.unapproved.write')}
-                            className={`btn-act btn-act-ok ${isAssigned ? '' : 'opacity-40 cursor-not-allowed'}`}
-                            title={
-                              !hasPermission('members.unapproved.write')
-                                ? 'Requires members.unapproved.write permission'
-                                : isAssigned
-                                  ? 'Approve membership and transfer to Membership List'
-                                  : 'Requires Receipt to be Assigned first'
-                            }
-                          >
-                            <Check className="w-3.5 h-3.5 shrink-0" />
-                            <span>Approve</span>
-                          </button>
+                          {hasPermission('members.unapproved.write') && (
+                            <button
+                              type="button"
+                              onClick={() => handleInitiateApprove(m)}
+                              className={`btn-act btn-act-ok ${isAssigned ? '' : 'opacity-40 cursor-not-allowed'}`}
+                              title={
+                                !hasPermission('members.unapproved.write')
+                                  ? 'Requires members.unapproved.write permission'
+                                  : isAssigned
+                                    ? 'Approve membership and transfer to Membership List'
+                                    : 'Requires Receipt to be Assigned first'
+                              }
+                            >
+                              <Check className="w-3.5 h-3.5 shrink-0" />
+                              <span>Approve</span>
+                            </button>
+                          )}
 
                           {/* 4. Reject Action */}
-                          <button
-                            type="button"
-                            onClick={() => handleReject(m)}
-                            disabled={!hasPermission('members.list.delete')}
-                            className="btn-act btn-act-danger"
-                            title={!hasPermission('members.list.delete') ? 'Requires members.list.delete permission' : 'Reject this application'}
-                          >
-                            <XCircle className="w-3.5 h-3.5 shrink-0" />
-                            <span>Reject</span>
-                          </button>
+                          {hasPermission('members.list.delete') && (
+                            <button
+                              type="button"
+                              onClick={() => handleReject(m)}
+                              className="btn-act btn-act-danger"
+                              title={'Reject this application'}
+                            >
+                              <XCircle className="w-3.5 h-3.5 shrink-0" />
+                              <span>Reject</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -642,7 +708,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold text-base">
                   {(viewingMember.fullName || viewingMember.name || 'U').charAt(0).toUpperCase()}
@@ -828,19 +894,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
             {/* Read-only footer */}
             </div>
-            <div className="shrink-0 flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
-              <div />
-
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setViewingMember(null)}
-                  className="py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
+            <ModalFooter kind="view" onCancel={() => setViewingMember(null)} />
           </div>
       )}
 

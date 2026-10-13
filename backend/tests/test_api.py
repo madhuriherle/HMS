@@ -2047,7 +2047,8 @@ def test_rank_hierarchy_rules(client, admin_headers):
     assert client.post("/api/v1/users/", headers=mgr,
                        json={"name": "Up", "username": "up_user", "password": "Upuser@1234", "role_id": _role_id(client, admin_headers, "ADMIN")}).status_code == 403
     users = {u["username"] for u in client.get("/api/v1/users/", headers=mgr, params={"limit": 200}).json()["data"]}
-    assert "sub_user" in users and "admin" not in users and "rank3_mgr" in users
+    # everyone who works in the panel is listed (higher ranks too); changing them is what the rank rule blocks
+    assert {"sub_user", "admin", "rank3_mgr"} <= users
     assert client.get("/api/v1/users/1", headers=mgr).status_code == 403
     assert client.put("/api/v1/users/1", headers=mgr, json={"name": "Hacked"}).status_code == 403
     assert client.delete("/api/v1/users/1", headers=mgr).status_code == 403

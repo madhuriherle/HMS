@@ -54,6 +54,7 @@ import {
 import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
 import { formatMoney } from '../utils/money';
 
+import ModalFooter from '../components/ModalFooter';
 // ----------------------------------------------------
 // Server member -> the shape this screen draws
 // ----------------------------------------------------
@@ -68,6 +69,9 @@ const ageFrom = (iso) => {
   if (now.getMonth() < d.getMonth() || (now.getMonth() === d.getMonth() && now.getDate() < d.getDate())) years -= 1;
   return years >= 0 ? String(years) : '';
 };
+
+// What to show for a member's number: the real membership number (given on approval), else their MID (the id).
+const numberTag = (m) => (m.membershipNumber ? `#${m.membershipNumber}` : `MID ${m.registrationNumber || m.id}`);
 
 const toEntryMember = (m, loc) => {
   const nameOf = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '';
@@ -224,6 +228,7 @@ export default function ReceiptEntry() {
   // Selected Member State & Lookup State
   const [selectedMember, setSelectedMember] = useState(null);
   const [lookupMembershipNo, setLookupMembershipNo] = useState('');
+  const [numberCheck, setNumberCheck] = useState(null); // is the typed receipt number free in its financial year?
   const [lookupError, setLookupError] = useState('');
   // "who is this membership number?" answer from the server, shown under the Membership No. box
   const [numberLookup, setNumberLookup] = useState({ status: 'idle', number: '', matches: [] });
@@ -482,6 +487,28 @@ export default function ReceiptEntry() {
   const defaultsSeq = useRef(0);
 
   // Fetches the default date (last receipt entered, else today) and the next number for a date's financial year.
+  // As the receipt number (or its date, which decides the financial year) changes, ask the server whether the
+  // number is free, instead of finding out only on save.
+  useEffect(() => {
+    const number = String(formData.receiptNumber || '').trim();
+    const date = formData.receiptDate;
+    if (!number || !/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) {
+      setNumberCheck(null);
+      return undefined;
+    }
+    let alive = true;
+    const timer = setTimeout(() => {
+      api
+        .get('/receipts/number-check', { params: { number, date, ...(editId ? { exclude_id: editId } : {}) } })
+        .then(({ data }) => alive && setNumberCheck(data))
+        .catch(() => alive && setNumberCheck(null));
+    }, 450);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [formData.receiptNumber, formData.receiptDate, editId]);
+
   const loadReceiptDefaults = (date, { keepNumber = false, keepDate = false } = {}) => {
     const seq = (defaultsSeq.current += 1);
     api
@@ -903,6 +930,11 @@ export default function ReceiptEntry() {
   // ----------------------------------------------------
   const handleSaveReceipt = async (e) => {
     e.preventDefault();
+    // Enter inside a field submits the form even when the Save buttons are hidden
+    if (!hasPermission(isEdit ? 'receipts.tracking.write' : 'receipts.entry.write')) {
+      showToast('You do not have permission to save receipts.', 'error');
+      return;
+    }
 
     if (!validateForm()) {
       showToast('Please correct the validation errors before saving.', 'error');
@@ -942,12 +974,12 @@ export default function ReceiptEntry() {
     const isAssignmentFlow = entrySource === 'unapproved-assignment' || entrySource === 'membership-assignment';
 
     let targetMember = selectedMember;
-    if (!targetMember && isAssignmentFlow && formData.membershipNo.trim()) {
+    if (!targetMember && formData.membershipNo.trim()) {
       targetMember = findMemberByQuery(formData.membershipNo);
     }
 
     const isCash = String(formData.paymentMode || '').trim().toLowerCase() === 'cash';
-    const linked = isAssignmentFlow && targetMember ? targetMember : null;
+    const linked = targetMember || null;
 
     const payload = {
       receiptNumber: formData.receiptNumber.trim(),
@@ -1292,7 +1324,7 @@ export default function ReceiptEntry() {
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
                       <span className="font-bold text-stone-900 shrink-0">Membership Number:</span>
-                      <span className="text-stone-800 font-mono">{viewingMember.membershipNumber || viewingMember.registrationNumber || '—'}</span>
+                      <span className="text-stone-800 font-mono">{viewingMember.membershipNumber || 'Not assigned'}</span>
                     </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
@@ -1394,15 +1426,7 @@ export default function ReceiptEntry() {
               </div>
 
               {/* Read-only footer */}
-              <div className="p-4 border-t border-stone-200 bg-white flex items-center justify-end">
-                <button
-                  type="button"
-                  onClick={() => setViewingMember(null)}
-                  className="px-5 py-2 bg-white hover:bg-stone-50 border border-stone-300 text-stone-700 text-xs sm:text-sm font-semibold rounded-lg transition-all cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
+              <ModalFooter kind="view" onCancel={() => setViewingMember(null)} inForm />
             </div>
           );
         })()}
@@ -1418,6 +1442,16 @@ export default function ReceiptEntry() {
               {isEdit ? `Edit Receipt${formData.receiptNumber ? ` #${formData.receiptNumber}` : ''}` : 'Receipt Entry'}
             </h1>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Active
+            </span>
+            {financialYear && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-stone-100 text-stone-700 border border-stone-200">
+                FY: {financialYear}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1431,30 +1465,6 @@ export default function ReceiptEntry() {
         {/* ------------------------------------------------------------ */}
         <div className="col-span-12 lg:col-span-6">
           <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_16px_-4px_rgba(24,2,0,0.06)] overflow-hidden">
-
-            {/* Form Card Header */}
-            <div className="bg-[#FAF7F2] border-b border-[#E8DFD8] px-4 py-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
-                  <FileText className="w-4 h-4" />
-                </div>
-                <div>
-                  <h2 className="text-sm sm:text-base font-bold text-[#180200]">
-                    {isEdit ? 'Edit Receipt' : 'Create New Receipt'}
-                  </h2>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Active
-                </span>
-                {financialYear && (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-stone-100 text-stone-700 border border-stone-200">
-                    FY: {financialYear}
-                  </span>
-                )}
-              </div>
-            </div>
 
             {/* Form Fields */}
             <form
@@ -1487,7 +1497,7 @@ export default function ReceiptEntry() {
                         Assigned Member: {selectedMember.fullName || selectedMember.name}
                       </span>
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#510601]/10 text-[#510601] shrink-0">
-                        #{selectedMember.membershipNumber || selectedMember.registrationNumber || selectedMember.id}
+                        {numberTag(selectedMember)}
                       </span>
                     </div>
                     <button
@@ -1542,6 +1552,24 @@ export default function ReceiptEntry() {
                         <AlertCircle className="w-3 h-3 shrink-0" />
                         {formErrors.receiptNumber}
                       </p>
+                    )}
+                    {!formErrors.receiptNumber && numberCheck && numberCheck.number === String(formData.receiptNumber || '').trim() && (
+                      numberCheck.available ? (
+                        numberCheck.matches_format ? (
+                          <p className="text-[11px] text-emerald-700 mt-1 font-medium">Available in FY {numberCheck.financial_year}</p>
+                        ) : (
+                          <p className="text-[11px] text-amber-700 mt-1 font-medium">
+                            Available, but not like the usual format (for example {numberCheck.example}). You can still save it.
+                          </p>
+                        )
+                      ) : (
+                        <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 shrink-0" />
+                          {numberCheck.number} already exists in FY {numberCheck.financial_year}
+                          {numberCheck.existing?.payer_name ? ` (${numberCheck.existing.payer_name}` : ''}
+                          {numberCheck.existing?.receipt_date ? `, ${formatDate(numberCheck.existing.receipt_date)})` : numberCheck.existing?.payer_name ? ')' : ''}
+                        </p>
+                      )
                     )}
                   </div>
 
@@ -1997,25 +2025,29 @@ export default function ReceiptEntry() {
                     <span>{isEdit ? 'Cancel' : 'Reset'}</span>
                   </button>
 
-                  <button
-                    type="submit"
-                    onClick={() => { saveMode.current = 'close'; }}
-                    disabled={saving || (isEdit ? !editOriginal : false) || !hasPermission(isEdit ? 'receipts.tracking.write' : 'receipts.entry.write')}
-                    className="disabled:opacity-50 px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#180200] text-xs sm:text-sm font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    <Save className="w-3.5 h-3.5 text-[#863221]" />
-                    <span>{isEdit ? 'Save Changes' : 'Save & Close'}</span>
-                  </button>
+                  {hasPermission(isEdit ? 'receipts.tracking.write' : 'receipts.entry.write') && (
+                    <>
+                    <button
+                      type="submit"
+                      onClick={() => { saveMode.current = 'close'; }}
+                      disabled={saving || (isEdit ? !editOriginal : false)}
+                      className="disabled:opacity-50 px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#180200] text-xs sm:text-sm font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Save className="w-3.5 h-3.5 text-[#863221]" />
+                      <span>{isEdit ? 'Save Changes' : 'Save & Close'}</span>
+                    </button>
 
-                  <button
-                    type="submit"
-                    onClick={() => { saveMode.current = 'new'; }}
-                    disabled={saving || (isEdit ? !editOriginal : false) || !hasPermission(isEdit ? 'receipts.tracking.write' : 'receipts.entry.write')}
-                    className="disabled:opacity-50 px-4 py-2 rounded-xl bg-[#510601] hover:bg-[#680801] text-white text-xs sm:text-sm font-bold shadow-2xs hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    <Save className="w-3.5 h-3.5 text-white" />
-                    <span>Save & New</span>
-                  </button>
+                    <button
+                      type="submit"
+                      onClick={() => { saveMode.current = 'new'; }}
+                      disabled={saving || (isEdit ? !editOriginal : false)}
+                      className="disabled:opacity-50 px-4 py-2 rounded-xl bg-[#510601] hover:bg-[#680801] text-white text-xs sm:text-sm font-bold shadow-2xs hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <Save className="w-3.5 h-3.5 text-white" />
+                      <span>Save & New</span>
+                    </button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -2046,7 +2078,7 @@ export default function ReceiptEntry() {
                       Member Details
                     </h2>
                     <p className="text-xs text-[#863221] font-mono truncate">
-                      #{selectedMember.membershipNumber || selectedMember.registrationNumber || selectedMember.id} — {selectedMember.fullName || selectedMember.name}
+                      {numberTag(selectedMember)} — {selectedMember.fullName || selectedMember.name}
                     </p>
                   </div>
                 </div>
@@ -2302,8 +2334,9 @@ export default function ReceiptEntry() {
                       member.postalCode || member.pinCode ? `(${member.postalCode || member.pinCode})` : ''
                     ].filter(Boolean).join(', ');
 
-                    const memCode = String(member.membershipNumber || member.registrationNumber || member.id || '—');
-                    const shortCode = memCode.includes('-') ? `#${memCode.split('-').pop()}` : `#${memCode}`;
+                    const shortCode = member.membershipNumber
+                      ? `#${String(member.membershipNumber).split('-').pop()}`
+                      : `MID ${member.registrationNumber || member.id || '—'}`;
                     const mobile = member.contactNumber || member.mobile || member.phone || '';
                     const isAssigned = selectedMember && (
                       String(member.id) === String(selectedMember.id) ||
@@ -2322,7 +2355,7 @@ export default function ReceiptEntry() {
                         <div className="flex items-center gap-3 min-w-0">
                           <div
                             className="text-xs sm:text-sm font-mono font-bold text-[#510601] pr-3 border-r border-[#E8DFD8] shrink-0"
-                            title={memCode}
+                            title={member.membershipNumber || `MID ${member.registrationNumber || member.id}`}
                           >
                             {shortCode}
                           </div>
@@ -2559,15 +2592,17 @@ export default function ReceiptEntry() {
                         {/* 4. Actions: Assign to Receipt & View */}
                         <td className="py-3.5 px-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleAssignFromUnapproved(member)}
-                              className="btn-act"
-                              title="Assign to Receipt"
-                            >
-                              <FileText className="w-3.5 h-3.5 shrink-0" />
-                              <span>Assign to Receipt</span>
-                            </button>
+                            {hasPermission('receipts.entry.write') && (
+                              <button
+                                type="button"
+                                onClick={() => handleAssignFromUnapproved(member)}
+                                className="btn-act"
+                                title="Assign to Receipt"
+                              >
+                                <FileText className="w-3.5 h-3.5 shrink-0" />
+                                <span>Assign to Receipt</span>
+                              </button>
+                            )}
 
                             <button
                               type="button"

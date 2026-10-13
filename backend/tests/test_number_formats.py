@@ -5,7 +5,7 @@ import re
 from test_frontend_contract import API, _sfx
 from test_receipt_entry_flow import _entry_payload
 
-DEFAULT_RECEIPT = dict(prefix="", date_part="NONE", separator="", digits=4, start_value=1, restart="NEVER", suffix="", allow_manual=True)
+DEFAULT_RECEIPT = dict(prefix="", date_part="NONE", separator="", digits=4, start_value=1, restart="FY", suffix="", allow_manual=True)
 
 
 def _put(client, h, doc, **body):
@@ -84,3 +84,67 @@ def test_preview_is_a_get_and_rejects_a_repeating_format(client, admin_headers):
     bad = client.get(f"{API}/system/number-formats/RECEIPT/preview", headers=admin_headers,
                      params={"date_part": "NONE", "restart": "DAY"})
     assert bad.status_code == 400
+
+
+def test_receipt_numbers_can_restart_every_year_with_no_year_in_the_number(client, admin_headers):
+    import random
+
+    h = admin_headers
+    y = random.randint(1960, 1990)  # a year no other test uses, so the run can be repeated on the same database
+    r = _put(client, h, "RECEIPT", prefix="", date_part="NONE", separator="", digits=4, start_value=1,
+             restart="FY", suffix="", allow_manual=True)
+    assert r.status_code == 200, r.text
+    first = client.get(f"{API}/receipts/next-number", headers=h, params={"date": f"{y}-04-01"}).json()
+    assert first["receipt_number"] == "0001" and first["financial_year"] == f"{y}-{str(y + 1)[-2:]}"
+    made = client.post(f"{API}/receipts/", headers=h, json=_entry_payload(None, "Yearly", receipt_date=f"{y}-05-01"))
+    assert made.status_code == 201, made.text
+    assert made.json()["receipt_number"] == "0001"
+    nxt = client.get(f"{API}/receipts/next-number", headers=h, params={"date": f"{y}-06-01"}).json()
+    assert nxt["receipt_number"] == "0002"
+    # the next financial year starts again from 0001
+    again = client.get(f"{API}/receipts/next-number", headers=h, params={"date": f"{y + 1}-04-01"}).json()
+    assert again["receipt_number"] == "0001" and again["financial_year"] == f"{y + 1}-{str(y + 2)[-2:]}"
+    # a restart by calendar year with no year in the number could repeat inside one financial year: refused
+    assert _put(client, h, "RECEIPT", **{**DEFAULT_RECEIPT, "restart": "YEAR"}).status_code == 400
+
+
+def test_a_receipt_number_is_unique_within_each_financial_year(client, admin_headers):
+    """0010 can be used once per financial year: a second 0010 in the same year is refused, in another year it is fine."""
+    import random
+
+    h = admin_headers
+    y = random.randint(1960, 1990)
+    assert _put(client, h, "RECEIPT", **DEFAULT_RECEIPT).status_code == 200
+    first = client.post(f"{API}/receipts/", headers=h, json=_entry_payload("0010", "First", receipt_date=f"{y}-06-01"))
+    assert first.status_code == 201, first.text
+    # same number, same financial year (a different date inside it, and with stray spaces) -> refused
+    for number, date in (("0010", f"{y}-09-15"), (" 0010 ", f"{y + 1}-02-01")):
+        dup = client.post(f"{API}/receipts/", headers=h, json=_entry_payload(number, "Second", receipt_date=date))
+        assert dup.status_code == 409, (number, date, dup.text)
+        assert "0010" in dup.json()["detail"] and f"{y}-{str(y + 1)[-2:]}" in dup.json()["detail"]
+    # the same number in the next financial year is a different receipt
+    other = client.post(f"{API}/receipts/", headers=h, json=_entry_payload("0010", "Third", receipt_date=f"{y + 1}-04-02"))
+    assert other.status_code == 201, other.text
+    # moving a receipt's date into a year that already has its number is refused too
+    moved = client.put(f"{API}/receipts/{other.json()['id']}", headers=h, json={"receipt_date": f"{y}-07-01"})
+    assert moved.status_code == 409, moved.text
+
+
+def test_number_check_says_whether_a_number_is_free_in_the_year(client, admin_headers):
+    import random
+
+    h = admin_headers
+    y = random.randint(1960, 1990)
+    assert _put(client, h, "RECEIPT", **DEFAULT_RECEIPT).status_code == 200
+    check = lambda number, date, **extra: client.get(  # noqa: E731
+        f"{API}/receipts/number-check", headers=h, params={"number": number, "date": date, **extra}).json()
+    assert check("0010", f"{y}-06-01")["available"] is True
+    made = client.post(f"{API}/receipts/", headers=h, json=_entry_payload("0010", "Checked", receipt_date=f"{y}-06-01")).json()
+    taken = check(" 0010 ", f"{y}-12-01")  # another date in the same financial year, with stray spaces
+    assert taken["available"] is False and taken["existing"]["payer_name"] == "Checked"
+    assert f"{y}-{str(y + 1)[-2:]}" in taken["message"] and taken["matches_format"] is True
+    assert check("0010", f"{y + 1}-04-01")["available"] is True  # the next financial year is free
+    assert check("0010", f"{y}-06-01", exclude_id=made["id"])["available"] is True  # editing that very receipt
+    assert check("A-1", f"{y}-06-01")["matches_format"] is False
+    assert check("", f"{y}-06-01")["available"] is True
+    assert client.get(f"{API}/receipts/number-check", params={"number": "1", "date": f"{y}-06-01"}).status_code == 401

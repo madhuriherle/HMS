@@ -19,6 +19,7 @@ import useAuth from '../hooks/useAuth';
 import { resolveLandingPath } from '../utils/landing';
 import { formatMoney } from '../utils/money';
 
+import ModalFooter from '../components/ModalFooter';
 const iconMap = {
   'users': Users,
   'user-check': UserCheck,
@@ -239,24 +240,30 @@ export default function Dashboard() {
       <div>
         <h2 className="text-sm font-semibold text-[#180200] uppercase tracking-wider mb-4 mt-8">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          <Link to="/dashboard/receipts/entry" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#510601] hover:shadow-md transition-all group h-full">
-            <div className="h-10 w-10 rounded-full bg-[#510601]/10 flex items-center justify-center mb-3 group-hover:bg-[#510601] transition-colors">
-              <FileText className="h-5 w-5 text-[#510601] group-hover:text-white transition-colors" />
-            </div>
-            <span className="text-xs font-semibold text-[#180200] text-center">Add Receipt</span>
-          </Link>
-          <Link to="/dashboard/membership/register" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#3D705C] hover:shadow-md transition-all group h-full">
-            <div className="h-10 w-10 rounded-full bg-[#3D705C]/10 flex items-center justify-center mb-3 group-hover:bg-[#3D705C] transition-colors">
-              <UserPlus className="h-5 w-5 text-[#3D705C] group-hover:text-white transition-colors" />
-            </div>
-            <span className="text-xs font-semibold text-[#180200] text-center">Add Member</span>
-          </Link>
-          <Link to="/dashboard/receipts/labels" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#FFC107] hover:shadow-md transition-all group h-full">
-            <div className="h-10 w-10 rounded-full bg-[#FFC107]/15 flex items-center justify-center mb-3 group-hover:bg-[#FFC107] transition-colors">
-              <Printer className="h-5 w-5 text-[#863221] group-hover:text-[#180200] transition-colors" />
-            </div>
-            <span className="text-xs font-semibold text-[#180200] text-center">Print Labels</span>
-          </Link>
+          {hasPermission('receipts.entry.write') && (
+            <Link to="/dashboard/receipts/entry" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#510601] hover:shadow-md transition-all group h-full">
+              <div className="h-10 w-10 rounded-full bg-[#510601]/10 flex items-center justify-center mb-3 group-hover:bg-[#510601] transition-colors">
+                <FileText className="h-5 w-5 text-[#510601] group-hover:text-white transition-colors" />
+              </div>
+              <span className="text-xs font-semibold text-[#180200] text-center">Add Receipt</span>
+            </Link>
+          )}
+          {hasPermission('members.register.write') && (
+            <Link to="/dashboard/membership/register" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#3D705C] hover:shadow-md transition-all group h-full">
+              <div className="h-10 w-10 rounded-full bg-[#3D705C]/10 flex items-center justify-center mb-3 group-hover:bg-[#3D705C] transition-colors">
+                <UserPlus className="h-5 w-5 text-[#3D705C] group-hover:text-white transition-colors" />
+              </div>
+              <span className="text-xs font-semibold text-[#180200] text-center">Add Member</span>
+            </Link>
+          )}
+          {hasPermission('members.list.read') && (
+            <Link to="/dashboard/receipts/labels" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#FFC107] hover:shadow-md transition-all group h-full">
+              <div className="h-10 w-10 rounded-full bg-[#FFC107]/15 flex items-center justify-center mb-3 group-hover:bg-[#FFC107] transition-colors">
+                <Printer className="h-5 w-5 text-[#863221] group-hover:text-[#180200] transition-colors" />
+              </div>
+              <span className="text-xs font-semibold text-[#180200] text-center">Print Labels</span>
+            </Link>
+          )}
           <Link to="/dashboard/membership/list" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#ED4636] hover:shadow-md transition-all group h-full">
             <div className="h-10 w-10 rounded-full bg-[#ED4636]/10 flex items-center justify-center mb-3 group-hover:bg-[#ED4636] transition-colors">
               <List className="h-5 w-5 text-[#ED4636] group-hover:text-white transition-colors" />
@@ -417,7 +424,7 @@ export default function Dashboard() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold text-base shadow-sm">
                   {(viewingMember.fullName || viewingMember.name || 'M').charAt(0).toUpperCase()}
@@ -552,23 +559,15 @@ export default function Dashboard() {
 
             {/* Modal Footer */}
             </div>
-            <div className="shrink-0 flex items-center justify-between px-6 py-3.5 border-t border-[#E8DFD8] bg-[#FAF7F2]">
-              <Link
-                to="/dashboard/membership/list"
-                onClick={() => setViewingMember(null)}
-                className="text-xs font-semibold text-[#510601] hover:text-[#8C1801] flex items-center gap-1"
-              >
-                <span>Go to Membership Directory</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-              <button
-                type="button"
-                onClick={() => setViewingMember(null)}
-                className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
+            <ModalFooter
+              kind="view"
+              onCancel={() => setViewingMember(null)}
+              left={
+                <Link to="/dashboard/membership/list" onClick={() => setViewingMember(null)} className="text-sm font-semibold text-[#510601] hover:text-[#8C1801] cursor-pointer">
+                  Go to Membership Directory
+                </Link>
+              }
+            />
           </div>
         )}
       </Modal>

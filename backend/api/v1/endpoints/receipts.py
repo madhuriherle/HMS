@@ -628,6 +628,44 @@ def next_receipt_number(
     }
 
 
+@router.get("/number-check")
+def check_receipt_number(
+    number: str,
+    date: date,
+    exclude_id: Optional[int] = None,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Receipt Entry asks this while the number is typed: is it free in that date's financial year?
+
+    ``available`` is false when another live receipt already has the number in the year (``existing`` says whose);
+    ``matches_format`` only advises whether it looks like the numbers the format in Number Formats makes."""
+    from services import numbering
+
+    typed = (number or "").strip()
+    fy = receipt_numbers.financial_year_for(date)
+    fmt = numbering.get_format(db, "RECEIPT")
+    out = {
+        "number": typed, "financial_year": fy, "available": True, "existing": None, "message": None,
+        "manual_allowed": fmt.allow_manual, "matches_format": True,
+        "example": numbering.render(fmt, date, fmt.start_value),
+    }
+    if not typed:
+        return out
+    q = db.query(Receipt).filter(
+        Receipt.financial_year == fy, Receipt.receipt_number == typed, Receipt.is_deleted == False  # noqa: E712
+    )
+    if exclude_id is not None:
+        q = q.filter(Receipt.id != exclude_id)
+    found = q.first()
+    if found:
+        out["available"] = False
+        out["existing"] = {"id": found.id, "payer_name": found.payer_name, "receipt_date": found.receipt_date}
+        out["message"] = receipt_numbers.duplicate_message(typed, fy)
+    out["matches_format"] = bool(numbering._regex(fmt, date).match(typed))
+    return out
+
+
 @router.get("/duplicate-check")
 def duplicate_check(
     payer_name: str,
@@ -723,7 +761,7 @@ def receipt_pdf(
         .first()
     )
     if alloc and alloc[1].member_code:
-        payee.append(f"Member ID: {alloc[1].member_code}")
+        payee.append(f"Membership No.: {alloc[1].member_code}")
     org = db.query(OrganisationSettings).first()
     pdf = build_receipt_pdf(receipt, lines, org, payee)
     safe = (receipt.receipt_number or f"ID-{receipt.id}").replace("/", "-")
@@ -738,9 +776,9 @@ def lookup_member_for_receipt(
 ) -> Any:
     """Who is this number? Backs the Membership No. box of Receipt Entry.
 
-    Accepts a member code, a membership number (e.g. HMSM-000123) or an applicant's registration number
-    (REG-2026-0007, as shown on the screens). Matching is exact and ignores case. A bare number such as 7 is
-    the member's id (MID), which is not a membership number, so it finds nobody.
+    Accepts a membership number (e.g. HMS-20261013-000007) only. Matching is exact and ignores case. The member id
+    (MID, a bare 7), the registration number (REG-2026-0007) and the mobile are not membership numbers, so they
+    find nobody; an applicant who is not approved yet has no membership number.
     """
     import re
 
@@ -764,13 +802,6 @@ def lookup_member_for_receipt(
         .filter(live, MemberMembership.is_deleted == False, func.upper(MemberMembership.membership_number) == upper)  # noqa: E712
         .limit(5)
     )
-    reg = re.fullmatch(r"REG-(\d{4})-(\d+)", raw, flags=re.IGNORECASE)
-    if reg:
-        add(
-            db.query(Member.id)
-            .filter(live, Member.id == int(reg.group(2)), func.extract("year", Member.created_at) == int(reg.group(1)))
-            .limit(1)
-        )
     exact = bool(ids)
 
     members = db.query(Member).filter(live, Member.id.in_(ids[:8])).all() if ids else []
@@ -841,24 +872,47 @@ def get_unassigned_candidates(
 
     receipts = q.order_by(Receipt.id.desc()).limit(limit).all()
 
-    # Pre-fetch candidate members by the membership number written on the receipt (the only thing matched on)
-    mem_nums = {r.payer_membership_no.strip().upper() for r in receipts if r.payer_membership_no and r.payer_membership_no.strip()}
+    # Pre-fetch candidate members strictly by the permanent membership number (member_code) written on the receipt
+    mem_nums = {
+        r.payer_membership_no.strip().upper()
+        for r in receipts
+        if r.payer_membership_no and r.payer_membership_no.strip()
+    }
 
     matched_by_num = {}
     if mem_nums:
+        # 1. Match strictly on Member.membership_number (member_code synonym)
         m_rows = (
+            db.query(Member)
+            .filter(
+                Member.is_deleted == False,
+                Member.membership_number != None,
+                func.upper(func.trim(Member.membership_number)).in_(mem_nums),
+            )
+            .all()
+        )
+        for m in m_rows:
+            if m.membership_number:
+                m_num = m.membership_number.strip().upper()
+                matched_by_num[m_num] = m
+
+        # 2. Also check MemberMembership table for permanent membership_number
+        mm_rows = (
             db.query(Member, MemberMembership)
             .join(MemberMembership, MemberMembership.member_id == Member.id)
             .filter(
                 Member.is_deleted == False,
                 MemberMembership.is_deleted == False,
-                func.upper(MemberMembership.membership_number).in_(mem_nums),
+                MemberMembership.membership_number != None,
+                func.upper(func.trim(MemberMembership.membership_number)).in_(mem_nums),
             )
             .all()
         )
-        for m, mm in m_rows:
-            key = mm.membership_number.strip().upper()
-            matched_by_num[key] = (m, mm)
+        for m, mm in mm_rows:
+            if mm.membership_number:
+                key = mm.membership_number.strip().upper()
+                if key not in matched_by_num:
+                    matched_by_num[key] = m
 
     candidates = []
     total_matched = 0
@@ -867,11 +921,10 @@ def get_unassigned_candidates(
         r_num = (r.payer_membership_no or "").strip().upper()
 
         matched_m = None
-        matched_mm = None
         match_type = "NONE"
 
         if r_num and r_num in matched_by_num:
-            matched_m, matched_mm = matched_by_num[r_num]
+            matched_m = matched_by_num[r_num]
             match_type = "EXACT_NUMBER"
 
         if match_type != "NONE":
@@ -898,7 +951,7 @@ def get_unassigned_candidates(
             item["matched_member"] = {
                 "id": matched_m.id,
                 "name": full_name or matched_m.full_name_kn or f"Member #{matched_m.id}",
-                "membership_number": matched_mm.membership_number if matched_mm else matched_m.member_code,
+                "membership_number": matched_m.membership_number or matched_m.member_code,
                 "mobile": matched_m.mobile,
                 "status": matched_m.approval_status,
             }

@@ -38,6 +38,7 @@ import RecentlyDeleted from '../components/RecentlyDeleted';
 import { formatMoney } from '../utils/money';
 
 
+import ModalFooter from '../components/ModalFooter';
 export default function MembershipTypeManagement() {
   const { hasPermission } = useAuth();
 
@@ -87,7 +88,6 @@ export default function MembershipTypeManagement() {
   const [formData, setFormData] = useState({
     name: '',
     amount: '',
-    onlineList: 'Yes',
     chartColor: '',
     status: 'Active'
   });
@@ -131,8 +131,7 @@ export default function MembershipTypeManagement() {
     const total = membershipTypes.length;
     const active = membershipTypes.filter(m => m.status === 'Active').length;
     const inactive = membershipTypes.filter(m => m.status === 'Inactive').length;
-    const onlineCount = membershipTypes.filter(m => (m.onlineList || 'Yes') === 'Yes').length;
-    return { total, active, inactive, onlineCount };
+    return { total, active, inactive };
   }, [membershipTypes]);
 
   // ----------------------------------------------------
@@ -176,7 +175,6 @@ export default function MembershipTypeManagement() {
     setFormData({
       name: '',
       amount: '',
-      onlineList: 'Yes',
       chartColor: '',
       status: 'Active'
     });
@@ -190,7 +188,6 @@ export default function MembershipTypeManagement() {
     setFormData({
       name: item.name || '',
       amount: String(item.currentPrice || ''),
-      onlineList: item.onlineList || 'Yes',
       chartColor: item.chartColor || '',
       status: item.status || 'Active'
     });
@@ -469,16 +466,17 @@ export default function MembershipTypeManagement() {
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-auto">
-          <RecentlyDeleted kind="membership-types" label="membership types" onRestored={fetchMembershipTypes} disabled={!hasPermission('masters.membership_types.delete')} />
-          <button
-            onClick={openAddModal}
-            disabled={!hasPermission('masters.membership_types.write')}
-            title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : undefined}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Membership Type</span>
-          </button>
+          {hasPermission('masters.membership_types.delete') && <RecentlyDeleted kind="membership-types" label="membership types" onRestored={fetchMembershipTypes} />}
+          {hasPermission('masters.membership_types.write') && (
+            <button
+              onClick={openAddModal}
+
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Membership Type</span>
+            </button>
+          )}
           </div>
         </div>
       </div>
@@ -613,26 +611,28 @@ export default function MembershipTypeManagement() {
                       <td className="px-5 py-4 text-right">
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
                           {/* Edit Button */}
-                          <button
-                            onClick={() => openEditModal(item)}
-                            disabled={!hasPermission('masters.membership_types.write')}
-                            className="btn-act"
-                            title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : 'Edit Membership Type'}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                            <span>Edit</span>
-                          </button>
+                          {hasPermission('masters.membership_types.write') && (
+                            <button
+                              onClick={() => openEditModal(item)}
+                              className="btn-act"
+                              title={'Edit Membership Type'}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+                          )}
 
                           {/* Delete Button */}
-                          <button
-                            onClick={() => handleConfirmDelete(item)}
-                            disabled={!hasPermission('masters.membership_types.delete')}
-                            className="btn-act btn-act-danger"
-                            title={!hasPermission('masters.membership_types.delete') ? 'Requires masters.membership_types.delete permission' : 'Delete Membership Type'}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Delete</span>
-                          </button>
+                          {hasPermission('masters.membership_types.delete') && (
+                            <button
+                              onClick={() => handleConfirmDelete(item)}
+                              className="btn-act btn-act-danger"
+                              title={'Delete Membership Type'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -659,14 +659,15 @@ export default function MembershipTypeManagement() {
                           Clear Filters
                         </button>
                       ) : (
-                        <button
-                          onClick={openAddModal}
-                          disabled={!hasPermission('masters.membership_types.write')}
-                          title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : undefined}
-                          className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                        >
-                          Add Membership Type
-                        </button>
+                        hasPermission('masters.membership_types.write') && (
+                          <button
+                            onClick={openAddModal}
+
+                            className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                          >
+                            Add Membership Type
+                          </button>
+                        )
                       )}
                     </div>
                   </td>
@@ -756,7 +757,7 @@ export default function MembershipTypeManagement() {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <Tag className="w-5 h-5" />
@@ -829,47 +830,7 @@ export default function MembershipTypeManagement() {
               )}
             </div>
 
-            {/* 3. Online List (Yes/No) */}
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                Online List <span className="text-[#ED4636]">*</span>
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border cursor-pointer font-semibold text-xs transition-all ${formData.onlineList === 'Yes'
-                  ? 'border-[#510601] bg-[#510601]/5 text-[#510601] ring-1 ring-[#510601]'
-                  : 'border-[#E8DFD8] bg-white text-gray-700 hover:bg-gray-50'
-                  }`}>
-                  <input
-                    type="radio"
-                    name="onlineList"
-                    value="Yes"
-                    checked={formData.onlineList === 'Yes'}
-                    onChange={handleFormChange}
-                    className="sr-only"
-                  />
-                  <Check className={`w-4 h-4 ${formData.onlineList === 'Yes' ? 'text-[#510601]' : 'text-gray-400'}`} />
-                  <span>Yes (Online)</span>
-                </label>
-
-                <label className={`flex items-center justify-center gap-2 p-2.5 rounded-xl border cursor-pointer font-semibold text-xs transition-all ${formData.onlineList === 'No'
-                  ? 'border-[#510601] bg-[#510601]/5 text-[#510601] ring-1 ring-[#510601]'
-                  : 'border-[#E8DFD8] bg-white text-gray-700 hover:bg-gray-50'
-                  }`}>
-                  <input
-                    type="radio"
-                    name="onlineList"
-                    value="No"
-                    checked={formData.onlineList === 'No'}
-                    onChange={handleFormChange}
-                    className="sr-only"
-                  />
-                  <X className={`w-4 h-4 ${formData.onlineList === 'No' ? 'text-[#510601]' : 'text-gray-400'}`} />
-                  <span>No (Offline only)</span>
-                </label>
-              </div>
-            </div>
-
-            {/* 4. Status (Active/Inactive) */}
+            {/* 3. Status (Active/Inactive) */}
             <div>
               <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
                 Dashboard colour
@@ -906,22 +867,7 @@ export default function MembershipTypeManagement() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
-              <button
-                type="button"
-                onClick={() => setIsAddEditOpen(false)}
-                className="px-4 py-2.5 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <Check className="w-4 h-4" />
-                <span>Save</span>
-              </button>
-            </div>
+            <ModalFooter kind={modalMode === 'add' ? 'add' : 'edit'} onCancel={() => setIsAddEditOpen(false)} inForm />
 
           </form>
         </div>
@@ -942,7 +888,7 @@ export default function MembershipTypeManagement() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                   <TrendingUp className="w-5 h-5" />
@@ -1044,21 +990,7 @@ export default function MembershipTypeManagement() {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
-                <button
-                  type="button"
-                  onClick={() => setIsUpdatePriceOpen(false)}
-                  className="px-4 py-2.5 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer"
-                >
-                  Update Price
-                </button>
-              </div>
+              <ModalFooter kind="edit" onCancel={() => setIsUpdatePriceOpen(false)} inForm />
 
             </form>
           </div>
@@ -1078,7 +1010,7 @@ export default function MembershipTypeManagement() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2] shrink-0">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                   <History className="w-5 h-5" />
@@ -1112,20 +1044,21 @@ export default function MembershipTypeManagement() {
                   </span>
                 </div>
 
-                <button
-                  type="button"
-                  disabled={!hasPermission('masters.membership_types.write')}
-                  title={!hasPermission('masters.membership_types.write') ? 'Requires masters.membership_types.write permission' : undefined}
-                  onClick={() => {
-                    const item = historyTargetItem;
-                    setHistoryTargetItem(null);
-                    openUpdatePriceModal(item);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer self-start sm:self-auto"
-                >
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  <span>Update Price</span>
-                </button>
+                {hasPermission('masters.membership_types.write') && (
+                  <button
+                    type="button"
+
+                    onClick={() => {
+                      const item = historyTargetItem;
+                      setHistoryTargetItem(null);
+                      openUpdatePriceModal(item);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer self-start sm:self-auto"
+                  >
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span>Update Price</span>
+                  </button>
+                )}
               </div>
 
               {/* Price History Table */}
@@ -1187,15 +1120,7 @@ export default function MembershipTypeManagement() {
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-end px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] shrink-0">
-              <button
-                type="button"
-                onClick={() => setHistoryTargetItem(null)}
-                className="px-4 py-2 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
+            <ModalFooter kind="view" onCancel={() => setHistoryTargetItem(null)} />
           </div>
         )}
       </Modal>
@@ -1213,7 +1138,7 @@ export default function MembershipTypeManagement() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                   <FileText className="w-5 h-5" />
@@ -1255,11 +1180,6 @@ export default function MembershipTypeManagement() {
                 </div>
 
                 <div>
-                  <p className="text-xs text-[#863221] font-semibold uppercase">Online List</p>
-                  <p className="text-sm font-bold text-[#180200] mt-0.5">{viewingItem.onlineList || 'Yes'}</p>
-                </div>
-
-                <div>
                   <p className="text-xs text-[#863221] font-semibold uppercase">Effective From</p>
                   <p className="text-sm font-medium text-[#180200] mt-0.5">{formatDate(viewingItem.effectiveFrom)}</p>
                 </div>
@@ -1276,15 +1196,7 @@ export default function MembershipTypeManagement() {
               </div>
 
               {/* Read-only footer */}
-              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[#E8DFD8]">
-                <button
-                  type="button"
-                  onClick={() => setViewingItem(null)}
-                  className="px-4 py-2 border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
+              <ModalFooter kind="view" onCancel={() => setViewingItem(null)} inForm />
 
             </div>
           </div>

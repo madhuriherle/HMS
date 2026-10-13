@@ -26,6 +26,7 @@ import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 import RecentlyDeleted from '../components/RecentlyDeleted';
 
+import ModalFooter from '../components/ModalFooter';
 export default function ReceiptTypeManagement() {
   const { hasPermission } = useAuth();
 
@@ -499,16 +500,17 @@ export default function ReceiptTypeManagement() {
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-auto">
-          <RecentlyDeleted kind="particulars" label="particulars" onRestored={fetchReceiptTypes} disabled={!hasPermission('masters.particulars.delete')} />
-          <button
-            onClick={openAddTypeModal}
-            disabled={!hasPermission('masters.particulars.write')}
-            title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : undefined}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Particular</span>
-          </button>
+          {hasPermission('masters.particulars.delete') && <RecentlyDeleted kind="particulars" label="particulars" onRestored={fetchReceiptTypes} />}
+          {hasPermission('masters.particulars.write') && (
+            <button
+              onClick={openAddTypeModal}
+
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Particular</span>
+            </button>
+          )}
           </div>
         </div>
       </div>
@@ -684,37 +686,40 @@ export default function ReceiptTypeManagement() {
                           <div className="flex flex-wrap items-center justify-end gap-1.5">
 
                             {/* Add Sub-Type Button */}
-                            <button
-                              onClick={() => openAddSubTypeModal(type)}
-                              disabled={!hasPermission('masters.particulars.write')}
-                              title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : `Add Sub-Type under ${type.name}`}
-                              className="btn-act"
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                              <span>Sub-Type</span>
-                            </button>
+                            {hasPermission('masters.particulars.write') && (
+                              <button
+                                onClick={() => openAddSubTypeModal(type)}
+                                title={`Add Sub-Type under ${type.name}`}
+                                className="btn-act"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Sub-Type</span>
+                              </button>
+                            )}
 
                             {/* Edit Button */}
-                            <button
-                              onClick={() => openEditTypeModal(type)}
-                              disabled={!hasPermission('masters.particulars.write')}
-                              className="btn-act"
-                              title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : 'Edit Particular'}
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                              <span>Edit</span>
-                            </button>
+                            {hasPermission('masters.particulars.write') && (
+                              <button
+                                onClick={() => openEditTypeModal(type)}
+                                className="btn-act"
+                                title={'Edit Particular'}
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                <span>Edit</span>
+                              </button>
+                            )}
 
                             {/* Delete Button */}
-                            <button
-                              onClick={() => promptDeleteType(type)}
-                              disabled={!hasPermission('masters.particulars.delete')}
-                              className="btn-act btn-act-danger"
-                              title={!hasPermission('masters.particulars.delete') ? 'Requires masters.particulars.delete permission' : 'Delete Particular'}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Delete</span>
-                            </button>
+                            {hasPermission('masters.particulars.delete') && (
+                              <button
+                                onClick={() => promptDeleteType(type)}
+                                className="btn-act btn-act-danger"
+                                title={'Delete Particular'}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -729,16 +734,17 @@ export default function ReceiptTypeManagement() {
                                   <Layers className="w-4 h-4 text-[#510601]" />
                                   <span>Sub-Types under {type.name}</span>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => openAddSubTypeModal(type)}
-                                  disabled={!hasPermission('masters.particulars.write')}
-                                  title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : undefined}
-                                  className="text-xs font-semibold text-[#510601] hover:text-[#8C1801] inline-flex items-center gap-1 cursor-pointer"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                  <span>Add New Sub-Type</span>
-                                </button>
+                                {hasPermission('masters.particulars.write') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => openAddSubTypeModal(type)}
+
+                                    className="text-xs font-semibold text-[#510601] hover:text-[#8C1801] inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>Add New Sub-Type</span>
+                                  </button>
+                                )}
                               </div>
 
                               <div className="border border-[#E8DFD8] rounded-xl overflow-hidden bg-white shadow-2xs">
@@ -781,26 +787,28 @@ export default function ReceiptTypeManagement() {
                                           {/* Sub-Type Actions */}
                                           <td className="px-4 py-3 text-right">
                                             <div className="flex items-center justify-end gap-1.5">
-                                              <button
-                                                type="button"
-                                                onClick={() => openEditSubTypeModal(type, sub)}
-                                                disabled={!hasPermission('masters.particulars.write')}
-                                                className="btn-act"
-                                                title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : 'Edit Sub-Type'}
-                                              >
-                                                <Pencil className="w-3.5 h-3.5" />
-                                                <span>Edit</span>
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={() => promptDeleteSubType(type, sub)}
-                                                disabled={!hasPermission('masters.particulars.delete')}
-                                                className="btn-act btn-act-danger"
-                                                title={!hasPermission('masters.particulars.delete') ? 'Requires masters.particulars.delete permission' : 'Delete Sub-Type'}
-                                              >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                                <span>Delete</span>
-                                              </button>
+                                              {hasPermission('masters.particulars.write') && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openEditSubTypeModal(type, sub)}
+                                                  className="btn-act"
+                                                  title={'Edit Sub-Type'}
+                                                >
+                                                  <Pencil className="w-3.5 h-3.5" />
+                                                  <span>Edit</span>
+                                                </button>
+                                              )}
+                                              {hasPermission('masters.particulars.delete') && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => promptDeleteSubType(type, sub)}
+                                                  className="btn-act btn-act-danger"
+                                                  title={'Delete Sub-Type'}
+                                                >
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                                  <span>Delete</span>
+                                                </button>
+                                              )}
                                             </div>
                                           </td>
                                         </tr>
@@ -837,14 +845,15 @@ export default function ReceiptTypeManagement() {
                           Clear Filters
                         </button>
                       ) : (
-                        <button
-                          onClick={openAddTypeModal}
-                          disabled={!hasPermission('masters.particulars.write')}
-                          title={!hasPermission('masters.particulars.write') ? 'Requires masters.particulars.write permission' : undefined}
-                          className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                        >
-                          Add Particular
-                        </button>
+                        hasPermission('masters.particulars.write') && (
+                          <button
+                            onClick={openAddTypeModal}
+
+                            className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                          >
+                            Add Particular
+                          </button>
+                        )
                       )}
                     </div>
                   </td>
@@ -926,7 +935,7 @@ export default function ReceiptTypeManagement() {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <FileText className="w-5 h-5" />
@@ -1012,22 +1021,7 @@ export default function ReceiptTypeManagement() {
             </div>
 
             {/* Modal Actions */}
-            <div className="pt-3 flex items-center justify-end gap-3 border-t border-[#E8DFD8]">
-              <button
-                type="button"
-                onClick={() => setIsTypeModalOpen(false)}
-                className="px-4 py-2.5 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{typeModalMode === 'add' ? 'Create Particular' : 'Save Changes'}</span>
-              </button>
-            </div>
+            <ModalFooter kind={typeModalMode === 'add' ? 'add' : 'edit'} onCancel={() => setIsTypeModalOpen(false)} inForm />
 
           </form>
         </div>
@@ -1045,7 +1039,7 @@ export default function ReceiptTypeManagement() {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <Layers className="w-5 h-5" />
@@ -1131,22 +1125,7 @@ export default function ReceiptTypeManagement() {
             </div>
 
             {/* Modal Actions */}
-            <div className="pt-3 flex items-center justify-end gap-3 border-t border-[#E8DFD8]">
-              <button
-                type="button"
-                onClick={() => setIsSubTypeModalOpen(false)}
-                className="px-4 py-2.5 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{subTypeModalMode === 'add' ? 'Add Sub-Type' : 'Save Changes'}</span>
-              </button>
-            </div>
+            <ModalFooter kind={subTypeModalMode === 'add' ? 'add' : 'edit'} onCancel={() => setIsSubTypeModalOpen(false)} inForm />
 
           </form>
         </div>
@@ -1163,7 +1142,7 @@ export default function ReceiptTypeManagement() {
       >
         {deletingItem && (
           <div
-            className="bg-white rounded-2xl max-w-sm w-full border border-[#E8DFD8] shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200"
+            className="bg-white rounded-2xl max-w-sm w-full border border-[#E8DFD8] shadow-2xl p-6 text-center overflow-hidden animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-14 h-14 rounded-full bg-red-100 text-[#ED4636] flex items-center justify-center mx-auto mb-3.5">
@@ -1180,24 +1159,14 @@ export default function ReceiptTypeManagement() {
                 : ' Historical receipts are preserved.'}
             </p>
 
-            <div className="mt-5 flex items-center justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => setDeletingItem(null)}
-                className="w-full py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!hasPermission('masters.particulars.delete')}
-                title={!hasPermission('masters.particulars.delete') ? 'Requires masters.particulars.delete permission' : undefined}
-                onClick={handleConfirmDelete}
-                className="w-full py-2.5 px-4 bg-[#ED4636] hover:bg-[#C93324] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Yes, Delete
-              </button>
-            </div>
+            <ModalFooter
+              kind="delete"
+              onCancel={() => setDeletingItem(null)}
+              onSubmit={handleConfirmDelete}
+              disabled={!hasPermission('masters.particulars.delete')}
+              title={!hasPermission('masters.particulars.delete') ? 'Requires masters.particulars.delete permission' : undefined}
+              inForm
+            />
           </div>
         )}
       </Modal>

@@ -26,6 +26,7 @@ import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 
+import ModalFooter from '../components/ModalFooter';
 export default function BankDetailsManagement() {
   const { hasPermission } = useAuth();
 
@@ -509,16 +510,17 @@ export default function BankDetailsManagement() {
         </div>
 
         {/* Action Button: Add Payment Mode */}
-        <button
-          onClick={openAddModal}
-          id="btn-add-payment-mode"
-          disabled={!hasPermission('masters.payment_modes.write')}
-          title={!hasPermission('masters.payment_modes.write') ? 'Requires masters.payment_modes.write permission' : undefined}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#510601] hover:bg-[#3D0400] active:bg-[#200200] text-white text-sm font-bold rounded-xl shadow-sm hover:shadow transition-all duration-200 cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Payment Mode</span>
-        </button>
+        {hasPermission('masters.payment_modes.write') && (
+          <button
+            onClick={openAddModal}
+            id="btn-add-payment-mode"
+
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#510601] hover:bg-[#3D0400] active:bg-[#200200] text-white text-sm font-bold rounded-xl shadow-sm hover:shadow transition-all duration-200 cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Payment Mode</span>
+          </button>
+        )}
       </div>
 
       {/* Search & Filter Card */}
@@ -657,28 +659,30 @@ export default function BankDetailsManagement() {
                           </button>
 
                           {/* Edit Button */}
-                          <button
-                            type="button"
-                            onClick={() => openEditModal(config)}
-                            disabled={!hasPermission('masters.payment_modes.write')}
-                            className="btn-act"
-                            title={!hasPermission('masters.payment_modes.write') ? 'Requires masters.payment_modes.write permission' : 'Edit Payment Mode'}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                            <span>Edit</span>
-                          </button>
+                          {hasPermission('masters.payment_modes.write') && (
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(config)}
+                              className="btn-act"
+                              title={'Edit Payment Mode'}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+                          )}
 
                           {/* Delete Button */}
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteClick(config)}
-                            disabled={!hasPermission('masters.payment_modes.delete')}
-                            className="btn-act btn-act-danger"
-                            title={!hasPermission('masters.payment_modes.delete') ? 'Requires masters.payment_modes.delete permission' : 'Delete Payment Mode'}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Delete</span>
-                          </button>
+                          {hasPermission('masters.payment_modes.delete') && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteClick(config)}
+                              className="btn-act btn-act-danger"
+                              title={'Delete Payment Mode'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -707,14 +711,15 @@ export default function BankDetailsManagement() {
                           Clear Filters
                         </button>
                       ) : (
-                        <button
-                          onClick={openAddModal}
-                          disabled={!hasPermission('masters.payment_modes.write')}
-                          title={!hasPermission('masters.payment_modes.write') ? 'Requires masters.payment_modes.write permission' : undefined}
-                          className="px-4 py-2 bg-[#510601] text-white text-xs font-bold rounded-xl hover:bg-[#3D0400] transition-colors"
-                        >
-                          + Add First Payment Mode
-                        </button>
+                        hasPermission('masters.payment_modes.write') && (
+                          <button
+                            onClick={openAddModal}
+
+                            className="px-4 py-2 bg-[#510601] text-white text-xs font-bold rounded-xl hover:bg-[#3D0400] transition-colors"
+                          >
+                            + Add First Payment Mode
+                          </button>
+                        )
                       )}
                     </div>
                   </td>
@@ -784,7 +789,7 @@ export default function BankDetailsManagement() {
       >
         <div className="bg-white rounded-2xl shadow-xl border border-[#E8DFD8] w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
           {/* Modal Header */}
-          <div className="px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between shrink-0">
+          <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between shrink-0">
             <div>
               <h3 className="text-lg font-bold text-[#180200] font-serif">
                 {modalMode === 'add' ? 'Add Payment Mode' : 'Edit Payment Mode'}
@@ -856,21 +861,7 @@ export default function BankDetailsManagement() {
 
             {/* Modal Buttons */}
             </div>
-            <div className="px-6 py-4 border-t border-[#E8DFD8] flex items-center justify-end gap-2.5 shrink-0 bg-[#FAF7F2]  rounded-b-2xl">
-              <button
-                type="button"
-                onClick={() => setIsAddEditOpen(false)}
-                className="px-4 py-2.5 border border-[#E8DFD8] hover:bg-[#FAF7F2] text-sm font-semibold text-[#863221] rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2.5 bg-[#510601] hover:bg-[#3D0400] text-white text-sm font-bold rounded-xl shadow-sm hover:shadow transition-all duration-200 cursor-pointer"
-              >
-                {modalMode === 'add' ? 'Save Payment Mode' : 'Save Changes'}
-              </button>
-            </div>
+            <ModalFooter kind={modalMode === 'add' ? 'add' : 'edit'} onCancel={() => setIsAddEditOpen(false)} />
           </form>
         </div>
       </Modal>
@@ -902,15 +893,7 @@ export default function BankDetailsManagement() {
                   </div>
                 ))}
               </dl>
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setViewingItem(null)}
-                  className="px-4 py-2 bg-[#510601] hover:bg-[#3D0400] text-white text-xs font-bold rounded-xl cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
+              <ModalFooter kind="view" onCancel={() => setViewingItem(null)} />
             </div>
           );
         })()}

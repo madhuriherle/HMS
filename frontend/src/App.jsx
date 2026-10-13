@@ -116,9 +116,9 @@ function App() {
           <Route path="users/management" element={<UserManagement />} />
           <Route path="users/user-management" element={<UserManagement />} />
           <Route path="users/modules" element={<PermissionGate minRank={1} title="Super Admin only" message="Module management is reserved for the Super Admin."><ModulesManagement /></PermissionGate>} />
-          <Route path="users/activity" element={<ActivityLogs />} />
-          <Route path="activity/logs" element={<ActivityLogs />} />
-          <Route path="activity" element={<ActivityLogs />} />
+          <Route path="users/activity" element={<PermissionGate required="activity.read"><ActivityLogs /></PermissionGate>} />
+          <Route path="activity/logs" element={<PermissionGate required="activity.read"><ActivityLogs /></PermissionGate>} />
+          <Route path="activity" element={<PermissionGate required="activity.read"><ActivityLogs /></PermissionGate>} />
           <Route path="master/modules" element={<PermissionGate minRank={1} title="Super Admin only" message="Module management is reserved for the Super Admin."><ModulesManagement /></PermissionGate>} />
           <Route path="masters/modules" element={<PermissionGate minRank={1} title="Super Admin only" message="Module management is reserved for the Super Admin."><ModulesManagement /></PermissionGate>} />
           <Route path="settings/modules" element={<PermissionGate minRank={1} title="Super Admin only" message="Module management is reserved for the Super Admin."><ModulesManagement /></PermissionGate>} />

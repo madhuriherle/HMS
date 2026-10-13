@@ -140,7 +140,7 @@ export default function DataCleanup() {
                 {g.has_files && <span className="block text-xs text-[#863221] mt-1">Uploaded files of these records are deleted from the server too.</span>}
                 {g.warning && effective.has(g.key) && <span className="block text-xs font-semibold text-[#ED4636] mt-1">{g.warning}</span>}
               </span>
-              <input type="checkbox" className="w-5 h-5" checked={effective.has(g.key)} disabled={!canWrite || forced(g.key)} onChange={() => toggle(g.key)} aria-label={`Clear ${g.label}`} />
+              <input type="checkbox" className="w-5 h-5" checked={effective.has(g.key)} disabled={forced(g.key)} onChange={() => toggle(g.key)} aria-label={`Clear ${g.label}`} />
             </label>
           ))}
         </div>
@@ -150,10 +150,12 @@ export default function DataCleanup() {
             <input type="checkbox" checked={backup} onChange={(e) => setBackup(e.target.checked)} />
             <Download className="w-4 h-4 text-[#863221]" /> Download a backup (CSV files) before clearing
           </label>
-          <button type="button" onClick={clear} disabled={!canWrite || busy || chosen.length === 0}
-            className="px-5 py-2.5 rounded-xl bg-[#ED4636] text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
-            {busy ? 'Clearing...' : `Clear selected data${rows ? ` (${rows} rows)` : ''}`}
-          </button>
+          {canWrite && (
+            <button type="button" onClick={clear} disabled={busy || chosen.length === 0}
+              className="px-5 py-2.5 rounded-xl bg-[#ED4636] text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+              {busy ? 'Clearing...' : `Clear selected data${rows ? ` (${rows} rows)` : ''}`}
+            </button>
+          )}
         </div>
       </div>
     </PermissionGate>

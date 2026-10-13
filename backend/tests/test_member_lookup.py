@@ -42,13 +42,11 @@ def test_lookup_finds_members_and_applicants_by_every_kind_of_number(client, adm
     assert card["member_code"] == code and card["membership_number"] == membership_no
     assert card["name"].startswith("SRI.") and card["warnings"] == []
 
-    # an applicant is found by the registration number the screens show
+    # an applicant has no membership number yet: neither their id (MID) nor the registration number finds them
     applicant = client.post(f"{API}/members/", headers=h, json=_payload(_sfx())).json()
     reg = f"REG-{datetime.now(timezone.utc).year}-{applicant['id']:04d}"
-    a = _lookup(client, h, reg)["matches"][0]
-    assert a["id"] == applicant["id"] and a["kind"] == "applicant"
-    assert any(w["code"] == "not_approved" for w in a["warnings"])
-    assert _lookup(client, h, reg.lower())["found"], "case does not matter"
+    assert _lookup(client, h, reg)["found"] is False
+    assert _lookup(client, h, str(applicant["id"]))["found"] is False
 
 
 def test_lookup_not_found_and_too_short(client, admin_headers):
@@ -125,3 +123,15 @@ def test_a_plain_member_id_is_not_a_membership_number(client, admin_headers):
     for typed in (str(m["id"]), f" {m['id']} "):
         r = _lookup(client, h, typed)
         assert not r["found"] and r["matches"] == [], typed
+
+
+def test_members_lookup_uses_the_membership_number_only(client, admin_headers):
+    """Registration forms verify a typed family number: the MID, the REG number and the mobile must not pass."""
+    h, s = admin_headers, _sfx()
+    mid, _t, code = _approved_member(client, h, s)
+    member = client.get(f"{API}/members/{mid}", headers=h).json()
+    ok = client.get(f"{API}/members/lookup", headers=h, params={"number": code}).json()
+    assert ok["found"] and ok["member"]["id"] == mid
+    for typed in (str(mid), f"REG-{datetime.now(timezone.utc).year}-{mid:04d}", member["mobile"]):
+        r = client.get(f"{API}/members/lookup", headers=h, params={"number": typed}).json()
+        assert r["found"] is False, typed

@@ -39,6 +39,7 @@ import useRules, { matchesPattern, mobileProblem, passwordProblem } from '../hoo
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 
+import ModalFooter from '../components/ModalFooter';
 export default function UserManagement() {
   const { myRank, hasPermission } = useAuth();
   const rules = useRules(); // formats and limits from the server
@@ -560,15 +561,16 @@ export default function UserManagement() {
         }
         onResetFilters={handleClearFilters}
         rightSlot={
-          <button
-            onClick={openAddModal}
-            disabled={!hasPermission('users.management.write')}
-            title={!hasPermission('users.management.write') ? 'You need the users.management.write permission' : 'Add User'}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-2xs hover:shadow transition-all cursor-pointer shrink-0"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>Add User</span>
-          </button>
+          hasPermission('users.management.write') && (
+            <button
+              onClick={openAddModal}
+              title={'Add User'}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-2xs hover:shadow transition-all cursor-pointer shrink-0"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Add User</span>
+            </button>
+          )
         }
       >
         {/* Role Filter */}
@@ -722,25 +724,29 @@ export default function UserManagement() {
                             <Eye className="w-3.5 h-3.5" />
                             <span>View</span>
                           </button>
-                          <button
-                            disabled={isRankLocked || !hasPermission('users.management.write')}
-                            onClick={() => !isRankLocked && openEditModal(user)}
-                            className={`btn-act ${isRankLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
-                            title={!hasPermission('users.management.write') ? 'You need the users.management.write permission' : isRankLocked ? 'User has a higher rank than you' : 'Edit User'}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                            <span>Edit</span>
-                          </button>
-                          {!isRankLocked && !(user.isCurrentAdmin || user.username === 'admin' || user.id === 1) && (
+                          {hasPermission('users.management.write') && (
                             <button
-                              disabled={isRankLocked || !hasPermission('users.management.delete')}
-                              onClick={() => setDeleteTargetUser(user)}
-                              className="btn-act btn-act-danger"
-                              title={!hasPermission('users.management.delete') ? 'You need the users.management.delete permission' : 'Delete User'}
+                              disabled={isRankLocked}
+                              onClick={() => !isRankLocked && openEditModal(user)}
+                              className={`btn-act ${isRankLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+                              title={!hasPermission('users.management.write') ? 'You need the users.management.write permission' : isRankLocked ? 'User has a higher rank than you' : 'Edit User'}
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Delete</span>
+                              <Pencil className="w-3.5 h-3.5" />
+                              <span>Edit</span>
                             </button>
+                          )}
+                          {!isRankLocked && !(user.isCurrentAdmin || user.username === 'admin' || user.id === 1) && (
+                            hasPermission('users.management.delete') && (
+                              <button
+                                disabled={isRankLocked}
+                                onClick={() => setDeleteTargetUser(user)}
+                                className="btn-act btn-act-danger"
+                                title={'Delete User'}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
+                              </button>
+                            )
                           )}
                         </div>
                       </td>
@@ -770,14 +776,15 @@ export default function UserManagement() {
                           Clear Filters
                         </button>
                       ) : (
-                        <button
-                          onClick={openAddModal}
-                          disabled={!hasPermission('users.management.write')}
-                          title={!hasPermission('users.management.write') ? 'You need the users.management.write permission' : undefined}
-                          className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                        >
-                          Add User
-                        </button>
+                        hasPermission('users.management.write') && (
+                          <button
+                            onClick={openAddModal}
+
+                            className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                          >
+                            Add User
+                          </button>
+                        )
                       )}
                     </div>
                   </td>
@@ -867,7 +874,7 @@ export default function UserManagement() {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2] shrink-0">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] shrink-0">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <UserPlus className="w-5 h-5" />
@@ -1187,21 +1194,7 @@ export default function UserManagement() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
-              <button
-                type="button"
-                onClick={() => setIsAddEditOpen(false)}
-                className="px-4 py-2.5 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer"
-              >
-                {modalMode === 'add' ? 'Create User' : 'Save Changes'}
-              </button>
-            </div>
+            <ModalFooter kind={modalMode === 'add' ? 'add' : 'edit'} onCancel={() => setIsAddEditOpen(false)} inForm />
 
           </form>
         </div>
@@ -1220,7 +1213,7 @@ export default function UserManagement() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                   <User className="w-5 h-5" />
@@ -1336,15 +1329,7 @@ export default function UserManagement() {
               })()}
 
               {/* Read-only footer */}
-              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[#E8DFD8]">
-                <button
-                  type="button"
-                  onClick={() => setViewingUser(null)}
-                  className="px-4 py-2 border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
+              <ModalFooter kind="view" onCancel={() => setViewingUser(null)} inForm />
 
             </div>
           </div>

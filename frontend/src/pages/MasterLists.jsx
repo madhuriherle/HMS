@@ -138,16 +138,17 @@ function MasterTable({ title, subtitle, endpoint, fields, columns, withCode, pag
         rightSlot={
           <>
             
-            <button
-              type="button"
-              onClick={add}
-              disabled={!hasPermission(`${permBase}.write`)}
-              title={!hasPermission(`${permBase}.write`) ? `Requires ${permBase}.write permission` : `Add ${title}`}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-40 shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add</span>
-            </button>
+            {hasPermission(`${permBase}.write`) && (
+              <button
+                type="button"
+                onClick={add}
+                title={`Add ${title}`}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-40 shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add</span>
+              </button>
+            )}
           </>
         }
       >
@@ -206,26 +207,28 @@ function MasterTable({ title, subtitle, endpoint, fields, columns, withCode, pag
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => edit(row)}
-                        disabled={!hasPermission(`${permBase}.write`)}
-                        className="btn-act"
-                        title={!hasPermission(`${permBase}.write`) ? `Requires ${permBase}.write permission` : 'Edit'}
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                        <span>Edit</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => remove(row)}
-                        disabled={!hasPermission(`${permBase}.delete`)}
-                        className="btn-act btn-act-danger"
-                        title={!hasPermission(`${permBase}.delete`) ? `Requires ${permBase}.delete permission` : 'Delete'}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Delete</span>
-                      </button>
+                      {hasPermission(`${permBase}.write`) && (
+                        <button
+                          type="button"
+                          onClick={() => edit(row)}
+                          className="btn-act"
+                          title={'Edit'}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                      )}
+                      {hasPermission(`${permBase}.delete`) && (
+                        <button
+                          type="button"
+                          onClick={() => remove(row)}
+                          className="btn-act btn-act-danger"
+                          title={'Delete'}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Delete</span>
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -68,7 +68,7 @@ class Fmt:
 DEFAULTS = {  # what the system produced before formats were configurable
     "MEMBER_CODE": Fmt("MEMBER_CODE", "HMS", "DATE_FULL", "-", 6, 1, "NEVER", "", True),
     "MEMBERSHIP_NO": Fmt("MEMBERSHIP_NO", "HMSM", "DATE_FULL", "-", 6, 1, "NEVER", "", True),
-    "RECEIPT": Fmt("RECEIPT", "", "NONE", "", 4, 1, "NEVER", "", True),  # 0001, 0002, 0003 ...
+    "RECEIPT": Fmt("RECEIPT", "", "NONE", "", 4, 1, "FY", "", True),  # 0001, 0002 ... starting again each financial year
 }
 
 
@@ -132,7 +132,10 @@ def validate(f: Fmt) -> None:
     for label, text in (("Prefix", f.prefix), ("Suffix", f.suffix)):
         if not TEXT_RE.match(text or ""):
             raise HTTPException(400, f"{label} may only have letters, digits and / . _ - (up to 12)")
-    if f.date_part not in ALLOWED_DATE_PARTS[f.restart]:
+    # A receipt number only has to be unique within its financial year (the database enforces that), so receipts
+    # may restart every year with no year in the number: 0001, 0002 ... again from April.
+    plain_yearly_receipt = f.doc_type == "RECEIPT" and f.restart == "FY" and f.date_part == "NONE"
+    if f.date_part not in ALLOWED_DATE_PARTS[f.restart] and not plain_yearly_receipt:
         allowed = ", ".join(DATE_PARTS[p] for p in DATE_PARTS if p in ALLOWED_DATE_PARTS[f.restart])
         raise HTTPException(
             400,

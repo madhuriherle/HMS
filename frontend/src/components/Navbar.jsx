@@ -3,6 +3,7 @@ import { Menu, User, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import GlobalSearch from './GlobalSearch';
+import api from '../api';
 
 export default function Navbar({ onToggleSidebar }) {
   const [profileOpen, setProfileOpen] = useState(false);
@@ -68,12 +69,19 @@ export default function Navbar({ onToggleSidebar }) {
 
     if (result.isConfirmed) {
       try {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('hms_auth_token');
-        localStorage.removeItem('hms_user_profile');
-      } catch (_) {}
-      navigate('/');
+        const refreshToken = localStorage.getItem('refresh_token');
+        await api.post('/auth/logout', { refresh_token: refreshToken });
+      } catch (err) {
+        console.error('Logout error:', err);
+      } finally {
+        try {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('hms_auth_token');
+          localStorage.removeItem('hms_user_profile');
+        } catch (_) {}
+        navigate('/');
+      }
     }
   };
 

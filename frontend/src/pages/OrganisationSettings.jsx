@@ -379,19 +379,20 @@ export default function OrganisationSettings() {
               <span>Reset</span>
             </button>
 
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!hasPermission('masters.organisation.write')}
-              title={!hasPermission('masters.organisation.write') ? 'You need the masters.organisation.write permission' : 'Save Changes'}
-              className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-2 cursor-pointer"
-            >
-              <Save className="w-4 h-4" />
-              <span>Save Changes</span>
-              {isDirty && (
-                <span className="w-2 h-2 rounded-full bg-[#FFC107] animate-pulse" title="Unsaved changes" />
-              )}
-            </button>
+            {hasPermission('masters.organisation.write') && (
+              <button
+                type="button"
+                onClick={handleSave}
+                title={'Save Changes'}
+                className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-2 cursor-pointer"
+              >
+                <Save className="w-4 h-4" />
+                <span>Save Changes</span>
+                {isDirty && (
+                  <span className="w-2 h-2 rounded-full bg-[#FFC107] animate-pulse" title="Unsaved changes" />
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -500,26 +501,29 @@ export default function OrganisationSettings() {
                     onChange={handleLogoUpload}
                     className="hidden"
                   />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={!hasPermission('masters.organisation.write')}
-                    title={!hasPermission('masters.organisation.write') ? 'You need the masters.organisation.write permission' : settings.profile.logo ? 'Change Logo' : 'Upload Logo'}
-                    className="px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>{settings.profile.logo ? 'Change Logo' : 'Upload Logo'}</span>
-                  </button>
-
-                  {settings.profile.logo && (
+                  {hasPermission('masters.organisation.write') && (
                     <button
                       type="button"
-                      onClick={handleRemoveLogo}
-                      className="px-3.5 py-2 bg-white hover:bg-red-50 text-[#ED4636] border border-[#E8DFD8] hover:border-red-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                      onClick={() => fileInputRef.current?.click()}
+                      title={!hasPermission('masters.organisation.write') ? 'You need the masters.organisation.write permission' : settings.profile.logo ? 'Change Logo' : 'Upload Logo'}
+                      className="px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Remove</span>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{settings.profile.logo ? 'Change Logo' : 'Upload Logo'}</span>
                     </button>
+                  )}
+
+                  {settings.profile.logo && (
+                    hasPermission('masters.organisation.write') && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveLogo}
+                        className="px-3.5 py-2 bg-white hover:bg-red-50 text-[#ED4636] border border-[#E8DFD8] hover:border-red-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Remove</span>
+                      </button>
+                    )
                   )}
                 </div>
               </div>
@@ -1571,16 +1575,17 @@ export default function OrganisationSettings() {
             <span>Reset Form</span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!hasPermission('masters.organisation.write')}
-            title={!hasPermission('masters.organisation.write') ? 'You need the masters.organisation.write permission' : 'Save Changes'}
-            className="flex-1 sm:flex-none px-6 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <Save className="w-4 h-4" />
-            <span>Save Changes</span>
-          </button>
+          {hasPermission('masters.organisation.write') && (
+            <button
+              type="button"
+              onClick={handleSave}
+              title={'Save Changes'}
+              className="flex-1 sm:flex-none px-6 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Save className="w-4 h-4" />
+              <span>Save Changes</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

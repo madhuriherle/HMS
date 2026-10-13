@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 import Modal from './Modal';
+import ModalFooter from './ModalFooter';
 import { registerFormHost } from '../utils/dialogs';
 
 // The popup used by askForm(): same look as the Add / Edit popups on the other screens
@@ -76,7 +77,7 @@ export default function FormModalHost() {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+        <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
               <FileText className="w-5 h-5" />
@@ -96,7 +97,8 @@ export default function FormModalHost() {
         </div>
 
         {/* Form */}
-        <form onSubmit={submit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={submit} className="flex flex-col max-h-[75vh]">
+        <div className="p-6 space-y-4 overflow-y-auto">
           {req.fields.map((f) => (
             <div key={f.name}>
               <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
@@ -178,23 +180,9 @@ export default function FormModalHost() {
             </div>
           ))}
 
+        </div>
           {/* Actions */}
-          <div className="pt-3 flex items-center justify-end gap-3 border-t border-[#E8DFD8]">
-            <button
-              type="button"
-              onClick={() => close(null)}
-              className="px-4 py-2.5 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer flex items-center gap-1.5"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>{req.confirmText || 'Save'}</span>
-            </button>
-          </div>
+          <ModalFooter kind="add" submitLabel={req.confirmText || 'Save'} onCancel={() => close(null)} />
         </form>
       </div>
     </Modal>

@@ -38,6 +38,7 @@ import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 
+import ModalFooter from '../components/ModalFooter';
 export default function RolesAndPrivileges() {
   // Master state
   const [roles, setRoles] = useState([]);
@@ -618,15 +619,16 @@ export default function RolesAndPrivileges() {
             </h1>
           </div>
 
-          <button
-            onClick={openAddModal}
-            disabled={!hasPermission('roles.write')}
-            title={!hasPermission('roles.write') ? 'You need the roles.write permission' : 'Add Role'}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer self-start sm:self-auto"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Role</span>
-          </button>
+          {hasPermission('roles.write') && (
+            <button
+              onClick={openAddModal}
+              title={'Add Role'}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Role</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -757,27 +759,31 @@ export default function RolesAndPrivileges() {
                           </button>
 
                           {/* Edit */}
-                          <button
-                            disabled={isLocked || !hasPermission('roles.write')}
-                            onClick={() => !isLocked && openEditModal(role)}
-                            className={`btn-act ${isLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
-                            title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? 'System role cannot be edited' : isLocked ? 'Role is at or above your rank' : 'Edit Role'}
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                            <span>Edit</span>
-                          </button>
+                          {hasPermission('roles.write') && (
+                            <button
+                              disabled={isLocked}
+                              onClick={() => !isLocked && openEditModal(role)}
+                              className={`btn-act ${isLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+                              title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? 'System role cannot be edited' : isLocked ? 'Role is at or above your rank' : 'Edit Role'}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+                          )}
 
                           {/* Delete (only for deletable roles) */}
                           {!isDeleteDisabled && (
-                            <button
-                              disabled={isLocked || !hasPermission('roles.delete')}
-                              onClick={() => setDeleteTargetRole(role)}
-                              className="btn-act btn-act-danger"
-                              title={!hasPermission('roles.delete') ? 'You need the roles.delete permission' : 'Delete Role'}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Delete</span>
-                            </button>
+                            hasPermission('roles.delete') && (
+                              <button
+                                disabled={isLocked}
+                                onClick={() => setDeleteTargetRole(role)}
+                                className="btn-act btn-act-danger"
+                                title={'Delete Role'}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Delete</span>
+                              </button>
+                            )
                           )}
                         </div>
                       </td>
@@ -805,14 +811,15 @@ export default function RolesAndPrivileges() {
                           Clear Filters
                         </button>
                       ) : (
-                        <button
-                          onClick={openAddModal}
-                          disabled={!hasPermission('roles.write')}
-                          title={!hasPermission('roles.write') ? 'You need the roles.write permission' : undefined}
-                          className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                        >
-                          Add Role
-                        </button>
+                        hasPermission('roles.write') && (
+                          <button
+                            onClick={openAddModal}
+
+                            className="px-4 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                          >
+                            Add Role
+                          </button>
+                        )
                       )}
                     </div>
                   </td>
@@ -903,7 +910,7 @@ export default function RolesAndPrivileges() {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <Shield className="w-5 h-5" />
@@ -1006,21 +1013,7 @@ export default function RolesAndPrivileges() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
-              <button
-                type="button"
-                onClick={() => setIsAddEditOpen(false)}
-                className="px-4 py-2.5 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer"
-              >
-                {modalMode === 'add' ? 'Save Role' : 'Update Role'}
-              </button>
-            </div>
+            <ModalFooter kind={modalMode === 'add' ? 'add' : 'edit'} onCancel={() => setIsAddEditOpen(false)} inForm />
 
           </form>
         </div>
@@ -1309,16 +1302,18 @@ export default function RolesAndPrivileges() {
                 </button>
 
                 {!isReadOnly && (
-                  <button
-                    type="button"
-                    onClick={handleSavePrivileges}
-                    disabled={savingPrivileges || !hasPermission('users.privileges.write')}
-                    title={!hasPermission('users.privileges.write') ? 'You need the users.privileges.write permission' : 'Save Privileges'}
-                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer disabled:opacity-60"
-                  >
-                    <Save className="w-4 h-4" />
-                    <span>{savingPrivileges ? 'Saving...' : 'Save Privileges'}</span>
-                  </button>
+                  hasPermission('users.privileges.write') && (
+                    <button
+                      type="button"
+                      onClick={handleSavePrivileges}
+                      disabled={savingPrivileges}
+                      title={'Save Privileges'}
+                      className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer disabled:opacity-60"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{savingPrivileges ? 'Saving...' : 'Save Privileges'}</span>
+                    </button>
+                  )
                 )}
               </div>
 
@@ -1341,7 +1336,7 @@ export default function RolesAndPrivileges() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                   <Shield className="w-5 h-5" />
@@ -1417,15 +1412,7 @@ export default function RolesAndPrivileges() {
               </div>
 
               {/* Read-only footer */}
-              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[#E8DFD8]">
-                <button
-                  type="button"
-                  onClick={() => setViewingRole(null)}
-                  className="px-4 py-2 border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
+              <ModalFooter kind="view" onCancel={() => setViewingRole(null)} inForm />
 
             </div>
           </div>

@@ -31,6 +31,7 @@ import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
 import useRules, { hasDigits } from '../hooks/useRules';
 
+import ModalFooter from '../components/ModalFooter';
 // <select> values are always strings; API ids are numbers, so convert back
 // before comparing with `===` or sending to the API.
 const toId = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? v : Number(v));
@@ -1115,32 +1116,34 @@ export default function LocationSetup() {
                         {/* Edit / Delete of a state are switched off for now (Karnataka and Kerala are the only states).
                             Remove this comment (this line and the closing line) to bring them back. */}
                         {/*
-                        <button
-                          type="button"
-                          disabled={!hasPermission('masters.location.write')}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEditState(st);
-                          }}
-                          className="btn-act"
-                          title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit State'}
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                          <span>Edit</span>
-                        </button>
-                        <button
-                          type="button"
-                          disabled={!hasPermission('masters.location.delete')}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteState(st);
-                          }}
-                          className="btn-act btn-act-danger"
-                          title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete State'}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Delete</span>
-                        </button>
+                        {hasPermission('masters.location.write') && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditState(st);
+                            }}
+                            className="btn-act"
+                            title={'Edit State'}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Edit</span>
+                          </button>
+                        )}
+                        {hasPermission('masters.location.delete') && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteState(st);
+                            }}
+                            className="btn-act btn-act-danger"
+                            title={'Delete State'}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete</span>
+                          </button>
+                        )}
                         */}
                       </div>
                     </div>
@@ -1166,16 +1169,17 @@ export default function LocationSetup() {
                     Manage districts belonging to {currentState.name}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleOpenAddDistrict}
-                  disabled={!hasPermission('masters.location.write')}
-                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#510601] text-white text-xs font-semibold rounded-lg hover:bg-[#863221] transition-colors self-start sm:self-auto"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add District</span>
-                </button>
+                {hasPermission('masters.location.write') && (
+                  <button
+                    type="button"
+                    onClick={handleOpenAddDistrict}
+
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#510601] text-white text-xs font-semibold rounded-lg hover:bg-[#863221] transition-colors self-start sm:self-auto"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add District</span>
+                  </button>
+                )}
               </div>
 
               {/* District Search */}
@@ -1267,26 +1271,28 @@ export default function LocationSetup() {
                             </td>
                             <td className="py-2.5 px-3 text-right">
                               <div className="flex flex-wrap items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditDistrict(dist)}
-                                  disabled={!hasPermission('masters.location.write')}
-                                  className="btn-act"
-                                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit District'}
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDeleteDialog({ type: 'district', item: dist })}
-                                  disabled={!hasPermission('masters.location.delete')}
-                                  className="btn-act btn-act-danger"
-                                  title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete District'}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Delete</span>
-                                </button>
+                                {hasPermission('masters.location.write') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditDistrict(dist)}
+                                    className="btn-act"
+                                    title={'Edit District'}
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                    <span>Edit</span>
+                                  </button>
+                                )}
+                                {hasPermission('masters.location.delete') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeleteDialog({ type: 'district', item: dist })}
+                                    className="btn-act btn-act-danger"
+                                    title={'Delete District'}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Delete</span>
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1314,16 +1320,17 @@ export default function LocationSetup() {
                     Under {currentState.name} → {currentDistrictForTaluk?.name || 'Selected District'}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleOpenAddTaluk}
-                  disabled={!currentDistrictForTaluk || !hasPermission('masters.location.write')}
-                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#510601] text-white text-xs font-semibold rounded-lg hover:bg-[#863221] disabled:opacity-50 transition-colors self-start sm:self-auto"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Taluk</span>
-                </button>
+                {hasPermission('masters.location.write') && (
+                  <button
+                    type="button"
+                    onClick={handleOpenAddTaluk}
+                    disabled={!currentDistrictForTaluk}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#510601] text-white text-xs font-semibold rounded-lg hover:bg-[#863221] disabled:opacity-50 transition-colors self-start sm:self-auto"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Taluk</span>
+                  </button>
+                )}
               </div>
 
               {/* District Dropdown Selector & Taluk Search */}
@@ -1416,26 +1423,28 @@ export default function LocationSetup() {
                             </td>
                             <td className="py-2.5 px-3 text-right">
                               <div className="flex flex-wrap items-center justify-end gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenEditTaluk(tk)}
-                                  disabled={!hasPermission('masters.location.write')}
-                                  className="btn-act"
-                                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit Taluk'}
-                                >
-                                  <Pencil className="w-3.5 h-3.5" />
-                                  <span>Edit</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setDeleteDialog({ type: 'taluk', item: tk })}
-                                  disabled={!hasPermission('masters.location.delete')}
-                                  className="btn-act btn-act-danger"
-                                  title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete Taluk'}
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  <span>Delete</span>
-                                </button>
+                                {hasPermission('masters.location.write') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenEditTaluk(tk)}
+                                    className="btn-act"
+                                    title={'Edit Taluk'}
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                    <span>Edit</span>
+                                  </button>
+                                )}
+                                {hasPermission('masters.location.delete') && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setDeleteDialog({ type: 'taluk', item: tk })}
+                                    className="btn-act btn-act-danger"
+                                    title={'Delete Taluk'}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Delete</span>
+                                  </button>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -1486,31 +1495,33 @@ export default function LocationSetup() {
 
               {/* Action Buttons: Add, Bulk Import, Export */}
               <div className="flex items-center flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={handleOpenAddPostal}
-                  disabled={!hasPermission('masters.location.write')}
-                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-[#510601] text-white text-sm font-semibold rounded-lg hover:bg-[#863221] transition-colors shadow-sm"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add PIN Code</span>
-                </button>
-                <button
-                  type="button"
-                  disabled={!hasPermission('masters.location.write')}
-                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
-                  onClick={() => {
-                    setImportFile(null);
-                    setImportPreviewRows([]);
-                    setImportSummary(null);
-                    setIsImportModalOpen(true);
-                  }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#510601] text-[#510601] text-sm font-semibold rounded-lg hover:bg-[#FAF7F2] transition-colors shadow-sm"
-                >
-                  <Upload className="w-4 h-4" />
-                  <span>Bulk Import</span>
-                </button>
+                {hasPermission('masters.location.write') && (
+                  <button
+                    type="button"
+                    onClick={handleOpenAddPostal}
+
+                    className="flex items-center gap-1.5 px-4 py-2 bg-[#510601] text-white text-sm font-semibold rounded-lg hover:bg-[#863221] transition-colors shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add PIN Code</span>
+                  </button>
+                )}
+                {hasPermission('masters.location.write') && (
+                  <button
+                    type="button"
+
+                    onClick={() => {
+                      setImportFile(null);
+                      setImportPreviewRows([]);
+                      setImportSummary(null);
+                      setIsImportModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#510601] text-[#510601] text-sm font-semibold rounded-lg hover:bg-[#FAF7F2] transition-colors shadow-sm"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>Bulk Import</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleExportPostalCodes}
@@ -1704,26 +1715,28 @@ export default function LocationSetup() {
                           </td>
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleOpenEditPostal(item)}
-                                disabled={!hasPermission('masters.location.write')}
-                                className="btn-act"
-                                title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : 'Edit PIN Code Mapping'}
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                                <span>Edit</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setDeleteDialog({ type: 'postal', item })}
-                                disabled={!hasPermission('masters.location.delete')}
-                                className="btn-act btn-act-danger"
-                                title={!hasPermission('masters.location.delete') ? 'Requires masters.location.delete permission' : 'Delete PIN Code'}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                <span>Delete</span>
-                              </button>
+                              {hasPermission('masters.location.write') && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenEditPostal(item)}
+                                  className="btn-act"
+                                  title={'Edit PIN Code Mapping'}
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                  <span>Edit</span>
+                                </button>
+                              )}
+                              {hasPermission('masters.location.delete') && (
+                                <button
+                                  type="button"
+                                  onClick={() => setDeleteDialog({ type: 'postal', item })}
+                                  className="btn-act btn-act-danger"
+                                  title={'Delete PIN Code'}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Delete</span>
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1809,7 +1822,7 @@ export default function LocationSetup() {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <Layers className="w-5 h-5" />
@@ -1887,21 +1900,7 @@ export default function LocationSetup() {
               </select>
             </div>
 
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
-              <button
-                type="button"
-                onClick={() => setIsDistrictModalOpen(false)}
-                className="py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="py-2.5 px-5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer"
-              >
-                {districtModalMode === 'add' ? 'Add District' : 'Save Changes'}
-              </button>
-            </div>
+            <ModalFooter kind={districtModalMode === 'add' ? 'add' : 'edit'} onCancel={() => setIsDistrictModalOpen(false)} inForm />
           </form>
         </div>
       </Modal>
@@ -1918,7 +1917,7 @@ export default function LocationSetup() {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <Layers className="w-5 h-5" />
@@ -2051,21 +2050,7 @@ export default function LocationSetup() {
               </select>
             </div>
 
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
-              <button
-                type="button"
-                onClick={() => setIsTalukModalOpen(false)}
-                className="py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="py-2.5 px-5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer"
-              >
-                {talukModalMode === 'add' ? 'Add Taluk' : 'Save Changes'}
-              </button>
-            </div>
+            <ModalFooter kind={talukModalMode === 'add' ? 'add' : 'edit'} onCancel={() => setIsTalukModalOpen(false)} inForm />
           </form>
         </div>
       </Modal>
@@ -2082,7 +2067,7 @@ export default function LocationSetup() {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <Building className="w-5 h-5" />
@@ -2300,21 +2285,7 @@ export default function LocationSetup() {
               </select>
             </div>
 
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
-              <button
-                type="button"
-                onClick={() => setIsPostalModalOpen(false)}
-                className="py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="py-2.5 px-5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-sm transition-colors cursor-pointer"
-              >
-                {postalModalMode === 'add' ? 'Add PIN Code' : 'Save Changes'}
-              </button>
-            </div>
+            <ModalFooter kind={postalModalMode === 'add' ? 'add' : 'edit'} onCancel={() => setIsPostalModalOpen(false)} inForm />
           </form>
         </div>
       </Modal>
@@ -2331,7 +2302,7 @@ export default function LocationSetup() {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <Upload className="w-5 h-5" />
@@ -2466,29 +2437,15 @@ export default function LocationSetup() {
             )}
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-between px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2] -mx-6 -mb-6 mt-6 rounded-b-2xl">
-              <p className="text-xs text-[#863221]">
-                Only valid rows without errors will be imported into the directory.
-              </p>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsImportModalOpen(false)}
-                  className="py-2.5 px-4 border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={(!importSummary || importSummary.valid === 0) || !hasPermission('masters.location.write')}
-                  title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
-                  onClick={handleCommitImport}
-                  className="py-2.5 px-5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-sm disabled:opacity-40 transition-colors cursor-pointer"
-                >
-                  Import {importSummary?.valid || 0} Valid Records
-                </button>
-              </div>
-            </div>
+            <ModalFooter
+              kind="confirm"
+              submitLabel={`Import ${importSummary?.valid || 0} Records`}
+              onCancel={() => setIsImportModalOpen(false)}
+              onSubmit={handleCommitImport}
+              disabled={(!importSummary || importSummary.valid === 0) || !hasPermission('masters.location.write')}
+              title={!hasPermission('masters.location.write') ? 'Requires masters.location.write permission' : undefined}
+              left={<span className="text-xs text-[#863221]">Only valid rows without errors will be imported.</span>}
+            />
           </div>
         </div>
       </Modal>
