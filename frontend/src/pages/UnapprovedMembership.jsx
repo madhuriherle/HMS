@@ -470,7 +470,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                       </td>
 
                       {/* Membership Type */}
-                      <td className="py-3.5 px-4 text-xs font-semibold text-[#510601]">{m.membershipType || 'Standard'}</td>
+                      <td className="py-3.5 px-4 text-xs font-semibold text-[#510601]">{m.membershipType || '—'}</td>
 
                       {/* State & District */}
                       <td className="py-3.5 px-4 text-[#863221]">
@@ -805,7 +805,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
               <div className="bg-[#FAF7F2]/60 rounded-xl p-4 border border-[#E8DFD8] grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <span className="text-[10px] uppercase font-bold text-[#863221]">Membership Type</span>
-                  <p className="font-bold text-[#510601] mt-0.5">{viewingMember.membershipType || 'Standard'}</p>
+                  <p className="font-bold text-[#510601] mt-0.5">{viewingMember.membershipType || '—'}</p>
                 </div>
                 <div>
                   <span className="text-[10px] uppercase font-bold text-[#863221]">Category</span>

@@ -1409,7 +1409,7 @@ export default function ReceiptEntry() {
                     </div>
                     <div>
                       <span className="font-semibold text-[#863221]/70 block">Type:</span>
-                      <span className="text-[#180200]">{selectedMember.membershipType || selectedMember.membershipTypeCategory || 'Standard'}</span>
+                      <span className="text-[#180200]">{selectedMember.membershipType || selectedMember.membershipTypeCategory || '—'}</span>
                     </div>
                     <div>
                       <span className="font-semibold text-[#863221]/70 block">District:</span>

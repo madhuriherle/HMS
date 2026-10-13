@@ -172,7 +172,7 @@ export default function AssignedApprovals() {
                           {m.mobile ? ` · ${m.mobile}` : ''}
                         </div>
                       </td>
-                      <td className="py-3.5 px-4 text-xs font-semibold text-[#510601]">{m.membershipType || 'Standard'}</td>
+                      <td className="py-3.5 px-4 text-xs font-semibold text-[#510601]">{m.membershipType || '—'}</td>
                       <td className="py-3.5 px-4">
                         <span className="font-mono font-bold text-xs text-[#510601]">#{m.assignedReceiptNumber}</span>
                         <div className="text-[11px] text-[#863221] mt-0.5">{formatDate(m.receipt?.receiptDate)}</div>
