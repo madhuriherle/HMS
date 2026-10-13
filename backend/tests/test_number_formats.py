@@ -15,7 +15,7 @@ def _put(client, h, doc, **body):
 def test_defaults_match_the_old_formats(client, admin_headers):
     rows = {r["doc_type"]: r for r in client.get(f"{API}/system/number-formats", headers=admin_headers).json()["data"]}
     assert re.fullmatch(r"HMS-\d{8}-000001", rows["MEMBER_CODE"]["example"])
-    assert re.fullmatch(r"HMSM-\d{8}-000001", rows["MEMBERSHIP_NO"]["example"])
+    assert "MEMBERSHIP_NO" not in rows  # one permanent number: the membership number
     assert re.fullmatch(r"\d{4}-\d\d/0001", rows["RECEIPT"]["example"])
 
 

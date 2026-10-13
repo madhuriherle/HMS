@@ -278,7 +278,8 @@ def apply_auto_upgrade(db: Session, member_id: int, acted_by: Optional[int]) -> 
             applied_at=now, status="ACTIVE", created_by=acted_by,
         )
         if member.approval_status == "APPROVED":
-            membership.membership_number = generate_next_number(db, "MEMBERSHIP_NO", "HMSM")
+            from services.member_activation import membership_number_for
+            membership.membership_number = membership_number_for(db, member)
             membership.activated_at = now
         db.add(membership)
         db.flush()

@@ -34,6 +34,22 @@ REQUIRED_FOR_APPROVAL = (
 )
 
 
+def membership_number_for(db: Session, member: Member, exclude_id=None):
+    """After approval a member has ONE permanent number (their member_code, set in Number Formats as the
+    membership number). Their membership record shows that same number, so nothing else is minted. A second
+    membership of the same member gets none, because the number belongs to the member."""
+    code = member.member_code
+    if not code:
+        return None
+    taken = db.query(MemberMembership.id).filter(
+        MemberMembership.member_id == member.id,
+        MemberMembership.is_deleted == False,  # noqa: E712
+        MemberMembership.membership_number == code,
+        MemberMembership.id != (exclude_id or 0),
+    ).first()
+    return None if taken else code
+
+
 def approval_gaps(member: Member) -> list:
     """The details still missing before this member can be approved (empty = ready)."""
     return [label for attr, label in REQUIRED_FOR_APPROVAL if not str(getattr(member, attr, None) or "").strip()]
@@ -78,7 +94,8 @@ def activate_member(db: Session, member: Member, *, activated_by: int) -> Member
         .all()
     )
     for membership in memberships:
-        membership.membership_number = generate_next_number(db, "MEMBERSHIP_NO", "HMSM")
+        membership.membership_number = membership_number_for(db, member, exclude_id=membership.id)
+        db.flush()  # a second membership of this member must see the number as taken
         membership.activated_at = now
         membership.updated_by = activated_by
 

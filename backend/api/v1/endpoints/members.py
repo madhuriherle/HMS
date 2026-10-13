@@ -990,7 +990,8 @@ def create_membership(
         created_by=current_user.id,
     )
     if member.approval_status == "APPROVED":
-        obj.membership_number = generate_next_number(db, "MEMBERSHIP_NO", "HMSM")
+        from services.member_activation import membership_number_for
+        obj.membership_number = membership_number_for(db, member)
         obj.activated_at = now
     db.add(obj)
     db.commit()

@@ -18,8 +18,7 @@ from sqlalchemy.orm import Session
 from models.system import NumberFormat, NumberSequence
 
 DOC_LABELS = {
-    "MEMBER_CODE": "Member ID",
-    "MEMBERSHIP_NO": "Membership number",
+    "MEMBER_CODE": "Membership number",  # the one permanent number a member gets at approval
     "RECEIPT": "Receipt number",
 }
 

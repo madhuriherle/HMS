@@ -3501,7 +3501,7 @@ def test_membership_numbered_on_approval(client, admin_headers):
     with SessionLocal() as db:
         membership = db.get(MemberMembership, membership_id)
         assert membership.membership_number
-        assert membership.membership_number.startswith("HMSM-")
+        assert membership.membership_number == approved.json()["member_code"]  # one permanent number
         assert membership.activated_at is not None
 
 
