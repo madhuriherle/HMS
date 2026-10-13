@@ -671,7 +671,7 @@ export default function UserManagement() {
 
                       {/* Role */}
                       <td className="px-6 py-4">
-                        <span className="text-xs font-semibold text-[#510601]">{roleObj ? roleObj.name : 'Unassigned'}</span>
+                        <span className="text-xs font-semibold text-[#510601]">{roleObj ? roleObj.name : (user.role_name || 'Unassigned')}</span>
                         {rowRank != null && (
                           <span
                             className="ml-1.5 text-[10px] font-semibold text-[#863221]/70"

@@ -279,6 +279,17 @@ RULE 13: PERMISSIONS AND ACCESS
         on every action (rule 13.2).
      e. Tests: the privilege tree shows the new codes, the sidebar shows or hides the page,
         and test_every_route_is_guarded still passes.
+13.9 RANK GATE OF A MODULE OR PAGE (Modules page, "rank gate" = min_rank_level):
+     - Rank N means only roles ranked N or better (smaller number) can see or use it.
+       Empty means no rank limit: then only the privilege decides.
+     - A module is only as reachable as every module above it. A rank 1 module makes ALL
+       its pages and sub-modules rank 1, whatever they say. A page may be stricter than its
+       module (rank 1 page under a rank 2 module), never looser.
+     - The sidebar, the server (require_permission) and the Roles & Privileges table all
+       follow this. The privilege table uses the strictest rank along the path, so rows a
+       role's rank cannot reach are not listed for it.
+     - A page with BOTH an empty rank gate AND no privilege is shown to every signed-in
+       user. Always set at least one of the two.
 
 --------------------------------------------------------------------------------
 RULE 14: SETTINGS AND ADMIN TOOLS
