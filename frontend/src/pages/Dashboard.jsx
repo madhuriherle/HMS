@@ -75,10 +75,9 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dashRes, reportRes, membersRes] = await Promise.allSettled([
-          api.get('/dashboard'),
-          api.get('/reports/summary'),
-          api.get('/members?limit=5&sort_by=created_at&sort_desc=true')
+        const [dashRes, membersRes] = await Promise.allSettled([
+          api.get('/dashboard/'),
+          api.get('/members/?limit=5&sort_by=created_at&sort_desc=true')
         ]);
         
         // each part loads on its own: a privilege the user lacks hides that part only
@@ -92,9 +91,8 @@ export default function Dashboard() {
         
         setMoney(dData.receipts && dData.receipts.today_amount !== undefined ? dData.receipts : null);
 
-        const rData = reportRes.status === 'fulfilled' ? reportRes.value.data : {};
-        if (rData.memberships?.by_type) {
-          setMembershipTypeData(rData.memberships.by_type.map(item => ({
+        if (dData.memberships_by_type) {
+          setMembershipTypeData(dData.memberships_by_type.map(item => ({
             name: item.membership_type,
             value: item.member_count
           })));

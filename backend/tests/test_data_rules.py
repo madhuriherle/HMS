@@ -107,3 +107,9 @@ def test_redirects_keep_https_behind_the_proxy(client):
     r = client.get(f"{API}/dashboard", headers={"X-Forwarded-Proto": "https", "X-Forwarded-For": "1.2.3.4"}, follow_redirects=False)
     assert r.status_code == 307
     assert r.headers["location"].startswith("https://"), r.headers["location"]
+
+
+def test_dashboard_carries_members_by_type_without_reports_access(client, admin_headers):
+    body = client.get(f"{API}/dashboard/", headers=admin_headers).json()
+    assert isinstance(body["memberships_by_type"], list)
+    assert all({"membership_type", "member_count"} <= set(row) for row in body["memberships_by_type"])

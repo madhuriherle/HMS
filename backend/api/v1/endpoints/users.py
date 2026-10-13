@@ -233,8 +233,22 @@ def read_modules(
     if status is not None:
         q = q.filter(Module.status == status)
     page_data = paginate(q.order_by(Module.display_order, Module.id), page, limit)
+    if page_data["data"]:
+        # the codes of every live privilege of each listed module (one query) —
+        # the Module Master edit form uses them to tick its checkboxes.
+        rows = (
+            db.query(Permission.code, Permission.module_id)
+            .filter(
+                Permission.is_deleted == False,  # noqa: E712
+                Permission.module_id.in_([m["id"] for m in page_data["data"]]),
+            ).all()
+        )
+        privs_by_module: dict = {}
+        for code, mid in rows:
+            privs_by_module.setdefault(mid, []).append(code)
     for module in page_data["data"]:
         module["permission_count"] = _module_permission_count(db, module["id"])
+        module["privileges"] = privs_by_module.get(module["id"], []) if page_data["data"] else []
     return page_data
 
 
@@ -262,13 +276,111 @@ def _check_module_refs(db: Session, parent_id, opens_id, own_id=None) -> None:
                 raise HTTPException(400, f"{label} {ref} not found")
 
 
+_PRIVILEGE_ACTIONS = ("read", "write", "delete")
+
+
+def _check_auto_privileges(actions: Optional[List[str]]) -> set:
+    """Validate a caller-supplied privilege selection; returns the wanted set."""
+    wanted = {str(a).strip().lower() for a in (actions or [])}
+    bad = sorted(wanted - set(_PRIVILEGE_ACTIONS))
+    if bad:
+        raise HTTPException(400, f"Unknown privilege action(s): {', '.join(bad)}. Choose from {', '.join(_PRIVILEGE_ACTIONS)}")
+    return wanted
+
+
+def _auto_privileges_for_module(db: Session, module: Module, actions: set, actor_id: Optional[int]) -> int:
+    """Create (or revive) the module's read / write / delete privileges, already
+    linked to it. A module is never created without its privilege ladder, so
+    new modules need no seed-list entry and no manual link-privileges call.
+    Returns how many privilege rows were added or brought back."""
+    created = 0
+    for action in sorted(set(actions) & set(_PRIVILEGE_ACTIONS)):
+        code = f"{module.code}.{action}"
+        perm = db.query(Permission).filter(Permission.code == code).first()
+        if perm is None:
+            perm = Permission(
+                module=module.code, module_id=module.id,
+                name=f"{action.title()} {module.name_en}",
+                code=code,
+                description=f"{action.title()} {module.name_en} (auto-created with the module)",
+                status=True,
+            )
+            if actor_id is not None:
+                perm.created_by = actor_id
+            db.add(perm)
+            created += 1
+        elif perm.is_deleted:  # revive a soft-deleted row — the unique code is taken either way
+            perm.is_deleted = False
+            perm.deleted_at = None
+            perm.deleted_by = None
+            perm.status = True
+            perm.module_id = module.id
+            perm.module = module.code
+            if actor_id is not None:
+                perm.updated_by = actor_id
+            created += 1
+    return created
+
+
+def _retire_module_privileges(db: Session, module: Module, wanted_actions: set, actor_id: Optional[int]) -> None:
+    """Unticked privileges of this module's own <code>.<action> set are
+    soft-deleted — but only while no role holds a grant to them."""
+    prefix = f"{module.code}."
+    wanted = set(wanted_actions)
+    blocked, to_retire = [], []
+    for p in db.query(Permission).filter(
+        Permission.module_id == module.id,
+        Permission.is_deleted == False,  # noqa: E712
+        Permission.code.like(f"{prefix}%"),
+    ).all():
+        action = p.code[len(prefix):]
+        if action not in _PRIVILEGE_ACTIONS or action in wanted:
+            continue
+        granted = db.query(RolePermission).filter(
+            RolePermission.is_deleted == False,  # noqa: E712
+            RolePermission.permission_id == p.id,
+        ).first()
+        if granted:
+            blocked.append(p.code)
+        else:
+            to_retire.append(p)
+    if blocked:
+        raise HTTPException(409, f"{', '.join(blocked)} is granted to a role — remove the grant before unticking it")
+    old_code = module.permission_code
+    for p in to_retire:
+        p.is_deleted = True
+        p.deleted_by = actor_id
+    if old_code in {p.code for p in to_retire}:
+        live = [f"{module.code}.{a}" for a in _PRIVILEGE_ACTIONS if a in wanted]
+        module.permission_code = live[0] if live else None
+
+
 @router.post("/modules", response_model=schemas_users.Module)
 def create_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_active_superuser), module_in: schemas_users.ModuleCreate) -> Any:
     if db.query(Module).filter(Module.code == module_in.code, Module.is_deleted == False).first():  # noqa: E712
         raise HTTPException(409, f"Module code '{module_in.code}' already exists")
     _check_module_refs(db, module_in.parent_id, module_in.opens_module_id)
     _check_permission_code(db, module_in.permission_code)
-    return crud_users.module.create(db=db, obj_in=module_in, created_by=current_user.id)
+    create_data = module_in.model_dump()
+    auto_privileges_in = create_data.pop("auto_privileges", None)
+    new_module = Module(**create_data, created_by=current_user.id)
+    wanted = (
+        _check_auto_privileges(auto_privileges_in)
+        if auto_privileges_in is not None
+        else set(_PRIVILEGE_ACTIONS)  # no selection made = the standard trio
+    )
+    # an explicit permission_code the caller validated wins; otherwise the
+    # module's page gates on its own dynamically created read privilege.
+    if not new_module.permission_code:
+        new_module.permission_code = f"{new_module.code}.read" if "read" in wanted else None
+    db.add(new_module)
+    db.flush()  # get the module id before the privileges reference it
+    # privileges + module go in one transaction — never an orphan module
+    # with no privileges, never privileges for a module that isn't born.
+    _auto_privileges_for_module(db, new_module, wanted, current_user.id)
+    db.commit()
+    db.refresh(new_module)
+    return new_module
 
 
 class ModuleReorderItem(BaseModel):
@@ -324,7 +436,15 @@ def update_module(*, db: Session = Depends(deps.get_db), current_user: User = De
     data = module_in.model_dump(exclude_unset=True)
     _check_module_refs(db, data.get("parent_id"), data.get("opens_module_id"), own_id=module_id)
     _check_permission_code(db, data.get("permission_code"))
-    return crud_users.module.update(db, db_obj=module, obj_in=module_in, updated_by=current_user.id)
+    auto_privileges = data.pop("auto_privileges", "__unset__")
+    module = crud_users.module.update(db, db_obj=module, obj_in=data, updated_by=current_user.id)
+    if auto_privileges != "__unset__":
+        wanted = _check_auto_privileges(auto_privileges)
+        _retire_module_privileges(db, module, wanted, current_user.id)
+        _auto_privileges_for_module(db, module, wanted, current_user.id)
+        db.commit()
+        db.refresh(module)
+    return module
 
 
 @router.delete("/modules/{module_id}", response_model=schemas_users.Module)
@@ -332,10 +452,23 @@ def delete_module(*, db: Session = Depends(deps.get_db), current_user: User = De
     module = crud_users.module.get(db, module_id)
     if not module:
         raise HTTPException(404, "Module not found")
-    if _module_permission_count(db, module.id) > 0:
-        raise HTTPException(409, "Module has permissions assigned to it and cannot be deleted")
     if db.query(Module).filter(Module.parent_id == module_id, Module.is_deleted == False).count():  # noqa: E712
         raise HTTPException(400, "Cannot delete a module that has submodules")
+    perms = db.query(Permission).filter(Permission.module_id == module.id, Permission.is_deleted == False).all()  # noqa: E712
+    granted_ids = {
+        rp.permission_id for rp in db.query(RolePermission)
+        .filter(
+            RolePermission.is_deleted == False,  # noqa: E712
+            RolePermission.permission_id.in_([p.id for p in perms] or {0}),
+        ).all()
+    }
+    in_use = [p.code for p in perms if p.id in granted_ids]
+    if in_use:
+        raise HTTPException(409, f"Module has privileges granted to roles ({', '.join(in_use)}) and cannot be deleted")
+    # its auto-created privileges are not in use — they go away with the module.
+    for p in perms:
+        p.is_deleted = True
+        p.deleted_by = current_user.id
     return crud_users.module.remove(db, id=module_id, deleted_by=current_user.id)
 
 
@@ -355,6 +488,12 @@ def link_privileges(
     for p in perms:
         p.module_id = module.id
         p.module = module.code
+        if p.is_deleted:  # re-linking revives a soft-deleted privilege
+            p.is_deleted = False
+            p.deleted_at = None
+            p.deleted_by = None
+            p.status = True
+            p.updated_by = current_user.id
     db.commit()
     return {"message": f"{len(perms)} privilege(s) linked to '{module.name_en}'"}
 

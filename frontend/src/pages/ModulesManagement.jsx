@@ -41,8 +41,9 @@ const emptyForm = {
   display_order: 0,
   min_rank_level: '',
   permission_code: '',
+  privileges: ['read', 'write', 'delete'], // which privileges to create & link (ticked from the form)
   status: true
-};
+};;
 
 export default function ModulesManagement() {
   const { myRank } = useAuth();
@@ -164,10 +165,20 @@ export default function ModulesManagement() {
       display_order: m.display_order ?? 0,
       min_rank_level: m.min_rank_level ?? '',
       permission_code: m.permission_code || '',
+      privileges: ['read', 'write', 'delete'].filter((a) => (m.privileges || []).includes(`${m.code}.${a}`)),
       status: Boolean(m.status)
     });
     setFormErrors({});
     setIsAddEditOpen(true);
+  };
+
+  const togglePrivilege = (action) => {
+    setFormData((prev) => ({
+      ...prev,
+      privileges: prev.privileges.includes(action)
+        ? prev.privileges.filter((a) => a !== action)
+        : [...prev.privileges, action]
+    }));
   };
 
   const handleFormChange = (e) => {
@@ -247,6 +258,7 @@ export default function ModulesManagement() {
           ? null
           : Number(formData.min_rank_level),
       permission_code: (formData.permission_code || '').trim() || null,
+      auto_privileges: formData.type === 'section' ? [] : formData.privileges,
       status: Boolean(formData.status)
     };
     if (modalMode === 'add') {
@@ -264,7 +276,7 @@ export default function ModulesManagement() {
     try {
       if (modalMode === 'add') {
         await api.post('/users/modules', buildPayload());
-        showToast('Module created successfully.');
+        showToast(`Module created with ${formData.type === 'section' ? 0 : formData.privileges.length} privilege(s) linked.`);
       } else {
         await api.put(`/users/modules/${editingModule.id}`, buildPayload());
         showToast('Module updated successfully.');
@@ -747,6 +759,33 @@ export default function ModulesManagement() {
                     {formErrors.parent_id}
                   </p>
                 )}
+                </div>
+              ) : (
+                <div className="hidden sm:block" />
+              )}
+
+              {formData.type === 'page' ? (
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
+                    Privileges to create &amp; link {modalMode === 'add' && <span className="text-[#ED4636]">*</span>}
+                  </label>
+                  <div className="flex items-center gap-5 mt-1">
+                    {['read', 'write', 'delete'].map((a) => (
+                      <label key={a} className="inline-flex items-center gap-2 text-sm text-[#180200] cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={formData.privileges.includes(a)}
+                          onChange={() => togglePrivilege(a)}
+                          className="w-4 h-4 accent-[#510601] cursor-pointer"
+                        />
+                        {a}
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-[#863221]/70 mt-1">
+                    Each tick is created and linked as &lt;module code&gt;.read / .write / .delete on save.
+                    On edit, unticking removes the privilege unless a role still holds it.
+                  </p>
                 </div>
               ) : (
                 <div className="hidden sm:block" />

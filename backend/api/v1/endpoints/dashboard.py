@@ -77,6 +77,18 @@ def get_dashboard(
         MemberMembership.expires_at >= now,
     ).count()
 
+    from models.masters import MembershipType
+    by_type = [
+        {"membership_type": mt.name_en, "member_count": count}
+        for mt, count in (
+            db.query(MembershipType, func.count(MemberMembership.id))
+            .join(MemberMembership, MemberMembership.membership_type_id == MembershipType.id)
+            .filter(MembershipType.is_deleted == False, MemberMembership.is_deleted == False)  # noqa: E712
+            .group_by(MembershipType.id)
+            .all()
+        )
+    ]
+
     return {
         "members": {
             "total": total_members,
@@ -84,6 +96,8 @@ def get_dashboard(
             "unapproved": unapproved_members,
             "inactive": inactive_members,
         } if allowed("members.read", "members.list.read", "members.unapproved.read") else None,
+        # members per membership type (the dashboard chart); needs no Reports access
+        "memberships_by_type": by_type if allowed("members.read", "members.list.read", "members.unapproved.read") else None,
         "receipts": {
             "total_count": total_receipts,
             "total_amount": float(total_receipt_amount),

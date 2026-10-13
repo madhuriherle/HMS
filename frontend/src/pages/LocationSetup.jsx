@@ -155,7 +155,7 @@ export default function LocationSetup() {
       api.get(`/masters/taluks-summary?district_id=${selectedDistrictIdForTaluk}`)
     ])
       .then(([res, sum]) => {
-        const mapTk = t => ({ id: t.id, name: t.name_en, districtId: t.district_id, stateId: t.state_id, status: t.status ? 'Active' : 'Inactive' });
+        const mapTk = t => ({ id: t.id, name: t.name_en, districtId: t.district_id, stateId: t.state_id || selectedStateId, status: t.status ? 'Active' : 'Inactive' });
         setTaluks((res.data?.data || []).map(mapTk));
         const map = {};
         (sum.data?.data || []).forEach((row) => { map[row.id] = row.pins || 0; });
@@ -208,25 +208,71 @@ export default function LocationSetup() {
       };
       fetchPostalCodes();
     }
-  }, [activeTab, postalCurrentPage, postalPageSize, postalSearchQuery, postalPincodeFilter, postalStateFilter, postalDistrictFilter, postalPrefixFilter, postalStatusFilter, states]);
+  }, [activeTab, postalCurrentPage, postalPageSize, postalSearchQuery, postalPincodeFilter, postalStateFilter, postalDistrictFilter, postalPrefixFilter, postalStatusFilter, states, summaryTick]);
 
   // Modals Data Fetching
   const [modalDistricts, setModalDistricts] = useState([]);
   const [modalTaluks, setModalTaluks] = useState([]);
+  const [talukModalDistricts, setTalukModalDistricts] = useState([]);
 
+  // Taluk Modal: Districts for the selected state in Taluk modal
+  useEffect(() => {
+    if (!isTalukModalOpen || !talukFormData.stateId) {
+      setTalukModalDistricts([]);
+      return;
+    }
+    if (talukFormData.stateId === selectedStateId && districts.length > 0) {
+      setTalukModalDistricts(districts);
+      return;
+    }
+    api.get(`/masters/districts?state_id=${talukFormData.stateId}&limit=2000`)
+      .then(res => {
+        const list = (res.data?.data || []).map(d => ({
+          id: d.id,
+          name: d.name_en || d.name,
+          stateId: d.state_id,
+          status: (d.status === true || d.status === 'Active') ? 'Active' : 'Inactive'
+        }));
+        setTalukModalDistricts(list);
+      })
+      .catch(console.error);
+  }, [isTalukModalOpen, talukFormData.stateId, selectedStateId, districts]);
+
+  // Postal Modal: Districts for the selected state in PIN modal
   useEffect(() => {
     if (isPostalModalOpen && postalFormData.stateId) {
-      api.get(`/masters/districts?state_id=${postalFormData.stateId}&limit=2000`).then(res => {
-         setModalDistricts(res.data?.data || []);
-      });
+      api.get(`/masters/districts?state_id=${postalFormData.stateId}&limit=2000`)
+        .then(res => {
+          const list = (res.data?.data || []).map(d => ({
+            id: d.id,
+            name: d.name_en || d.name,
+            stateId: d.state_id,
+            status: (d.status === true || d.status === 'Active') ? 'Active' : 'Inactive'
+          }));
+          setModalDistricts(list);
+        })
+        .catch(console.error);
+    } else {
+      setModalDistricts([]);
     }
   }, [isPostalModalOpen, postalFormData.stateId]);
 
+  // Postal Modal: Taluks for the selected district in PIN modal
   useEffect(() => {
     if (isPostalModalOpen && postalFormData.districtId) {
-      api.get(`/masters/taluks?district_id=${postalFormData.districtId}&limit=2000`).then(res => {
-         setModalTaluks(res.data?.data || []);
-      });
+      api.get(`/masters/taluks?district_id=${postalFormData.districtId}&limit=2000`)
+        .then(res => {
+          const list = (res.data?.data || []).map(t => ({
+            id: t.id,
+            name: t.name_en || t.name,
+            districtId: t.district_id,
+            status: (t.status === true || t.status === 'Active') ? 'Active' : 'Inactive'
+          }));
+          setModalTaluks(list);
+        })
+        .catch(console.error);
+    } else {
+      setModalTaluks([]);
     }
   }, [isPostalModalOpen, postalFormData.districtId]);
 
@@ -400,7 +446,7 @@ export default function LocationSetup() {
     setEditingTaluk(null);
     setTalukFormData({
       name: '',
-      stateId: currentState.id,
+      stateId: currentState.id || selectedStateId,
       districtId: currentDistrictForTaluk ? currentDistrictForTaluk.id : (stateDistricts[0]?.id || ''),
       status: 'Active'
     });
@@ -411,9 +457,11 @@ export default function LocationSetup() {
   const handleOpenEditTaluk = (taluk) => {
     setTalukModalMode('edit');
     setEditingTaluk(taluk);
+    const parentDist = districts.find((d) => d.id === taluk.districtId);
+    const resolvedStateId = taluk.stateId || parentDist?.stateId || selectedStateId || currentState.id;
     setTalukFormData({
       name: taluk.name,
-      stateId: taluk.stateId,
+      stateId: resolvedStateId,
       districtId: taluk.districtId,
       status: taluk.status
     });
@@ -428,7 +476,11 @@ export default function LocationSetup() {
 
     if (!trimmedName) {
       errors.name = 'Taluk name is required';
-    } else if (!talukFormData.districtId) {
+    }
+    if (!talukFormData.stateId) {
+      errors.stateId = 'Please select a state';
+    }
+    if (!talukFormData.districtId) {
       errors.districtId = 'Please select a parent district';
     }
 
@@ -437,20 +489,20 @@ export default function LocationSetup() {
       return;
     }
 
-    const targetDist = districts.find((d) => d.id === talukFormData.districtId);
+    const distId = toId(talukFormData.districtId);
 
     try {
       if (talukModalMode === 'add') {
         await api.post('/masters/taluks', {
           name_en: trimmedName,
-          district_id: targetDist.id,
+          district_id: distId,
           status: talukFormData.status === 'Active'
         });
         showToast(`Taluk "${trimmedName}" created successfully.`);
       } else {
         await api.put(`/masters/taluks/${editingTaluk.id}`, {
           name_en: trimmedName,
-          district_id: targetDist.id,
+          district_id: distId,
           status: talukFormData.status === 'Active'
         });
         showToast(`Taluk "${trimmedName}" updated successfully.`);
@@ -473,12 +525,12 @@ export default function LocationSetup() {
 
   // Filtered districts for Add/Edit PIN modal based on selected state
   const activeDistrictsForModal = useMemo(() => {
-    return modalDistricts.filter((d) => postalModalMode === 'edit' || d.status);
+    return modalDistricts.filter((d) => postalModalMode === 'edit' || d.status === 'Active');
   }, [modalDistricts, postalModalMode]);
 
   // Filtered taluks for Add/Edit PIN modal based on selected district
   const activeTaluksForModal = useMemo(() => {
-    return modalTaluks.filter((t) => postalModalMode === 'edit' || t.status);
+    return modalTaluks.filter((t) => postalModalMode === 'edit' || t.status === 'Active');
   }, [modalTaluks, postalModalMode]);
 
   // Available districts for Postal Directory filter dropdown
@@ -512,7 +564,10 @@ export default function LocationSetup() {
   const handleOpenAddPostal = () => {
     setPostalModalMode('add');
     setEditingPostal(null);
-    const activeState = states.find((s) => s.status === 'Active') || states[0];
+    const activeState =
+      states.find((s) => s.id === selectedStateId && s.status === 'Active') ||
+      states.find((s) => s.status === 'Active') ||
+      states[0];
 
     setPostalFormData({
       postalCode: '',
@@ -570,9 +625,9 @@ export default function LocationSetup() {
         await api.post('/masters/postal-codes', {
           pincode: cleanPin,
           post_office_name: cleanArea,
-          state_id: postalFormData.stateId,
-          district_id: postalFormData.districtId,
-          taluk_id: postalFormData.talukId,
+          state_id: toId(postalFormData.stateId),
+          district_id: toId(postalFormData.districtId),
+          taluk_id: toId(postalFormData.talukId),
           status: postalFormData.status === 'Active'
         });
         showToast(`PIN Code ${cleanPin} (${cleanArea}) added successfully.`);
@@ -580,9 +635,9 @@ export default function LocationSetup() {
         await api.put(`/masters/postal-codes/${editingPostal.id}`, {
           pincode: cleanPin,
           post_office_name: cleanArea,
-          state_id: postalFormData.stateId,
-          district_id: postalFormData.districtId,
-          taluk_id: postalFormData.talukId,
+          state_id: toId(postalFormData.stateId),
+          district_id: toId(postalFormData.districtId),
+          taluk_id: toId(postalFormData.talukId),
           status: postalFormData.status === 'Active'
         });
         showToast(`PIN Code ${cleanPin} updated successfully.`);
@@ -1894,21 +1949,34 @@ export default function LocationSetup() {
                 value={talukFormData.stateId}
                 onChange={(e) => {
                   const newStateId = toId(e.target.value);
-                  const matchDists = districts.filter((d) => d.stateId === newStateId);
-                  setTalukFormData({
-                    ...talukFormData,
+                  setTalukFormData((prev) => ({
+                    ...prev,
                     stateId: newStateId,
-                    districtId: matchDists[0] ? matchDists[0].id : ''
-                  });
+                    districtId: ''
+                  }));
+                  if (talukFormErrors.stateId) {
+                    setTalukFormErrors((prev) => ({ ...prev, stateId: null }));
+                  }
                 }}
-                className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
+                className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-medium text-[#180200] focus:outline-none transition-colors ${
+                  talukFormErrors.stateId
+                    ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
+                    : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                }`}
               >
+                <option value="">-- Select State --</option>
                 {states.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
                   </option>
                 ))}
               </select>
+              {talukFormErrors.stateId && (
+                <p className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {talukFormErrors.stateId}
+                </p>
+              )}
             </div>
 
             <div>
@@ -1918,25 +1986,24 @@ export default function LocationSetup() {
               <select
                 value={talukFormData.districtId}
                 onChange={(e) => {
-                  setTalukFormData({ ...talukFormData, districtId: toId(e.target.value) });
+                  setTalukFormData((prev) => ({ ...prev, districtId: toId(e.target.value) }));
                   if (talukFormErrors.districtId) {
-                    setTalukFormErrors({ ...talukFormErrors, districtId: null });
+                    setTalukFormErrors((prev) => ({ ...prev, districtId: null }));
                   }
                 }}
-                className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-medium text-[#180200] focus:outline-none transition-colors ${
+                disabled={!talukFormData.stateId}
+                className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-medium text-[#180200] focus:outline-none transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed ${
                   talukFormErrors.districtId
                     ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
                     : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
                 }`}
               >
                 <option value="">-- Select District --</option>
-                {districts
-                  .filter((d) => d.stateId === talukFormData.stateId)
-                  .map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} ({d.status})
-                    </option>
-                  ))}
+                {talukModalDistricts.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name || d.name_en} {d.status === 'Inactive' ? '(Inactive)' : ''}
+                  </option>
+                ))}
               </select>
               {talukFormErrors.districtId && (
                 <p className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">
@@ -2109,23 +2176,23 @@ export default function LocationSetup() {
                   value={postalFormData.stateId}
                   onChange={(e) => {
                     const newStateId = toId(e.target.value);
-                    const newDists = districts.filter(
-                      (d) => d.stateId === newStateId && (postalModalMode === 'edit' || d.status === 'Active')
-                    );
-                    const firstD = newDists[0];
-                    const newTaluks = taluks.filter(
-                      (t) => t.districtId === firstD?.id && (postalModalMode === 'edit' || t.status === 'Active')
-                    );
-
-                    setPostalFormData({
-                      ...postalFormData,
+                    setPostalFormData(prev => ({
+                      ...prev,
                       stateId: newStateId,
-                      districtId: firstD ? firstD.id : '',
-                      talukId: newTaluks[0] ? newTaluks[0].id : ''
-                    });
+                      districtId: '',
+                      talukId: ''
+                    }));
+                    if (postalFormErrors.stateId) {
+                      setPostalFormErrors(prev => ({ ...prev, stateId: null }));
+                    }
                   }}
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
+                  className={`w-full px-3 py-2 text-xs bg-white border rounded-xl text-sm font-medium text-[#180200] focus:outline-none transition-colors ${
+                    postalFormErrors.stateId
+                      ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
+                      : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                  }`}
                 >
+                  <option value="">-- Select State --</option>
                   {states
                     .filter((s) => postalModalMode === 'edit' || s.status === 'Active')
                     .map((s) => (
@@ -2134,6 +2201,12 @@ export default function LocationSetup() {
                       </option>
                     ))}
                 </select>
+                {postalFormErrors.stateId && (
+                  <p className="text-xs text-red-600 mt-1 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    {postalFormErrors.stateId}
+                  </p>
+                )}
               </div>
 
               {/* 2. District (Dependent on State) */}
@@ -2145,20 +2218,17 @@ export default function LocationSetup() {
                   value={postalFormData.districtId}
                   onChange={(e) => {
                     const newDistId = toId(e.target.value);
-                    const newTaluks = taluks.filter(
-                      (t) => t.districtId === newDistId && (postalModalMode === 'edit' || t.status === 'Active')
-                    );
-
-                    setPostalFormData({
-                      ...postalFormData,
+                    setPostalFormData(prev => ({
+                      ...prev,
                       districtId: newDistId,
-                      talukId: newTaluks[0] ? newTaluks[0].id : ''
-                    });
+                      talukId: ''
+                    }));
                     if (postalFormErrors.districtId) {
-                      setPostalFormErrors({ ...postalFormErrors, districtId: null });
+                      setPostalFormErrors(prev => ({ ...prev, districtId: null }));
                     }
                   }}
-                  className={`w-full px-3 py-2 text-xs bg-white border rounded-xl text-sm font-medium text-[#180200] focus:outline-none transition-colors ${
+                  disabled={!postalFormData.stateId}
+                  className={`w-full px-3 py-2 text-xs bg-white border rounded-xl text-sm font-medium text-[#180200] focus:outline-none transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed ${
                     postalFormErrors.districtId
                       ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
                       : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -2167,7 +2237,7 @@ export default function LocationSetup() {
                   <option value="">-- Select District --</option>
                   {activeDistrictsForModal.map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.name}
+                      {d.name || d.name_en} {d.status === 'Inactive' ? '(Inactive)' : ''}
                     </option>
                   ))}
                 </select>
@@ -2187,12 +2257,17 @@ export default function LocationSetup() {
                 <select
                   value={postalFormData.talukId}
                   onChange={(e) => {
-                    setPostalFormData({ ...postalFormData, talukId: toId(e.target.value) });
+                    const newTalukId = toId(e.target.value);
+                    setPostalFormData(prev => ({
+                      ...prev,
+                      talukId: newTalukId
+                    }));
                     if (postalFormErrors.talukId) {
-                      setPostalFormErrors({ ...postalFormErrors, talukId: null });
+                      setPostalFormErrors(prev => ({ ...prev, talukId: null }));
                     }
                   }}
-                  className={`w-full px-3 py-2 text-xs bg-white border rounded-xl text-sm font-medium text-[#180200] focus:outline-none transition-colors ${
+                  disabled={!postalFormData.districtId}
+                  className={`w-full px-3 py-2 text-xs bg-white border rounded-xl text-sm font-medium text-[#180200] focus:outline-none transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed ${
                     postalFormErrors.talukId
                       ? 'border-red-500 ring-1 ring-red-500/30 bg-red-50/20'
                       : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -2201,7 +2276,7 @@ export default function LocationSetup() {
                   <option value="">-- Select Taluk --</option>
                   {activeTaluksForModal.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name}
+                      {t.name || t.name_en} {t.status === 'Inactive' ? '(Inactive)' : ''}
                     </option>
                   ))}
                 </select>

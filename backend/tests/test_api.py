@@ -125,23 +125,77 @@ def test_module_crud_lifecycle(client, admin_headers):
     )
     assert upd.status_code == 200 and upd.json()["name_en"] == "Renamed Module"
 
+    # the read/write/delete trio is created and linked at module birth
     got = client.get(f"/api/v1/users/modules/{module['id']}", headers=admin_headers)
-    assert got.status_code == 200 and got.json()["permission_count"] == 0
+    assert got.status_code == 200 and got.json()["permission_count"] == 3
+    perms = client.get("/api/v1/users/permissions", headers=admin_headers,
+                       params={"limit": 500}).json()["data"]
+    trio_codes = {p["code"] for p in perms if p["module_id"] == module["id"]}
+    assert trio_codes == {f"custom_test_module.{a}" for a in ("read", "write", "delete")}
 
-    # in-use guard: the "members" module (seeded, has permissions) can't be deleted
+    # in-use guard: 'members' has submodules, so deletion is refused (400); a
+    # module whose privileges are granted to roles is refused with 409 instead.
     members_module = next(
         m for m in client.get("/api/v1/users/modules", headers=admin_headers).json()["data"]
         if m["code"] == "members"
     )
     blocked = client.delete(f"/api/v1/users/modules/{members_module['id']}", headers=admin_headers)
-    assert blocked.status_code == 409
+    assert blocked.status_code == 400
 
     # unused custom module deletes fine
     assert client.delete(f"/api/v1/users/modules/{module['id']}", headers=admin_headers).status_code == 200
     assert client.get(f"/api/v1/users/modules/{module['id']}", headers=admin_headers).status_code == 404
 
 
-# ─────────────── generic approval engine ───────────────
+def test_module_auto_privilege_checkboxes(client, admin_headers):
+    """auto_privileges: only the ticked read/write/delete actions are created
+    and linked; the edit form can tick/un-tick later (granted ones resist)."""
+    r = client.post(
+        "/api/v1/users/modules", headers=admin_headers,
+        json={"code": "checkbox_module", "name_en": "Checkbox Module", "auto_privileges": ["read", "write"]},
+    )
+    assert r.status_code == 200, r.text
+    mid = r.json()["id"]
+    listing = client.get("/api/v1/users/modules", headers=admin_headers).json()["data"]
+    row = next(m for m in listing if m["id"] == mid)
+    assert row["permission_count"] == 2
+    assert set(row["privileges"]) == {"checkbox_module.read", "checkbox_module.write"}
+    assert r.json()["permission_code"] == "checkbox_module.read"
+
+    # an empty selection creates and links nothing
+    none_ = client.post(
+        "/api/v1/users/modules", headers=admin_headers,
+        json={"code": "checkbox_none", "name_en": "No Privileges", "auto_privileges": []},
+    )
+    assert none_.status_code == 200 and none_.json()["permission_code"] is None
+    assert next(m for m in client.get("/api/v1/users/modules", headers=admin_headers).json()["data"]
+                if m["id"] == none_.json()["id"])["permission_count"] == 0
+
+    # unknown actions are refused
+    unknown = client.post(
+        "/api/v1/users/modules", headers=admin_headers,
+        json={"code": "checkbox_bad", "name_en": "Bad", "auto_privileges": ["edit"]},
+    )
+    assert unknown.status_code == 400
+
+    # edit form: ticking delete adds it (PUT returns the Module schema, so
+    # the count is re-read from the detail endpoint afterwards)
+    r = client.put(f"/api/v1/users/modules/{mid}", headers=admin_headers, json={"auto_privileges": ["read", "write", "delete"]})
+    assert r.status_code == 200, r.text
+    assert client.get(f"/api/v1/users/modules/{mid}", headers=admin_headers).json()["permission_count"] == 3
+
+    # a privilege granted to a role resists unticking
+    _, box_role_id, _ = _staff_with_role(client, admin_headers, "box_user", "Box User", "BOX_USER",
+                     permission_grants=[("checkbox_module.write", False)])
+    blocked = client.put(f"/api/v1/users/modules/{mid}", headers=admin_headers, json={"auto_privileges": ["read", "delete"]})
+    assert blocked.status_code == 409
+    # after the grant is stripped, unticking succeeds
+    assert client.put(f"/api/v1/users/roles/{box_role_id}/permissions", headers=admin_headers,
+                      json={"permission_codes": []}).status_code == 200
+    stripped = client.put(f"/api/v1/users/modules/{mid}", headers=admin_headers, json={"auto_privileges": ["read", "delete"]})
+    assert stripped.status_code == 200, stripped.text
+    assert client.get(f"/api/v1/users/modules/{mid}", headers=admin_headers).json()["permission_count"] == 2
+
 
 def test_generic_approval_engine_create_update_delete(client, admin_headers):
     """End-to-end: a gated create/update/delete on masters.states doesn't
@@ -2078,7 +2132,9 @@ def test_menu_and_privilege_tree_come_from_module_table(client, admin_headers):
     mid = created.json()["id"]
     assert "inventory_demo" in {m["code"] for m in client.get("/api/v1/users/modules/menu", headers=admin_headers).json()}
     tree = client.get("/api/v1/users/modules/privilege-tree", headers=admin_headers).json()
-    assert "inventory_demo" not in {m["code"] for m in tree}  # nothing linked yet
+    demo_tree = next(m for m in tree if m["code"] == "inventory_demo")
+    # its read/write/delete privileges were auto-created and linked at birth
+    assert {p["code"] for p in demo_tree["privileges"]} == {"inventory_demo.read", "inventory_demo.write", "inventory_demo.delete"}
 
     perm = next(p for p in client.get("/api/v1/users/permissions", headers=admin_headers, params={"limit": 500}).json()["data"] if p["code"] == "events.delete")
     orig_id = perm["module_id"]
@@ -2089,6 +2145,10 @@ def test_menu_and_privilege_tree_come_from_module_table(client, admin_headers):
     # put it back and drop the demo module
     assert client.post(f"/api/v1/users/modules/{orig_id}/link-privileges", headers=admin_headers, json=[perm["id"]]).status_code == 200
     assert client.delete(f"/api/v1/users/modules/{mid}", headers=admin_headers).status_code == 200
+
+    # events.delete was linked back after the module cascade, so it's live again
+    perm = next(p for p in client.get("/api/v1/users/permissions", headers=admin_headers, params={"limit": 500}).json()["data"] if p["code"] == "events.delete")
+    assert perm["module_id"] == orig_id
 
 
 def test_security_stamp_invalidates_sessions(client, admin_headers):

@@ -143,7 +143,9 @@ class ModuleBase(BaseModel):
 
 
 class ModuleCreate(ModuleBase):
-    pass
+    # Which privileges to auto-create and link at birth. None = the full
+    # read/write/delete trio; a subset (or []) limits what is created.
+    auto_privileges: Optional[List[str]] = None
 
 
 class ModuleUpdate(BaseModel):
@@ -159,6 +161,9 @@ class ModuleUpdate(BaseModel):
     min_rank_level: Optional[int] = None
     permission_code: Optional[str] = None
     # code is immutable — permissions reference it as a stable string key.
+    # Sent = sync which of <code>.read/.write/.delete exist and are linked;
+    # omitted = leave the module's privileges untouched.
+    auto_privileges: Optional[List[str]] = None
 
 
 class Module(ModuleBase):
