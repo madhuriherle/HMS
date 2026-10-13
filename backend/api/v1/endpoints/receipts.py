@@ -795,7 +795,7 @@ def receipt_pdf(
         payee.append(f"Member ID: {alloc[1].member_code}")
     org = db.query(OrganisationSettings).first()
     pdf = build_receipt_pdf(receipt, lines, org, payee)
-    safe = receipt.receipt_number.replace("/", "-")
+    safe = (receipt.receipt_number or f"ID-{receipt.id}").replace("/", "-")
     return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="receipt-{safe}.pdf"'})
 
 

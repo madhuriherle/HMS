@@ -36,15 +36,15 @@ def amount_in_words(value) -> str:
 
 
 def _inr(v) -> str:
-    return f"Rs. {float(v):,.2f}"
+    return f"Rs. {float(v or 0):,.2f}"
 
 
 def _period_text(receipt) -> str:
     """'15-03-2027 to 20-03-2027, 06:00 to 08:00' from whichever period fields are filled."""
     d1, d2 = receipt.period_from_date, receipt.period_to_date
     t1, t2 = receipt.period_from_time, receipt.period_to_time
-    fd = lambda d: d.strftime("%d-%m-%Y")
-    ft = lambda t: t.strftime("%H:%M")
+    fd = lambda d: d.strftime("%d-%m-%Y") if hasattr(d, 'strftime') else str(d)
+    ft = lambda t: t.strftime("%H:%M") if hasattr(t, 'strftime') else str(t)
     dates = " to ".join(fd(d) for d in (d1, d2) if d) if d1 != d2 else (fd(d1) if d1 else "")
     times = " to ".join(ft(t) for t in (t1, t2) if t)
     return ", ".join(x for x in (dates, times) if x)
@@ -54,7 +54,8 @@ def build_receipt_pdf(receipt, lines, org, payee_lines) -> bytes:
     buf = io.BytesIO()
     w, h = landscape(A5)
     c = canvas.Canvas(buf, pagesize=(w, h))
-    c.setTitle(f"Receipt {receipt.receipt_number}")
+    num_str = receipt.receipt_number or f"ID-{receipt.id}"
+    c.setTitle(f"Receipt {num_str}")
     maroon = colors.HexColor("#510601")
     margin = 28
 
@@ -86,8 +87,9 @@ def build_receipt_pdf(receipt, lines, org, payee_lines) -> bytes:
     y = h - 90
     c.setFont("Helvetica-Bold", 10)
     c.setFillColor(maroon)
-    c.drawString(margin, y, f"Receipt No: {receipt.receipt_number}")
-    c.drawRightString(w - margin, y, f"Date: {receipt.receipt_date.strftime('%d-%m-%Y')}")
+    c.drawString(margin, y, f"Receipt No: {num_str}")
+    date_str = receipt.receipt_date.strftime("%d-%m-%Y") if hasattr(receipt.receipt_date, "strftime") else (str(receipt.receipt_date) if receipt.receipt_date else "-")
+    c.drawRightString(w - margin, y, f"Date: {date_str}")
     c.setFillColor(colors.black)
     c.setFont("Helvetica", 9)
     y -= 15
@@ -109,26 +111,26 @@ def build_receipt_pdf(receipt, lines, org, payee_lines) -> bytes:
     c.setFont("Helvetica", 9)
     for i, ln in enumerate(lines, start=1):
         y -= 14
-        label = ln["particular"]
-        if ln.get("description") and ln["description"] != ln["particular"]:
+        label = ln.get("particular") or "Particular"
+        if ln.get("description") and ln["description"] != ln.get("particular"):
             label += f" - {ln['description']}"
         c.drawString(margin + 4, y, str(i))
         c.drawString(margin + 28, y, label[:70])
-        c.drawRightString(w - margin - 4, y, _inr(ln["amount"]))
+        c.drawRightString(w - margin - 4, y, _inr(ln.get("amount", 0)))
     y -= 8
     c.line(margin, y, w - margin, y)
     y -= 14
     c.setFont("Helvetica-Bold", 10)
     c.drawString(margin + 28, y, "Total")
-    c.drawRightString(w - margin - 4, y, _inr(receipt.net_amount))
+    c.drawRightString(w - margin - 4, y, _inr(receipt.net_amount or 0))
     y -= 14
     c.setFont("Helvetica-Oblique", 8.5)
-    c.drawString(margin, y, amount_in_words(receipt.net_amount))
+    c.drawString(margin, y, amount_in_words(receipt.net_amount or 0))
 
     # payment
     y -= 16
     c.setFont("Helvetica", 9)
-    pay = f"Paid by: {receipt.payment_mode}"
+    pay = f"Paid by: {receipt.payment_mode or '-'}"
     if receipt.bank_account:
         pay += f" ({receipt.bank_account})"
     if receipt.transaction_reference:

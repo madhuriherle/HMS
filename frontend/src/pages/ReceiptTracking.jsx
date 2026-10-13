@@ -231,11 +231,38 @@ export default function ReceiptTracking() {
   // PRINT, EXPORT, DAY BOOK, BULK MAP
   // ----------------------------------------------------
   const openReceiptPdf = async (receipt) => {
+    if (!receipt?.id) return;
+    const newWindow = window.open('', '_blank');
     try {
       const { data } = await api.get(`/receipts/${receipt.id}/pdf`, { responseType: 'blob' });
-      window.open(URL.createObjectURL(data), '_blank');
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const fileUrl = URL.createObjectURL(blob);
+      if (newWindow) {
+        newWindow.location.href = fileUrl;
+      } else {
+        const a = document.createElement('a');
+        a.href = fileUrl;
+        a.target = '_blank';
+        a.download = `receipt-${String(receipt.receiptNumber || receipt.id).replace(/\//g, '-')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
     } catch (error) {
-      showToast(apiErrorMessage(error, 'Could not open the receipt PDF.'), 'error');
+      if (newWindow) newWindow.close();
+      let msg = 'Could not open the receipt PDF.';
+      if (error?.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text);
+          if (parsed?.detail) {
+            msg = typeof parsed.detail === 'string' ? parsed.detail : JSON.stringify(parsed.detail);
+          }
+        } catch (_) {}
+      } else if (error?.response?.data?.detail) {
+        msg = typeof error.response.data.detail === 'string' ? error.response.data.detail : JSON.stringify(error.response.data.detail);
+      }
+      showToast(msg, 'error');
     }
   };
 
@@ -1137,7 +1164,15 @@ export default function ReceiptTracking() {
 
             {/* Read-only footer */}
             <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
-              <div />
+              <button
+                type="button"
+                onClick={() => openReceiptPdf(viewingReceipt)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#510601] hover:bg-[#6b0801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                title="Print / download the receipt PDF"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Receipt</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setViewingReceipt(null)}

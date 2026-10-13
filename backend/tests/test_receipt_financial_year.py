@@ -96,6 +96,26 @@ def test_pdf_day_book_and_duplicate_check(client, admin_headers):
     none = client.get(f"{API}/receipts/duplicate-check", headers=h, params={"payer_name": "Pdf Payer", "net_amount": 731, "date": "2018-05-05"}).json()
     assert none["matches"] == []
 
-    from services.receipt_pdf import amount_in_words
+    from services.receipt_pdf import amount_in_words, build_receipt_pdf
     assert amount_in_words(8230) == "Eight Thousand Two Hundred and Thirty Rupees Only"
     assert amount_in_words(100000) == "One Lakh Rupees Only"
+
+    # Test PDF generation directly with sparse / cancelled receipt
+    class DummyReceipt:
+        id = 99
+        receipt_number = "2026-27/0099"
+        receipt_date = None
+        payer_name = None
+        receipt_status = "CANCELLED"
+        payment_status = "CANCELLED"
+        net_amount = 0
+        payment_mode = None
+        bank_account = None
+        transaction_reference = None
+        period_from_date = None
+        period_to_date = None
+        period_from_time = None
+        period_to_time = None
+
+    pdf_sparse = build_receipt_pdf(DummyReceipt(), [], None, [])
+    assert pdf_sparse[:5] == b"%PDF-"

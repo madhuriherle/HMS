@@ -983,7 +983,8 @@ export default function ReceiptEntry() {
         if (saveMode.current === 'print' && data?.id) {
           try {
             const pdf = await api.get(`/receipts/${data.id}/pdf`, { responseType: 'blob' });
-            window.open(URL.createObjectURL(pdf.data), '_blank');
+            const blob = new Blob([pdf.data], { type: 'application/pdf' });
+            window.open(URL.createObjectURL(blob), '_blank');
           } catch (_) {
             showToast('Saved, but the receipt PDF could not be opened.', 'error');
           }
