@@ -1693,7 +1693,7 @@ export default function ReceiptEntry() {
 
                 {/* Row 4: Particulars (with sub-type), Amount & Add Item */}
                 <div className="space-y-2.5">
-                  <div className="grid grid-cols-12 gap-3 items-end">
+                  <div className="relative grid grid-cols-12 gap-3 items-end">
                     {/* Particulars + Sub-Type in one picker */}
                     <div className={`col-span-12 ${showDescription ? 'sm:col-span-4' : 'sm:col-span-6'}`}>
                       <label className="block text-xs font-bold text-[#180200] mb-1">
@@ -1704,6 +1704,7 @@ export default function ReceiptEntry() {
                         particular={formData.particulars}
                         subType={formData.donationSubType}
                         onChange={handleParticularsChange}
+                        spread
                         hasError={Boolean(formErrors.particulars || formErrors.donationSubType)}
                       />
                       {(formErrors.particulars || formErrors.donationSubType) && (
@@ -1787,13 +1788,14 @@ export default function ReceiptEntry() {
                         const subs = activeSubTypesOf(l.particular);
                         const needsDescription = isOthersName(l.particular) && subs.length === 0;
                         return (
-                          <div key={l.key} className="grid grid-cols-12 gap-3 items-end">
+                          <div key={l.key} className="relative grid grid-cols-12 gap-3 items-end">
                             <div className={`col-span-12 ${needsDescription ? 'sm:col-span-4' : 'sm:col-span-6'}`}>
                               <label className="block text-xs font-bold text-[#180200] mb-1">Particulars</label>
                               <ParticularPicker
                                 particulars={activeParticulars}
                                 particular={l.particular}
                                 subType={l.subType}
+                                spread
                                 onChange={({ particular, subType }) =>
                                   updateExtraLine(l.key, { particular, subType, description: particular === l.particular ? l.description : '' })
                                 }

@@ -7,9 +7,10 @@ const activeSubs = (p) => (p?.subTypes || []).filter((st) => (st.status || 'Acti
  * One field for "Particular" and its "Sub-Type".
  * One list: a particular without sub-types is chosen with one click; a particular with sub-types
  * opens in place and its sub-types are listed indented beneath it. Search looks in both.
- * `onChange({ particular, subType })`.
+ * `onChange({ particular, subType })`. With `spread` the list is as wide as the whole row it sits in
+ * (the parent row must be `relative`), instead of only as wide as the field.
  */
-export default function ParticularPicker({ particulars, particular, subType, onChange, hasError = false, placeholder = 'Select particular' }) {
+export default function ParticularPicker({ particulars, particular, subType, onChange, hasError = false, placeholder = 'Select particular', spread = false }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState('');
@@ -67,7 +68,7 @@ export default function ParticularPicker({ particulars, particular, subType, onC
   const incomplete = particular && needsSub && !subType;
 
   return (
-    <div className="relative" ref={box}>
+    <div className={spread ? '' : 'relative'} ref={box}>
       <button
         type="button"
         onClick={() => (open ? setOpen(false) : openBox())}
@@ -84,7 +85,7 @@ export default function ParticularPicker({ particulars, particular, subType, onC
 
       {open && (
         <div
-          className={`absolute z-40 w-full min-w-[280px] bg-white border border-[#E8DFD8] rounded-xl shadow-lg overflow-hidden ${
+          className={`absolute z-40 ${spread ? 'left-0 right-0' : 'w-full min-w-[280px]'} bg-white border border-[#E8DFD8] rounded-xl shadow-lg overflow-hidden ${
             upward ? 'bottom-full mb-1' : 'top-full mt-1'
           }`}
         >

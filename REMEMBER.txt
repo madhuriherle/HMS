@@ -293,6 +293,11 @@ RULE 13: PERMISSIONS AND ACCESS
      - A page with BOTH an empty rank gate AND no privilege is shown to every signed-in
        user. Always set at least one of the two.
 
+13.10 WHO YOU CAN SEE IN USER MANAGEMENT: only users whose role is your own rank or weaker.
+      A stronger rank is never listed and never opened (a rank 2 Admin does not see the
+      Super Admin). Opening, editing or deleting a stronger user is refused by the server
+      too (403). A rank 1 user sees everyone.
+
 --------------------------------------------------------------------------------
 RULE 14: SETTINGS AND ADMIN TOOLS
 --------------------------------------------------------------------------------

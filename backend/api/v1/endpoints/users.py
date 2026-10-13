@@ -63,8 +63,9 @@ def read_users(
     status: Optional[bool] = None,
     role_id: Optional[int] = None,
 ) -> Any:
-    """Every staff account is listed (members are not), Super Admin included. Changing one still needs a
-    a rank at least as strong as theirs (see can_manage_rank), so the row actions are locked for stronger users."""
+    """Staff accounts whose role is the same rank as yours or weaker (members are not users). A stronger rank is
+    never listed or opened: a rank 2 Admin does not see the Super Admin; a rank 1 sees everyone."""
+    my_rank = deps.user_rank(db, current_user)
     q = (
         db.query(User)
         .join(Role, Role.id == User.role_id)
@@ -72,6 +73,7 @@ def read_users(
             User.is_deleted == False,
             User.user_type != "MEMBER",
             Role.code != "MEMBER",
+            Role.rank_level >= my_rank,
         )  # noqa: E712
     )
     if search:
