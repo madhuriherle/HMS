@@ -883,11 +883,21 @@ export default function BankDetailsManagement() {
             ['Shown on receipt as', formatPaymentModeLabel(viewingItem)],
           ];
           return (
-            <div className="bg-white rounded-2xl shadow-xl border border-[#E8DFD8] w-full max-w-sm p-5 animate-in zoom-in-95 duration-200">
-              <h3 className="text-base font-bold text-[#180200] mb-3">Payment mode details</h3>
-              <dl className="divide-y divide-[#F0E8E2] text-sm">
+            <div className="bg-white rounded-2xl shadow-xl border border-[#E8DFD8] w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+              <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
+                <h3 className="text-lg font-bold text-[#180200] font-serif">Payment Mode Details</h3>
+                <button
+                  type="button"
+                  onClick={() => setViewingItem(null)}
+                  className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <dl className="divide-y divide-[#F0E8E2] text-sm px-6 py-2">
                 {rows.map(([label, value]) => (
-                  <div key={label} className="flex items-baseline justify-between gap-4 py-2">
+                  <div key={label} className="flex items-baseline justify-between gap-4 py-2.5">
                     <dt className="text-xs text-[#863221] shrink-0">{label}</dt>
                     <dd className="font-semibold text-[#180200] text-right break-all">{value}</dd>
                   </div>

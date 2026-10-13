@@ -1060,17 +1060,18 @@ export default function ReceiptTracking() {
       {/* ============================================================ */}
       <Modal isOpen={Boolean(dayBook)} onClose={() => setDayBook(null)}>
         {dayBook && (
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-base font-bold text-[#180200]">Day Book</h3>
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between gap-3">
+              <h3 className="text-lg font-bold text-[#180200] font-serif">Day Book</h3>
               <input
                 type="date"
                 value={dayBook.date}
                 onChange={(e) => e.target.value && loadDayBook(e.target.value)}
-                className="px-3 py-1.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]"
+                className="px-3 py-1.5 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]"
               />
             </div>
-            <div className="mt-4 flex items-baseline justify-between">
+            <div className="p-6">
+            <div className="flex items-baseline justify-between">
               <span className="text-xs text-[#863221]">{dayBook.data.receipt_count} receipt(s)</span>
               <span className="text-2xl font-bold font-mono text-[#510601]">{formatMoney(dayBook.data.total)}</span>
             </div>
@@ -1096,7 +1097,8 @@ export default function ReceiptTracking() {
                 ))}
               </div>
             </div>
-            <ModalFooter kind="view" onCancel={() => setDayBook(null)} inForm />
+            </div>
+            <ModalFooter kind="view" onCancel={() => setDayBook(null)} />
           </div>
         )}
       </Modal>

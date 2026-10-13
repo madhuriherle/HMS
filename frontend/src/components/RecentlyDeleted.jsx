@@ -56,9 +56,11 @@ export default function RecentlyDeleted({ kind, label = 'items', onRestored, dis
 
       <Modal isOpen={open} onClose={() => setOpen(false)}>
         {open && (
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-bold text-[#180200]">Recently deleted {label}</h3>
-            <div className="mt-4 max-h-80 overflow-y-auto divide-y divide-[#E8DFD8]/70">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between gap-3">
+              <h3 className="text-lg font-bold text-[#180200] font-serif">Recently Deleted {label}</h3>
+            </div>
+            <div className="p-6 max-h-80 overflow-y-auto divide-y divide-[#E8DFD8]/70">
               {loading && <p className="py-4 text-xs text-[#863221]">Loading…</p>}
               {!loading && rows.length === 0 && <p className="py-4 text-xs text-[#863221]">Nothing has been deleted.</p>}
               {rows.map((r) => (
@@ -81,7 +83,7 @@ export default function RecentlyDeleted({ kind, label = 'items', onRestored, dis
                 </div>
               ))}
             </div>
-            <ModalFooter kind="view" onCancel={() => setOpen(false)} inForm />
+            <ModalFooter kind="view" onCancel={() => setOpen(false)} />
           </div>
         )}
       </Modal>
