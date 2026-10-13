@@ -169,32 +169,36 @@ function CreditBanner({ credit }) {
 
 // ── tabs ──
 
-// ── Overview: one profile sheet (no boxes inside it) ──
-function SheetSection({ title, tab, onOpen, children, className = '' }) {
-  return (
-    <section className={`px-5 py-4 ${className}`}>
-      <div className="flex items-center justify-between mb-2.5">
-        <h2 className="text-[11px] font-bold uppercase tracking-widest text-[#863221]">{title}</h2>
-        {tab && (
-          <button type="button" onClick={() => onOpen(tab)} className="text-[11px] font-semibold text-[#510601] hover:underline cursor-pointer">
-            View all →
-          </button>
-        )}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-// label and value on one line; a missing value is a faint dash
-const Row = ({ label, value }) => (
-  <div className="flex gap-3 py-1 text-sm">
-    <span className="w-28 shrink-0 text-xs text-[#863221]">{label}</span>
-    <span className={`min-w-0 break-words ${value ? 'text-[#180200]' : 'text-[#863221]/40'}`}>{value || '—'}</span>
+// ── Overview: key facts up top, tidy details below ──
+const Tile = ({ label, children }) => (
+  <div className="rounded-xl border border-[#E8DFD8] bg-white px-4 py-3 min-w-0">
+    <div className="text-[10px] uppercase font-bold tracking-wider text-[#863221]">{label}</div>
+    <div className="mt-1">{children}</div>
   </div>
 );
 
-function OverviewTab({ id, onOpen }) {
+const SectionTitle = ({ icon: Icon, children }) => (
+  <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#510601] mb-3">
+    <Icon className="w-4 h-4 text-[#863221]" />
+    {children}
+  </h2>
+);
+
+// a small label over a bold value; an empty value is not drawn at all
+const Item = ({ label, children }) =>
+  children ? (
+    <div className="min-w-0">
+      <div className="text-[10px] uppercase font-bold tracking-wider text-[#863221]/80">{label}</div>
+      <div className="mt-0.5 text-sm font-semibold text-[#180200] break-words">{children}</div>
+    </div>
+  ) : null;
+
+const NotProvided = ({ labels }) =>
+  labels.length > 0 ? <p className="mt-3 text-[11px] text-[#863221]/60">Not provided: {labels.join(', ')}</p> : null;
+
+const initialOf = (name) => String(name || '?').trim().charAt(0).toUpperCase();
+
+function OverviewTab({ id }) {
   const state = useSection(id, 'overview');
   return (
     <Loading state={state}>
@@ -204,134 +208,169 @@ function OverviewTab({ id, onOpen }) {
         const m = d.membership;
         const f = d.family;
         const credit = m.credit;
-        const hasFamily = f.father_name || f.mother_name || f.spouse_name || f.children_count > 0;
-        const hasMagazine = d.magazine.subscriptions.length > 0 || d.magazine.services.length > 0 || d.magazine.magazine_needed;
         const target = credit?.target_type;
         const pct = target?.price ? Math.min(100, Math.round((credit.credit_total / target.price) * 100)) : 100;
+        const since = m.current?.activated_at || m.current?.applied_at;
+
+        const missing = (pairs) => pairs.filter(([, v]) => !v).map(([l]) => l);
+        const personal = [
+          ['Date of birth', b.date_of_birth ? formatDate(b.date_of_birth) : ''],
+          ['Gotra', b.gotra],
+          ['Qualification', b.qualification],
+          ['Occupation', b.occupation],
+          ['Native place', b.native_place]
+        ];
+        const contact = [
+          ['Mobile', phone(c.mobile_country_code, c.mobile)],
+          ['WhatsApp', phone(c.whatsapp_country_code, c.whatsapp_number)],
+          ['Email', c.email],
+          ['Address', c.address]
+        ];
+        const relatives = [
+          ['Father', f.father_name, f.father_membership_number],
+          ['Mother', f.mother_name, f.mother_membership_number],
+          ['Spouse', f.spouse_name, f.spouse_membership_number]
+        ].filter(([, name]) => name);
+        const hasMagazine = d.magazine.magazine_needed || d.magazine.subscriptions.length > 0 || d.magazine.services.length > 0;
+
         return (
-          <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm divide-y divide-[#E8DFD8]">
-            {/* Membership strip */}
-            <SheetSection title="Membership" tab="membership" onOpen={onOpen}>
-              {!m.current ? (
-                <Empty>No membership yet.</Empty>
-              ) : (
-                <>
-                  <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-                    <span className="text-lg font-bold text-[#180200]">
-                      {m.current.type_name_en}
-                      <span className="ml-2 text-xs font-semibold text-emerald-700">{m.current.status}</span>
-                    </span>
-                    <span className="text-xs text-[#863221]">
-                      No. <span className="font-mono text-[#180200]">{m.current.membership_number || 'given on approval'}</span>
-                    </span>
-                    {m.current.expires_at && (
-                      <span className="text-xs text-[#863221]">Valid till {formatDate(m.current.expires_at)}</span>
-                    )}
-                    {credit && <span className="text-xs text-[#863221]">Credit <b className="font-mono text-[#180200]">{inr(credit.credit_total)}</b></span>}
+          <div className="space-y-5">
+            {/* Key facts */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <Tile label="Membership">
+                {m.current ? (
+                  <>
+                    <div className="text-sm font-bold text-[#180200] truncate">{m.current.type_name_en}</div>
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className={`chip ${m.current.status === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>{m.current.status}</span>
+                      <span className="text-[11px] font-mono text-[#863221] truncate">{m.current.membership_number || 'No. on approval'}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-[#863221]/70">No membership yet</div>
+                )}
+              </Tile>
+              <Tile label="Credit">
+                <div className="text-sm font-bold font-mono text-[#180200]">
+                  {inr(credit?.credit_total || 0)}
+                  {target && <span className="font-normal text-[#863221]"> / {inr(target.price)}</span>}
+                </div>
+                <div className="mt-1.5 w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
+                  <div className="bg-[#510601] h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                </div>
+                <div className="mt-1 text-[11px] text-[#863221]">
+                  {target ? `${pct}% to ${target.name_en}` : 'Highest tier reached'}
+                </div>
+              </Tile>
+              <Tile label="Receipts">
+                <div className="text-sm font-bold text-[#180200]">{d.receipts.total}</div>
+                <div className="mt-1 text-[11px] text-[#863221] truncate">
+                  {d.receipts.latest[0]
+                    ? `Last ${d.receipts.latest[0].receipt_number} · ${formatDate(d.receipts.latest[0].receipt_date)}`
+                    : 'None yet'}
+                </div>
+              </Tile>
+              <Tile label="Member since">
+                <div className="text-sm font-bold text-[#180200]">{since ? formatDate(since) : '—'}</div>
+                {m.current?.expires_at && <div className="mt-1 text-[11px] text-[#863221]">Valid till {formatDate(m.current.expires_at)}</div>}
+              </Tile>
+            </div>
+
+            {/* Details | activity */}
+            <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm grid grid-cols-1 lg:grid-cols-3 lg:divide-x divide-[#E8DFD8]">
+              <div className="lg:col-span-2 divide-y divide-[#E8DFD8]">
+                <section className="p-5">
+                  <SectionTitle icon={User}>Personal</SectionTitle>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {b.gender && <span className="chip chip-off">{b.gender}</span>}
+                    {b.blood_group && <span className="chip chip-bad">Blood {b.blood_group}</span>}
                   </div>
-                  {credit && (
-                    <div className="mt-2.5">
-                      <div className="w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
-                        <div className="bg-[#510601] h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
+                    {personal.map(([label, value]) => <Item key={label} label={label}>{value}</Item>)}
+                  </div>
+                  <NotProvided labels={[...missing(personal), ...(b.blood_group ? [] : ['Blood group'])]} />
+                </section>
+
+                <section className="p-5">
+                  <SectionTitle icon={Phone}>Contact &amp; address</SectionTitle>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                    {contact.map(([label, value]) => (
+                      <div key={label} className={label === 'Address' ? 'sm:col-span-2' : ''}>
+                        <Item label={label}>{value}</Item>
                       </div>
-                      <div className="mt-1 text-[11px] text-[#863221]">
-                        {target
-                          ? `${inr(credit.credit_total)} of ${inr(target.price)} to ${target.name_en} (${pct}%) — ${inr(credit.amount_to_target || 0)} to go`
-                          : 'Highest tier reached'}
-                      </div>
+                    ))}
+                  </div>
+                  <NotProvided labels={missing(contact)} />
+                </section>
+
+                <section className="p-5">
+                  <SectionTitle icon={Users}>Family</SectionTitle>
+                  {relatives.length === 0 && f.children_count === 0 ? (
+                    <p className="text-xs text-[#863221]/60">Not provided yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {relatives.map(([relation, name, number]) => (
+                        <div key={relation} className="flex items-center gap-3 min-w-0">
+                          <span className="w-8 h-8 rounded-full bg-[#FAF1EE] text-[#510601] text-xs font-bold flex items-center justify-center shrink-0">
+                            {initialOf(name)}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-[#180200] truncate">{name}</div>
+                            <div className="text-[11px] text-[#863221] truncate">
+                              {relation}
+                              {number ? ` · ${number}` : ''}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {f.children_count > 0 && (
+                        <div className="flex items-center gap-3">
+                          <span className="w-8 h-8 rounded-full bg-[#FAF1EE] text-[#510601] text-xs font-bold flex items-center justify-center shrink-0">
+                            {f.children_count}
+                          </span>
+                          <div className="text-sm font-semibold text-[#180200]">{f.children_count === 1 ? 'Child' : 'Children'}</div>
+                        </div>
+                      )}
                     </div>
                   )}
-                </>
-              )}
-            </SheetSection>
+                </section>
 
-            {/* Personal | Contact */}
-            <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-[#E8DFD8] max-md:divide-y">
-              <SheetSection title="Personal" tab="personal" onOpen={onOpen}>
-                <Row label="Gender" value={b.gender} />
-                <Row label="Born" value={b.date_of_birth ? formatDate(b.date_of_birth) : ''} />
-                <Row label="Blood group" value={b.blood_group} />
-                <Row label="Gotra" value={b.gotra} />
-                <Row label="Qualification" value={b.qualification} />
-                <Row label="Occupation" value={b.occupation} />
-                <Row label="Native place" value={b.native_place} />
-              </SheetSection>
-              <SheetSection title="Contact" tab="contact" onOpen={onOpen}>
-                <Row label="Mobile" value={phone(c.mobile_country_code, c.mobile)} />
-                <Row label="WhatsApp" value={phone(c.whatsapp_country_code, c.whatsapp_number)} />
-                <Row label="Email" value={c.email} />
-                <Row label="Address" value={c.address} />
-              </SheetSection>
-            </div>
-
-            {/* Family | Magazine & services */}
-            <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-[#E8DFD8] max-md:divide-y">
-              <SheetSection title="Family" tab="family" onOpen={onOpen}>
-                {!hasFamily ? (
-                  <p className="text-xs text-[#863221]/60">Not recorded yet.</p>
-                ) : (
-                  <>
-                    <Row label="Father" value={f.father_name} />
-                    <Row label="Mother" value={f.mother_name} />
-                    <Row label="Spouse" value={f.spouse_name} />
-                    <Row label="Children" value={f.children_count > 0 ? String(f.children_count) : ''} />
-                  </>
-                )}
-              </SheetSection>
-              <SheetSection title="Magazine & services" tab="magazine" onOpen={onOpen}>
-                {!hasMagazine ? (
-                  <p className="text-xs text-[#863221]/60">No magazine subscription or services.</p>
-                ) : (
-                  <>
-                    <Row label="Magazine needed" value={d.magazine.magazine_needed} />
-                    {d.magazine.subscriptions.map((st, i) => (
-                      <Row key={`s${i}`} label="Subscription" value={st} />
-                    ))}
-                    {d.magazine.services.map((sv, i) => (
-                      <Row key={`v${i}`} label="Service" value={sv} />
-                    ))}
-                  </>
-                )}
-              </SheetSection>
-            </div>
-
-            {/* Latest receipts */}
-            <SheetSection title={`Latest receipts (${d.receipts.total})`} tab="receipts" onOpen={onOpen}>
-              {d.receipts.latest.length === 0 ? (
-                <p className="text-xs text-[#863221]/60">No receipts mapped to this member.</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-1 text-sm">
-                  {d.receipts.latest.map((r) => (
-                    <div key={r.receipt_id} className="flex items-baseline justify-between gap-3">
-                      <span>
-                        <b className="font-mono">{r.receipt_number}</b>
-                        <span className="ml-2 text-xs text-[#863221]">{formatDate(r.receipt_date)}</span>
-                      </span>
-                      <span className="font-mono font-semibold">{inr(r.allocated_amount)}</span>
+                {hasMagazine && (
+                  <section className="p-5">
+                    <SectionTitle icon={BookOpen}>Magazine &amp; services</SectionTitle>
+                    <div className="flex flex-wrap gap-2">
+                      {d.magazine.magazine_needed && (
+                        <span className={`chip ${String(d.magazine.magazine_needed).toUpperCase() === 'YES' ? 'chip-on' : 'chip-off'}`}>
+                          Magazine: {d.magazine.magazine_needed}
+                        </span>
+                      )}
+                      {d.magazine.subscriptions.map((st, i) => <span key={`s${i}`} className="chip chip-on">Subscription: {st}</span>)}
+                      {d.magazine.services.map((sv, i) => <span key={`v${i}`} className="chip chip-off">{sv}</span>)}
                     </div>
-                  ))}
-                </div>
-              )}
-            </SheetSection>
+                  </section>
+                )}
+              </div>
 
-            {/* Recent activity */}
-            <SheetSection title="Recent activity" tab="activity" onOpen={onOpen}>
-              {d.activity.length === 0 ? (
-                <p className="text-xs text-[#863221]/60">No activity recorded yet.</p>
-              ) : (
-                <ul className="space-y-1 text-sm">
-                  {d.activity.map((e) => (
-                    <li key={e.id} className="flex items-baseline gap-2">
-                      <span className="text-[#510601]">●</span>
-                      <span className="text-[#180200]">{e.description}</span>
-                      <span className="text-xs text-[#863221]">
-                        — {e.acted_by_name || 'System'}, {e.created_at ? formatDateTime(e.created_at) : ''}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </SheetSection>
+              {/* Activity timeline */}
+              <section className="p-5 border-t border-[#E8DFD8] lg:border-t-0">
+                <SectionTitle icon={History}>Recent activity</SectionTitle>
+                {d.activity.length === 0 ? (
+                  <p className="text-xs text-[#863221]/60">No activity recorded yet.</p>
+                ) : (
+                  <ol className="relative border-l border-[#E8DFD8] ml-1.5 space-y-4">
+                    {d.activity.map((e) => (
+                      <li key={e.id} className="ml-4">
+                        <span className="absolute -left-[5px] mt-1.5 w-2.5 h-2.5 rounded-full bg-[#510601] border-2 border-white" />
+                        <div className="text-xs font-semibold text-[#180200]">{e.description}</div>
+                        <div className="text-[11px] text-[#863221]">
+                          {e.acted_by_name || 'System'} · {e.created_at ? formatDateTime(e.created_at) : ''}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+            </div>
           </div>
         );
       }}

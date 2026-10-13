@@ -254,8 +254,8 @@ RULE 13: PERMISSIONS AND ACCESS
      privileges for them. Data Cleanup has privileges (system.cleanup.read / write) but is
      also locked to rank 1 roles.
 13.6 USERS AND ROLES (rank 1 = top, bigger = weaker):
-     - User Management lists every staff account (members are never users), the Super Admin
-       included.
+     - User Management lists staff accounts of your own rank or weaker (members are never
+       users); see rule 13.10. A rank 1 user sees everyone.
      - Changing a user (edit, status, delete) needs the target to be the same rank or weaker.
        This includes rank 1: a Super Admin may create and manage another Super Admin (a
        lower rank never can). Stronger users' rows show locked buttons.
@@ -297,6 +297,16 @@ RULE 13: PERMISSIONS AND ACCESS
       A stronger rank is never listed and never opened (a rank 2 Admin does not see the
       Super Admin). Opening, editing or deleting a stronger user is refused by the server
       too (403). A rank 1 user sees everyone.
+13.11 ROLE DATA IN THE SCREENS: GET /users/roles returns each role with permission_codes
+     (the privilege codes it holds) and is_all_access. A full-access role holds no
+     individual privilege rows, so show "All privileges" / "Every module" for it. Never read
+     a field called `privileges` on a role. The roles list only holds roles you may assign
+     (the Super Admin role is not in it for lower ranks), so a user's role name and rank
+     come from the user row (role_name, role_rank_level), not from a lookup in that list.
+13.12 LOGIN: the username is the login ID (email and mobile do not log in). It must be
+     unique, is shown as the display name in the top bar, and changing it signs the person
+     out. Dates and last login come from created_at / last_login_at (snake_case) as the
+     server sends them.
 
 --------------------------------------------------------------------------------
 RULE 14: SETTINGS AND ADMIN TOOLS
@@ -326,9 +336,12 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
 15.1 Membership does NOT expire: no "renewals due" list, panel, reminder button or count.
 15.2 A membership type has no "Online List" setting (it was never saved or used). Add one
      only if the server enforces it.
-15.3 Particulars and Sub-Type are ONE picker (components/ParticularPicker.jsx): left list
-     of particulars, right list of the highlighted one's sub-types. No separate Sub-Type
-     box. Others with no sub-types asks for a description beside the amount.
+15.3 Particulars and Sub-Type are ONE picker (components/ParticularPicker.jsx): a single
+     list; a particular with sub-types opens in place with its sub-types indented beneath it;
+     one with none is chosen with one click. On Receipt Entry it opens across the whole row
+     (spread, the row is relative), names wrap and are never cut with "...". No separate
+     Sub-Type box and no side pane. Others with no sub-types asks for a description beside
+     the amount.
 15.4 Editing a receipt uses the Receipt Entry screen (/dashboard/receipts/edit/:id), not a
      separate popup. Receipt Tracking has no Print buttons.
 15.5 The Membership List panel on Receipt Entry is one compact line per member:

@@ -1845,6 +1845,10 @@ def test_membership_type_price_history_flow(client, admin_headers):
         f"/api/v1/masters/membership-types/{mt_id}/prices", headers=admin_headers
     )
     assert history_after.json()["total"] == 2  # still two rows, no duplicate
+    # the correction keeps a trail of what the price was, and the list says how many rows the history has
+    assert "(was " in same_day.json()["change_reason"] and "typo fix" in same_day.json()["change_reason"]
+    again = client.get("/api/v1/masters/membership-types", headers=admin_headers, params={"search": "Pricey"}).json()
+    assert [t for t in again["data"] if t["id"] == mt_id][0]["price_count"] == 2
 
     # price correction on a closed row works
     fix = client.put(

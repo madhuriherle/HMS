@@ -56,6 +56,7 @@ export default function MembershipTypeManagement() {
         name: m.name_en,
         code: m.code,
         currentPrice: m.current_price || 0,
+        priceCount: m.price_count || 0,
         chartColor: m.chart_color || '',
         status: m.status ? 'Active' : 'Inactive',
         effectiveFrom: 'Present',
@@ -259,11 +260,26 @@ export default function MembershipTypeManagement() {
         
         showToast(`Membership Type "${formData.name}" added successfully.`);
       } else {
+        // the amount on this form is the type's price: a changed amount is a new price revision (kept in the history)
+        let priceResult = null;
+        if (Number.isFinite(amountVal) && amountVal !== Number(editingItem.currentPrice)) {
+          priceResult = await api.post(`/masters/membership-types/${editingItem.id}/prices`, {
+            amount: amountVal,
+            effective_from: today,
+            change_reason: 'Changed while editing the membership type'
+          });
+        }
         await api.put(`/masters/membership-types/${editingItem.id}`, {
           name_en: formData.name,
           chart_color: formData.chartColor || null,
           status: isActive
         });
+        if (isPendingApproval(priceResult?.data)) {
+          showToast(`Price change for "${formData.name}" submitted for approval.`);
+          setIsAddEditOpen(false);
+          fetchMembershipTypes();
+          return;
+        }
         
         showToast(`Membership Type "${formData.name}" updated successfully.`);
       }
@@ -286,7 +302,7 @@ export default function MembershipTypeManagement() {
         effectiveFrom: p.effective_from,
         effectiveTo: p.effective_to || 'Present',
         reason: p.change_reason || '',
-        changedAt: p.created_at ? String(p.created_at).slice(0, 10) : ''
+        changedAt: (p.updated_at || p.created_at) ? String(p.updated_at || p.created_at).slice(0, 10) : ''
       }));
       setHistoryTargetItem({
         ...item,
@@ -549,7 +565,7 @@ export default function MembershipTypeManagement() {
             <tbody className="divide-y divide-[#E8DFD8] text-sm">
               {paginatedData.length > 0 ? (
                 paginatedData.map((item, index) => {
-                  const historyCount = item.priceHistory ? item.priceHistory.length : 1;
+                  const historyCount = item.priceHistory?.length || item.priceCount || 1;
                   const revisionsCount = historyCount - 1;
                   const isActive = item.status === 'Active';
 
@@ -1100,7 +1116,7 @@ export default function MembershipTypeManagement() {
                             <td className="px-4 py-3 text-[#863221]/80">
                               {formatDate(ph.changedAt)}
                             </td>
-                            <td className="px-4 py-3 text-[#180200]/90 max-w-[200px] truncate" title={ph.reason}>
+                            <td className="px-4 py-3 text-[#180200]/90 max-w-[260px] break-words" title={ph.reason}>
                               {ph.reason || '—'}
                             </td>
                           </tr>

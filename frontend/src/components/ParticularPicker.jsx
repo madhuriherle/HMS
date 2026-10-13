@@ -6,15 +6,16 @@ const activeSubs = (p) => (p?.subTypes || []).filter((st) => (st.status || 'Acti
 /**
  * One field for "Particular" and its "Sub-Type".
  * One list: a particular without sub-types is chosen with one click; a particular with sub-types
- * opens in place and its sub-types are listed indented beneath it. Search looks in both.
+ * shows its sub-types indented beneath it, all open by default (the arrow folds one away). Search looks in both.
+ * The list always opens downward and is only as tall as the room below the field (it scrolls inside).
  * `onChange({ particular, subType })`. With `spread` the list is as wide as the whole row it sits in
  * (the parent row must be `relative`), instead of only as wide as the field.
  */
 export default function ParticularPicker({ particulars, particular, subType, onChange, hasError = false, placeholder = 'Select particular', spread = false }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [expanded, setExpanded] = useState('');
-  const [upward, setUpward] = useState(false);
+  const [folded, setFolded] = useState(() => new Set()); // particulars whose sub-types are folded away
+  const [listMax, setListMax] = useState(288);
   const box = useRef(null);
   const input = useRef(null);
 
@@ -43,12 +44,13 @@ export default function ParticularPicker({ particulars, particular, subType, onC
   };
 
   const openBox = () => {
-    const current = particulars.find((p) => p.name === particular);
-    setExpanded(activeSubs(current).length ? particular : '');
-    const rect = box.current?.getBoundingClientRect();
-    setUpward(Boolean(rect) && window.innerHeight - rect.bottom < 320 && rect.top > 320);
+    setFolded(new Set());
     setOpen(true);
     setTimeout(() => input.current?.focus(), 0);
+    // keep the list below the field: scroll the field up if there is little room, then size the list to the room left
+    const room = () => window.innerHeight - (box.current?.getBoundingClientRect().bottom || 0) - 12;
+    if (room() < 260) box.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    setTimeout(() => setListMax(Math.max(150, Math.min(288, room() - 56))), 300);
   };
 
   const onKey = (e) => {
@@ -86,7 +88,7 @@ export default function ParticularPicker({ particulars, particular, subType, onC
       {open && (
         <div
           className={`absolute z-40 ${spread ? 'left-0 right-0' : 'w-full min-w-[280px]'} bg-white border border-[#E8DFD8] rounded-xl shadow-lg overflow-hidden ${
-            upward ? 'bottom-full mb-1' : 'top-full mt-1'
+            'top-full mt-1'
           }`}
         >
           <div className="relative border-b border-[#E8DFD8]">
@@ -100,9 +102,9 @@ export default function ParticularPicker({ particulars, particular, subType, onC
               className="w-full pl-9 pr-3 py-2.5 text-sm focus:outline-none"
             />
           </div>
-          <ul role="listbox" className="max-h-72 overflow-y-auto py-1">
+          <ul role="listbox" className="overflow-y-auto py-1" style={{ maxHeight: listMax }}>
             {rows.map((r) => {
-              const isOpen = r.subs.length > 0 && (q ? true : expanded === r.p.name);
+              const isOpen = r.subs.length > 0 && (q ? true : !folded.has(r.p.name));
               const selectedHere = r.p.name === particular;
               return (
                 <li key={r.p.id || r.p.name}>
@@ -112,7 +114,14 @@ export default function ParticularPicker({ particulars, particular, subType, onC
                     aria-selected={selectedHere && r.subs.length === 0}
                     aria-expanded={r.subs.length ? isOpen : undefined}
                     title={r.p.name}
-                    onClick={() => (r.subs.length ? setExpanded(isOpen && !q ? '' : r.p.name) : pick(r.p.name))}
+                    onClick={() => {
+                      if (!r.subs.length) return pick(r.p.name);
+                      setFolded((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(r.p.name)) next.delete(r.p.name); else next.add(r.p.name);
+                        return next;
+                      });
+                    }}
                     className={`w-full flex items-start justify-between gap-2 px-3 py-2 text-sm text-left cursor-pointer hover:bg-[#FAF7F2] ${
                       selectedHere ? 'font-bold text-[#510601]' : 'text-[#180200]'
                     }`}

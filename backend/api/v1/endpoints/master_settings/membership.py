@@ -56,10 +56,20 @@ def read_membership_types(
             if p:
                 prices[tid] = p
         price_by_type = prices
+    counts = {}
+    if page_data["data"]:
+        from sqlalchemy import func
+        counts = dict(
+            db.query(MembershipTypePrice.membership_type_id, func.count(MembershipTypePrice.id))
+            .filter(MembershipTypePrice.membership_type_id.in_([i["id"] for i in page_data["data"]]),
+                    MembershipTypePrice.is_deleted == False)  # noqa: E712
+            .group_by(MembershipTypePrice.membership_type_id).all()
+        )
     for item in page_data["data"]:
         p = price_by_type.get(item["id"])
         item["current_price"] = float(p.amount) if p else None
         item["current_price_id"] = p.id if p else None
+        item["price_count"] = int(counts.get(item["id"], 0))  # rows in the price history (1 = base price only)
     return page_data
 
 
@@ -185,9 +195,12 @@ def create_membership_type_price(
 
     def _reprice_in_place(row: MembershipTypePrice) -> MembershipTypePrice:
         """Same-day correction: reprice an existing row instead of stacking a duplicate."""
+        was = float(row.amount)
         row.amount = price_in.amount
         row.currency = price_in.currency
-        row.change_reason = price_in.change_reason or row.change_reason
+        # keep a trail of what it was, since the row is corrected instead of stacked
+        note = (price_in.change_reason or "Price revision").strip()
+        row.change_reason = f"{note} (was {was:,.2f})"[:500]
         row.updated_by = current_user.id
         db.commit()
         db.refresh(row)
