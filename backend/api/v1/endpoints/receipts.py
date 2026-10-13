@@ -462,78 +462,6 @@ def read_receipt_tracking(
     }
 
 
-@router.get("/renewals-due")
-def read_renewals_due(
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
-    page: int = 1, limit: int = 20,
-    days_ahead: int = 30,
-    include_expired: bool = True,
-    export: Optional[str] = None,  # "csv" or "excel"
-) -> Any:
-    """Renewal worklist: ACTIVE memberships whose expires_at falls within
-    ``days_ahead`` days (or already expired when include_expired=true).
-
-    Backs the Receipt Entry screen's UNAPPROVED RENEWAL PAYMENT LIST —
-    the operator picks a member here, then records their renewal receipt
-    (receipt_type=MEMBERSHIP, is_renewal=true) and allocates it.
-    """
-    now = datetime.now(timezone.utc)
-    horizon = now + timedelta(days=max(0, days_ahead))
-    q = (
-        db.query(MemberMembership, Member, MembershipType)
-        .join(Member, Member.id == MemberMembership.member_id)
-        .outerjoin(MembershipType, MembershipType.id == MemberMembership.membership_type_id)
-        .filter(
-            MemberMembership.is_deleted == False,
-            MemberMembership.status == "ACTIVE",
-            MemberMembership.expires_at.isnot(None),
-            Member.is_deleted == False,
-        )
-    )
-    if include_expired:
-        q = q.filter(MemberMembership.expires_at <= horizon)
-    else:
-        q = q.filter(MemberMembership.expires_at >= now, MemberMembership.expires_at <= horizon)
-
-    q = q.order_by(MemberMembership.expires_at.asc())
-    total = q.count()
-    rows = q.offset((max(1, page) - 1) * limit).limit(min(max(1, limit), 500)).all()
-
-    def _date_only(dt):
-        return dt.date() if dt else None
-
-    data = [{
-        "membership_id": m.id,
-        "member_id": member.id,
-        "member_name": " ".join(p for p in (member.first_name_en, member.last_name_en) if p),
-        "member_code": member.member_code,
-        "mobile": member.mobile,
-        "approval_status": member.approval_status,
-        "membership_number": m.membership_number,
-        "membership_type_id": t.id if t else None,
-        "membership_type": t.name_en if t else None,
-        "status": m.status,
-        "expiry_date": _date_only(m.expires_at),
-        "days_to_expiry": (_date_only(m.expires_at) - now.date()).days if m.expires_at else None,
-    } for m, member, t in rows]
-
-    if export:
-        return render_export(
-            db, current_user, "renewals_due", export,
-            {"days_ahead": days_ahead, "include_expired": include_expired},
-            data, "renewals_due",
-        )
-
-    return {
-        "total": total,
-        "page": page,
-        "limit": limit,
-        "pages": (total + limit - 1) // limit if limit else 0,
-        "data": data,
-    }
-
-
 @router.post("/{id}/activate-member")
 # entity_type is "MemberActivation", not "Member" — the registry is keyed on
 # (module, action, entity_type) and last-wins; reusing "Member" would clobber
@@ -807,9 +735,8 @@ def lookup_member_for_receipt(
 ) -> Any:
     """Who is this number? Backs the Membership No. box of Receipt Entry.
 
-    Accepts a member code, a membership number (e.g. HMSM-000123), an applicant's registration number
-    (REG-2026-0007, as shown on the screens) or a 10-digit mobile number. Matching is exact and ignores case.
-    Returns at most 5 small cards (8 for a name / partial-mobile search, flagged exact=false); a mobile number shared by a family can match more than one.
+    Accepts a member code, a membership number (e.g. HMSM-000123) or an applicant's registration number
+    (REG-2026-0007, as shown on the screens). Matching is exact and ignores case.
     """
     import re
 
@@ -842,26 +769,7 @@ def lookup_member_for_receipt(
             .filter(live, Member.id == int(reg.group(2)), func.extract("year", Member.created_at) == int(reg.group(1)))
             .limit(1)
         )
-    digits = re.sub(r"\D", "", raw)
-    if len(digits) >= 10:
-        add(db.query(Member.id).filter(live, Member.mobile.in_({digits, digits[-10:]})).limit(5))
-
     exact = bool(ids)
-    if not ids and len(raw) >= 3:
-        # Nothing matched as a number: treat the text as a name or the start of a mobile number.
-        like = f"%{raw}%"
-        name_hits = db.query(Member.id).filter(
-            live,
-            or_(
-                Member.first_name_en.ilike(like),
-                Member.last_name_en.ilike(like),
-                Member.full_name_kn.ilike(like),
-                func.concat(Member.first_name_en, " ", func.coalesce(Member.last_name_en, "")).ilike(like),
-            ),
-        )
-        add(name_hits.order_by(Member.first_name_en).limit(8))
-        if len(digits) >= 5:
-            add(db.query(Member.id).filter(live, Member.mobile.like(f"%{digits}%")).limit(8))
 
     members = db.query(Member).filter(live, Member.id.in_(ids[:8])).all() if ids else []
     members.sort(key=lambda m: ids.index(m.id))

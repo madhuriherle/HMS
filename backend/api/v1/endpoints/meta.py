@@ -3,6 +3,9 @@ import urllib.request
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
+
+from sqlalchemy.orm import Session
 
 from api import deps
 from core import rules
@@ -15,6 +18,43 @@ router = APIRouter()
 def read_rules(current_user: User = Depends(deps.get_current_user)) -> Any:
     """The data rules the server enforces (formats, limits, fixed lists), for the screens to use."""
     return rules.as_dict()
+
+
+@router.get("/lists")
+def read_lists(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """The fixed lists the screens show (from the lookup_values table): {list_code: [{code, label, extra}]}."""
+    from models.masters import LookupValue
+
+    out: dict = {}
+    for row in (
+        db.query(LookupValue)
+        .filter(LookupValue.is_deleted == False, LookupValue.status == True)  # noqa: E712
+        .order_by(LookupValue.list_code, LookupValue.sort_order, LookupValue.id)
+        .all()
+    ):
+        out.setdefault(row.list_code, []).append({"code": row.code, "label": row.label, "extra": row.extra})
+    return out
+
+
+@router.get("/pin-prefixes")
+def read_pin_prefixes(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """The first two digits of the PIN codes in the master (for the PIN filter), with how many codes each has."""
+    from sqlalchemy import func
+    from models.masters import PostalCode
+
+    prefix = func.substr(PostalCode.pincode, 1, 2)
+    rows = (
+        db.query(prefix, func.count(PostalCode.id))
+        .filter(PostalCode.is_deleted == False)  # noqa: E712
+        .group_by(prefix).order_by(prefix).all()
+    )
+    return [{"prefix": p, "count": c} for p, c in rows]
 
 
 def _fetch_pincode(pin: str) -> Any:
@@ -44,3 +84,32 @@ def lookup_pincode(pin: str, current_user: User = Depends(deps.get_current_user)
         "district": office.get("District") or "",
         "state": office.get("State") or "",
     }
+
+
+# Column headings of the files the office uploads. The templates carry the headings only (no made-up people or
+# places), so a template uploaded unedited can never import anything.
+IMPORT_TEMPLATES = {
+    "members": (
+        "members_import_template.csv",
+        ["membership_number", "first_name_en", "last_name_en", "middle_name_en", "full_name_kn", "mobile", "gender",
+         "date_of_birth", "email", "address_line1", "address_line2", "locality", "city", "pincode",
+         "membership_type", "remarks"],
+    ),
+    "postal-codes": (
+        "location_postal_codes_template.csv",
+        ["pin_code", "post_office_name", "taluk_name", "district_name", "state_name"],
+    ),
+}
+
+
+@router.get("/import-template/{kind}")
+def import_template(kind: str, current_user: User = Depends(deps.get_current_user)) -> Any:
+    """Header-only CSV template for an upload screen (members, postal-codes)."""
+    if kind not in IMPORT_TEMPLATES:
+        raise HTTPException(status_code=404, detail="Unknown template")
+    filename, headers = IMPORT_TEMPLATES[kind]
+    return Response(
+        content=",".join(headers) + "\n",
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

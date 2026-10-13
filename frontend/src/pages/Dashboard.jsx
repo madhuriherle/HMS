@@ -28,12 +28,8 @@ const iconMap = {
   'book-open': BookOpen,
 };
 
-const MEMBERSHIP_COLORS = {
-  'Poshaka': '#510601',
-  'Mahaposhaka': '#F4AA26',
-  'Mahapalaka': '#3D705C',
-  'Sahasadasyatva': '#863221',
-};
+// a type without a colour of its own (set on the Membership Types screen) gets one from this list
+const FALLBACK_COLORS = ['#510601', '#F4AA26', '#3D705C', '#863221', '#6B4E9B', '#2F6F9F'];
 
 const StatCard = ({ title, value, icon, color, trend }) => {
   const Icon = iconMap[icon] || BookOpen || Users;
@@ -108,9 +104,10 @@ export default function Dashboard() {
         setMoney(dData.receipts && dData.receipts.today_amount !== undefined ? dData.receipts : null);
 
         if (dData.memberships_by_type) {
-          setMembershipTypeData(dData.memberships_by_type.map(item => ({
+          setMembershipTypeData(dData.memberships_by_type.map((item, i) => ({
             name: item.membership_type,
-            value: item.member_count
+            value: item.member_count,
+            color: item.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length]
           })));
         }
         
@@ -156,8 +153,7 @@ export default function Dashboard() {
           color: '#3D705C',
           to: '/dashboard/receipts/tracking'
         },
-        { id: 'unassigned', title: 'Unassigned Receipts', value: money.unassigned_count.toLocaleString(), icon: 'clock', color: '#EE6A00', to: '/dashboard/receipts/tracking' },
-        { id: 'renewals', title: 'Renewals Due (30 days)', value: money.renewals_due.toLocaleString(), icon: 'user-x', color: '#8C1801', to: '/dashboard/receipts/entry' }
+        { id: 'unassigned', title: 'Unassigned Receipts', value: money.unassigned_count.toLocaleString(), icon: 'clock', color: '#EE6A00', to: '/dashboard/receipts/tracking' }
       ]
     : [];
 
@@ -308,7 +304,7 @@ export default function Dashboard() {
                   {membershipTypeData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={MEMBERSHIP_COLORS[entry.name] || '#863221'}
+                      fill={entry.color || '#863221'}
                     />
                   ))}
                 </Pie>

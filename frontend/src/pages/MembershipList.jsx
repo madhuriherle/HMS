@@ -1190,7 +1190,7 @@ export default function MembershipList() {
                                 <span className="text-stone-400">•</span>
                                 <span className="text-[#863221]">{r.receiptDate || '—'}</span>
                                 <span className="text-stone-400">•</span>
-                                <span className="text-stone-600 font-medium">{r.paymentMode || 'Cash'}</span>
+                                <span className="text-stone-600 font-medium">{r.paymentMode || '—'}</span>
                               </div>
                               <span className="font-mono font-bold text-[#180200]">
                                 ₹{Number(r.amount).toLocaleString('en-IN')}
@@ -1263,7 +1263,7 @@ export default function MembershipList() {
                                       {subType}
                                     </td>
                                     <td className="py-2 px-2.5 text-stone-600 text-[11px]">
-                                      {r.paymentMode || 'Cash'}
+                                      {r.paymentMode || '—'}
                                     </td>
                                     <td className="py-2 px-2.5 text-right font-mono font-bold text-[#180200]">
                                       ₹{Number(r.amount).toLocaleString('en-IN')}

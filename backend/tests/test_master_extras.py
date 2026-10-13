@@ -44,7 +44,7 @@ def test_dashboard_collection_cards_and_global_search(client, admin_headers):
     assert r.status_code == 201, r.text
     d = client.get(f"{API}/dashboard/", headers=h).json()["receipts"]
     assert d["today_amount"] >= 250 and d["month_amount"] >= d["today_amount"]
-    assert d["unassigned_count"] >= 1 and "renewals_due" in d and "last_month_amount" in d
+    assert d["unassigned_count"] >= 1 and "last_month_amount" in d
 
     found = client.get(f"{API}/dashboard/search", headers=h, params={"q": "Searchable Payerzz"}).json()
     assert [x["id"] for x in found["receipts"]] == [r.json()["id"]]

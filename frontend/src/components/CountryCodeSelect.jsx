@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, ChevronDown, Check } from 'lucide-react';
-import { COUNTRY_CODES } from '../utils/countryCodes';
+import { useCountryCodes } from '../hooks/useLists';
 
 export default function CountryCodeSelect({
   value = '+91',
@@ -9,6 +9,7 @@ export default function CountryCodeSelect({
   disabled = false,
   className = ''
 }) {
+  const COUNTRY_CODES = useCountryCodes(); // from the server (GET /meta/lists)
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const containerRef = useRef(null);
@@ -19,9 +20,10 @@ export default function CountryCodeSelect({
     return (
       COUNTRY_CODES.find((c) => c.code === countryIso) ||
       COUNTRY_CODES.find((c) => c.dialCode === value) ||
-      COUNTRY_CODES[0]
+      COUNTRY_CODES[0] ||
+      { code: countryIso, name: '', dialCode: value, flag: '' }
     );
-  }, [countryIso, value]);
+  }, [COUNTRY_CODES, countryIso, value]);
 
   // Filtered countries list based on search
   const filteredCountries = useMemo(() => {
@@ -33,7 +35,7 @@ export default function CountryCodeSelect({
         c.code.toLowerCase().includes(q) ||
         c.dialCode.includes(q)
     );
-  }, [searchQuery]);
+  }, [COUNTRY_CODES, searchQuery]);
 
   // Click outside listener
   useEffect(() => {

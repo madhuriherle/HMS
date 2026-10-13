@@ -53,7 +53,7 @@ def get_dashboard(
         return bool(row and row.status)
 
     # Collection: today / this month / last month, receipts waiting to be mapped, memberships due to renew.
-    from datetime import datetime, timedelta, timezone
+    from datetime import timedelta
     from models.receipts import ReceiptAllocation
 
     live_receipts = [Receipt.is_deleted == False, Receipt.receipt_status != "CANCELLED"]  # noqa: E712
@@ -68,18 +68,10 @@ def get_dashboard(
         return float(q.scalar() or 0)
 
     unassigned = db.query(Receipt).filter(*live_receipts, Receipt.receipt_status == "UNASSIGNED").count()
-    now = datetime.now(timezone.utc)
-    renewals_due = db.query(MemberMembership).filter(
-        MemberMembership.is_deleted == False,  # noqa: E712
-        MemberMembership.status == "ACTIVE",
-        MemberMembership.expires_at.isnot(None),
-        MemberMembership.expires_at <= now + timedelta(days=30),
-        MemberMembership.expires_at >= now,
-    ).count()
 
     from models.masters import MembershipType
     by_type = [
-        {"membership_type": mt.name_en, "member_count": count}
+        {"membership_type": mt.name_en, "member_count": count, "color": mt.chart_color}
         for mt, count in (
             db.query(MembershipType, func.count(MemberMembership.id))
             .join(MemberMembership, MemberMembership.membership_type_id == MembershipType.id)
@@ -105,7 +97,6 @@ def get_dashboard(
             "month_amount": collected(first_this),
             "last_month_amount": collected(first_last, first_this),
             "unassigned_count": unassigned,
-            "renewals_due": renewals_due,
         } if allowed("receipts.read", "receipts.entry.read", "receipts.tracking.read") else None,
         "magazines": {
             "active_subscriptions": active_subscriptions,

@@ -4,13 +4,9 @@ Revision ID: 20261009_0033
 Revises: 20261009_0032
 Create Date: 2026-10-09
 
-Adds the placeholder rows in db.seed_defaults.PLANNED_SCREENS (Magazine, Reports, Notifications, Activity,
-Events, Imports, System). Only rows created now are switched off, so a row an admin enabled later is kept.
-Idempotent.
+Used to add switched-off placeholder rows for screens that were only planned. They were dead rows in the
+Module Master, so nothing is added any more (migration 0049 removes the ones already created).
 """
-
-from alembic import op
-from sqlalchemy.orm import Session
 
 revision = "20261009_0033"
 down_revision = "20261009_0032"
@@ -19,20 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    session = Session(bind=op.get_bind())
-    try:
-        from db.seed_defaults import PLANNED_SCREENS, seed_modules
-        from models.users import Module
-
-        planned = [row[0] for row in PLANNED_SCREENS]
-        before = {m.code for m in session.query(Module).filter(Module.code.in_(planned)).all()}
-        seed_modules(session)
-        for m in session.query(Module).filter(Module.code.in_(planned)).all():
-            if m.code not in before:
-                m.status = False
-        session.commit()
-    finally:
-        session.close()
+    pass
 
 
 def downgrade() -> None:

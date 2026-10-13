@@ -31,7 +31,7 @@ import {
   loadPaymentModeConfigs
 } from '../utils/serverData';
 import { validateInternationalPhone } from '../utils/phoneValidation';
-import { COUNTRY_CODES } from '../utils/countryCodes';
+import useLists, { useCountryCodes } from '../hooks/useLists';
 import { toISODate } from '../utils/dateUtils';
 import DateInput from '../components/DateInput';
 import CountryCodeSelect from '../components/CountryCodeSelect';
@@ -51,6 +51,8 @@ export default function RegisterNewMember() {
   const { hasPermission } = useAuth();
   // formats, limits and fixed lists come from the server (GET /meta/rules); null until loaded
   const rules = useRules();
+  const lists = useLists(); // child relations, YES/NO, country codes (GET /meta/lists)
+  const COUNTRY_CODES = useCountryCodes();
   const BLOOD_GROUPS = rules?.blood_groups || [];
   const BEHALF_OPTIONS = rules?.applied_on_behalf_of || [];
   const NAME_TITLES = rules?.name_titles || [];
@@ -1318,9 +1320,10 @@ export default function RegisterNewMember() {
                         }`}
                     >
                       <option value="">Select Gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
+                      {(rules?.genders || []).map((g) => {
+                        const label = g.charAt(0) + g.slice(1).toLowerCase();
+                        return <option key={g} value={label}>{label}</option>;
+                      })}
                     </select>
                     {formErrors.gender && (
                       <p className="text-[11px] text-red-600 mt-1">{formErrors.gender}</p>
@@ -1561,8 +1564,7 @@ export default function RegisterNewMember() {
                         }`}
                     >
                       <option value="">Select YES/NO</option>
-                      <option value="YES">YES</option>
-                      <option value="NO">NO</option>
+                      {(lists?.yes_no || []).map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
                     </select>
                     {formErrors.magazineNeeded && (
                       <p className="text-[11px] text-red-600 mt-1">{formErrors.magazineNeeded}</p>
@@ -1869,9 +1871,7 @@ export default function RegisterNewMember() {
                                     onChange={(e) => handleChildChange(index, 'gender', e.target.value)}
                                     className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] focus:outline-none focus:border-[#510601] cursor-pointer"
                                   >
-                                    <option value="Male">Son (Male)</option>
-                                    <option value="Female">Daughter (Female)</option>
-                                    <option value="Other">Other</option>
+                                    {(lists?.child_relations || []).map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
                                   </select>
                                 </div>
                                 <div className="sm:col-span-3">

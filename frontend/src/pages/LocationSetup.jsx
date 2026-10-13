@@ -97,6 +97,7 @@ export default function LocationSetup() {
   const [postalStateFilter, setPostalStateFilter] = useState('ALL');
   const [postalDistrictFilter, setPostalDistrictFilter] = useState('ALL');
   const [postalPrefixFilter, setPostalPrefixFilter] = useState('ALL');
+  const [pinPrefixes, setPinPrefixes] = useState([]); // the first two digits that exist in the PIN master
   const [postalPincodeFilter, setPostalPincodeFilter] = useState('');
   const [postalStatusFilter, setPostalStatusFilter] = useState('ALL');
 
@@ -120,6 +121,10 @@ export default function LocationSetup() {
 
   useEffect(() => {
     fetchMasters();
+  }, []);
+
+  useEffect(() => {
+    api.get('/meta/pin-prefixes').then(({ data }) => setPinPrefixes(data || [])).catch(() => {});
   }, []);
 
   // Districts of the selected state, with the real taluk and PIN count of each
@@ -652,23 +657,20 @@ export default function LocationSetup() {
   // ====================================================
   // BULK IMPORT LOGIC & TEMPLATE DOWNLOAD
   // ====================================================
-  const handleDownloadSampleTemplate = () => {
-    const csvContent = `pin_code,post_office_name,taluk_name,district_name,state_name
-576101,Udupi H.O,Udupi,Udupi,Karnataka
-575001,Mangaluru H.O,Mangaluru,Dakshina Kannada,Karnataka
-560003,Malleswaram H.O,Bengaluru North,Bengaluru Urban,Karnataka
-581401,Sirsi H.O,Sirsi,Uttara Kannada,Karnataka
-671121,Kasaragod H.O,Kasaragod,Kasaragod,Kerala
-670001,Kannur H.O,Kannur,Kannur,Kerala`;
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'location_postal_codes_template.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownloadSampleTemplate = async () => {
+    try {
+      const { data } = await api.get('/meta/import-template/postal-codes', { responseType: 'blob' });
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'location_postal_codes_template.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      showToast('Could not download the template.', 'error');
+    }
   };
 
   const handleExportPostalCodes = () => {
@@ -1596,12 +1598,9 @@ export default function LocationSetup() {
                   className="w-full py-1.5 px-2.5 text-xs bg-white border border-[#E8DFD8] rounded-lg focus:outline-none focus:ring-1 focus:ring-[#510601] text-[#180200]"
                 >
                   <option value="ALL">All Prefixes</option>
-                  <option value="56">56xxxx (Bengaluru & surrounding)</option>
-                  <option value="57">57xxxx (Coastal & Malnad KA)</option>
-                  <option value="58">58xxxx (North KA)</option>
-                  <option value="67">67xxxx (North Kerala)</option>
-                  <option value="68">68xxxx (Central Kerala)</option>
-                  <option value="69">69xxxx (South Kerala)</option>
+                  {pinPrefixes.map((p) => (
+                    <option key={p.prefix} value={p.prefix}>{p.prefix}xxxx ({p.count} codes)</option>
+                  ))}
                 </select>
               </div>
 

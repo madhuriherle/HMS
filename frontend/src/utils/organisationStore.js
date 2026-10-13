@@ -2,15 +2,6 @@
 // Nothing is kept in the browser: this file only holds the form's empty shape
 // and the mapping between the form and the API.
 
-export const ORGANISATION_TYPES = [
-  'Non-Profit / Community Trust',
-  'Society / Association',
-  'Charitable Trust',
-  'Religious / Cultural Institution',
-  'Educational Trust',
-  'General Organisation'
-];
-
 export const EMPTY_ORGANISATION_SETTINGS = {
   profile: {
     organisationName: '', shortName: '', registrationNumber: '', organisationType: '',

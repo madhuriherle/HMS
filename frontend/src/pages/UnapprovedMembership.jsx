@@ -459,7 +459,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                       <td className="py-3.5 px-4">
                         <span className="font-bold text-[#180200] text-sm">{m.fullName || m.name}</span>
                         <div className="text-[11px] text-[#863221] mt-0.5 font-mono">
-                          ID: {m.id} · {m.registrationSource || 'Online'}
+                          ID: {m.id} · {m.registrationSource || '—'}
                         </div>
                       </td>
 
@@ -652,7 +652,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                       {viewingMember.fullName || viewingMember.name}
                     </h3>
                     <span className="font-mono text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200 font-bold">
-                      {viewingMember.registrationSource || 'Online'}
+                      {viewingMember.registrationSource || '—'}
                     </span>
                   </div>
                   <p className="text-xs text-[#863221]">

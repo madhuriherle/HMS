@@ -142,20 +142,6 @@ export const loadPaymentModeConfigs = async () => {
 export const loadMembers = (params) => fetchMembers(params);
 export const loadReceipts = (params) => fetchReceipts(params);
 
-export const loadRenewals = async () => {
-  const res = await api.get('/receipts/renewals-due', { params: { limit: 500 } });
-  return rows(res).map((row) => ({
-    ...row,
-    id: row.membership_id || row.member_id,
-    registrationNumber: row.member_code || row.member_id,
-    name: row.member_name,
-    membershipNumber: row.membership_number,
-    membershipName: row.member_name,
-    contactNumber: row.mobile,
-    membershipType: row.membership_type,
-  }));
-};
-
 // Members waiting for approval, each with whether a receipt has been mapped to
 // them (the server records that as a receipt allocation).
 export const loadUnapprovedMembers = async () => {

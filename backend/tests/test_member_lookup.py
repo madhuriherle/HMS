@@ -32,10 +32,9 @@ def test_lookup_finds_members_and_applicants_by_every_kind_of_number(client, adm
     mid, type_name, code = _approved_member(client, h, s)
     prof = client.get(f"{API}/members/{mid}/profile", headers=h).json()
     membership_no = prof["memberships"][0]["membership_number"]
-    mobile = client.get(f"{API}/members/{mid}", headers=h).json()["mobile"]
 
-    # by member code, membership number (any case), mobile (with +91 and spaces)
-    for typed in (code, code.lower(), membership_no, membership_no.lower(), mobile, f"+91 {mobile}"):
+    # by member code, membership number (any case)
+    for typed in (code, code.lower(), membership_no, membership_no.lower()):
         r = _lookup(client, h, typed)
         assert r["found"] and r["matches"][0]["id"] == mid, typed
     card = _lookup(client, h, membership_no)["matches"][0]
@@ -108,17 +107,15 @@ def test_members_lookup_endpoint(client, admin_headers):
 
 
 
-def test_lookup_falls_back_to_name_and_partial_mobile(client, admin_headers):
+def test_lookup_does_not_search_by_name_or_mobile(client, admin_headers):
     h, s = admin_headers, _sfx()
     mid, _t, code = _approved_member(client, h, s)
     exact = client.get(f"{API}/receipts/member-lookup", headers=h, params={"number": code}).json()
     assert exact["exact"] is True
-    name = client.get(f"{API}/members/{mid}", headers=h).json()["first_name_en"][:4]
-    fuzzy = client.get(f"{API}/receipts/member-lookup", headers=h, params={"number": name}).json()
-    assert fuzzy["found"] is True and fuzzy["exact"] is False
-    assert mid in [m["id"] for m in fuzzy["matches"]]
-    none = client.get(f"{API}/receipts/member-lookup", headers=h, params={"number": "Qzxqzx"}).json()
-    assert none["found"] is False
+    member = client.get(f"{API}/members/{mid}", headers=h).json()
+    for typed in (member["first_name_en"][:4], member["mobile"]):
+        res = client.get(f"{API}/receipts/member-lookup", headers=h, params={"number": typed}).json()
+        assert mid not in [m["id"] for m in res["matches"]]
 
 
 def test_lookup_by_plain_member_id(client, admin_headers):

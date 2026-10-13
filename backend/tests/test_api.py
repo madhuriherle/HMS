@@ -6039,7 +6039,7 @@ def test_activate_member_from_receipt_requires_permission(client, admin_headers)
     assert "members.write" in r.json()["detail"]
 
 
-# ─────────────── receipt screen gaps: tracking export + renewals due ───────────────
+# ─────────────── receipt screen gaps: tracking export ───────────────
 
 def test_receipt_tracking_export_csv_and_excel(client, admin_headers):
     """The Tracking screen's Export button: the whole filtered register as a
@@ -6068,76 +6068,6 @@ def test_receipt_tracking_export_csv_and_excel(client, admin_headers):
     # junk export value refused (same contract as /reports/*)
     bad = client.get("/api/v1/receipts/tracking", headers=admin_headers, params={"export": "pdf"})
     assert bad.status_code == 400
-
-
-def test_renewals_due_worklist(client, admin_headers):
-    """Receipt Entry's UNAPPROVED RENEWAL PAYMENT LIST: ACTIVE memberships
-    expiring within days_ahead (plus already-expired ones), soonest first,
-    with the member + membership columns needed to record the renewal."""
-    from datetime import datetime, timedelta, timezone
-    from db.session import SessionLocal
-    from models.members import MemberMembership
-
-    member = _create_member(client, admin_headers, "9800000031", "RenewalDue")
-    mtype = _create_membership_type(client, admin_headers, "RND_TYP", "Renewal Due Type")
-    r = client.post(
-        f"/api/v1/members/{member['id']}/memberships", headers=admin_headers,
-        json={"membership_type_id": mtype["id"]},
-    )
-    assert r.status_code in (200, 201), r.text
-    membership_id = r.json()["id"]
-
-    # no expires_at yet -> not on the worklist
-    body = client.get("/api/v1/receipts/renewals-due", headers=admin_headers).json()
-    assert membership_id not in {row["membership_id"] for row in body["data"]}
-
-    # expiring in 10 days -> shows up with member/membership columns
-    expires = datetime.now(timezone.utc) + timedelta(days=10)
-    with SessionLocal() as db:
-        row = db.query(MemberMembership).filter(MemberMembership.id == membership_id).first()
-        row.expires_at = expires
-        db.commit()
-
-    body = client.get(
-        "/api/v1/receipts/renewals-due", headers=admin_headers,
-        params={"days_ahead": 30},
-    ).json()
-    hit = next((row for row in body["data"] if row["membership_id"] == membership_id), None)
-    assert hit is not None
-    assert hit["member_id"] == member["id"]
-    assert hit["member_name"] == "RenewalDue"
-    assert hit["membership_type"] == "Renewal Due Type"
-    assert hit["status"] == "ACTIVE"
-    assert hit["days_to_expiry"] in (9, 10)  # wall-time dependent
-
-    # soonest-expiry-first ordering across the whole worklist
-    expiries = [row["expiry_date"] for row in body["data"]]
-    assert expiries == sorted(expiries)
-
-    # already-expired memberships stay on the list (include_expired default)
-    past = datetime.now(timezone.utc) - timedelta(days=5)
-    with SessionLocal() as db:
-        row = db.query(MemberMembership).filter(MemberMembership.id == membership_id).first()
-        row.expires_at = past
-        db.commit()
-    body = client.get("/api/v1/receipts/renewals-due", headers=admin_headers).json()
-    hit = next((row for row in body["data"] if row["membership_id"] == membership_id), None)
-    assert hit is not None
-    assert hit["days_to_expiry"] in (-6, -5)
-
-    # include_expired=false drops it
-    body = client.get(
-        "/api/v1/receipts/renewals-due", headers=admin_headers,
-        params={"include_expired": "false"},
-    ).json()
-    assert membership_id not in {row["membership_id"] for row in body["data"]}
-
-    # export path shares the reports Export plumbing
-    csv = client.get(
-        "/api/v1/receipts/renewals-due", headers=admin_headers, params={"export": "csv"},
-    )
-    assert csv.status_code == 200, csv.text
-    assert "renewals_due.csv" in csv.headers["content-disposition"]
 
 
 def test_engagement_gap_endpoints(client, admin_headers):
@@ -6618,3 +6548,38 @@ def test_member_list_carries_the_membership_type_name(client, admin_headers):
                 json={"membership_type_id": mt["id"]})
     rows = client.get("/api/v1/members/", headers=admin_headers, params={"search": "ListTyped"}).json()["data"]
     assert rows[0]["membership_type"] == "List Type" and rows[0]["membership_type_id"] == mt["id"]
+
+
+def test_import_templates_have_headings_only(client, admin_headers):
+    r = client.get("/api/v1/meta/import-template/members", headers=admin_headers)
+    assert r.status_code == 200 and r.text.startswith("membership_number,first_name_en")
+    assert r.text.strip().count("\n") == 0  # one heading line, no made-up person
+    p = client.get("/api/v1/meta/import-template/postal-codes", headers=admin_headers)
+    assert p.status_code == 200 and p.text.strip() == "pin_code,post_office_name,taluk_name,district_name,state_name"
+    assert client.get("/api/v1/meta/import-template/nope", headers=admin_headers).status_code == 404
+    assert client.get("/api/v1/meta/import-template/members").status_code == 401
+
+
+def test_membership_type_chart_colour_reaches_the_dashboard(client, admin_headers):
+    mt = _create_membership_type(client, admin_headers, "TST_CLR", "Colour Type")
+    r = client.put(f"/api/v1/masters/membership-types/{mt['id']}", headers=admin_headers,
+                   json={"chart_color": "#112233"}, params={"reason": "colour"})
+    assert r.status_code == 200, r.text
+    rows = client.get("/api/v1/masters/membership-types", headers=admin_headers, params={"limit": 100}).json()["data"]
+    assert next(x for x in rows if x["id"] == mt["id"])["chart_color"] == "#112233"
+    bad = client.put(f"/api/v1/masters/membership-types/{mt['id']}", headers=admin_headers,
+                     json={"chart_color": "red"}, params={"reason": "colour"})
+    assert bad.status_code == 422
+
+
+def test_lists_come_from_the_lookup_table(client, admin_headers):
+    lists = client.get("/api/v1/meta/lists", headers=admin_headers).json()
+    for name in ("child_relations", "yes_no", "receipt_statuses", "organisation_types",
+                 "activity_action_groups", "activity_statuses", "activity_clients", "country_codes"):
+        assert lists.get(name), name
+    assert [r["code"] for r in lists["receipt_statuses"]] == ["UNASSIGNED", "ASSIGNED", "APPROVED", "CANCELLED"]
+    assert lists["receipt_statuses"][0]["extra"] == "chip-warn"
+    india = next(c for c in lists["country_codes"] if c["code"] == "IN")
+    assert india["label"] == "India" and india["extra"] == "+91"
+    assert client.get("/api/v1/meta/lists").status_code == 401
+    assert isinstance(client.get("/api/v1/meta/pin-prefixes", headers=admin_headers).json(), list)

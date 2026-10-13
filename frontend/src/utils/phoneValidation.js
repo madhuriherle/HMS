@@ -1,5 +1,5 @@
 import { parsePhoneNumberFromString, isValidPhoneNumber, isPossiblePhoneNumber } from 'libphonenumber-js';
-import { COUNTRY_CODES } from './countryCodes';
+import { currentLists } from '../hooks/useLists';
 
 /**
  * Validates a national phone number against a selected country code.
@@ -30,7 +30,8 @@ export function validateInternationalPhone(rawNumber, countryIso = 'IN', dialCod
   }
 
   // Find country name for friendly error messaging
-  const countryObj = COUNTRY_CODES.find((c) => c.code === countryIso) || { name: 'selected country' };
+  const found = (currentLists()?.country_codes || []).find((c) => c.code === countryIso);
+  const countryObj = { name: found?.label || 'selected country' };
 
   try {
     // Attempt parse with libphonenumber-js

@@ -32,16 +32,17 @@ import {
   Sparkles
 } from 'lucide-react';
 import {
-  ORGANISATION_TYPES,
   EMPTY_ORGANISATION_SETTINGS,
   settingsFromApi,
   settingsToApi
 } from '../utils/organisationStore';
 import { loadLocations, findLocationByPin } from '../utils/serverData';
 import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
+import { useList } from '../hooks/useLists';
 
 export default function OrganisationSettings() {
   const rules = useRules(); // formats and limits from the server
+  const organisationTypes = useList('organisation_types'); // from the server (GET /meta/lists)
   const { hasPermission } = useAuth();
 
   // Tab state: 'profile' | 'print' | 'notifications' | 'contact'
@@ -599,9 +600,9 @@ export default function OrganisationSettings() {
                   onChange={handleProfileChange}
                   className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-xl text-sm font-medium text-[#180200] focus:outline-none cursor-pointer"
                 >
-                  {ORGANISATION_TYPES.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
+                  {organisationTypes.map((o) => (
+                    <option key={o.code} value={o.code}>
+                      {o.label}
                     </option>
                   ))}
                 </select>

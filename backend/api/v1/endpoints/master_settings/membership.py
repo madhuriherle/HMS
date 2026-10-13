@@ -27,6 +27,7 @@ def _serialize_type_with_price(db: Session, mt: MembershipType) -> dict:
         "name_kn": mt.name_kn,
         "description": mt.description,
         "status": mt.status,
+        "chart_color": mt.chart_color,
         "created_at": mt.created_at,
         "current_price": float(price.amount) if price else None,
         "current_price_id": price.id if price else None,

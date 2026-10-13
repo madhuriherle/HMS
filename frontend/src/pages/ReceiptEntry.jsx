@@ -16,7 +16,6 @@ import {
   FileText,
   MapPin,
   Phone,
-  Mail,
   Tag,
   Building,
   Heart,
@@ -48,7 +47,6 @@ import {
   loadParticulars,
   loadMembershipTypes,
   loadPaymentModeConfigs,
-  loadRenewals,
   loadMembers,
   loadReceipts,
   loadLocations,
@@ -168,7 +166,6 @@ export default function ReceiptEntry() {
   const [particularsMaster, setParticularsMaster] = useState([]);
   const [unapprovedMembers, setUnapprovedMembers] = useState([]);
   const [registeredMembers, setRegisteredMembers] = useState([]);
-  const [unapprovedRenewals, setUnapprovedRenewals] = useState([]);
   const [membershipTypes, setMembershipTypes] = useState([]);
   const [existingReceipts, setExistingReceipts] = useState([]);
   const [paymentModeConfigs, setPaymentModeConfigs] = useState([]);
@@ -230,6 +227,7 @@ export default function ReceiptEntry() {
 
   // Search and pagination state for Right-Side Membership List Table
   const [rightSearchQuery, setRightSearchQuery] = useState('');
+  const [rightSearchOpen, setRightSearchOpen] = useState(false);
   const [rightPage, setRightPage] = useState(1);
   const [rightPageSize, setRightPageSize] = useState(10);
 
@@ -237,25 +235,6 @@ export default function ReceiptEntry() {
   const [unapprovedSearchQuery, setUnapprovedSearchQuery] = useState('');
   const [unapprovedPage, setUnapprovedPage] = useState(1);
   const [unapprovedPageSize, setUnapprovedPageSize] = useState(10);
-
-  // Renewals due (server)
-  const [renewalSearchQuery, setRenewalSearchQuery] = useState('');
-  const sendRenewalReminders = async () => {
-    const ok = await confirmYesNo({
-      title: 'Send renewal reminders?',
-      text: 'Members whose membership expires within 30 days get the renewal message. Anyone reminded in the last 7 days is skipped.',
-      confirmText: 'Send reminders'
-    });
-    if (!ok) return;
-    try {
-      const { data } = await api.post('/notifications/expiry-reminders', null, {
-        params: { days_ahead: 30, reason: 'Renewal reminders from Receipt Entry' }
-      });
-      showToast(data?.queued ? `${data.queued} reminder(s) queued.` : 'No one needs a reminder right now.');
-    } catch (error) {
-      showToast(apiErrorMessage(error, 'Could not send the reminders.'), 'error');
-    }
-  };
 
   // View Member Details Modal State
   const [viewingMember, setViewingMember] = useState(null);
@@ -348,7 +327,6 @@ export default function ReceiptEntry() {
       loadMembershipTypes().then(setMembershipTypes).catch(fail('membership types')),
       loadPaymentModeConfigs().then(setPaymentModeConfigs).catch(fail('payment modes')),
       loadReceipts({ limit: 1000 }).then(setExistingReceipts).catch(fail('receipts')),
-      loadRenewals().then(setUnapprovedRenewals).catch(fail('renewals')),
       loadMembers({ approval_status: 'UNAPPROVED', limit: 1000 })
         .then((rows) => setUnapprovedMembers(rows.map((m) => toEntryMember(m, loc))))
         .catch(fail('unapproved members')),
@@ -621,21 +599,6 @@ export default function ReceiptEntry() {
     applyMemberToForm(member);
     setLookupError('');
     showToast(`Assigned membership record "${member.fullName || member.name}" to Receipt.`);
-  };
-
-  // A renewal due: load that member from the server and assign it (renewal payment)
-  const handleAssignRenewal = async (renewal) => {
-    try {
-      const { data } = await api.get(`/members/${renewal.member_id || renewal.id}`);
-      const mem = { ...toEntryMember(data, locations), isRenewal: true };
-      setEntrySource('membership-assignment');
-      setLookupMembershipNo(mem.membershipNumber || mem.registrationNumber || mem.id || '');
-      applyMemberToForm(mem);
-      setLookupError('');
-      showToast(`Assigned renewal for "${mem.fullName}" to Receipt.`);
-    } catch (error) {
-      showToast(apiErrorMessage(error, 'Could not load that member.'), 'error');
-    }
   };
 
   // Update Particulars Change
@@ -1096,23 +1059,6 @@ export default function ReceiptEntry() {
     return filteredBottomMembers.slice(start, start + unapprovedPageSize);
   }, [filteredBottomMembers, unapprovedPage, unapprovedPageSize]);
 
-  // ----------------------------------------------------
-  // RENEWALS DUE (server)
-  // ----------------------------------------------------
-  const filteredRenewals = useMemo(() => {
-    const q = renewalSearchQuery.trim().toLowerCase();
-    if (!q) return unapprovedRenewals;
-    return unapprovedRenewals.filter(
-      (r) =>
-        String(r.registrationNumber ?? '').toLowerCase().includes(q) ||
-        String(r.name || '').toLowerCase().includes(q) ||
-        String(r.membershipNumber ?? '').toLowerCase().includes(q) ||
-        String(r.membershipType || '').toLowerCase().includes(q) ||
-        String(r.contactNumber || '').includes(q)
-    );
-  }, [unapprovedRenewals, renewalSearchQuery]);
-
-
   return (
     <PermissionGate required="receipts.entry.read">
     <div className="space-y-6 pb-16 font-sans">
@@ -1532,7 +1478,7 @@ export default function ReceiptEntry() {
                       {/* Membership No */}
                       <div>
                         <label className="block text-xs font-bold text-[#180200] mb-1">
-                          Membership No. / Name / Mobile
+                          Membership No.
                         </label>
                         <input
                           type="text"
@@ -1632,7 +1578,7 @@ export default function ReceiptEntry() {
                     {/* Membership No */}
                     <div>
                       <label className="block text-xs font-bold text-[#180200] mb-1">
-                        Membership No. / Name / Mobile
+                        Membership No.
                       </label>
                       <input
                         type="text"
@@ -1666,7 +1612,12 @@ export default function ReceiptEntry() {
                         </p>
                       )}
                     </div>
+                  </div>
+                )}
 
+                {/* Particulars with its sub-type / Others description on the same row */}
+                {formData.particulars !== 'Donation' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Particulars */}
                     <div>
                       <label className="block text-xs font-bold text-[#180200] mb-1">
@@ -1694,43 +1645,37 @@ export default function ReceiptEntry() {
                         </p>
                       )}
                     </div>
-                  </div>
-                )}
 
-                {/* Conditional Row for Non-Donation Sub-Types or Others Description */}
-                {formData.particulars !== 'Donation' && hasActiveSubTypes ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {hasActiveSubTypes ? (
+                      <div>
+                        <label className="block text-xs font-bold text-[#180200] mb-1">
+                          {`${formData.particulars} Sub-Type`} <span className="text-[#ED4636]">*</span>
+                        </label>
+                        <select
+                          name="donationSubType"
+                          value={formData.donationSubType}
+                          onChange={handleInputChange}
+                          className={`w-full px-3 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none cursor-pointer transition-colors ${formErrors.donationSubType
+                            ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
+                            : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                            }`}
+                        >
+                          <option value="">{`Select ${formData.particulars} Sub-Type`}</option>
+                          {activeSubTypes.map((st) => (
+                            <option key={st.id || st.name} value={st.name}>
+                              {st.name}
+                            </option>
+                          ))}
+                        </select>
+                        {formErrors.donationSubType && (
+                          <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3 shrink-0" />
+                            {formErrors.donationSubType}
+                          </p>
+                        )}
+                      </div>
+                    ) : isOthersName(formData.particulars) ? (
                     <div>
-                      <label className="block text-xs font-bold text-[#180200] mb-1">
-                        {`${formData.particulars} Sub-Type`} <span className="text-[#ED4636]">*</span>
-                      </label>
-                      <select
-                        name="donationSubType"
-                        value={formData.donationSubType}
-                        onChange={handleInputChange}
-                        className={`w-full px-3 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none cursor-pointer transition-colors ${formErrors.donationSubType
-                          ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                          : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                          }`}
-                      >
-                        <option value="">{`Select ${formData.particulars} Sub-Type`}</option>
-                        {activeSubTypes.map((st) => (
-                          <option key={st.id || st.name} value={st.name}>
-                            {st.name}
-                          </option>
-                        ))}
-                      </select>
-                      {formErrors.donationSubType && (
-                        <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 shrink-0" />
-                          {formErrors.donationSubType}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ) : isOthersName(formData.particulars) ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="sm:col-span-2">
                       <label className="block text-xs font-bold text-[#180200] mb-1">
                         Others Description <span className="text-[#ED4636]">*</span>
                       </label>
@@ -1752,10 +1697,11 @@ export default function ReceiptEntry() {
                         </p>
                       )}
                     </div>
+                    ) : null}
                   </div>
-                ) : null}
+                )}
 
-                {/* Row 4: Amount & Payment Mode */}
+                {/* Row 4: Amount */}
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                   {/* 9. Amount */}
                   <div className="sm:col-span-6">
@@ -1787,35 +1733,6 @@ export default function ReceiptEntry() {
                     {formData.amount && Number(formData.amount) > 0 && (
                       <p className="text-[10px] text-[#863221]/80 italic mt-1 truncate" title={numberToWords(formData.amount)}>
                         {numberToWords(formData.amount)}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* 10. Payment Mode */}
-                  <div className="sm:col-span-6">
-                    <label className="block text-xs font-bold text-[#180200] mb-1">
-                      Payment Mode <span className="text-[#ED4636]">*</span>
-                    </label>
-                    <select
-                      name="paymentMode"
-                      value={formData.paymentMode}
-                      onChange={handlePaymentModeChange}
-                      className={`w-full px-3 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white cursor-pointer transition-colors ${formErrors.paymentMode
-                        ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
-                        : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                        }`}
-                    >
-                      <option value="">Select Mode</option>
-                      {activePaymentModes.map((mode) => (
-                        <option key={mode} value={mode}>
-                          {mode}
-                        </option>
-                      ))}
-                    </select>
-                    {formErrors.paymentMode && (
-                      <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3 shrink-0" />
-                        {formErrors.paymentMode}
                       </p>
                     )}
                   </div>
@@ -1900,7 +1817,7 @@ export default function ReceiptEntry() {
                     </p>
                   )}
 
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-end justify-between gap-3">
                     <button
                       type="button"
                       onClick={() => setExtraLines((prev) => [...prev, emptyLine()])}
@@ -1909,6 +1826,34 @@ export default function ReceiptEntry() {
                       <Plus className="w-3.5 h-3.5" />
                       Add another particular
                     </button>
+                  {/* 10. Payment Mode */}
+                  <div className="w-full sm:w-64">
+                    <label className="block text-xs font-bold text-[#180200] mb-1">
+                      Payment Mode <span className="text-[#ED4636]">*</span>
+                    </label>
+                    <select
+                      name="paymentMode"
+                      value={formData.paymentMode}
+                      onChange={handlePaymentModeChange}
+                      className={`w-full px-3 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm font-semibold text-[#180200] focus:outline-none focus:bg-white cursor-pointer transition-colors ${formErrors.paymentMode
+                        ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
+                        : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                        }`}
+                    >
+                      <option value="">Select Mode</option>
+                      {activePaymentModes.map((mode) => (
+                        <option key={mode} value={mode}>
+                          {mode}
+                        </option>
+                      ))}
+                    </select>
+                    {formErrors.paymentMode && (
+                      <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" />
+                        {formErrors.paymentMode}
+                      </p>
+                    )}
+                  </div>
                   </div>
                 </div>
 
@@ -2295,7 +2240,7 @@ export default function ReceiptEntry() {
                     </div>
                     <div>
                       <span className="text-[#863221] font-semibold block">Payment Mode:</span>
-                      <strong className="text-[#180200]">{selectedMember.paymentMode || 'Cash'}</strong>
+                      <strong className="text-[#180200]">{selectedMember.paymentMode || '—'}</strong>
                     </div>
                     <div>
                       <span className="text-[#863221] font-semibold block">Receipt Status:</span>
@@ -2316,50 +2261,65 @@ export default function ReceiptEntry() {
             <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_16px_-4px_rgba(24,2,0,0.06)] overflow-hidden">
               {/* Header */}
               <div className="bg-[#FAF7F2] border-b border-[#E8DFD8] px-4 sm:px-5 py-3.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2.5 shrink-0">
                   <div className="w-9 h-9 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold text-sm shadow-sm shrink-0">
                     <Users className="w-4 h-4" />
                   </div>
-                  <div>
+                  {!rightSearchOpen && (
                     <h2 className="text-sm sm:text-base font-bold text-[#180200]">
                       Membership List
                     </h2>
-                  </div>
+                  )}
                 </div>
 
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#510601]/10 text-[#510601] border border-[#510601]/20 shrink-0">
-                  {totalRightMembers} Members
-                </span>
-              </div>
-
-              {/* Search Box */}
-              <div className="p-3.5 sm:p-4 border-b border-[#E8DFD8] bg-[#FAF7F2]/40">
-                <div className="relative w-full">
-                  <Search className="w-4 h-4 text-[#863221]/60 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    value={rightSearchQuery}
-                    onChange={(e) => {
-                      setRightSearchQuery(e.target.value);
-                      setRightPage(1);
-                    }}
-
-                    className="w-full pl-9 pr-9 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
-                  />
-                  {rightSearchQuery && (
+                {rightSearchOpen ? (
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="w-4 h-4 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      autoFocus
+                      value={rightSearchQuery}
+                      onChange={(e) => {
+                        setRightSearchQuery(e.target.value);
+                        setRightPage(1);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setRightSearchQuery('');
+                          setRightPage(1);
+                          setRightSearchOpen(false);
+                        }
+                      }}
+                      className="w-full pl-9 pr-9 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
+                    />
                     <button
                       type="button"
                       onClick={() => {
                         setRightSearchQuery('');
                         setRightPage(1);
+                        setRightSearchOpen(false);
                       }}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
-                      title="Clear search"
+                      title="Close search"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setRightSearchOpen(true)}
+                      className="w-8 h-8 rounded-xl bg-white border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] flex items-center justify-center cursor-pointer"
+                      title="Search"
+                    >
+                      <Search className="w-4 h-4" />
+                    </button>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#510601]/10 text-[#510601] border border-[#510601]/20 shrink-0">
+                      {totalRightMembers} Members
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Membership Cards Directory */}
@@ -2732,82 +2692,6 @@ export default function ReceiptEntry() {
           )}
         </div>
       )}
-
-
-      {/* ==================================================== */}
-      {/* RENEWALS DUE (from the server)                        */}
-      {/* ==================================================== */}
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-[#E8DFD8] bg-[#FAF7F2]/60 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h3 className="text-sm font-bold text-[#180200]">Renewals due</h3>
-          </div>
-          {hasPermission('notifications.write') && (
-            <button
-              type="button"
-              onClick={sendRenewalReminders}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
-              title="Send the renewal WhatsApp reminder to members whose membership expires within 30 days"
-            >
-              <Mail className="w-3.5 h-3.5" />
-              Send reminders (30 days)
-            </button>
-          )}
-          <div className="relative w-full sm:w-72">
-            <Search className="w-3.5 h-3.5 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={renewalSearchQuery}
-              onChange={(e) => setRenewalSearchQuery(e.target.value)}
-
-              className="w-full pl-8 pr-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]"
-            />
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="py-3 px-3.5">Member No.</th>
-                <th className="py-3 px-3.5">Name</th>
-                <th className="py-3 px-3.5">Membership No.</th>
-                <th className="py-3 px-3.5">Membership Type</th>
-                <th className="py-3 px-3.5">Contact</th>
-                <th className="py-3 px-3.5 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E8DFD8]">
-              {filteredRenewals.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-8 text-center text-[#863221]/70">
-                    No renewals are due.
-                  </td>
-                </tr>
-              ) : (
-                filteredRenewals.map((r) => (
-                  <tr key={r.id} className="hover:bg-[#FAF7F2]/40">
-                    <td className="py-3 px-3.5 font-mono text-[#510601]">{r.registrationNumber || '—'}</td>
-                    <td className="py-3 px-3.5 font-bold text-[#180200]">{r.name || '—'}</td>
-                    <td className="py-3 px-3.5 font-mono">{r.membershipNumber || '—'}</td>
-                    <td className="py-3 px-3.5">{r.membershipType || '—'}</td>
-                    <td className="py-3 px-3.5 font-mono">{r.contactNumber || '—'}</td>
-                    <td className="py-3 px-3.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleAssignRenewal(r)}
-                        className="btn-act"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Assign to Receipt</span>
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
     </PermissionGate>
   );

@@ -62,6 +62,7 @@ export default function MembershipTypeManagement() {
         name: m.name_en,
         code: m.code,
         currentPrice: m.current_price || 0,
+        chartColor: m.chart_color || '',
         status: m.status ? 'Active' : 'Inactive',
         effectiveFrom: 'Present',
         priceHistory: [] // Can fetch lazily or in another call
@@ -94,6 +95,7 @@ export default function MembershipTypeManagement() {
     name: '',
     amount: '',
     onlineList: 'Yes',
+    chartColor: '',
     status: 'Active'
   });
   const [formErrors, setFormErrors] = useState({});
@@ -182,6 +184,7 @@ export default function MembershipTypeManagement() {
       name: '',
       amount: '',
       onlineList: 'Yes',
+      chartColor: '',
       status: 'Active'
     });
     setFormErrors({});
@@ -195,6 +198,7 @@ export default function MembershipTypeManagement() {
       name: item.name || '',
       amount: String(item.currentPrice || ''),
       onlineList: item.onlineList || 'Yes',
+      chartColor: item.chartColor || '',
       status: item.status || 'Active'
     });
     setFormErrors({});
@@ -253,6 +257,7 @@ export default function MembershipTypeManagement() {
       if (modalMode === 'add') {
         const res = await api.post('/masters/membership-types', {
           name_en: formData.name,
+          chart_color: formData.chartColor || null,
           status: isActive
         });
         
@@ -266,6 +271,7 @@ export default function MembershipTypeManagement() {
       } else {
         await api.put(`/masters/membership-types/${editingItem.id}`, {
           name_en: formData.name,
+          chart_color: formData.chartColor || null,
           status: isActive
         });
         
@@ -871,6 +877,26 @@ export default function MembershipTypeManagement() {
             </div>
 
             {/* 4. Status (Active/Inactive) */}
+            <div>
+              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
+                Dashboard colour
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={formData.chartColor || '#863221'}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, chartColor: e.target.value }))}
+                  className="h-10 w-14 rounded-lg border border-[#E8DFD8] bg-white cursor-pointer"
+                />
+                <span className="text-xs text-[#863221]">{formData.chartColor || 'Automatic'}</span>
+                {formData.chartColor && (
+                  <button type="button" onClick={() => setFormData((prev) => ({ ...prev, chartColor: '' }))} className="text-xs font-semibold text-[#8C1801] hover:underline">
+                    Use automatic
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
                 Status

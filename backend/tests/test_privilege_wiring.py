@@ -5,7 +5,7 @@ from test_api import _staff_with_role
 API = "/api/v1"
 
 READS = [
-    "/members/", "/members/export-labels", "/receipts/tracking", "/receipts/", "/receipts/renewals-due",
+    "/members/", "/members/export-labels", "/receipts/tracking", "/receipts/",
     "/reports/members", "/reports/receipts", "/reports/summary", "/activity/users", "/activity/members",
     "/masters/banks", "/masters/payment-modes", "/masters/particulars", "/masters/states", "/masters/membership-types",
     "/masters/postal-codes", "/events/", "/magazines/subscriptions", "/notifications/templates",

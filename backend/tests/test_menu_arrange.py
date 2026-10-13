@@ -99,35 +99,27 @@ def test_module_tree_is_neat(client, admin_headers):
         if code in mods and parent and parent in mods and code not in ("approvals.requests",):
             assert by_id[mods[code]["parent_id"]]["code"] == parent, code
 
-    # the planned screens sit under their modules
-    for code, parent in (("magazines.subscriptions", "magazines"), ("reports.members", "reports"), ("notifications.bulk", "notifications"),
-                         ("events.guests", "events"), ("activity.members", "activity"), ("system.error_logs", "system")):
-        assert by_id[mods[code]["parent_id"]]["code"] == parent, code
 
-
-def test_migration_0033_adds_planned_screens_switched_off(client, admin_headers):
+def test_planned_screen_placeholders_are_gone_and_the_migration_removes_old_ones(client, admin_headers):
     from db.session import SessionLocal, engine
     from models.users import Module
 
-    with SessionLocal() as db:
-        db.query(Module).filter(Module.code == "events.guests").delete()
+    mods = {m["code"] for m in client.get("/api/v1/users/modules", headers=admin_headers, params={"limit": 500}).json()["data"]}
+    for code in ("magazines.subscriptions", "reports.members", "events.guests", "system.error_logs"):
+        assert code not in mods, code
+
+    with SessionLocal() as db:  # an old placeholder, as migration 0033 used to create it
+        db.add(Module(code="events.guests", name_en="Guests & Honourees", status=False, display_order=2))
         db.commit()
-    path = Path(__file__).resolve().parents[1] / "alembic" / "versions" / "20261009_0033_planned_screens.py"
-    spec = importlib.util.spec_from_file_location("mig0033", path)
+    path = Path(__file__).resolve().parents[1] / "alembic" / "versions" / "20261013_0049_remove_planned_screen_placeholders.py"
+    spec = importlib.util.spec_from_file_location("mig0049", path)
     mig = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mig)
-    try:
-        with engine.connect() as conn, mock.patch.object(mig.op, "get_bind", return_value=conn):
-            mig.upgrade()
-            mig.upgrade()  # idempotent
-        with SessionLocal() as db:
-            row = db.query(Module).filter(Module.code == "events.guests").first()
-            assert row is not None and row.status is False and row.route is None
-    finally:
-        with SessionLocal() as db:  # the shared test database keeps every module enabled
-            for m in db.query(Module).all():
-                m.status = True
-            db.commit()
+    with engine.connect() as conn, mock.patch.object(mig.op, "get_bind", return_value=conn):
+        mig.upgrade()
+        mig.upgrade()  # idempotent
+    with SessionLocal() as db:
+        assert db.query(Module).filter(Module.code == "events.guests", Module.is_deleted == False).first() is None  # noqa: E712
 
 
 def test_create_a_section_then_a_page_inside_it(client, admin_headers):

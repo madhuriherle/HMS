@@ -17,9 +17,11 @@ import {
 } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';
+import useLists from '../hooks/useLists';
 import { apiErrorMessage } from '../utils/apiError';
 
 export default function ActivityLogs() {
+  const lists = useLists(); // filter choices from the server (GET /meta/lists)
   // Preset tabs: 'today' | 'yesterday' | 'week' | 'month' | 'custom'
   const [activeDateTab, setActiveDateTab] = useState('custom');
 
@@ -318,10 +320,7 @@ export default function ActivityLogs() {
               className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FAF7F2] focus:bg-white border border-[#E8DFD8] rounded-lg text-xs font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20 shadow-2xs cursor-pointer"
             >
               <option value="All">All Actions</option>
-              <option value="IMPORTANT">Important Actions</option>
-              <option value="CRUD">CRUD Actions</option>
-              <option value="AUTH">Authentication / Logins</option>
-              <option value="NAVIGATION">Navigation Activity</option>
+              {(lists?.activity_action_groups || []).map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
             </select>
           </div>
 
@@ -339,8 +338,7 @@ export default function ActivityLogs() {
               className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FAF7F2] focus:bg-white border border-[#E8DFD8] rounded-lg text-xs font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20 shadow-2xs cursor-pointer"
             >
               <option value="All Status">All Status</option>
-              <option value="SUCCESS">Success</option>
-              <option value="FAILED">Failed</option>
+              {(lists?.activity_statuses || []).map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
             </select>
           </div>
 
@@ -358,8 +356,7 @@ export default function ActivityLogs() {
               className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FAF7F2] focus:bg-white border border-[#E8DFD8] rounded-lg text-xs font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20 shadow-2xs cursor-pointer"
             >
               <option value="All Clients">All Clients</option>
-              <option value="Web Admin">Web Admin</option>
-              <option value="Mobile App">Mobile App</option>
+              {(lists?.activity_clients || []).map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
             </select>
           </div>
         </div>

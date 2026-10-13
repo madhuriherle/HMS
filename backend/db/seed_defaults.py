@@ -64,7 +64,6 @@ SUB_MODULE_AREAS = {
     "receipts": [
         ("receipts.entry", "Receipt Entry", [
             ("POST", r"^/receipts/?$"),
-            ("GET", r"^/receipts/renewals-due/?$"),
             ("GET", r"^/receipts/tracking/?$"),  # the entry screen checks existing receipt numbers
             ("GET", r"^/receipts/member-lookup/?$"),  # "who is this membership number?"
         ]),
@@ -105,31 +104,6 @@ _ENGAGEMENT_SUBS = [
     for i, (code, label, _paths) in enumerate(SUB_MODULE_AREAS["engagements"])
 ]
 
-# Screens planned for the modules that are not built yet (from the product scope). They are placeholders:
-# no route, no privileges, switched off by migration 0033 until their screens exist, so they only give the
-# Module Master and the privilege table a tidy tree to show.
-# (code, name, parent_code, route, icon, display_order, min_rank_level)
-PLANNED_SCREENS = [
-    ("magazines.subscriptions", "Subscriptions & Delivery", "magazines", None, None, 1, None),
-    ("magazines.pauses", "Pause & Resume", "magazines", None, None, 2, None),
-    ("magazines.returns", "Returns", "magazines", None, None, 3, None),
-    ("magazines.labels", "Label Printing", "magazines", None, None, 4, None),
-    ("reports.members", "Member Reports", "reports", None, None, 1, None),
-    ("reports.receipts", "Receipt Reports", "reports", None, None, 2, None),
-    ("reports.magazine_returns", "Magazine Returns", "reports", None, None, 3, None),
-    ("reports.saved", "Saved Reports", "reports", None, None, 4, None),
-    ("notifications.templates", "Templates", "notifications", None, None, 1, None),
-    ("notifications.individual", "Individual Notification", "notifications", None, None, 2, None),
-    ("notifications.bulk", "Bulk Notification", "notifications", None, None, 3, None),
-    ("activity.users", "User Activity", "activity", None, None, 1, None),
-    ("activity.members", "Member Timeline", "activity", None, None, 2, None),
-    ("events.list", "Events", "events", None, None, 1, None),
-    ("events.guests", "Guests & Honourees", "events", None, None, 2, None),
-    ("imports.postal_codes", "Postal Code Import", "imports", None, None, 1, None),
-    ("system.files", "Files & Attachments", "system", None, None, 3, None),
-    ("system.error_logs", "Error Logs", "system", None, None, 4, None),
-]
-
 # ── modules ──────────────────────────────────────────────────
 # (code, name, parent_code, route, icon, display_order, min_rank_level)
 MODULE_CATALOG = [
@@ -154,7 +128,6 @@ MODULE_CATALOG += [  # sub-modules of Affiliation, Associates & Press (no menu p
     (code, label, parent, route, icon, order, rank)
     for code, label, parent, route, icon, order, rank in _ENGAGEMENT_SUBS
 ]
-MODULE_CATALOG += PLANNED_SCREENS
 
 _READ_WRITE_DELETE = (
     "masters", "users.management", "roles", "members", "magazines", "receipts",
@@ -482,6 +455,26 @@ def seed_organisation_settings(db) -> bool:
     db.add(OrganisationSettings(**ORGANISATION_SETTINGS_DEFAULTS))
     db.commit()
     return True
+
+
+def seed_lookup_values(db) -> int:
+    """Fill each lookup list that has no rows yet (an edited list is never touched). Returns rows added."""
+    from db.lookup_seed import LOOKUP_DEFAULTS
+    from models.masters import LookupValue
+
+    present = {
+        row[0] for row in db.query(LookupValue.list_code).filter(LookupValue.is_deleted == False).distinct().all()  # noqa: E712
+    }
+    added = 0
+    for list_code, entries in LOOKUP_DEFAULTS.items():
+        if list_code in present:
+            continue
+        for order, (code, label, extra) in enumerate(entries, start=1):
+            db.add(LookupValue(list_code=list_code, code=code, label=label, extra=extra, sort_order=order, status=True))
+            added += 1
+    if added:
+        db.commit()
+    return added
 
 
 def seed_banks(db) -> int:

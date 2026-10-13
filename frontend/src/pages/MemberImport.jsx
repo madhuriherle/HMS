@@ -38,57 +38,21 @@ export default function MemberImport() {
   const [skippedList, setSkippedList] = useState([]);
   const [importCompleted, setImportCompleted] = useState(false);
 
-  // Helper to trigger template download
-  const handleDownloadTemplate = () => {
-    const headers = [
-      'membership_number',
-      'first_name_en',
-      'last_name_en',
-      'middle_name_en',
-      'full_name_kn',
-      'mobile',
-      'gender',
-      'date_of_birth',
-      'email',
-      'address_line1',
-      'address_line2',
-      'locality',
-      'city',
-      'pincode',
-      'membership_type',
-      'remarks'
-    ];
-
-    const sampleRow = [
-      'LM-1001',
-      'Ramesh',
-      'Bhat',
-      '',
-      'ರಮೇಶ್ ಭಟ್',
-      '9876543210',
-      'MALE',
-      '1985-05-15',
-      'ramesh@example.com',
-      '#45, 2nd Main, Temple Road',
-      'Near Ganapathi Temple',
-      'Malleshwaram',
-      'Bengaluru',
-      '560003',
-      'Life Member',
-      'Legacy Register Migration'
-    ];
-
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), sampleRow.join(',')].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'members_30k_import_template.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // The template comes from the server (column headings only)
+  const handleDownloadTemplate = async () => {
+    try {
+      const { data } = await api.get('/meta/import-template/members', { responseType: 'blob' });
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'members_import_template.csv';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      notify('Could not download the template.', 'error');
+    }
   };
 
   // Parse CSV text into array of objects

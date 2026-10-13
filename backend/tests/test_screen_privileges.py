@@ -38,14 +38,12 @@ def test_membership_screens_each_hold_their_own_access(client, admin_headers):
 
 def test_receipt_entry_and_tracking_are_separate(client, admin_headers):
     entry = _role_user(client, admin_headers, ["receipts.entry.read", "receipts.entry.write"])
-    assert client.get(f"{API}/receipts/renewals-due", headers=entry).status_code == 200
     assert client.get(f"{API}/receipts/tracking", headers=entry).status_code == 200, "entry checks existing receipt numbers"
     assert client.get(f"{API}/receipts/", headers=entry).status_code == 403, "the full receipt list is Receipt Tracking's"
     assert client.post(f"{API}/receipts/1/cancel", headers=entry, json={"reason": "x"}).status_code == 403
 
     tracking = _role_user(client, admin_headers, ["receipts.tracking.read"])
     assert client.get(f"{API}/receipts/tracking", headers=tracking).status_code == 200
-    assert client.get(f"{API}/receipts/renewals-due", headers=tracking).status_code == 403
     assert client.post(f"{API}/receipts/", headers=tracking, json={}).status_code == 403
 
 

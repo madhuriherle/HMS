@@ -41,7 +41,7 @@ export default function ReceiptTypeManagement() {
   const [pageSize, setPageSize] = useState(10);
 
   // Expandable row state (expanded receipt type IDs)
-  const [expandedRows, setExpandedRows] = useState({ 3: true }); // Donation expanded by default
+  const [expandedRows, setExpandedRows] = useState({}); // groups start closed; a click opens one
 
   // Modal States - Particular (Add/Edit)
   const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);

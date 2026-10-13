@@ -51,6 +51,7 @@ class MembershipType(AuditMixin, Base):
     name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
+    chart_color: Mapped[str] = mapped_column(String(9), nullable=True)  # #RRGGBB, used for this type on the dashboard
 
 class MembershipTypePrice(AuditMixin, Base):
     __tablename__ = "membership_type_prices"
@@ -179,4 +180,21 @@ Index("uq_particulars_code_active", Particular.__table__.c.code, unique=True,
 Index("uq_service_types_code_active", ServiceType.__table__.c.code, unique=True,
       postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
 Index("uq_banks_code_active", Bank.__table__.c.code, unique=True,
+      postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
+
+
+class LookupValue(AuditMixin, Base):
+    """One entry of a fixed list the screens show (child relations, receipt statuses, country codes ...).
+    list_code names the list; extra carries one optional detail (a chip colour class, a dial code)."""
+    __tablename__ = "lookup_values"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    list_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String(60), nullable=False)
+    label: Mapped[str] = mapped_column(String(150), nullable=False)
+    extra: Mapped[str] = mapped_column(String(60), nullable=True)
+    sort_order: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    status: Mapped[bool] = mapped_column(Boolean, default=True)
+
+
+Index("uq_lookup_values_list_code_active", LookupValue.__table__.c.list_code, LookupValue.__table__.c.code, unique=True,
       postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))

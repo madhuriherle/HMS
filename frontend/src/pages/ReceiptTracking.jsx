@@ -39,6 +39,7 @@ import { askForm, askReason, confirmYesNo } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import { fetchReceipts, normalizeReceipt, receiptToApiPayload } from '../utils/apiAdapters';
 import useRules, { currentRules } from '../hooks/useRules';
+import { useList } from '../hooks/useLists';
 
 // Financial year (April-March) of an ISO date: 2026-10-12 -> 2026-27
 const fyOf = (iso) => {
@@ -81,18 +82,14 @@ const numberToWords = (num) => {
   return str.trim() + ' Rupees Only';
 };
 
-const STATUS_LOOK = {
-  UNASSIGNED: { label: 'Unassigned', chip: 'chip-warn' },
-  ASSIGNED: { label: 'Assigned', chip: 'chip-on' },
-  APPROVED: { label: 'Approved', chip: 'chip-brand' },
-  CANCELLED: { label: 'Cancelled', chip: 'chip-bad' }
-};
-
+// the status names and chip colours come from the server (receipt_statuses in GET /meta/lists)
 function StatusDot({ receipt }) {
+  const statuses = useList('receipt_statuses');
   const key = receipt.receiptStatus || (isReceiptUnmapped(receipt) ? 'UNASSIGNED' : 'ASSIGNED');
-  const look = STATUS_LOOK[key] || STATUS_LOOK.ASSIGNED;
+  const look = statuses.find((s) => s.code === key);
+  if (!look) return <span className="chip chip-off">{key}</span>;
   return (
-    <span className={`chip ${look.chip}`}>{look.label}</span>
+    <span className={`chip ${look.extra || 'chip-off'}`}>{look.label}</span>
   );
 }
 
@@ -365,7 +362,7 @@ export default function ReceiptTracking() {
       donationDetails: receipt.donationDetails || '',
       othersDescription: receipt.othersDescription || '',
       amount: String(receipt.amount || ''),
-      paymentMode: receipt.paymentMode || 'Online',
+      paymentMode: receipt.paymentMode || '',
       bankName: receipt.bankName || receipt.bankAccount || '',
       transactionId: receipt.transactionId || '',
       transactionDate: receipt.transactionDate || '',
@@ -1131,7 +1128,7 @@ export default function ReceiptTracking() {
                   )}
                   <div>
                     <span className="text-[10px] uppercase font-bold text-[#863221]">Payment Mode</span>
-                    <p className="font-medium mt-0.5">{viewingReceipt.paymentMode || 'Online'}</p>
+                    <p className="font-medium mt-0.5">{viewingReceipt.paymentMode || '—'}</p>
                   </div>
                   <div>
                     <span className="text-[10px] uppercase font-bold text-[#863221]">Amount in Words</span>

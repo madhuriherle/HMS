@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import date as date_type, datetime
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from core import rules
 
@@ -129,6 +129,7 @@ class MembershipTypeBase(BaseModel):
     name_kn: Optional[str] = None
     description: Optional[str] = None
     status: bool = True
+    chart_color: Optional[str] = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
 
 
 class MembershipTypeCreate(_AutoCode, MembershipTypeBase):
@@ -141,6 +142,7 @@ class MembershipTypeUpdate(BaseModel):
     name_kn: Optional[str] = None
     description: Optional[str] = None
     status: Optional[bool] = None
+    chart_color: Optional[str] = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
 
 
 class MembershipType(MembershipTypeBase):

@@ -304,8 +304,6 @@ def test_receipt_roundtrip(client, admin_headers):
         db.expire_all()
         assert Decimal(str(db.get(Receipt, rid).net_amount)) == Decimal("900")
 
-    assert client.get(f"{API}/receipts/renewals-due", headers=admin_headers,
-                      params={"limit": 500}).status_code == 200
     # member-allocated receipts are (by design) not deletable
     assert client.delete(f"{API}/receipts/{rid}", headers=admin_headers).status_code == 409
     free = client.post(f"{API}/receipts/", headers=admin_headers, json=_receipt_payload(None, 5)).json()

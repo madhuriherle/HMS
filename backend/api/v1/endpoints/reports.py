@@ -52,7 +52,7 @@ KANNADA_HEADERS = {
 # ─────────────── shared helpers ───────────────
 
 # CSV/Excel rendering + export audit logging moved to services.exports so
-# operational screens (receipt tracking, renewals-due) share the Export button.
+# operational screens (receipt tracking) share the Export button.
 
 
 def _member_name(m: Member) -> str:
