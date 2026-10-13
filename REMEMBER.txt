@@ -316,6 +316,11 @@ RULE 13: PERMISSIONS AND ACCESS
      - The Approvals screen (/dashboard/approvals) displays all approval actions in ONE unified
        list by default, with live category filter pills (All, Change Requests, Member Deletions,
        Profile Changes, Type Changes) and status filters, rather than fragmented isolated tabs.
+     - Each approval row has a "View" button that opens a large comparison popup (components/Modal.jsx
+       & ModalFooter.jsx) showing field-by-field diff (Previous / Current Value vs Proposed / New Value)
+       across all request types, with direct Approve / Reject actions in the modal footer.
+     - The backend approval gate captures prior record state (_previous) on UPDATE and DELETE
+       requests to support side-by-side comparison during review.
 
 --------------------------------------------------------------------------------
 RULE 14: SETTINGS AND ADMIN TOOLS
@@ -356,4 +361,7 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
 15.5 The Membership List panel on Receipt Entry is one compact line per member:
      #000001 | name | mobile | location, with a small Assign button.
 15.6 Receipt Tracking's search sits in the header row (searchInHeader).
+15.7 Approvals does NOT use siloed tabs: all requests (change requests, deletions, profile
+     updates, type changes) appear together in one unified list with category filter pills,
+     and each row provides a View button opening a Previous vs. Proposed comparison modal.
 ================================================================================
