@@ -550,7 +550,7 @@ export default function BulkReceiptMapping() {
                               </span>
                               <div className="flex items-center gap-2 text-[11px] text-[#863221]">
                                 <span className="font-mono font-semibold">
-                                  No: {cand.matched_member.membership_number || `MID #${cand.matched_member.id}`}
+                                  No: {cand.matched_member.membership_number || '—'}
                                 </span>
                                 {cand.matched_member.mobile && (
                                   <span>· {cand.matched_member.mobile}</span>

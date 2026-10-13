@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { AlertTriangle, ArrowLeft, Download } from 'lucide-react';
+import { Download, Trash2 } from 'lucide-react';
 import api from '../api';
 import PermissionGate from '../components/PermissionGate';
 import { askReason } from '../utils/dialogs';
@@ -23,7 +22,6 @@ const withRequired = (keys, groups) => {
 };
 
 export default function DataCleanup() {
-  const navigate = useNavigate();
   const canWrite = useAuth().hasPermission('system.cleanup.write');
   const [groups, setGroups] = useState([]);
   const [word, setWord] = useState('CLEAR');
@@ -104,58 +102,96 @@ export default function DataCleanup() {
     }
   };
 
+  const labelOf = (key) => groups.find((g) => g.key === key)?.label || key;
+
   return (
     <PermissionGate required="system.cleanup.read" minRank={1} title="Access Restricted" message="Data Cleanup needs its privilege and a rank 1 role.">
-      <div className="space-y-4 max-w-5xl">
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={() => navigate('/dashboard/settings')} aria-label="Back to System Settings"
-            className="w-10 h-10 rounded-full bg-white border border-[#E8DFD8] flex items-center justify-center text-[#180200] hover:bg-[#FAF7F2] cursor-pointer">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+      <div className="space-y-6">
+        <div>
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Data Cleanup</h1>
+          <p className="mt-1 text-xs text-[#863221]">Clears operational records only. Master setup data stays protected. Cleared rows cannot be brought back.</p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-[#E8DFD8] p-5 flex items-start gap-4">
-          <span className="w-12 h-12 rounded-xl bg-[#FAF1EE] text-[#ED4636] flex items-center justify-center shrink-0"><AlertTriangle className="w-6 h-6" /></span>
-          <div>
-            <h2 className="text-lg font-bold text-[#180200]">Clear only operational records</h2>
-            <p className="text-sm text-[#863221]">Select operational data to clear. Master setup data stays protected. Cleared rows cannot be brought back.</p>
+        {error && <p className="text-xs font-semibold text-red-700">{error}</p>}
+
+        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-[#FAF7F2] text-[10px] font-bold uppercase tracking-wider text-[#863221] border-b border-[#E8DFD8]">
+                  <th className="py-3 pl-5 pr-2 w-10" />
+                  <th className="py-3 px-3">Data group</th>
+                  <th className="py-3 px-3">Rows</th>
+                  <th className="py-3 px-3">What it clears</th>
+                  <th className="py-3 px-3">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groups.map((g) => {
+                  const on = effective.has(g.key);
+                  const empty = g.rows === 0 && !forced(g.key);
+                  return (
+                    <tr
+                      key={g.key}
+                      onClick={() => !empty && !forced(g.key) && canWrite && toggle(g.key)}
+                      className={`border-b last:border-b-0 border-[#F1E9E2] ${empty ? 'opacity-50' : 'cursor-pointer hover:bg-[#FAF7F2]/60'} ${on ? 'bg-[#FAF1EE]/50' : ''}`}
+                    >
+                      <td className="py-3 pl-5 pr-2 align-top">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 mt-0.5 cursor-pointer disabled:cursor-not-allowed"
+                          checked={on}
+                          disabled={empty || forced(g.key) || !canWrite}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggle(g.key)}
+                          aria-label={`Clear ${g.label}`}
+                        />
+                      </td>
+                      <td className="py-3 px-3 align-top text-sm font-bold text-[#180200] whitespace-nowrap">{g.label}</td>
+                      <td className="py-3 px-3 align-top">
+                        <span className={`chip ${g.rows ? 'chip-warn' : 'chip-off'}`}>{g.rows}</span>
+                      </td>
+                      <td className="py-3 px-3 align-top text-xs text-[#180200]/70 min-w-[18rem]">{g.description}</td>
+                      <td className="py-3 px-3 align-top">
+                        <div className="flex flex-wrap gap-1.5">
+                          {g.requires.length > 0 && (
+                            <span className="chip chip-brand" title="Cleared together with this group">
+                              Also clears {g.requires.map(labelOf).join(', ')}
+                            </span>
+                          )}
+                          {forced(g.key) && <span className="chip chip-brand">Cleared along with your selection</span>}
+                          {g.has_files && (
+                            <span className="chip chip-off inline-flex items-center gap-1" title="Uploaded files of these records are deleted from the server too">
+                              <Trash2 className="w-3 h-3" /> Files deleted
+                            </span>
+                          )}
+                          {g.warning && <span className="chip chip-bad" title={g.warning}>{on ? g.warning : 'Signs everyone out'}</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {error && <p className="text-sm font-semibold text-red-700">{error}</p>}
-
-        <div className="bg-white rounded-2xl border border-[#E8DFD8] overflow-hidden">
-          <div className="grid grid-cols-[1fr_2fr_auto] gap-4 px-5 py-3 bg-[#FAF7F2] text-xs font-bold uppercase tracking-widest text-[#863221]">
-            <span>Data group</span><span>Description</span><span>Clear</span>
-          </div>
-          {groups.map((g) => (
-            <label key={g.key} className="grid grid-cols-[1fr_2fr_auto] gap-4 px-5 py-4 border-t border-[#F1E9E2] items-center cursor-pointer hover:bg-[#FAF7F2]/60">
-              <span className="font-bold text-[#180200]">
-                {g.label}
-                <span className="block text-xs font-normal text-[#863221] mt-0.5">{g.rows} rows{forced(g.key) ? ' - cleared along with your selection' : ''}</span>
-              </span>
-              <span className="text-sm text-[#180200]/70">
-                {g.description}
-                {g.has_files && <span className="block text-xs text-[#863221] mt-1">Uploaded files of these records are deleted from the server too.</span>}
-                {g.warning && effective.has(g.key) && <span className="block text-xs font-semibold text-[#ED4636] mt-1">{g.warning}</span>}
-              </span>
-              <input type="checkbox" className="w-5 h-5" checked={effective.has(g.key)} disabled={forced(g.key)} onChange={() => toggle(g.key)} aria-label={`Clear ${g.label}`} />
-            </label>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <label className="flex items-center gap-2 text-sm font-semibold text-[#180200]">
-            <input type="checkbox" checked={backup} onChange={(e) => setBackup(e.target.checked)} />
+        <div className="sticky bottom-3 flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl border border-[#E8DFD8] shadow-sm px-5 py-3">
+          <label className="flex items-center gap-2 text-xs font-semibold text-[#180200] cursor-pointer">
+            <input type="checkbox" className="w-4 h-4" checked={backup} onChange={(e) => setBackup(e.target.checked)} />
             <Download className="w-4 h-4 text-[#863221]" /> Download a backup (CSV files) before clearing
           </label>
-          {canWrite && (
-            <button type="button" onClick={clear} disabled={busy || chosen.length === 0}
-              className="px-5 py-2.5 rounded-xl bg-[#ED4636] text-white text-sm font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
-              {busy ? 'Clearing...' : `Clear selected data${rows ? ` (${rows} rows)` : ''}`}
-            </button>
-          )}
+          <div className="flex items-center gap-4">
+            <span className="text-xs text-[#863221]">
+              {chosen.length === 0 ? 'Nothing selected' : `${chosen.length} group${chosen.length > 1 ? 's' : ''} selected · ${rows} rows`}
+            </span>
+            {canWrite && (
+              <button type="button" onClick={clear} disabled={busy || chosen.length === 0}
+                className="px-4 py-2 rounded-xl bg-[#ED4636] text-white text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                {busy ? 'Clearing...' : 'Clear selected data'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </PermissionGate>

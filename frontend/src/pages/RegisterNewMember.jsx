@@ -974,8 +974,8 @@ export default function RegisterNewMember() {
             <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight flex items-center gap-3">
               <span>{isViewMode ? 'View Member Details' : isEditMode ? 'Edit Member Details' : 'Register New Member'}</span>
               {(isViewMode || isEditMode) && targetMember?.registrationNumber && (
-                <span className="font-mono text-sm font-bold bg-[#FAF7F2] text-[#510601] px-3 py-1 rounded-xl border border-[#E8DFD8]" title="MID (member id)">
-                  MID {targetMember.registrationNumber}
+                <span className="font-mono text-sm font-bold bg-[#FAF7F2] text-[#510601] px-3 py-1 rounded-xl border border-[#E8DFD8]" title="Record ID">
+                  ID: {targetMember.registrationNumber}
                 </span>
               )}
               {(isViewMode || isEditMode) && targetMember?.membershipNumber && targetMember.membershipNumber !== 'Not Assigned' && targetMember.approvalStatus === 'Approved' && (

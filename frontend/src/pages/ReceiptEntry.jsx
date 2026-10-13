@@ -70,8 +70,8 @@ const ageFrom = (iso) => {
   return years >= 0 ? String(years) : '';
 };
 
-// What to show for a member's number: the real membership number (given on approval), else their MID (the id).
-const numberTag = (m) => (m.membershipNumber ? `#${m.membershipNumber}` : `MID ${m.registrationNumber || m.id}`);
+// What to show for a member's number: the real membership number (given on approval), else their application ID.
+const numberTag = (m) => (m.membershipNumber ? `#${m.membershipNumber}` : `ID #${m.registrationNumber || m.id}`);
 
 const toEntryMember = (m, loc) => {
   const nameOf = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '';
@@ -361,7 +361,7 @@ export default function ReceiptEntry() {
       .then(({ data }) => {
         const mem = toEntryMember(data, locations);
         setEntrySource(location.state?.source === 'membership' ? 'membership-assignment' : 'unapproved-assignment');
-        setLookupMembershipNo(mem.registrationNumber || mem.membershipNumber || mem.id || '');
+        setLookupMembershipNo(mem.membershipNumber || '');
         applyMemberToForm(mem);
       })
       .catch((error) => showToast(apiErrorMessage(error, 'Could not load that member.'), 'error'));
@@ -601,7 +601,7 @@ export default function ReceiptEntry() {
           const mem = toEntryMember(m, locations);
           setEntrySource(m.approval_status === 'APPROVED' ? 'membership-assignment' : 'unapproved-assignment');
           setSelectedMember(mem);
-          setLookupMembershipNo(mem.membershipNumber || mem.registrationNumber || mem.id || '');
+          setLookupMembershipNo(mem.membershipNumber || '');
         }
         setEditOriginal({ receipt: raw, allocation });
       } catch (error) {
@@ -2336,7 +2336,7 @@ export default function ReceiptEntry() {
 
                     const shortCode = member.membershipNumber
                       ? `#${String(member.membershipNumber).split('-').pop()}`
-                      : `MID ${member.registrationNumber || member.id || '—'}`;
+                      : `ID #${member.registrationNumber || member.id || '—'}`;
                     const mobile = member.contactNumber || member.mobile || member.phone || '';
                     const isAssigned = selectedMember && (
                       String(member.id) === String(selectedMember.id) ||
@@ -2355,7 +2355,7 @@ export default function ReceiptEntry() {
                         <div className="flex items-center gap-3 min-w-0">
                           <div
                             className="text-xs sm:text-sm font-mono font-bold text-[#510601] pr-3 border-r border-[#E8DFD8] shrink-0"
-                            title={member.membershipNumber || `MID ${member.registrationNumber || member.id}`}
+                            title={member.membershipNumber ? `Membership #${member.membershipNumber}` : `App ID #${member.registrationNumber || member.id}`}
                           >
                             {shortCode}
                           </div>

@@ -171,7 +171,7 @@ export default function AssignedApprovals() {
                       <td className="py-3.5 px-4">
                         <span className="font-bold">{m.fullName || m.name}</span>
                         <div className="text-[11px] font-mono text-[#863221] mt-0.5">
-                          MID {m.id}
+                          ID: {m.id}
                           {m.mobile ? ` · ${m.mobile}` : ''}
                         </div>
                       </td>

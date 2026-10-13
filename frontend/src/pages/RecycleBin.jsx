@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { RotateCcw, Search, Trash2 } from 'lucide-react';
 import api from '../api';
 import PermissionGate from '../components/PermissionGate';
 import { askReason } from '../utils/dialogs';
@@ -12,7 +11,6 @@ import useAuth from '../hooks/useAuth';
 const LIMIT = 25;
 
 export default function RecycleBin() {
-  const navigate = useNavigate();
   const canWrite = useAuth().hasPermission('system.recycle_bin.write');
   const [rows, setRows] = useState([]);
   const [types, setTypes] = useState([]);
@@ -101,18 +99,13 @@ export default function RecycleBin() {
   return (
     <PermissionGate required="system.recycle_bin.read" title="Access Restricted" message="You need the Recycle Bin privilege to open this screen.">
       <div className="space-y-4">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="flex items-start gap-3">
-            <button type="button" onClick={() => navigate('/dashboard/settings')} aria-label="Back to System Settings"
-              className="w-10 h-10 rounded-full bg-white border border-[#E8DFD8] flex items-center justify-center text-[#180200] hover:bg-[#FAF7F2] cursor-pointer">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
                 Recycle Bin
                 <span className="ml-2 align-middle text-xs font-semibold px-2.5 py-1 rounded-full bg-[#FFF1E0] text-[#C2570C] border border-[#F8D9B5]">Admin tool</span>
               </h1>
-              <p className="text-sm text-[#863221]">View, restore, or permanently delete soft-deleted records.</p>
             </div>
           </div>
           {canWrite && (

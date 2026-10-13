@@ -43,7 +43,7 @@ export const normalizeMember = (member) => {
   return {
     ...member,
     id: member.id,
-    membershipNumber: firstDefined(member.member_code, member.membership_number, member.membershipNumber, member.id),
+    membershipNumber: firstDefined(member.member_code, member.membership_number, member.membershipNumber, ''),
     fullName,
     name: fullName,
     membershipName: fullName,

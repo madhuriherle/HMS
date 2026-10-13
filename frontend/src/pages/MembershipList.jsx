@@ -660,7 +660,7 @@ export default function MembershipList() {
     () => setDeleteDialog(null),
     (m) => ({
       title: 'Delete membership?',
-      text: `Are you sure you want to delete ${m.fullName || m.name} (${m.membershipNumber ? `#${m.membershipNumber}` : `MID ${m.id}`})?`,
+      text: `Are you sure you want to delete ${m.fullName || m.name}${m.membershipNumber ? ` (#${m.membershipNumber})` : ''}?`,
       confirmText: 'Yes, delete',
       danger: true,
     }),
@@ -1455,7 +1455,7 @@ export default function MembershipList() {
                       Akhila Havyaka Mahasabha
                     </span>
                     <span className="font-mono text-[10px] font-bold bg-[#FAF7F2] text-[#510601] px-1.5 py-0.5 rounded border border-[#E8DFD8]">
-                      {m.membershipNumber ? `#${m.membershipNumber}` : `MID ${m.id}`}
+                      {m.membershipNumber ? `#${m.membershipNumber}` : '—'}
                     </span>
                   </div>
 
