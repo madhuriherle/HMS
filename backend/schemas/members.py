@@ -62,6 +62,8 @@ class MemberBase(BaseModel):
     applied_on_behalf_of: Optional[str] = None
     magazine_needed: Optional[bool] = None
     magazine_delivery_address: Optional[str] = None
+    magazine_kind: Optional[str] = None
+    magazine_email: Optional[str] = None
     membership_type_category: Optional[str] = None
     referred_by_number: Optional[str] = None
     referred_by_name: Optional[str] = None
@@ -195,6 +197,8 @@ class MemberUpdate(BaseModel):
     applied_on_behalf_of: Optional[str] = None
     magazine_needed: Optional[bool] = None
     magazine_delivery_address: Optional[str] = None
+    magazine_kind: Optional[str] = None
+    magazine_email: Optional[str] = None
     membership_type_category: Optional[str] = None
     referred_by_number: Optional[str] = None
     referred_by_name: Optional[str] = None

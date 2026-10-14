@@ -245,8 +245,8 @@ export default function UserManagement() {
     setFormData({
       fullName: user.name || user.fullName || '',
       username: user.username,
-      email: user.email,
-      mobile: user.mobile,
+      email: user.email || '',
+      mobile: user.mobile || '',
       password: '',
       confirmPassword: '',
       roleId: userRoleId ? Number(userRoleId) : '',
@@ -308,23 +308,20 @@ export default function UserManagement() {
       }
     }
 
-    if (!email) {
-      errors.email = 'Email Address is required';
-    } else if (!matchesPattern(email, rules?.email?.pattern)) {
+    // email and mobile are optional; when given they must be valid and not already used
+    if (email && !matchesPattern(email, rules?.email?.pattern)) {
       errors.email = 'Please enter a valid email address';
     } else {
       const isDuplicateEmail = users.some(
         u => (u.id !== editingUser?.id && String(u.id) !== String(editingUser?.id)) &&
-          u.email.toLowerCase() === email.toLowerCase()
+          (u.email || '').toLowerCase() === email.toLowerCase()
       );
       if (isDuplicateEmail) {
         errors.email = 'A user with this email address already exists.';
       }
     }
 
-    if (!mobile) {
-      errors.mobile = 'Mobile Number is required';
-    } else if (mobileProblem(rules, mobile)) {
+    if (mobile && mobileProblem(rules, mobile)) {
       errors.mobile = mobileProblem(rules, mobile);
     }
 
@@ -368,8 +365,8 @@ export default function UserManagement() {
       const payload = {
         name: formData.fullName.trim(),
         username: formData.username.trim(),
-        email: formData.email.trim(),
-        mobile: formData.mobile.trim(),
+        email: formData.email.trim() || null,
+        mobile: formData.mobile.trim() || null,
         mobile_country_code: '+91',
         role_id: Number(formData.roleId),
         status: typeof formData.status === 'boolean' ? formData.status : (formData.status === 'Active' || formData.status === 'true')
@@ -957,7 +954,7 @@ export default function UserManagement() {
                 {/* Email */}
                 <div>
                   <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                    Email Address <span className="text-[#ED4636]">*</span>
+                    Email Address
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#863221]/50" />
@@ -983,7 +980,7 @@ export default function UserManagement() {
                 {/* Mobile Number */}
                 <div>
                   <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                    Mobile Number <span className="text-[#ED4636]">*</span>
+                    Mobile Number
                   </label>
                   <div className="relative">
                     <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#863221]/50" />
@@ -1260,7 +1257,7 @@ export default function UserManagement() {
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
                   <p className="text-[#863221] font-semibold uppercase">Email Address</p>
-                  <p className="text-[#180200] font-medium mt-0.5">{viewingUser.email}</p>
+                  <p className="text-[#180200] font-medium mt-0.5">{viewingUser.email || '—'}</p>
                 </div>
 
                 <div>

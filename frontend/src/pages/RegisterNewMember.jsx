@@ -185,6 +185,8 @@ export default function RegisterNewMember() {
     magazineNeeded: 'YES',
     magazineDeliveryChoice: 'COMMUNICATION',
     magazineDeliveryAddress: '',
+    magazineKind: 'PHYSICAL',
+    magazineEmail: '',
     referredMembershipNo: '',
     referredMembershipName: '',
     familyMembershipNo: '',
@@ -334,6 +336,8 @@ export default function RegisterNewMember() {
           magazineNeeded: m.magazine_needed === false ? 'NO' : 'YES',
           magazineDeliveryChoice: m.magazine_delivery_address ? 'DIFFERENT' : 'COMMUNICATION',
           magazineDeliveryAddress: m.magazine_delivery_address || '',
+          magazineKind: m.magazine_kind || 'PHYSICAL',
+          magazineEmail: m.magazine_email || '',
           referredMembershipNo: m.referred_by_number || '',
           referredMembershipName: m.referred_by_name || '',
           familyMembershipNo: m.family_membership_number || '',
@@ -763,6 +767,12 @@ export default function RegisterNewMember() {
       errors.postalCode = `PIN Code must be ${rules?.pincode?.digits} numeric digits`;
     }
 
+    if (formData.magazineNeeded === 'YES' && formData.magazineKind !== 'PHYSICAL') {
+      const mail = (formData.magazineEmail || '').trim();
+      if (!mail) errors.magazineEmail = 'An e-copy needs an email address';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) errors.magazineEmail = 'Please enter a valid email address';
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -902,7 +912,9 @@ export default function RegisterNewMember() {
       pincode_id: pinRow?.id || null,
       applied_on_behalf_of: formData.appliedOnBehalfOf || null,
       magazine_needed: formData.magazineNeeded === 'YES',
-      magazine_delivery_address: formData.magazineNeeded === 'YES' && formData.magazineDeliveryChoice === 'DIFFERENT' ? (formData.magazineDeliveryAddress || '').trim() || null : null,
+      magazine_kind: formData.magazineNeeded === 'YES' ? formData.magazineKind || 'PHYSICAL' : null,
+      magazine_email: formData.magazineNeeded === 'YES' && formData.magazineKind !== 'PHYSICAL' ? (formData.magazineEmail || '').trim() || null : null,
+      magazine_delivery_address: formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' && formData.magazineDeliveryChoice === 'DIFFERENT' ? (formData.magazineDeliveryAddress || '').trim() || null : null,
       membership_type_category: formData.membershipTypeCategory || null,
       ...(isEditMode && formData.membershipTypeId ? { membership_type_id: Number(formData.membershipTypeId) } : {}),
       referred_by_number: formData.referredMembershipNo.trim() || null,
@@ -1681,8 +1693,52 @@ export default function RegisterNewMember() {
                     )}
                   </div>
 
-                  {/* Magazine Delivery Address (shown when YES) */}
+                  {/* How the member wants the magazine (shown when YES) */}
                   {formData.magazineNeeded === 'YES' && (
+                    <div className="md:col-span-2 bg-[#FAF7F2] p-4 rounded-xl border border-[#E8DFD8] space-y-3">
+                      <label className="block text-xs font-bold text-[#510601] uppercase tracking-wider">
+                        How do you want the magazine?
+                      </label>
+                      <div className="flex flex-wrap gap-5 text-xs font-semibold text-[#863221]">
+                        {[
+                          ['PHYSICAL', 'Physical copy (posted)'],
+                          ['EMAIL', 'E-copy (by email)'],
+                          ['BOTH', 'Both']
+                        ].map(([code, label]) => (
+                          <label key={code} className="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input
+                              type="radio"
+                              name="magazineKind"
+                              value={code}
+                              checked={formData.magazineKind === code}
+                              onChange={() => setFormData({ ...formData, magazineKind: code })}
+                              className="w-4 h-4 text-[#510601] focus:ring-[#510601] accent-[#510601] cursor-pointer"
+                            />
+                            <span>{label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      {formData.magazineKind !== 'PHYSICAL' && (
+                        <div className="pt-1">
+                          <label className="block text-xs text-[#863221] mb-1 font-semibold">E-copy Email Address *</label>
+                          <input
+                            type="email"
+                            value={formData.magazineEmail || ''}
+                            onChange={(e) => {
+                              setFormData({ ...formData, magazineEmail: e.target.value });
+                              if (formErrors.magazineEmail) setFormErrors({ ...formErrors, magazineEmail: '' });
+                            }}
+                            placeholder="name@example.com"
+                            className={`w-full px-3.5 py-2 bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] ${formErrors.magazineEmail ? 'border-red-500' : 'border-[#DFD5CC]'}`}
+                          />
+                          {formErrors.magazineEmail && <p className="text-[11px] text-red-600 mt-1">{formErrors.magazineEmail}</p>}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Magazine Delivery Address (shown when YES and a posted copy is wanted) */}
+                  {formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' && (
                     <div className="md:col-span-2 bg-[#FAF7F2] p-4 rounded-xl border border-[#E8DFD8] space-y-3">
                       <label className="block text-xs font-bold text-[#510601] uppercase tracking-wider">
                         Magazine Delivery Destination

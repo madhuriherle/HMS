@@ -58,6 +58,8 @@ class Member(AuditMixin, Base):
     applied_on_behalf_of: Mapped[str] = mapped_column(String(30), nullable=True)
     magazine_needed: Mapped[bool] = mapped_column(Boolean, nullable=True)
     magazine_delivery_address: Mapped[str] = mapped_column(Text, nullable=True)
+    magazine_kind: Mapped[str] = mapped_column(String(10), nullable=True)  # PHYSICAL, EMAIL (e-copy) or BOTH
+    magazine_email: Mapped[str] = mapped_column(String(191), nullable=True)
     membership_type_category: Mapped[str] = mapped_column(String(80), nullable=True)
     referred_by_number: Mapped[str] = mapped_column(String(30), nullable=True)
     referred_by_name: Mapped[str] = mapped_column(String(150), nullable=True)

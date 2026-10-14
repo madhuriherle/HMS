@@ -120,6 +120,30 @@ def _attach_membership_types(db: Session, rows: list) -> None:
                 r["member_code"] = mem_no
 
 
+MAGAZINE_KINDS = {"PHYSICAL", "EMAIL", "BOTH"}
+
+
+def _magazine_choice(data: dict, *, needed, own_email=None) -> None:
+    """Check the magazine choice and tidy it: the kind must be known, an e-copy needs an email (the member's own
+    email is used when none is typed), and a member who only wants the e-copy has no delivery address."""
+    kind = data.get("magazine_kind")
+    if kind is not None and kind not in MAGAZINE_KINDS:
+        raise HTTPException(400, f"magazine_kind must be one of {sorted(MAGAZINE_KINDS)}")
+    if not needed:
+        return
+    kind = kind or "PHYSICAL"
+    data["magazine_kind"] = kind
+    if kind in ("EMAIL", "BOTH"):
+        email = (data.get("magazine_email") or own_email or "").strip()
+        if not email:
+            raise HTTPException(400, "An e-copy needs an email address for the magazine")
+        data["magazine_email"] = email
+    else:
+        data["magazine_email"] = None
+    if kind == "EMAIL":
+        data["magazine_delivery_address"] = None
+
+
 @router.post("/", response_model=Union[schemas_members.Member, PendingApproval], status_code=201)
 @approval_gate.gated("members", "CREATE", "Member", "members.write")
 def create_member(
@@ -201,9 +225,16 @@ def create_member(
     # Mangalya-parity personal master references must exist.
     _member_master_checks(db, member_in.model_dump(exclude_unset=False))
 
-    db_obj = MemberModel(**member_in.model_dump(), created_by=current_user.id)
+    fields = member_in.model_dump()
+    _magazine_choice(fields, needed=fields.get("magazine_needed"), own_email=fields.get("email"))
+    db_obj = MemberModel(**fields, created_by=current_user.id)
     db.add(db_obj)
     db.flush()
+
+    if db_obj.magazine_needed:
+        # a member who says Yes is on the magazine subscription straight away (no separate accept step)
+        from services.magazine_subscriptions import sync_member_magazine_subscription
+        sync_member_magazine_subscription(db, db_obj, user_id=current_user.id)
 
     db.commit()
     db.refresh(db_obj)
@@ -758,8 +789,17 @@ def update_member(
     new_type_id = data.pop("membership_type_id", None)
     if new_type_id:
         _change_membership_type(db, member, new_type_id, current_user.id)
+    if any(k in data for k in ("magazine_needed", "magazine_delivery_address", "magazine_kind", "magazine_email")):
+        merged = {
+            "magazine_kind": data.get("magazine_kind", member.magazine_kind),
+            "magazine_email": data.get("magazine_email", member.magazine_email),
+            "magazine_delivery_address": data.get("magazine_delivery_address", member.magazine_delivery_address),
+        }
+        needed = data.get("magazine_needed", member.magazine_needed)
+        _magazine_choice(merged, needed=needed, own_email=data.get("email", member.email))
+        data.update(merged)
     updated = crud_members.member.update(db=db, db_obj=member, obj_in=data, updated_by=current_user.id)
-    if "magazine_needed" in data or "magazine_delivery_address" in data:
+    if any(k in data for k in ("magazine_needed", "magazine_delivery_address", "magazine_kind", "magazine_email")):
         from services.magazine_subscriptions import sync_member_magazine_subscription
         sync_member_magazine_subscription(
             db,
@@ -1707,6 +1747,8 @@ def read_member_profile(
             "magazine": [
                 {
                     "id": s.id,
+                    "delivery_kind": member.magazine_kind,
+                    "delivery_email": member.magazine_email,
                     "delivery_status": s.delivery_status,
                     "address_override": s.address_override,
                     "notes": s.notes,
@@ -2176,6 +2218,8 @@ def _profile_magazine(db: Session, member: Member) -> dict:
     return {
         "magazine_needed": member.magazine_needed,
         "magazine_delivery_address": getattr(member, "magazine_delivery_address", None),
+        "magazine_kind": member.magazine_kind,
+        "magazine_email": member.magazine_email,
         "subscriptions": [
             {"id": x.id, "delivery_status": x.delivery_status, "address_override": x.address_override, "notes": x.notes}
             for x in subs

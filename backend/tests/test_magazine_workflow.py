@@ -31,8 +31,10 @@ def test_member_registration_stores_magazine_delivery_address(client, admin_head
     prof = client.get(f"{API}/members/{mid}/profile", headers=h).json()
     assert prof["personal"]["magazine_needed"] is True
     assert prof["personal"]["magazine_delivery_address"] == custom_addr
-    # At registration before payment/edit, no subscription exists yet
-    assert len(prof["services"]["magazine"]) == 0
+    # A member who says Yes is on the magazine subscription straight away (Active, delivering to that address)
+    assert len(prof["services"]["magazine"]) == 1
+    assert prof["services"]["magazine"][0]["delivery_status"] == "ACTIVE"
+    assert prof["services"]["magazine"][0]["address_override"] == custom_addr
 
 
 def test_member_edit_starts_and_stops_subscription(client, admin_headers):
@@ -244,3 +246,59 @@ def test_all_recipients_and_labels_paid_filtering(client, admin_headers):
     assert "AFFILIATION" in batch_recip_types
     assert "ASSOCIATE" in batch_recip_types
     assert "PRESS" in batch_recip_types
+
+
+def _register(client, h, s, **extra):
+    res = client.post(f"{API}/members/", headers=h, json={
+        "first_name_en": f"MagKind{s}", "mobile": "93" + s.zfill(8), "magazine_needed": True, **extra,
+    })
+    return res
+
+
+def test_yes_puts_the_member_on_the_subscription_with_the_kind(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    res = _register(client, h, s, magazine_kind="BOTH", magazine_email="reader@example.com", magazine_delivery_address="Sirsi")
+    assert res.status_code in (200, 201), res.text
+    mid = res.json()["id"]
+    m = client.get(f"{API}/members/{mid}", headers=h).json()
+    assert (m["magazine_kind"], m["magazine_email"]) == ("BOTH", "reader@example.com")
+    subs = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"]
+    assert len(subs) == 1 and subs[0]["delivery_status"] == "ACTIVE"
+    prof = client.get(f"{API}/members/{mid}/profile/magazine", headers=h).json()
+    assert prof["magazine_kind"] == "BOTH" and prof["magazine_email"] == "reader@example.com"
+
+
+def test_a_physical_copy_is_the_default_and_needs_no_email(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    res = _register(client, h, s)
+    assert res.status_code in (200, 201), res.text
+    m = client.get(f"{API}/members/{res.json()['id']}", headers=h).json()
+    assert m["magazine_kind"] == "PHYSICAL" and m["magazine_email"] is None
+
+
+def test_an_e_copy_needs_an_email_and_has_no_address(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    assert _register(client, h, s, magazine_kind="EMAIL").status_code == 400
+    bad = _register(client, h, s, magazine_kind="PAPER")
+    assert bad.status_code == 400
+    ok = _register(client, h, s, magazine_kind="EMAIL", magazine_email="e@example.com", magazine_delivery_address="Ignored St")
+    assert ok.status_code in (200, 201), ok.text
+    m = client.get(f"{API}/members/{ok.json()['id']}", headers=h).json()
+    assert m["magazine_kind"] == "EMAIL" and m["magazine_delivery_address"] is None
+
+
+def _label_members(client, h, batch_id):
+    body = client.get(f"{API}/magazines/label-batches/{batch_id}", headers=h).json()
+    return [i["recipient_id"] for i in body["data"] if i["recipient_type"] == "MEMBER"]
+
+
+def test_an_e_copy_member_gets_no_posted_label(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    mid = _register(client, h, s, magazine_kind="EMAIL", magazine_email="e@example.com").json()["id"]
+    labels = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": "2026-07", "only_paid": False})
+    assert labels.status_code in (200, 201), labels.text
+    assert mid not in _label_members(client, h, labels.json()["batch_id"])
+    # switching the same member to a posted copy puts them on the next list
+    assert client.put(f"{API}/members/{mid}", headers=h, json={"magazine_kind": "PHYSICAL"}).status_code == 200
+    again = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": "2026-08", "only_paid": False})
+    assert mid in _label_members(client, h, again.json()["batch_id"])

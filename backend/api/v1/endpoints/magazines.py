@@ -1,5 +1,6 @@
 from typing import Any, Optional, List, Union
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from api import deps
 from models.users import User
@@ -667,6 +668,8 @@ def generate_labels(
             MagazineSubscription.delivery_status == "ACTIVE",
             MagazineSubscription.is_deleted == False,
             Member.is_deleted == False,
+            # a member who wants only the e-copy gets no posted label
+            or_(Member.magazine_kind.is_(None), Member.magazine_kind != "EMAIL"),
         )
     )
     if state_id: member_subs = member_subs.filter(Member.state_id == state_id)
