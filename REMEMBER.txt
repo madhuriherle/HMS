@@ -311,8 +311,9 @@ RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
 12.13 REPEATED ROWS (extra particular lines, children, relatives): the field labels are written
      ONCE above the first row. The next rows have no labels of their own; a field that needs a
      hint uses a placeholder (e.g. "Description").
-12.14 A SELECT / CHECKBOX MODE IS OFFERED ONLY TO A ROLE THAT CAN USE IT (the Select button on
-     Receipt Tracking needs receipts.tracking.write), and only valid rows get a checkbox.
+12.14 A SELECT / CHECKBOX MODE IS OFFERED ONLY TO A ROLE THAT CAN USE IT, and only valid rows get a
+     checkbox. Receipt Tracking has NO mapping and NO Select mode: linking receipts to members is
+     done on the Bulk Receipt Mapping page and on Receipt Entry (edit), never from the receipt list.
 
 --------------------------------------------------------------------------------
 RULE 13: PERMISSIONS AND ACCESS
@@ -446,6 +447,16 @@ RULE 14: SETTINGS AND ADMIN TOOLS
 14.4 MY PROFILE (/dashboard/profile, from the top-right menu): the person edits name,
      username, email and mobile and can change their password. Role, rank and status are
      read-only. Saving signs the person out of every session.
+14.5 KYC UPDATE (member's basic details re-verified): the Send KYC Update button lives on
+     the member profile's Magazine & Services tab and needs the magazines.write privilege
+     (hidden without it). LINK channel sends a WhatsApp link to the member-facing KYC form
+     (frontend route /kyc?token=..., no sign-in; point KYC_WEB_BASE_URL at the panel's
+     public URL so links open it — the app URL https://hms-mma.app/kyc stays the default);
+     APP channel sends a nudge for the app's own KYC screen. The submission is stored as
+     a source="KYC" profile-change request for the Approvals screen — nothing on the
+     member's record changes before an admin approves it. The magazine profile section
+     carries the latest request (kyc: status / sent_at / expires_at / submitted_at); the
+     periodic re-send is the POST /magazines/members/kyc-reminders batch job.
 
 --------------------------------------------------------------------------------
 RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)

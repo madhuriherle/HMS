@@ -8,7 +8,6 @@ import {
   Eye,
   Pencil,
   Trash2,
-  Link as LinkIcon,
   CheckCircle2,
   AlertCircle,
   AlertTriangle,
@@ -22,12 +21,11 @@ import {
   RotateCcw,
   FileText,
   Building,
-  CreditCard,
-  CheckSquare
+  CreditCard
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import { isReceiptUnmapped } from '../utils/displayHelpers';
-import { loadParticulars, loadMembers, loadPaymentModeConfigs } from '../utils/serverData';
+import { loadParticulars, loadPaymentModeConfigs } from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
@@ -90,8 +88,6 @@ export default function ReceiptTracking() {
   const navigate = useNavigate();
   // Master Synchronized Stores
   const [receipts, setReceipts] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [unapprovedMembers, setUnapprovedMembers] = useState([]);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
@@ -102,8 +98,6 @@ export default function ReceiptTracking() {
   const [modeFilter, setModeFilter] = useState('ALL');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
-  const [selectionMode, setSelectionMode] = useState(false); // checkboxes show only after the Select button is pressed
   const [dayBook, setDayBook] = useState(null); // { date, data }
 
   // Modals State
@@ -128,13 +122,6 @@ export default function ReceiptTracking() {
     };
     await Promise.all([
       fetchReceipts().then(setReceipts).catch(fail('receipts')),
-      api.get('/members/', { params: { limit: 500 } })
-        .then((res) => setMembers((res.data?.data || []).map((m) => ({
-          ...m,
-          name: [m.first_name_en, m.last_name_en].filter(Boolean).join(' ')
-        }))))
-        .catch(fail('members')),
-      loadMembers({ approval_status: 'UNAPPROVED' }).then(setUnapprovedMembers).catch(fail('unapproved members')),
       loadParticulars()
         .then((all) => setParticularOptions(all.filter((p) => p.status === 'Active').map((p) => p.name)))
         .catch(fail('particulars')),
@@ -220,13 +207,8 @@ export default function ReceiptTracking() {
     () => [...new Set(receipts.map((r) => r.paymentMode).filter(Boolean))].sort(),
     [receipts]
   );
-  const unassignedVisible = useMemo(
-    () => filteredReceipts.filter((r) => isReceiptUnmapped(r)),
-    [filteredReceipts]
-  );
-
   // ----------------------------------------------------
-  // EXPORT, DAY BOOK, BULK MAP
+  // EXPORT, DAY BOOK
   // ----------------------------------------------------
   const exportVisibleReceipts = () => {
     const head = ['Receipt No', 'Date', 'Financial Year', 'Name', 'Mobile', 'Particulars', 'Amount', 'Payment Mode', 'Reference', 'Status'];
@@ -260,55 +242,6 @@ export default function ReceiptTracking() {
     }
   };
 
-  const toggleSelected = (id) =>
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-
-  const handleBulkMap = async () => {
-    const chosen = receipts.filter((r) => selectedIds.has(r.id));
-    if (!chosen.length) return;
-    const total = chosen.filter((r) => r.receiptStatus !== 'CANCELLED').reduce((sum, r) => sum + Number(r.amount || 0), 0);
-    const v = await askForm({
-      title: `Map ${chosen.length} receipt(s) (${formatMoney(total)}) to one member`,
-      confirmText: 'Map receipts',
-      fields: [
-        {
-          name: 'memberId',
-          label: 'Member',
-          type: 'select',
-          required: true,
-          options: members.map((m) => ({
-            value: m.id,
-            label: `${m.name || m.first_name_en || ''}${(m.membership_number || m.member_code) ? ` (${m.membership_number || m.member_code})` : ` (App ID ${m.id})`}`
-          }))
-        }
-      ]
-    });
-    if (!v) return;
-    let done = 0;
-    const failed = [];
-    for (const r of chosen) {
-      try {
-        await api.post(
-          `/receipts/${r.id}/allocate`,
-          { member_id: Number(v.memberId), allocated_amount: r.amount },
-          { params: { reason: 'Bulk mapping from Receipt Tracking' } }
-        );
-        done += 1;
-      } catch (error) {
-        failed.push(`${r.receiptNumber}: ${apiErrorMessage(error, 'failed')}`);
-      }
-    }
-    setSelectedIds(new Set());
-    await reloadData();
-    if (failed.length) showToast(`Mapped ${done}. Failed: ${failed.join(' | ')}`, 'error');
-    else showToast(`Mapped ${done} receipt(s) to the member.`);
-  };
-
   // ----------------------------------------------------
   // ACTION HANDLERS
   // ----------------------------------------------------
@@ -318,7 +251,7 @@ export default function ReceiptTracking() {
 
   // 2. Delete Receipt
   // ----------------------------------------------------
-  // RECEIPT ACTIONS (all server calls): map / unmap, refund, cancel
+  // RECEIPT ACTIONS (all server calls): refund, cancel
   // ----------------------------------------------------
   const isPendingApproval = (data) => Boolean(data && (data.approval_request_id || data.status === 'PENDING'));
 
@@ -326,77 +259,6 @@ export default function ReceiptTracking() {
     showToast(isPendingApproval(data) ? pendingMessage : doneMessage);
     setViewingReceipt(null);
     await reloadData();
-  };
-
-  const handleMapReceipt = async (receipt) => {
-    const v = await askForm({
-      title: `Map receipt ${receipt.receiptNumber} to a member`,
-      confirmText: 'Map receipt',
-      fields: [
-        {
-          name: 'memberId',
-          label: 'Member',
-          type: 'select',
-          required: true,
-          options: members.map((m) => ({
-            value: m.id,
-            label: `${m.name || m.first_name_en || ''}${(m.membership_number || m.member_code) ? ` (${m.membership_number || m.member_code})` : ` (App ID ${m.id})`}`
-          }))
-        },
-        { name: 'amount', label: 'Amount to allocate', type: 'number', required: true, value: receipt.amount }
-      ]
-    });
-    if (!v) return;
-    try {
-      const { data } = await api.post(`/receipts/${receipt.id}/allocate`, {
-        member_id: Number(v.memberId),
-        allocated_amount: v.amount
-      });
-      await afterReceiptAction(data, 'Receipt mapped to the member.', 'Mapping submitted for approval.');
-    } catch (error) {
-      showToast(error.response?.data?.detail || 'Error mapping the receipt', 'error');
-    }
-  };
-
-  const handleRemoveMapping = async (receipt) => {
-    try {
-      const { data: allocations } = await api.get(`/receipts/${receipt.id}/allocations`);
-      if (!allocations.length) {
-        showToast('This receipt is not mapped to anyone.', 'error');
-        return;
-      }
-      let target = allocations[0];
-      if (allocations.length > 1) {
-        const v = await askForm({
-          title: 'Remove which mapping?',
-          confirmText: 'Remove',
-          fields: [{
-            name: 'allocationId',
-            label: 'Mapping',
-            type: 'select',
-            required: true,
-            options: allocations.map((a) => ({
-              value: a.id,
-              label: `${a.member_name || a.associate_name || `${a.id}`} - ${a.allocated_amount}`
-            }))
-          }]
-        });
-        if (!v) return;
-        target = allocations.find((a) => String(a.id) === String(v.allocationId));
-      } else {
-        const ok = await confirmYesNo({
-          title: 'Remove the mapping?',
-          text: `Receipt ${receipt.receiptNumber} will no longer be mapped to ${target.member_name || 'this member'}.`,
-          confirmText: 'Yes, remove',
-          danger: true
-        });
-        if (!ok) return;
-      }
-      const { data } = await api.delete(`/receipts/${receipt.id}/allocations/${target.id}`);
-      await afterReceiptAction(data, 'Mapping removed.', 'Removal submitted for approval.');
-    } catch (error) {
-      showToast(error.response?.data?.detail || 'Error removing the mapping', 'error');
-    }
   };
 
   const handleRefundReceipt = async (receipt) => {
@@ -530,22 +392,6 @@ export default function ReceiptTracking() {
         }}
         rightSlot={
           <>
-            {hasPermission('receipts.tracking.write') && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectionMode((on) => !on);
-                  setSelectedIds(new Set());
-                }}
-                className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border cursor-pointer ${
-                  selectionMode ? 'text-white bg-[#510601] border-[#510601]' : 'text-[#510601] bg-white border-[#E8DFD8] hover:bg-[#FAF7F2]'
-                }`}
-                title="Select unassigned receipts to map to one member"
-              >
-                <CheckSquare className="w-4 h-4" />
-                {selectionMode ? 'Done' : 'Select'}
-              </button>
-            )}
             <button
               type="button"
               onClick={() => loadDayBook(new Date().toISOString().slice(0, 10))}
@@ -627,31 +473,6 @@ export default function ReceiptTracking() {
         />
       </SearchFilterBar>
 
-      {selectedIds.size > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50 text-xs">
-          <span className="font-semibold text-[#180200]">{selectedIds.size} unassigned receipt(s) selected</span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setSelectedIds(new Set())}
-              className="px-3 py-1.5 font-semibold text-[#863221] border border-[#E8DFD8] bg-white rounded-lg cursor-pointer"
-            >
-              Clear
-            </button>
-            {hasPermission('receipts.tracking.write') && (
-              <button
-                type="button"
-                onClick={handleBulkMap}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 font-bold text-white bg-[#510601] rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <LinkIcon className="w-3.5 h-3.5" />
-                Map to a member
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Phone layout: one card per receipt */}
       <div className="sm:hidden space-y-2.5">
         {filteredReceipts.length === 0 && (
@@ -680,17 +501,6 @@ export default function ReceiptTracking() {
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                {unmapped && selectionMode && (
-                  <label className="mr-auto inline-flex items-center gap-1.5 text-[11px] text-[#863221]">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(receipt.id)}
-                      onChange={() => toggleSelected(receipt.id)}
-                      className="accent-[#510601]"
-                    />
-                    Select
-                  </label>
-                )}
                 <button type="button" onClick={() => setViewingReceipt(receipt)} className="btn-act" title="View"><Eye className="w-3.5 h-3.5" /><span>View</span></button>
                 {hasPermission('receipts.tracking.write') && (
                   <button
@@ -715,16 +525,6 @@ export default function ReceiptTracking() {
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
-                {selectionMode && <th className="py-3.5 pl-4 pr-0 w-8">
-                  <input
-                    type="checkbox"
-                    title="Select all unassigned receipts shown"
-                    checked={unassignedVisible.length > 0 && unassignedVisible.every((r) => selectedIds.has(r.id))}
-                    disabled={unassignedVisible.length === 0}
-                    onChange={(e) => setSelectedIds(e.target.checked ? new Set(unassignedVisible.map((r) => r.id)) : new Set())}
-                    className="cursor-pointer accent-[#510601]"
-                  />
-                </th>}
                 <th className="py-3.5 px-4 whitespace-nowrap">Receipt No.</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Date</th>
                 <th className="py-3.5 px-4 whitespace-nowrap">Name</th>
@@ -738,7 +538,7 @@ export default function ReceiptTracking() {
             <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
               {filteredReceipts.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="py-14 text-center text-[#863221]">
+                  <td colSpan="8" className="py-14 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <FileSpreadsheet className="w-10 h-10 text-[#863221]/40" />
                       <p className="text-base font-bold text-[#180200]">No receipts found</p>
@@ -757,16 +557,6 @@ export default function ReceiptTracking() {
                       key={receipt.id}
                       className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]"
                     >
-                      {selectionMode && <td className="py-3.5 pl-4 pr-0 w-8">
-                        {isUnmapped && (
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(receipt.id)}
-                            onChange={() => toggleSelected(receipt.id)}
-                            className="cursor-pointer accent-[#510601]"
-                          />
-                        )}
-                      </td>}
                       {/* Column 1: Receipt Number */}
                       <td className="py-3.5 px-4 font-mono font-bold text-xs">
                         <span className="text-[#510601] tracking-wider">{receipt.receiptNumber}</span>

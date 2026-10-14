@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
-import ParticularPicker from '../components/ParticularPicker';
+import ParticularPicker, { lineKey as particularLineKey } from '../components/ParticularPicker';
 import {
   ChevronRight,
   ChevronLeft,
@@ -1775,6 +1775,7 @@ export default function ReceiptEntry() {
                         subType={formData.donationSubType}
                         onChange={handleParticularsChange}
                         spread
+                        taken={extraLines.filter((x) => x.particular).map((x) => particularLineKey(x.particular, x.subType))}
                         hasError={Boolean(formErrors.particulars || formErrors.donationSubType)}
                       />
                       {(formErrors.particulars || formErrors.donationSubType) && (
@@ -1853,6 +1854,10 @@ export default function ReceiptEntry() {
                                 particular={l.particular}
                                 subType={l.subType}
                                 spread
+                                taken={[
+                                  ...(formData.particulars ? [particularLineKey(formData.particulars, formData.donationSubType)] : []),
+                                  ...extraLines.filter((x) => x.key !== l.key && x.particular).map((x) => particularLineKey(x.particular, x.subType))
+                                ]}
                                 onChange={({ particular, subType }) =>
                                   updateExtraLine(l.key, { particular, subType, description: particular === l.particular ? l.description : '' })
                                 }

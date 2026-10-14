@@ -11,7 +11,12 @@ const activeSubs = (p) => (p?.subTypes || []).filter((st) => (st.status || 'Acti
  * `onChange({ particular, subType })`. With `spread` the list is as wide as the whole row it sits in
  * (the parent row must be `relative`), instead of only as wide as the field.
  */
-export default function ParticularPicker({ particulars, particular, subType, onChange, hasError = false, placeholder = 'Select particular', spread = false }) {
+// the key a line is known by: particular and sub-type, in lower case
+export const lineKey = (particular, subType = '') => `${String(particular || '').trim().toLowerCase()}::${String(subType || '').trim().toLowerCase()}`;
+
+export default function ParticularPicker({ particulars, particular, subType, onChange, hasError = false, placeholder = 'Select particular', spread = false, taken = [] }) {
+  // particular + sub-type choices already used on the OTHER lines of the receipt: they cannot be picked again
+  const takenKeys = new Set(taken);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [folded, setFolded] = useState(() => new Set()); // particulars whose sub-types are folded away
@@ -115,18 +120,20 @@ export default function ParticularPicker({ particulars, particular, subType, onC
                     aria-expanded={r.subs.length ? isOpen : undefined}
                     title={r.p.name}
                     onClick={() => {
-                      if (!r.subs.length) return pick(r.p.name);
+                      if (!r.subs.length) return takenKeys.has(lineKey(r.p.name)) ? undefined : pick(r.p.name);
                       setFolded((prev) => {
                         const next = new Set(prev);
                         if (next.has(r.p.name)) next.delete(r.p.name); else next.add(r.p.name);
                         return next;
                       });
                     }}
-                    className={`w-full flex items-start justify-between gap-2 px-3 py-2 text-sm text-left cursor-pointer hover:bg-[#FAF7F2] ${
-                      selectedHere ? 'font-bold text-[#510601]' : 'text-[#180200]'
+                    className={`w-full flex items-start justify-between gap-2 px-3 py-2 text-sm text-left ${
+                      !r.subs.length && takenKeys.has(lineKey(r.p.name))
+                        ? 'text-[#863221]/40 cursor-not-allowed'
+                        : `cursor-pointer hover:bg-[#FAF7F2] ${selectedHere ? 'font-bold text-[#510601]' : 'text-[#180200]'}`
                     }`}
                   >
-                    <span className="break-words">{r.p.name}</span>
+                    <span className="break-words">{r.p.name}{!r.subs.length && takenKeys.has(lineKey(r.p.name)) && <span className="ml-2 text-[10px] font-semibold">already added</span>}</span>
                     {r.subs.length > 0 ? (
                       isOpen ? <ChevronDown className="w-4 h-4 shrink-0 mt-0.5 text-[#863221]" /> : <ChevronRight className="w-4 h-4 shrink-0 mt-0.5 text-[#863221]" />
                     ) : (
@@ -137,6 +144,7 @@ export default function ParticularPicker({ particulars, particular, subType, onC
                     <ul className="border-l-2 border-[#E8DFD8] ml-5 mb-1">
                       {r.shown.map((st) => {
                         const on = selectedHere && st.name === subType;
+                        const used = takenKeys.has(lineKey(r.p.name, st.name));
                         return (
                           <li key={st.id || st.name}>
                             <button
@@ -144,12 +152,14 @@ export default function ParticularPicker({ particulars, particular, subType, onC
                               role="option"
                               aria-selected={on}
                               title={st.name}
-                              onClick={() => pick(r.p.name, st.name)}
-                              className={`w-full flex items-start justify-between gap-2 pl-3 pr-3 py-1.5 text-sm text-left cursor-pointer hover:bg-[#FAF7F2] ${
-                                on ? 'font-bold text-[#510601]' : 'text-[#180200]'
+                              onClick={() => (used ? undefined : pick(r.p.name, st.name))}
+                              className={`w-full flex items-start justify-between gap-2 pl-3 pr-3 py-1.5 text-sm text-left ${
+                                used
+                                  ? 'text-[#863221]/40 cursor-not-allowed'
+                                  : `cursor-pointer hover:bg-[#FAF7F2] ${on ? 'font-bold text-[#510601]' : 'text-[#180200]'}`
                               }`}
                             >
-                              <span className="break-words">{st.name}</span>
+                              <span className="break-words">{st.name}{used && <span className="ml-2 text-[10px] font-semibold">already added</span>}</span>
                               {on && <Check className="w-4 h-4 shrink-0 mt-0.5" />}
                             </button>
                           </li>
