@@ -794,8 +794,22 @@ export default function ReceiptEntry() {
       setFormData((prev) => ({ ...prev, receiptNumber: value }));
     } else if (name === 'receiptDate') {
       setFormData((prev) => ({ ...prev, receiptDate: value }));
+      if (value && value > getTodayISODate()) {
+        setFormErrors((prev) => ({ ...prev, receiptDate: 'Receipt Date cannot be in the future.' }));
+      } else {
+        setFormErrors((prev) => ({ ...prev, receiptDate: '' }));
+      }
       // a different financial year has its own series: re-suggest unless the user typed a number
-      if (value && value.length === 10) loadReceiptDefaults(value, { keepNumber: numberTouched.current, keepDate: true });
+      if (value && value.length === 10 && value <= getTodayISODate()) {
+        loadReceiptDefaults(value, { keepNumber: numberTouched.current, keepDate: true });
+      }
+    } else if (name === 'transactionDate') {
+      setFormData((prev) => ({ ...prev, transactionDate: value }));
+      if (value && value > getTodayISODate()) {
+        setFormErrors((prev) => ({ ...prev, transactionDate: 'Transaction Date cannot be in the future.' }));
+      } else {
+        setFormErrors((prev) => ({ ...prev, transactionDate: '' }));
+      }
     } else if (name === 'membershipNo') {
       setFormData((prev) => ({ ...prev, membershipNo: value }));
       setLookupMembershipNo(value);
@@ -904,9 +918,12 @@ export default function ReceiptEntry() {
     if (!formData.paymentMode) {
       errors.paymentMode = 'Payment Mode is mandatory.';
     } else {
-      // Transaction Id / Date are optional for every payment mode (only the length is checked).
+      // Transaction Id / Date are optional for every payment mode (only the length and future date are checked).
       if (formData.transactionId.trim().length > 150) {
         errors.transactionId = 'Transaction ID can be at most 150 characters.';
+      }
+      if (formData.transactionDate && formData.transactionDate > getTodayISODate()) {
+        errors.transactionDate = 'Transaction Date cannot be in the future.';
       }
     }
 
@@ -1633,6 +1650,7 @@ export default function ReceiptEntry() {
                     <DateInput
                       name="receiptDate"
                       value={formData.receiptDate}
+                      max={getTodayISODate()}
                       onChange={handleInputChange}
                       className={`w-full px-3 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none focus:bg-white transition-colors ${formErrors.receiptDate
                         ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
@@ -1971,9 +1989,19 @@ export default function ReceiptEntry() {
                     <DateInput
                       name="transactionDate"
                       value={formData.transactionDate}
+                      max={getTodayISODate()}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none transition-colors"
+                      className={`w-full px-3 py-2 bg-[#FAF7F2] border rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none focus:bg-white transition-colors ${formErrors.transactionDate
+                        ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30'
+                        : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                        }`}
                     />
+                    {formErrors.transactionDate && (
+                      <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" />
+                        {formErrors.transactionDate}
+                      </p>
+                    )}
                   </div>
                 </div>
 
