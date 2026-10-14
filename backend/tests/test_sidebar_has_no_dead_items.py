@@ -48,8 +48,8 @@ def test_super_admin_sidebar_has_only_real_screens(client, admin_headers):
         ok = route == "/dashboard" or (route.startswith("/dashboard/") and route[len("/dashboard/"):] in real)
         assert ok, f"sidebar item '{item['name']}' ({item['code']}) opens nothing: route={route!r}"
     names = {n["name"] for n in _walk(menu)}
-    assert "Settings" in names and "Privileges" not in names and "Magazine" in names and "Events" in names and "Affiliation, Associates & Press" in names and "Reports" in names, "every built module shows; unbuilt ones do not"
-    assert {"Dashboard", "Masters", "Users", "Membership", "Approvals", "Receipts", "Magazine", "Events", "Affiliation, Associates & Press", "Reports"} <= names
+    assert "Settings" in names and "Privileges" not in names and "Magazine" in names and "Events" in names and "Affiliation, Associates & Press" in names and "Reports" in names and "Notifications" in names, "every built module shows; unbuilt ones do not"
+    assert {"Dashboard", "Masters", "Users", "Membership", "Approvals", "Receipts", "Magazine", "Events", "Affiliation, Associates & Press", "Reports", "Notifications"} <= names
 
 
 def test_migration_0034_removes_the_dead_routes(client, admin_headers):

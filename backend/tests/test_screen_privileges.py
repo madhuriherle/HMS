@@ -115,13 +115,17 @@ def test_migration_0032_moves_roles_retires_old_module_and_switches_off_unbuilt(
             page = db.query(Module).filter(Module.code == "approvals.requests").first()
             assert page.permission_code == "approvals.read"
             assert db.query(Module).filter(Module.id == page.parent_id).first().code == "approvals"
-            # "reports" is built now and switched on by migration 0068
-            for code in ("notifications", "imports"):
+            # "notifications" is built now and switched on by migration 0069
+            for code in ("imports",):
                 assert db.query(Module).filter(Module.code == code).first().status is False, code
-            for code in ("masters", "members", "receipts", "approvals", "users", "system", "magazines", "events", "engagements", "reports"):
+            for code in ("masters", "members", "receipts", "approvals", "users", "system", "magazines", "events", "engagements", "reports", "notifications"):
                 assert db.query(Module).filter(Module.code == code).first().status is True, code
         # a switched-off module blocks even the Super Admin on the API
-        blocked = client.get(f"{API}/notifications/templates", headers=admin_headers)
+        blocked = client.post(
+            f"{API}/imports/postal-codes/import",
+            headers=admin_headers,
+            files={"file": ("sample.csv", b"pincode\n560001", "text/csv")},
+        )
         assert blocked.status_code == 403 and "disabled" in blocked.text.lower(), blocked.text
     finally:
         with SessionLocal() as db:  # leave the shared test database as the other tests expect it

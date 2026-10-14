@@ -36,6 +36,7 @@ import KycForm from './pages/KycForm';
 import EventsManagement from './pages/EventsManagement';
 import EngagementsManagement from './pages/EngagementsManagement';
 import ReportsManagement from './pages/ReportsManagement';
+import NotificationsManagement from './pages/NotificationsManagement';
 // Personal Masters (gotra / qualification / native place) screen is switched off for now:
 // import PersonalMasters from './pages/MasterLists';
 
@@ -69,6 +70,7 @@ function App() {
         <Route path="/events" element={<Navigate to="/dashboard/events" replace />} />
         <Route path="/engagements" element={<Navigate to="/dashboard/engagements" replace />} />
         <Route path="/reports" element={<Navigate to="/dashboard/reports" replace />} />
+        <Route path="/notifications" element={<Navigate to="/dashboard/notifications" replace />} />
 
         <Route path="/dashboard" element={<RequireLogin><MainLayout /></RequireLogin>}>
           <Route index element={<Dashboard />} />
@@ -169,6 +171,13 @@ function App() {
           <Route path="reports/receipts" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
           <Route path="reports/magazines" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
           <Route path="reports/saved" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
+        
+          {/* Notifications Module Routes */}
+          <Route path="notifications" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
+          <Route path="notifications/campaigns" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
+          <Route path="notifications/templates" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
+          <Route path="notifications/quick-send" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
+          <Route path="notifications/inbox" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
         </Route>
 
         {/* Any unknown address: a full-screen page, no panel around it */}
