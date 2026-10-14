@@ -969,7 +969,7 @@ export default function MembershipList() {
 
         {/* Pagination Section */}
         {filteredMembers.length > 0 && (
-          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#863221]">
+          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#863221]">
             <div className="flex items-center gap-2">
               <span>Showing</span>
               <span className="font-bold text-[#180200]">
@@ -1035,7 +1035,7 @@ export default function MembershipList() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold text-base">
                   {(viewingMember.fullName || viewingMember.name || 'M').charAt(0).toUpperCase()}
@@ -1419,7 +1419,7 @@ export default function MembershipList() {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] print:hidden no-print">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl print:hidden no-print">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <Printer className="w-5 h-5" />

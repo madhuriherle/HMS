@@ -731,7 +731,7 @@ export default function BankDetailsManagement() {
 
         {/* Pagination Footer */}
         {filteredData.length > 0 && (
-          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/30 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#863221]">
+          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#863221]">
             <div className="flex items-center gap-2">
               <span>Show</span>
               <select

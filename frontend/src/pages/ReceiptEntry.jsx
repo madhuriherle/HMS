@@ -2500,7 +2500,7 @@ export default function ReceiptEntry() {
 
               {/* Pagination Footer */}
               {totalRightMembers > 0 && (
-                <div className="p-3.5 bg-[#FAF7F2]/40 border-t border-[#E8DFD8] text-xs text-[#863221] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="p-3.5 bg-[#FAF7F2] border-t border-[#E8DFD8] text-xs text-[#863221] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-1.5 text-xs">
                     <span>Showing</span>
                     <span className="font-bold text-[#180200]">
@@ -2726,7 +2726,7 @@ export default function ReceiptEntry() {
 
           {/* Bottom Pagination */}
           {totalBottomMembers > 0 && (
-            <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#863221]">
+            <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#863221]">
               <div className="flex items-center gap-1.5">
                 <span>Showing</span>
                 <span className="font-bold text-[#180200]">

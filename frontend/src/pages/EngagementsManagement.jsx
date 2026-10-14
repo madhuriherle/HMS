@@ -442,7 +442,7 @@ function AffiliationsView({ canWrite, canDelete }) {
       {/* Modal: Add / Edit Affiliation */}
       <Modal isOpen={formModalOpen} onClose={() => setFormModalOpen(false)}>
         <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <h3 className="text-base font-bold text-[#180200]">
               {editingAff ? 'Edit Affiliate Group' : 'Add Affiliate Group'}
             </h3>
@@ -517,6 +517,7 @@ function AffiliationsView({ canWrite, canDelete }) {
               </label>
             </div>
             <ModalFooter
+              inForm
               kind={editingAff ? 'edit' : 'add'}
               submitLabel={editingAff ? 'Update' : 'Save'}
               busyLabel={editingAff ? 'Updating...' : 'Saving...'}
@@ -531,7 +532,7 @@ function AffiliationsView({ canWrite, canDelete }) {
       {/* Modal: Affiliate Contacts List */}
       <Modal isOpen={contactsModalOpen} onClose={() => setContactsModalOpen(false)}>
         <div className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <h3 className="text-base font-bold text-[#180200]">
               Contacts: {activeAffForContacts?.group_name}
             </h3>
@@ -632,7 +633,7 @@ function AffiliationsView({ canWrite, canDelete }) {
       {/* Modal: Add / Edit Contact Form */}
       <Modal isOpen={contactFormOpen} onClose={() => setContactFormOpen(false)}>
         <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <h3 className="text-base font-bold text-[#180200]">
               {editingContact ? 'Edit Contact' : 'Add Contact Person'}
             </h3>
@@ -695,6 +696,7 @@ function AffiliationsView({ canWrite, canDelete }) {
               />
             </div>
             <ModalFooter
+              inForm
               kind={editingContact ? 'edit' : 'add'}
               submitLabel={editingContact ? 'Update' : 'Save'}
               busyLabel={editingContact ? 'Updating...' : 'Saving...'}
@@ -973,7 +975,7 @@ function AssociatesView({ canWrite, canDelete }) {
       {/* Modal: Add / Edit Associate */}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
         <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <h3 className="text-base font-bold text-[#180200]">
               {editingAssoc ? 'Edit Associate' : 'Register New Associate'}
             </h3>
@@ -1074,6 +1076,7 @@ function AssociatesView({ canWrite, canDelete }) {
               </label>
             </div>
             <ModalFooter
+              inForm
               kind={editingAssoc ? 'edit' : 'add'}
               submitLabel={editingAssoc ? 'Update' : 'Save'}
               busyLabel={editingAssoc ? 'Updating...' : 'Saving...'}
@@ -1343,7 +1346,7 @@ function PressMediaView({ canWrite, canDelete }) {
       {/* Modal: Add / Edit Press */}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
         <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <h3 className="text-base font-bold text-[#180200]">
               {editingPress ? 'Edit Press/Media' : 'Add Press/Media'}
             </h3>
@@ -1432,6 +1435,7 @@ function PressMediaView({ canWrite, canDelete }) {
               </label>
             </div>
             <ModalFooter
+              inForm
               kind={editingPress ? 'edit' : 'add'}
               submitLabel={editingPress ? 'Update' : 'Save'}
               busyLabel={editingPress ? 'Updating...' : 'Saving...'}
@@ -1886,7 +1890,7 @@ function CommitteeView({ canWrite, canDelete }) {
       {/* Modal: Add / Edit Committee Member */}
       <Modal isOpen={memberModalOpen} onClose={() => setMemberModalOpen(false)}>
         <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <h3 className="text-base font-bold text-[#180200]">
               {editingMember ? 'Edit Committee Member' : 'Add Committee Member'}
             </h3>
@@ -2099,6 +2103,7 @@ function CommitteeView({ canWrite, canDelete }) {
             </div>
 
             <ModalFooter
+              inForm
               kind={editingMember ? 'edit' : 'add'}
               submitLabel={editingMember ? 'Update' : 'Save'}
               busyLabel={editingMember ? 'Updating...' : 'Saving...'}
@@ -2113,7 +2118,7 @@ function CommitteeView({ canWrite, canDelete }) {
       {/* Modal: Category Setup */}
       <Modal isOpen={catModalOpen} onClose={() => setCatModalOpen(false)}>
         <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <h3 className="text-base font-bold text-[#180200]">Committee Categories</h3>
             <button
               type="button"
@@ -2201,7 +2206,7 @@ function CommitteeView({ canWrite, canDelete }) {
       {/* Modal: Term Setup */}
       <Modal isOpen={termModalOpen} onClose={() => setTermModalOpen(false)}>
         <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <h3 className="text-base font-bold text-[#180200]">Committee Terms</h3>
             <button
               type="button"

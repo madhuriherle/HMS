@@ -96,7 +96,7 @@ function FieldError({ children }) {
 function ModalShell({ title, children, footer }) {
   return (
     <div className="relative w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
-      <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
+      <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between rounded-t-2xl">
         <h3 className="text-lg font-bold text-[#180200]">{title}</h3>
       </div>
       <div className="flex-1 overflow-y-auto">{children}</div>
@@ -688,7 +688,7 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
       {historyFor && (
         <Modal isOpen onClose={() => setHistoryFor(null)}>
           <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
+            <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between rounded-t-2xl">
               <h3 className="text-lg font-bold text-[#180200] truncate">Pauses & Returns — {memberName(historyFor.member_id)}</h3>
               <button type="button" onClick={() => setHistoryFor(null)} className="rounded-lg p-1 text-gray-400 hover:bg-stone-200 hover:text-gray-700 cursor-pointer"><X className="h-5 w-5" /></button>
             </div>
@@ -846,7 +846,7 @@ function MonthlyModal({ sub, memberName, onClose }) {
   return (
     <Modal isOpen onClose={onClose}>
       <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
+        <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-[#180200]">Monthly marks</h3>
             <p className="text-xs text-gray-500">{memberName(sub.member_id)}</p>
@@ -1452,7 +1452,7 @@ function RepeatReturnsModal({ subToMember, memberName, onClose }) {
   return (
     <Modal isOpen onClose={onClose}>
       <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
+        <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-[#180200]">Repeat returns</h3>
             <p className="text-xs text-gray-500">Active subscriptions with 2+ returns in the last 12 months.</p>
@@ -1743,7 +1743,7 @@ function LabelBatchModal({ batch, onClose }) {
   return (
     <Modal isOpen onClose={onClose}>
       <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
+        <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-[#180200]">{batch.batch_name}</h3>
             <p className="text-xs text-gray-500">{items.length} label{items.length === 1 ? '' : 's'} shown</p>
@@ -2119,7 +2119,7 @@ function BackfillModal({ isOpen, onClose, onBackfilled, canWrite }) {
   return (
     <Modal isOpen onClose={onClose}>
       <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
-        <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
+        <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl flex items-center justify-between">
           <h3 className="text-lg font-bold text-[#180200]">Paid Members Awaiting Magazine Subscription</h3>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-5 h-5" />

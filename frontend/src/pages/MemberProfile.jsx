@@ -827,7 +827,7 @@ function ServiceOptinsCard({ id, data, reload, canWrite }) {
 
       <Modal isOpen={modalOpen} onClose={() => !busy && setModalOpen(false)}>
         <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
-          <div className="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <span className="text-sm font-bold text-[#180200]">Opt into a Service</span>
             <button type="button" onClick={() => setModalOpen(false)} disabled={busy} className="text-[#863221] hover:text-[#510601]" aria-label="Close">✕</button>
           </div>
@@ -864,7 +864,7 @@ function ServiceOptinsCard({ id, data, reload, canWrite }) {
 
       <Modal isOpen={Boolean(cancelling)} onClose={() => !busy && setCancelling(null)}>
         <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
-          <div className="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <span className="text-sm font-bold text-[#180200]">Cancel {cancelling?.service_name_en}?</span>
             <button type="button" onClick={() => setCancelling(null)} disabled={busy} className="text-[#863221] hover:text-[#510601]" aria-label="Close">✕</button>
           </div>
@@ -994,7 +994,7 @@ function KycUpdateCard({ id, kyc, reload, canSend }) {
 
       <Modal isOpen={modalOpen} onClose={() => !sending && setModalOpen(false)}>
         <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-          <div className="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <span className="text-sm font-bold text-[#180200]">Send KYC Update Request</span>
             <button type="button" onClick={() => setModalOpen(false)} disabled={sending} className="text-[#863221] hover:text-[#510601]" aria-label="Close">✕</button>
           </div>

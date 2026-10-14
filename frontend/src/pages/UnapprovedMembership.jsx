@@ -643,7 +643,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
         {/* Pagination Section */}
         {filteredList.length > 0 && (
-          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#863221]">
+          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#863221]">
             <div className="flex items-center gap-2">
               <span>Showing</span>
               <span className="font-bold text-[#180200]">
@@ -708,7 +708,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold text-base">
                   {(viewingMember.fullName || viewingMember.name || 'U').charAt(0).toUpperCase()}

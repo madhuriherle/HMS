@@ -738,7 +738,7 @@ export default function EventsManagement() {
         {/* ── CREATE / EDIT EVENT MODAL ───────────────────────── */}
         <Modal isOpen={eventModalOpen} onClose={() => setEventModalOpen(false)}>
           <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
               <h3 className="text-base font-bold text-[#180200]">
                 {editingEvent ? 'Edit Event' : 'Add New Event'}
               </h3>
@@ -805,6 +805,7 @@ export default function EventsManagement() {
               </div>
 
               <ModalFooter
+                inForm
                 kind={editingEvent ? 'edit' : 'add'}
                 submitLabel={editingEvent ? 'Update' : 'Save'}
                 busyLabel={editingEvent ? 'Updating...' : 'Saving...'}
@@ -820,7 +821,7 @@ export default function EventsManagement() {
         <Modal isOpen={detailModalOpen} onClose={() => setDetailModalOpen(false)}>
           <div className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
               <div className="flex items-center gap-3">
                 <Calendar className="w-5 h-5 text-[#510601]" />
                 <h3 className="text-base font-bold text-[#180200]">
@@ -1120,7 +1121,7 @@ export default function EventsManagement() {
         {/* ── PARTICIPANT ADD / EDIT MODAL ────────────────────── */}
         <Modal isOpen={participantModalOpen} onClose={() => setParticipantModalOpen(false)}>
           <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
               <h3 className="text-base font-bold text-[#180200]">
                 {editingParticipant ? 'Edit Participant' : 'Add Participant'}
               </h3>
@@ -1304,6 +1305,7 @@ export default function EventsManagement() {
               </div>
 
               <ModalFooter
+                inForm
                 kind={editingParticipant ? 'edit' : 'add'}
                 submitLabel={editingParticipant ? 'Update' : 'Save'}
                 busyLabel={editingParticipant ? 'Updating...' : 'Saving...'}
@@ -1318,7 +1320,7 @@ export default function EventsManagement() {
         {/* ── NOTIFICATION MODAL ──────────────────────────────── */}
         <Modal isOpen={notifyModalOpen} onClose={() => setNotifyModalOpen(false)}>
           <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
               <div className="flex items-center gap-2">
                 <Send className="w-4 h-4 text-[#3D705C]" />
                 <h3 className="text-base font-bold text-[#180200]">Send WhatsApp Notification</h3>
@@ -1355,6 +1357,7 @@ export default function EventsManagement() {
               </div>
 
               <ModalFooter
+                inForm
                 kind="confirm"
                 submitLabel="Send Now"
                 busyLabel="Sending..."

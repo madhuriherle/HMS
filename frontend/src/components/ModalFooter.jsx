@@ -28,9 +28,9 @@ export default function ModalFooter({
   const label = submitLabel || LABELS[kind];
   return (
     <div
-      className={`${MODAL_BAR} flex items-center gap-3 px-6 border-t border-[#E8DFD8] bg-[#FAF7F2] ${left ? 'justify-between' : 'justify-end'} ${
-        inForm ? '-mx-6 -mb-6 mt-6 sticky bottom-0 z-10' : ''
-      } ${className}`}
+      className={`${MODAL_BAR} ${
+        inForm ? 'w-[calc(100%+3rem)] -mx-6 -mb-6 mt-6 sticky bottom-0 z-10' : 'w-full'
+      } flex items-center gap-3 px-6 border-t border-[#E8DFD8] bg-[#FAF7F2] rounded-b-2xl ${left ? 'justify-between' : 'justify-end'} ${className}`}
     >
       {left}
       <div className="flex items-center gap-3">

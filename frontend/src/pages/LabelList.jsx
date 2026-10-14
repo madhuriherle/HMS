@@ -525,7 +525,7 @@ export default function LabelList() {
         </div>
 
         {/* Table Footer */}
-        <div className="flex flex-col items-center justify-between gap-3 border-t border-stone-200 bg-[#FAF7F2]/60 px-4 py-3 sm:flex-row text-xs text-gray-600">
+        <div className="flex flex-col items-center justify-between gap-3 border-t border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3 sm:flex-row text-xs text-[#863221]">
           <div>
             Showing <span className="font-semibold">{paginatedList.length}</span> of{' '}
             <span className="font-semibold">{filteredList.length}</span> queued members

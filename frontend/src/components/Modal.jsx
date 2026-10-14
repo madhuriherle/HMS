@@ -12,6 +12,7 @@ export default function Modal({
   onClose,
   children,
   title,                 // given: the popup draws the standard card with a header bar (rule 12.9)
+  footer = null,         // optional pinned footer
   maxWidthClass = 'max-w-2xl',
   className = '',
   backdropClassName = 'bg-[#180200]/60 backdrop-blur-sm',
@@ -68,10 +69,10 @@ export default function Modal({
     >
       {title ? (
         <div
-          className={`bg-white rounded-2xl ${maxWidthClass} w-full border border-[#E8DFD8] shadow-2xl overflow-y-auto flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200`}
+          className={`bg-white rounded-2xl ${maxWidthClass} w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200`}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 sticky top-0 z-10 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <h3 className="text-base font-bold text-[#180200] truncate">{title}</h3>
             {onClose && (
               <button
@@ -83,7 +84,10 @@ export default function Modal({
               </button>
             )}
           </div>
-          {children}
+          <div className="overflow-y-auto flex-1 flex flex-col min-h-0">
+            {children}
+          </div>
+          {footer}
         </div>
       ) : (
         children

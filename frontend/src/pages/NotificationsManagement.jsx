@@ -396,8 +396,15 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         title="Create Broadcast Campaign"
+        footer={
+          <ModalFooter
+            onCancel={() => setModalOpen(false)}
+            onSubmit={handleCreateCampaign}
+            submitLabel="Create Campaign"
+          />
+        }
       >
-        <div className="p-4 space-y-4">
+        <div className="p-6 space-y-4">
           <div>
             <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Campaign Name *</label>
             <input
@@ -502,11 +509,6 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
             </div>
           </div>
         </div>
-        <ModalFooter
-          onCancel={() => setModalOpen(false)}
-          onSubmit={handleCreateCampaign}
-          submitLabel="Create Campaign"
-        />
       </Modal>
 
       {/* View Recipients Modal */}
@@ -514,8 +516,14 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
         isOpen={recipientsModalOpen}
         onClose={() => setRecipientsModalOpen(false)}
         title={`Campaign Recipients — ${selectedCampaign?.campaign_name || ''}`}
+        footer={
+          <ModalFooter
+            kind="view"
+            onCancel={() => setRecipientsModalOpen(false)}
+          />
+        }
       >
-        <div className="p-4 space-y-3">
+        <div className="p-6 space-y-3">
           <div className="overflow-x-auto max-h-80 overflow-y-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold sticky top-0">
@@ -557,11 +565,6 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
             </table>
           </div>
         </div>
-        <ModalFooter
-          onCancel={() => setRecipientsModalOpen(false)}
-          submitLabel="Close"
-          onSubmit={() => setRecipientsModalOpen(false)}
-        />
       </Modal>
     </div>
   );
@@ -795,8 +798,16 @@ function TemplatesTab({ canWrite, canDelete }) {
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         title={editingTemplate ? 'Edit Message Template' : 'Create Message Template'}
+        footer={
+          <ModalFooter
+            kind={editingTemplate ? 'edit' : 'add'}
+            onCancel={() => setModalOpen(false)}
+            onSubmit={handleSaveTemplate}
+            submitLabel={editingTemplate ? 'Update Template' : 'Create Template'}
+          />
+        }
       >
-        <div className="p-4 space-y-4">
+        <div className="p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Template Name *</label>
@@ -897,11 +908,6 @@ function TemplatesTab({ canWrite, canDelete }) {
             />
           </div>
         </div>
-        <ModalFooter
-          onCancel={() => setModalOpen(false)}
-          onSubmit={handleSaveTemplate}
-          submitLabel={editingTemplate ? 'Update Template' : 'Create Template'}
-        />
       </Modal>
     </div>
   );
@@ -966,8 +972,8 @@ function QuickSendModal({ isOpen, onClose, canWrite }) {
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Quick Send">
-      <form onSubmit={handleSend}>
-        <div className="p-4 space-y-4">
+      <form onSubmit={handleSend} className="flex-1 flex flex-col justify-between">
+        <div className="p-6 space-y-4 flex-1 overflow-y-auto">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Communication Channel</label>
@@ -1174,8 +1180,15 @@ function InboxTab({ canWrite }) {
         isOpen={broadcastModalOpen}
         onClose={() => setBroadcastModalOpen(false)}
         title="Broadcast System Announcement"
+        footer={
+          <ModalFooter
+            onCancel={() => setBroadcastModalOpen(false)}
+            onSubmit={handleBroadcast}
+            submitLabel="Broadcast Now"
+          />
+        }
       >
-        <div className="p-4 space-y-3">
+        <div className="p-6 space-y-4">
           <div>
             <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Title *</label>
             <input
@@ -1208,11 +1221,6 @@ function InboxTab({ canWrite }) {
             />
           </div>
         </div>
-        <ModalFooter
-          onCancel={() => setBroadcastModalOpen(false)}
-          onSubmit={handleBroadcast}
-          submitLabel="Broadcast Now"
-        />
       </Modal>
     </div>
   );

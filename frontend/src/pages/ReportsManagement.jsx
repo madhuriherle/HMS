@@ -816,7 +816,7 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
         </div>
 
         {/* Pagination Controls */}
-        <div className="p-3 bg-white border-t border-[#E8DFD8] flex items-center justify-between text-xs text-stone-600">
+        <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8] flex items-center justify-between text-xs text-[#863221]">
           <span>Page {page} of {totalPages}</span>
           <div className="flex items-center gap-1">
             <button
@@ -842,8 +842,16 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
         isOpen={columnModalOpen}
         onClose={() => setColumnModalOpen(false)}
         title="Select Report Columns"
+        footer={
+          <ModalFooter
+            kind="confirm"
+            submitLabel="Apply Columns"
+            onCancel={() => setColumnModalOpen(false)}
+            onSubmit={() => setColumnModalOpen(false)}
+          />
+        }
       >
-        <div className="p-4 space-y-3">
+        <div className="p-6 space-y-4">
           <p className="text-xs text-stone-600">
             Choose which data fields to include in the screen table and CSV/Excel export:
           </p>
@@ -874,11 +882,6 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
             })}
           </div>
         </div>
-        <ModalFooter
-          onCancel={() => setColumnModalOpen(false)}
-          onSubmit={() => setColumnModalOpen(false)}
-          submitLabel="Apply Columns"
-        />
       </Modal>
     </div>
   );
@@ -1085,7 +1088,7 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
         </div>
 
         {/* Pagination */}
-        <div className="p-3 bg-white border-t border-[#E8DFD8] flex items-center justify-between text-xs text-stone-600">
+        <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8] flex items-center justify-between text-xs text-[#863221]">
           <span>Page {page} of {totalPages}</span>
           <div className="flex items-center gap-1">
             <button
@@ -1344,7 +1347,7 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
         </div>
 
         {/* Pagination */}
-        <div className="p-3 bg-white border-t border-[#E8DFD8] flex items-center justify-between text-xs text-stone-600">
+        <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8] flex items-center justify-between text-xs text-[#863221]">
           <span>Page {page} of {totalPages}</span>
           <div className="flex items-center gap-1">
             <button

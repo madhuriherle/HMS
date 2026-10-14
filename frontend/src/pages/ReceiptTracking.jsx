@@ -716,7 +716,7 @@ export default function ReceiptTracking() {
         </div>
 
         {/* Footer Summary bar */}
-        <div className="px-5 py-3.5 bg-[#FAF7F2]/60 border-t border-[#E8DFD8] flex flex-col sm:flex-row items-center justify-between text-xs text-[#863221] gap-2">
+        <div className="px-5 py-3.5 bg-[#FAF7F2] border-t border-[#E8DFD8] flex flex-col sm:flex-row items-center justify-between text-xs text-[#863221] gap-2">
           <div>
             Showing <strong className="text-[#180200]">{filteredReceipts.length}</strong> of{' '}
             <strong className="text-[#180200]">{receipts.length}</strong> total receipts
@@ -745,7 +745,7 @@ export default function ReceiptTracking() {
         {viewingReceipt && (
           <div className="bg-white rounded-2xl max-w-3xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold">
                   <FileText className="w-4 h-4" />
@@ -912,7 +912,7 @@ export default function ReceiptTracking() {
       <Modal isOpen={Boolean(dayBook)} onClose={() => setDayBook(null)}>
         {dayBook && (
           <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between gap-3">
+            <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl flex items-center justify-between gap-3">
               <h3 className="text-lg font-bold text-[#180200] font-serif">Day Book</h3>
               <input
                 type="date"

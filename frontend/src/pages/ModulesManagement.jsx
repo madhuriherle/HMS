@@ -630,7 +630,7 @@ export default function ModulesManagement() {
 
         {/* Count */}
         {treeRows.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-3.5 border-t border-[#E8DFD8] bg-[#FAF7F2]/50">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-6 py-3.5 border-t border-[#E8DFD8] bg-[#FAF7F2]">
             <span className="text-xs text-[#863221] font-medium">{treeRows.length} modules shown</span>
             {hiddenOffCount > 0 && (
               <span className="text-xs text-[#863221]/80">
@@ -650,7 +650,7 @@ export default function ModulesManagement() {
           className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <div className="flex items-center gap-2.5">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <Layers className="w-5 h-5" />
