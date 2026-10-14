@@ -214,8 +214,8 @@ RULE 10: MASTERS AND SCREENS
 --------------------------------------------------------------------------------
 RULE 11: HOW WE WORK (ALL AGENTS)
 --------------------------------------------------------------------------------
-11.1 Deploy to UAT only when the user asks. Never touch production. Push to GitHub only
-     when the user says push.
+11.1 Deploy to UAT only when the user asks. Never touch production unless the user explicitly asks
+     for a prod update (then follow 11.9). Push to GitHub only when the user says push.
 11.2 Alembic revisions are numbered in sequence and other agents add migrations at the
      same time: before creating one, list alembic/versions, take the next free number
      and confirm there is a single head (ScriptDirectory.get_heads()).
@@ -233,6 +233,19 @@ RULE 11: HOW WE WORK (ALL AGENTS)
      commit it and deploy it to UAT. Push to GitHub only when the user says push.
 11.8 The top header of every panel page is layouts/MainLayout.jsx. components/Navbar.jsx is
      NOT used: a change to the signed-in user box (Profile, Log Out) goes in MainLayout.
+11.9 PROD UPDATE, in this order, only when the user asks: (1) back up the prod database
+     (pg_dump), the web folder, the code folder /opt/hms/repo and tag the running image;
+     (2) restore the dump into a throwaway database on the UAT database server and run all
+     migrations on that copy with the new code; check the real rows (members, receipts, users,
+     roles) and run scripts/check_fk_orphans.py; (3) only if that is clean, upload the committed
+     code to /opt/hms/repo/backend (the old folder is kept as backend.prev-*), rebuild with
+     `docker compose up -d --build backend` in /opt/hms/prod (it runs alembic at start), replace
+     /var/www/hms/prod with the same /api/v1 build UAT uses; (4) verify the site, the login
+     route, the migration version and the row counts; (5) drop the throwaway database (it holds
+     real data). Prod has real data: never run an untested migration on it. Rollback = the dump,
+     the old backend folder, the web copy and the tagged image.
+11.10 Tests that create dated receipts use a random far-past year, because the test database
+     keeps its rows between runs and a fixed year or number would collide.
 
 --------------------------------------------------------------------------------
 RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
@@ -291,6 +304,15 @@ RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
 12.11 PROFILE OVERVIEW (member profile): a strip of key facts, then the details as small
      label-over-value items. Empty fields are not drawn; one quiet line lists what was not
      provided. No "View all" links (the tabs are right above) and no boxes inside boxes.
+12.12 NO "#" BEFORE IDs OR NUMBERS. Membership numbers, receipt numbers, member / application ids
+     and request ids are shown plain (HMS-0001, 0010, ID 7), on screens, in toasts, in popups
+     and in the text the server writes (notifications, activity log, fallback names). A "#" is
+     only for a position in a list (Particulars #2), never for an identifier.
+12.13 REPEATED ROWS (extra particular lines, children, relatives): the field labels are written
+     ONCE above the first row. The next rows have no labels of their own; a field that needs a
+     hint uses a placeholder (e.g. "Description").
+12.14 A SELECT / CHECKBOX MODE IS OFFERED ONLY TO A ROLE THAT CAN USE IT (the Select button on
+     Receipt Tracking needs receipts.tracking.write), and only valid rows get a checkbox.
 
 --------------------------------------------------------------------------------
 RULE 13: PERMISSIONS AND ACCESS
