@@ -104,14 +104,14 @@ SHARED_READS = [
     # reference lists the screens fill their dropdowns and filters from
     (r"^/masters/(states|districts|taluks|postal-codes)(/.*)?$",
      ["receipts.entry.read", "receipts.tracking.read", "members.list.read", "members.unapproved.read",
-      "members.register.write"]),
+      "members.register.write", "reports.read"]),
     (r"^/masters/membership-types(/.*)?$",
      ["receipts.entry.read", "receipts.tracking.read", "members.list.read", "members.unapproved.read",
-      "members.register.write"]),
+      "members.register.write", "reports.read"]),
     (r"^/masters/(gotras|qualifications|native-places)(/.*)?$",
      ["members.list.read", "members.unapproved.read", "members.register.write"]),
     (r"^/masters/(particulars|payment-modes|banks)(/.*)?$",
-     ["receipts.entry.read", "receipts.tracking.read", "members.register.write"]),
+     ["receipts.entry.read", "receipts.tracking.read", "members.register.write", "reports.read"]),
     # the member picker and member checks used by the receipt screens and the registration form
     (r"^/members/?$", ["receipts.entry.read", "receipts.tracking.read", "receipts.bulk_mapping.read", "events.write", "engagements.write"]),
     (r"^/members/lookup/?$", ["receipts.entry.read", "members.register.write"]),
@@ -134,7 +134,7 @@ AREA_ACTIONS = {
 }
 
 # Modules whose screens are not built yet: switched off (status = false) by migration 0032
-NOT_BUILT_YET = ("reports", "notifications", "imports")
+NOT_BUILT_YET = ("notifications", "imports")
 
 # ── modules ──────────────────────────────────────────────────
 # (code, name, parent_code, route, icon, display_order, min_rank_level)
@@ -335,6 +335,7 @@ MENU_PAGE_CATALOG = [
     ("engagements.associates", "Associates", "engagements", "/dashboard/engagements/associates", "user-check", 2, "engagements.associates.read", None),
     ("engagements.press_media", "Press & Media", "engagements", "/dashboard/engagements/press-media", "newspaper", 3, "engagements.press_media.read", None),
     ("engagements.committee", "Managing Committee", "engagements", "/dashboard/engagements/committee", "shield", 4, "engagements.committee.read", None),
+    ("reports.management", "Reports", "reports", "/dashboard/reports", "bar-chart", 1, "reports.read", None),
 ]
 
 # Older rows were seeded with API-style routes; point them at the real pages,

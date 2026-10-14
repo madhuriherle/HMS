@@ -35,6 +35,7 @@ import BulkReceiptMapping from './pages/BulkReceiptMapping';
 import KycForm from './pages/KycForm';
 import EventsManagement from './pages/EventsManagement';
 import EngagementsManagement from './pages/EngagementsManagement';
+import ReportsManagement from './pages/ReportsManagement';
 // Personal Masters (gotra / qualification / native place) screen is switched off for now:
 // import PersonalMasters from './pages/MasterLists';
 
@@ -67,6 +68,7 @@ function App() {
         <Route path="/membership" element={<Navigate to="/dashboard/membership/list" replace />} />
         <Route path="/events" element={<Navigate to="/dashboard/events" replace />} />
         <Route path="/engagements" element={<Navigate to="/dashboard/engagements" replace />} />
+        <Route path="/reports" element={<Navigate to="/dashboard/reports" replace />} />
 
         <Route path="/dashboard" element={<RequireLogin><MainLayout /></RequireLogin>}>
           <Route index element={<Dashboard />} />
@@ -159,6 +161,14 @@ function App() {
           <Route path="engagements/associates" element={<PermissionGate required={['engagements.read', 'engagements.associates.read']} title="Access Restricted"><EngagementsManagement /></PermissionGate>} />
           <Route path="engagements/press-media" element={<PermissionGate required={['engagements.read', 'engagements.press_media.read']} title="Access Restricted"><EngagementsManagement /></PermissionGate>} />
           <Route path="engagements/committee" element={<PermissionGate required={['engagements.read', 'engagements.committee.read']} title="Access Restricted"><EngagementsManagement /></PermissionGate>} />
+
+          {/* Reports Module Routes */}
+          <Route path="reports" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
+          <Route path="reports/summary" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
+          <Route path="reports/members" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
+          <Route path="reports/receipts" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
+          <Route path="reports/magazines" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
+          <Route path="reports/saved" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
         </Route>
 
         {/* Any unknown address: a full-screen page, no panel around it */}

@@ -37,7 +37,7 @@ const server = await createServer({
 const pages = process.argv.slice(2).length ? process.argv.slice(2) : [
   'LocationSetup', 'MembershipTypeManagement', 'ReceiptTypeManagement', 'BankDetailsManagement', 'MasterLists',
   'MembershipList', 'UnapprovedMembership', 'RegisterNewMember', 'ReceiptEntry', 'ReceiptTracking', 'Approvals',
-  'RolesAndPrivileges', 'UserManagement', 'ModulesManagement', 'OrganisationSettings', 'Dashboard', 'LabelList', 'MagazineManagement', 'EventsManagement', 'EngagementsManagement', 'NotFound',
+  'RolesAndPrivileges', 'UserManagement', 'ModulesManagement', 'OrganisationSettings', 'Dashboard', 'LabelList', 'MagazineManagement', 'EventsManagement', 'EngagementsManagement', 'ReportsManagement', 'NotFound',
   'components/MenuArranger',
   'components/MemberLookupCard',
   'components/IconPicker',
