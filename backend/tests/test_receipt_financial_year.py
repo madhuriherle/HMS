@@ -54,10 +54,13 @@ def test_financial_year_numbering_and_duplicate_messages(client, admin_headers, 
     assert r.status_code == 409
 
 
-def test_default_date_is_last_entered_receipt(client, admin_headers):
+def test_default_date_is_today_not_the_last_receipt(client, admin_headers):
+    from datetime import date
+
     h = admin_headers
     _create(client, h, None, "2018-02-14")
-    assert client.get(f"{API}/receipts/next-number", headers=h).json()["default_date"] == "2018-02-14"
+    got = client.get(f"{API}/receipts/next-number", headers=h).json()
+    assert got["default_date"] == date.today().isoformat() == got["receipt_date"]
 
 
 def test_one_receipt_many_particular_lines(client, admin_headers):

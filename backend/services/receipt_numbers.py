@@ -54,11 +54,6 @@ def assert_number_free(db: Session, fy: str, number: str, exclude_id: int | None
 
 
 def default_entry_date(db: Session) -> date:
-    """Date of the receipt entered last, or today when there is none."""
-    last = (
-        db.query(Receipt.receipt_date)
-        .filter(Receipt.is_deleted == False)  # noqa: E712
-        .order_by(Receipt.id.desc())
-        .first()
-    )
-    return last[0] if last else date.today()
+    """The date Receipt Entry opens on: today. (Save & New keeps the date just used, so a pile of old receipts
+    can still be entered one after another; a fresh open or Reset always starts on today.)"""
+    return date.today()

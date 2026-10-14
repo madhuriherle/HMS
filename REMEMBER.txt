@@ -159,6 +159,9 @@ RULE 6: NUMBERING (RECEIPTS AND MEMBERSHIP NUMBERS)
      message names the Recycle Bin). Only a PERMANENT delete (purge) gives the number back, and the
      series then carries on from the highest receipt that still exists in that financial year. A
      cancelled receipt keeps its number too.
+6.4  RECEIPT ENTRY OPENS ON TODAY'S DATE (so a new open or Reset suggests the current financial year's
+     0001). Save & New keeps the date just used, so old receipts can be entered one after another. The
+     Receipt Tracking footer counts Assigned, Unassigned and Cancelled separately by real status.
 
 --------------------------------------------------------------------------------
 RULE 7: LOOKUPS

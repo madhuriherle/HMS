@@ -657,11 +657,15 @@ export default function ReceiptTracking() {
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1 font-semibold text-emerald-800">
               <span className="w-2 h-2 rounded-full bg-emerald-600" />
-              <span>{receipts.filter((r) => !isReceiptUnmapped(r)).length} Assigned</span>
+              <span>{receipts.filter((r) => r.receiptStatus === 'ASSIGNED').length} Assigned</span>
             </span>
             <span className="inline-flex items-center gap-1 font-semibold text-amber-800">
               <span className="w-2 h-2 rounded-full bg-amber-500" />
               <span>{receipts.filter((r) => isReceiptUnmapped(r)).length} Unassigned</span>
+            </span>
+            <span className="inline-flex items-center gap-1 font-semibold text-red-800">
+              <span className="w-2 h-2 rounded-full bg-red-500" />
+              <span>{receipts.filter((r) => r.receiptStatus === 'CANCELLED').length} Cancelled</span>
             </span>
           </div>
         </div>
