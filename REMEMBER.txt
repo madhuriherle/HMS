@@ -538,7 +538,8 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
 15.19 NO TAB ROWS ON A PAGE FOR SEPARATE SCREENS. Magazine (Subscriptions, Pauses & Returns, Labels & Delivery),
       Reports (Summary, Members, Receipts & Finance, Magazine & Logistics, Saved & Audit Logs),
       Notifications (Send Messages, Templates, System Inbox; Quick Send is a popup on Send Messages) and the registries below each
-      have ONE SIDEBAR PAGE PER SECTION; the page title is the section name (migration 0071).
+      have ONE SIDEBAR PAGE PER SECTION (Magazine has two: Subscriptions and Labels & Delivery; a pause or a
+      return is a Pause / Resume / Return action on a Subscriptions row, with a History popup); the page title is the section name (migration 0071).
       Each page opens with its module's privilege (magazines.read, reports.read, notifications.read).
 15.20 THE "PR & Communications" GROUP (modules "engagements" + "events", migration 0073/0074) holds five
       separate pages: Events, Affiliations, Associates, Press & Media, Managing Committee. Each opens with

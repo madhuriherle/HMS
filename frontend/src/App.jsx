@@ -150,7 +150,7 @@ function App() {
           <Route path="magazine" element={<Navigate to="/dashboard/magazine/subscriptions" replace />} />
           <Route path="magazine/management" element={<Navigate to="/dashboard/magazine/subscriptions" replace />} />
           <Route path="magazine/subscriptions" element={<MagazineManagement />} />
-          <Route path="magazine/pauses-returns" element={<MagazineManagement />} />
+          <Route path="magazine/pauses-returns" element={<Navigate to="/dashboard/magazine/subscriptions" replace />} />
           <Route path="magazine/labels-delivery" element={<MagazineManagement />} />
           <Route path="magazines" element={<Navigate to="/dashboard/magazine" replace />} />
           <Route path="magazine/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />

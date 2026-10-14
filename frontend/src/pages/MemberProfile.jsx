@@ -662,6 +662,21 @@ function MagazineTab({ id }) {
                 ))}
               </div>
             )}
+            {(d.pauses || []).length > 0 && (
+              <div className="mt-4">
+                <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mb-1">Delivery pauses</div>
+                <div className="space-y-1 text-xs">
+                  {d.pauses.map((p) => (
+                    <div key={p.id} className="flex justify-between gap-3">
+                      <span>{p.reason || 'paused'}</span>
+                      <span className="text-[#863221] whitespace-nowrap">
+                        {formatDate(p.pause_start_date)} – {p.pause_end_date ? formatDate(p.pause_end_date) : 'open'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {d.returns.length > 0 && (
               <div className="mt-4">
                 <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mb-1">Returned copies</div>

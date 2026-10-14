@@ -20,6 +20,7 @@ import {
   Search,
   X,
   RefreshCw,
+  History,
   Pencil,
   Trash2,
   Eye,
@@ -166,8 +167,8 @@ export default function MagazineManagement() {
 
   // the sidebar picks the section; each one is its own page
   const { pathname } = useLocation();
-  const tab = pathname.includes('/pauses-returns') ? 'pauses-returns' : pathname.includes('/labels-delivery') ? 'labels-delivery' : 'subscriptions';
-  const sectionTitle = { subscriptions: 'Subscriptions', 'pauses-returns': 'Pauses & Returns', 'labels-delivery': 'Labels & Delivery' }[tab];
+  const tab = pathname.includes('/labels-delivery') ? 'labels-delivery' : 'subscriptions';
+  const sectionTitle = { subscriptions: 'Subscriptions', 'labels-delivery': 'Labels & Delivery' }[tab];
   const [members, setMembers] = useState([]);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [] });
 
@@ -268,22 +269,6 @@ export default function MagazineManagement() {
                 canDelete={canDelete}
               />
             )}
-            {tab === 'pauses-returns' && (
-              <PausesTab
-                subscriptions={subscriptions}
-                memberName={memberName}
-                canWrite={canWrite}
-                canDelete={canDelete}
-              />
-            )}
-            {tab === 'pauses-returns' && (
-              <ReturnsTab
-                subscriptions={subscriptions}
-                memberName={memberName}
-                canWrite={canWrite}
-                canDelete={canDelete}
-              />
-            )}
             {tab === 'labels-delivery' && (
               <>
                 <LabelsTab locations={locations} canWrite={canWrite} />
@@ -323,6 +308,13 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
   const [editing, setEditing] = useState(null);
   const [monthlyFor, setMonthlyFor] = useState(null);
   const [nonMemberSetting, setNonMemberSetting] = useState(null);
+  const [pauseFor, setPauseFor] = useState(null);      // subscription to pause
+  const [returnFor, setReturnFor] = useState(null);    // subscription to mark a return on
+  const [historyFor, setHistoryFor] = useState(null); // subscription whose pauses and returns are shown
+  const [repeatOpen, setRepeatOpen] = useState(false);
+  const [activePauses, setActivePauses] = useState([]);
+  const [returnCounts, setReturnCounts] = useState({});
+  const [returnsFilter, setReturnsFilter] = useState('ALL');
 
   const loadRecipients = useCallback(async () => {
     setLoadingRecipients(true);
@@ -339,6 +331,42 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
   useEffect(() => {
     loadRecipients();
   }, [loadRecipients, subscriptions]);
+
+  // pauses running today and how many returns each subscription has (shown as tags on the row)
+  const loadMarks = useCallback(async () => {
+    try {
+      const [p, r] = await Promise.all([
+        api.get('/magazines/pauses', { params: { limit: 5000, active_only: true } }),
+        api.get('/magazines/returns', { params: { limit: 5000 } }),
+      ]);
+      setActivePauses(Array.isArray(p.data?.data) ? p.data.data : []);
+      const counts = {};
+      for (const x of Array.isArray(r.data?.data) ? r.data.data : []) counts[x.subscription_id] = (counts[x.subscription_id] || 0) + 1;
+      setReturnCounts(counts);
+    } catch {
+      // the tags are a convenience; the list still works without them
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMarks();
+  }, [loadMarks, subscriptions]);
+
+  const refreshAll = () => {
+    reload();
+    loadRecipients();
+    loadMarks();
+  };
+
+  const resumeDelivery = async (pause) => {
+    try {
+      await api.post(`/magazines/pauses/${pause.id}/resume`);
+      notify('Delivery resumed.');
+      refreshAll();
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Could not resume delivery.', 'error');
+    }
+  };
 
   const stats = useMemo(() => {
     let active = 0;
@@ -378,9 +406,11 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
       const matchSearch = !q || name.includes(q) || code.includes(q);
       const matchType = typeFilter === 'ALL' || r.recipient_type === typeFilter;
       const matchStatus = statusFilter === 'ALL' || r.delivery_status === statusFilter;
-      return matchSearch && matchType && matchStatus;
+      const rowSub = r.recipient_type === 'MEMBER' ? subscriptions.find((x) => String(x.member_id) === String(r.recipient_id)) : null;
+      const matchReturns = returnsFilter === 'ALL' || (rowSub && returnCounts[rowSub.id] > 0);
+      return matchSearch && matchType && matchStatus && matchReturns;
     });
-  }, [recipients, subscriptions, search, typeFilter, statusFilter, memberName, members]);
+  }, [recipients, subscriptions, search, typeFilter, statusFilter, returnsFilter, returnCounts, memberName, members]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const current = Math.min(page, pages);
@@ -465,13 +495,24 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
             options={[{ value: 'ALL', label: 'All Statuses' }, ...DELIVERY_STATUSES.map((s) => ({ value: s, label: s }))]}
             widthClass="w-44"
           />
+          <FilterSelect
+            value={returnsFilter}
+            onChange={(v) => { setReturnsFilter(v); setPage(1); }}
+            options={[{ value: 'ALL', label: 'All Returns' }, { value: 'WITH', label: 'With Returns' }]}
+            widthClass="w-40"
+          />
         </div>
-        {canWrite && (
-          <PageActions><button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
-            <Plus className="w-4 h-4" />
-            <span>Start Subscription</span>
-          </button></PageActions>
-        )}
+        <PageActions>
+          <button type="button" onClick={() => setRepeatOpen(true)} className={BTN_OUTLINE} title="Subscriptions with repeated returns">
+            <RefreshCw className="w-3.5 h-3.5" /><span>Repeat Returns</span>
+          </button>
+          {canWrite && (
+            <button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
+              <Plus className="w-4 h-4" />
+              <span>Start Subscription</span>
+            </button>
+          )}
+        </PageActions>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
@@ -507,7 +548,19 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
                           {row.recipient_type}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5"><Chip value={row.delivery_status} /></td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Chip value={row.delivery_status} />
+                          {sub && activePauses.some((p) => String(p.subscription_id) === String(sub.id)) && row.delivery_status !== 'PAUSED' && (
+                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">Paused</span>
+                          )}
+                          {sub && returnCounts[sub.id] > 0 && (
+                            <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">
+                              {returnCounts[sub.id]} returned
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3.5 text-xs text-gray-600 max-w-[240px]">
                         {row.address_override ? (
                           <span className="text-amber-700 font-medium">Override: {row.address_override}</span>
@@ -534,6 +587,26 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
                                   <Pause className="w-3.5 h-3.5" /><span>Stop</span>
                                 </button>
                               )}
+                              {canWrite && sub.delivery_status === 'ACTIVE' && (() => {
+                                const running = activePauses.find((p) => String(p.subscription_id) === String(sub.id));
+                                return running ? (
+                                  <button type="button" onClick={() => resumeDelivery(running)} className="btn-act" title="Resume the paused delivery">
+                                    <Play className="w-3.5 h-3.5" /><span>Resume</span>
+                                  </button>
+                                ) : (
+                                  <button type="button" onClick={() => setPauseFor(sub)} className="btn-act" title="Pause delivery for a while">
+                                    <Pause className="w-3.5 h-3.5" /><span>Pause</span>
+                                  </button>
+                                );
+                              })()}
+                              {canWrite && (
+                                <button type="button" onClick={() => setReturnFor(sub)} className="btn-act" title="Mark a returned issue">
+                                  <Undo2 className="w-3.5 h-3.5" /><span>Return</span>
+                                </button>
+                              )}
+                              <button type="button" onClick={() => setHistoryFor(sub)} className="btn-act" title="Pauses and returns of this member">
+                                <History className="w-3.5 h-3.5" /><span>History</span>
+                              </button>
                               {canWrite && (
                                 <button type="button" onClick={() => { setEditing(sub); setFormOpen(true); }} className="btn-act" title="Edit">
                                   <Pencil className="w-3.5 h-3.5" />
@@ -592,6 +665,50 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
         />
       )}
       {monthlyFor && <MonthlyModal sub={monthlyFor} memberName={memberName} onClose={() => setMonthlyFor(null)} />}
+      {pauseFor && (
+        <PauseForm
+          subOptions={subscriptions.map((x) => ({ value: x.id, label: `${memberName(x.member_id)} — ${x.delivery_status}` }))}
+          presetSubscriptionId={pauseFor.id}
+          onClose={() => setPauseFor(null)}
+          onSaved={() => { setPauseFor(null); refreshAll(); }}
+        />
+      )}
+      {returnFor && (
+        <ReturnForm
+          subOptions={subscriptions.map((x) => ({ value: x.id, label: `${memberName(x.member_id)} — ${x.delivery_status}` }))}
+          presetSubscriptionId={returnFor.id}
+          onClose={() => setReturnFor(null)}
+          onSaved={() => { setReturnFor(null); refreshAll(); }}
+        />
+      )}
+      {historyFor && (
+        <Modal isOpen onClose={() => setHistoryFor(null)}>
+          <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
+              <h3 className="text-lg font-bold text-[#180200] truncate">Pauses & Returns — {memberName(historyFor.member_id)}</h3>
+              <button type="button" onClick={() => setHistoryFor(null)} className="rounded-lg p-1 text-gray-400 hover:bg-stone-200 hover:text-gray-700 cursor-pointer"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-8">
+              <section className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#510601]">Delivery pauses</h4>
+                <PausesTab subscriptions={subscriptions} memberName={memberName} canWrite={canWrite} canDelete={canDelete} subscriptionId={historyFor.id} onChanged={refreshAll} />
+              </section>
+              <section className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#510601]">Returns</h4>
+                <ReturnsTab subscriptions={subscriptions} memberName={memberName} canWrite={canWrite} canDelete={canDelete} subscriptionId={historyFor.id} onChanged={refreshAll} />
+              </section>
+            </div>
+            <ModalFooter kind="view" onCancel={() => setHistoryFor(null)} />
+          </div>
+        </Modal>
+      )}
+      {repeatOpen && (
+        <RepeatReturnsModal
+          subToMember={new Map(subscriptions.map((x) => [String(x.id), x.member_id]))}
+          memberName={memberName}
+          onClose={() => setRepeatOpen(false)}
+        />
+      )}
       {nonMemberSetting && (
         <NonMemberSettingModal
           recipient={nonMemberSetting}
@@ -777,7 +894,7 @@ function MonthlyModal({ sub, memberName, onClose }) {
 }
 
 // ── Delivery Pauses ──────────────────────────────────────────
-function PausesTab({ subscriptions, memberName, canWrite, canDelete }) {
+function PausesTab({ subscriptions, memberName, canWrite, canDelete, subscriptionId, onChanged }) {
   const [pauses, setPauses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeOnly, setActiveOnly] = useState(false);
@@ -802,13 +919,14 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete }) {
     setLoading(true);
     try {
       const { data } = await api.get('/magazines/pauses', { params: { limit: 5000, active_only: activeOnly } });
-      setPauses(Array.isArray(data?.data) ? data.data : []);
+      const all = Array.isArray(data?.data) ? data.data : [];
+      setPauses(subscriptionId ? all.filter((p) => String(p.subscription_id) === String(subscriptionId)) : all);
     } catch (error) {
       notify(error.response?.data?.detail || 'Could not load delivery pauses.', 'error');
     } finally {
       setLoading(false);
     }
-  }, [activeOnly]);
+  }, [activeOnly, subscriptionId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -817,6 +935,7 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete }) {
       await api.post(`/magazines/pauses/${pause.id}/resume`);
       notify('Delivery resumed.');
       load();
+      onChanged?.();
     } catch (error) {
       notify(error.response?.data?.detail || 'Could not resume delivery.', 'error');
     }
@@ -829,6 +948,7 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete }) {
       await api.delete(`/magazines/pauses/${pause.id}`);
       notify('Pause deleted.');
       load();
+      onChanged?.();
     } catch (error) {
       notify(error.response?.data?.detail || 'Could not delete the pause.', 'error');
     }
@@ -846,9 +966,9 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete }) {
           Show only pauses active today
         </label>
         {canWrite && (
-          <PageActions><button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
+          <button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
             <Plus className="w-4 h-4" /><span>Pause Delivery</span>
-          </button></PageActions>
+          </button>
         )}
       </div>
 
@@ -916,17 +1036,18 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete }) {
         <PauseForm
           editing={editing}
           subOptions={subOptions}
+          presetSubscriptionId={subscriptionId}
           onClose={() => setFormOpen(false)}
-          onSaved={() => { setFormOpen(false); load(); }}
+          onSaved={() => { setFormOpen(false); load(); onChanged?.(); }}
         />
       )}
     </div>
   );
 }
 
-function PauseForm({ editing, subOptions, onClose, onSaved }) {
+function PauseForm({ editing, subOptions, presetSubscriptionId, onClose, onSaved }) {
   const [form, setForm] = useState({
-    subscription_id: editing?.subscription_id || '',
+    subscription_id: editing?.subscription_id || presetSubscriptionId || '',
     pause_start_date: editing?.pause_start_date || today(),
     pause_end_date: editing?.pause_end_date || '',
     reason: editing?.reason || '',
@@ -972,9 +1093,9 @@ function PauseForm({ editing, subOptions, onClose, onSaved }) {
         <div className="p-6 space-y-4">
           <div>
             <label className={LABEL}>Subscription <span className="text-[#ED4636]">*</span></label>
-            {editing ? (
+            {editing || presetSubscriptionId ? (
               <div className="px-3.5 py-2.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg text-sm text-[#180200]">
-                {subOptions.find((o) => String(o.value) === String(editing.subscription_id))?.label || `Subscription ${editing.subscription_id}`}
+                {subOptions.find((o) => String(o.value) === String(editing?.subscription_id || presetSubscriptionId))?.label || `Subscription ${editing?.subscription_id || presetSubscriptionId}`}
               </div>
             ) : (
               <SearchableFormSelect
@@ -1022,15 +1143,13 @@ function PauseForm({ editing, subOptions, onClose, onSaved }) {
 }
 
 // ── Returns ──────────────────────────────────────────────────
-function ReturnsTab({ subscriptions, memberName, canWrite, canDelete }) {
+function ReturnsTab({ subscriptions, memberName, canWrite, canDelete, subscriptionId, onChanged }) {
   const [returns, setReturns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [followFilter, setFollowFilter] = useState('ALL');
-  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [formOpen, setFormOpen] = useState(false);
-  const [repeatOpen, setRepeatOpen] = useState(false);
 
   const subOptions = useMemo(
     () => subscriptions.map((s) => ({ value: s.id, label: `${memberName(s.member_id)} — ${s.delivery_status}` })),
@@ -1042,13 +1161,14 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete }) {
     setLoading(true);
     try {
       const { data } = await api.get('/magazines/returns', { params: { limit: 5000 } });
-      setReturns(Array.isArray(data?.data) ? data.data : []);
+      const all = Array.isArray(data?.data) ? data.data : [];
+      setReturns(subscriptionId ? all.filter((r) => String(r.subscription_id) === String(subscriptionId)) : all);
     } catch (error) {
       notify(error.response?.data?.detail || 'Could not load returns.', 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [subscriptionId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -1057,6 +1177,7 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete }) {
       await api.put(`/magazines/returns/${ret.id}`, { follow_up_status });
       notify(`Follow-up set to ${follow_up_status}.`);
       load();
+      onChanged?.();
     } catch (error) {
       notify(error.response?.data?.detail || 'Could not update the follow-up.', 'error');
     }
@@ -1069,20 +1190,15 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete }) {
       await api.delete(`/magazines/returns/${ret.id}`);
       notify('Return deleted.');
       load();
+      onChanged?.();
     } catch (error) {
       notify(error.response?.data?.detail || 'Could not delete the return.', 'error');
     }
   };
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return returns.filter((r) => {
-      const name = memberName(subToMember.get(String(r.subscription_id))).toLowerCase();
-      const matchSearch = !q || name.includes(q) || String(r.issue_month_year).includes(q);
-      const matchStatus = followFilter === 'ALL' || r.follow_up_status === followFilter;
-      return matchSearch && matchStatus;
-    });
-  }, [returns, search, followFilter, memberName, subToMember]);
+    return returns.filter((r) => followFilter === 'ALL' || r.follow_up_status === followFilter);
+  }, [returns, followFilter]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const current = Math.min(page, pages);
@@ -1092,24 +1208,17 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete }) {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative w-56">
-            <Search className="w-4 h-4 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} placeholder="Search member or issue…" className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]" />
-          </div>
           <FilterSelect
             value={followFilter}
             onChange={(v) => { setFollowFilter(v); setPage(1); }}
             options={[{ value: 'ALL', label: 'All Follow-ups' }, ...FOLLOW_UP_STATUSES.map((s) => ({ value: s, label: s }))]}
             widthClass="w-44"
           />
-          <button type="button" onClick={() => setRepeatOpen(true)} className={BTN_OUTLINE} title="Subscriptions with repeated returns">
-            <RefreshCw className="w-3.5 h-3.5" /><span>Repeat Returns</span>
-          </button>
         </div>
         {canWrite && (
-          <PageActions><button type="button" onClick={() => setFormOpen(true)} className={BTN_PRIMARY}>
+          <button type="button" onClick={() => setFormOpen(true)} className={BTN_PRIMARY}>
             <Plus className="w-4 h-4" /><span>Mark Return</span>
-          </button></PageActions>
+          </button>
         )}
       </div>
 
@@ -1167,20 +1276,18 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete }) {
       {formOpen && (
         <ReturnForm
           subOptions={subOptions}
+          presetSubscriptionId={subscriptionId}
           onClose={() => setFormOpen(false)}
-          onSaved={() => { setFormOpen(false); load(); }}
+          onSaved={() => { setFormOpen(false); load(); onChanged?.(); }}
         />
-      )}
-      {repeatOpen && (
-        <RepeatReturnsModal subToMember={subToMember} memberName={memberName} onClose={() => setRepeatOpen(false)} />
       )}
     </div>
   );
 }
 
-function ReturnForm({ subOptions, onClose, onSaved }) {
+function ReturnForm({ subOptions, presetSubscriptionId, onClose, onSaved }) {
   const [form, setForm] = useState({
-    subscription_id: '',
+    subscription_id: presetSubscriptionId || '',
     issue_month_year: thisMonth(),
     return_date: today(),
     return_reason: '',
@@ -1219,13 +1326,19 @@ function ReturnForm({ subOptions, onClose, onSaved }) {
         <div className="p-6 space-y-4">
           <div>
             <label className={LABEL}>Subscription <span className="text-[#ED4636]">*</span></label>
-            <SearchableFormSelect
-              value={form.subscription_id}
-              onChange={(v) => { setForm((f) => ({ ...f, subscription_id: v })); setErrors((e) => ({ ...e, subscription_id: '' })); }}
-              options={subOptions}
-              placeholder="Choose a subscription"
-              hasError={Boolean(errors.subscription_id)}
-            />
+            {presetSubscriptionId ? (
+              <div className="px-3.5 py-2.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg text-sm text-[#180200]">
+                {subOptions.find((o) => String(o.value) === String(presetSubscriptionId))?.label || `Subscription ${presetSubscriptionId}`}
+              </div>
+            ) : (
+              <SearchableFormSelect
+                value={form.subscription_id}
+                onChange={(v) => { setForm((f) => ({ ...f, subscription_id: v })); setErrors((e) => ({ ...e, subscription_id: '' })); }}
+                options={subOptions}
+                placeholder="Choose a subscription"
+                hasError={Boolean(errors.subscription_id)}
+              />
+            )}
             <FieldError>{errors.subscription_id}</FieldError>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

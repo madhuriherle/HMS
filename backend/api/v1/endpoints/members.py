@@ -2207,6 +2207,15 @@ def _profile_magazine(db: Session, member: Member) -> dict:
         .all()
         if ids else []
     )
+    from models.magazines import MagazineDeliveryPause
+
+    pauses = (
+        db.query(MagazineDeliveryPause)
+        .filter(MagazineDeliveryPause.subscription_id.in_(ids), MagazineDeliveryPause.is_deleted == False)  # noqa: E712
+        .order_by(MagazineDeliveryPause.pause_start_date.desc())
+        .all()
+        if ids else []
+    )
     opted = (
         db.query(MemberServiceOptin, ServiceType)
         .join(ServiceType, ServiceType.id == MemberServiceOptin.service_type_id)
@@ -2223,6 +2232,11 @@ def _profile_magazine(db: Session, member: Member) -> dict:
         "subscriptions": [
             {"id": x.id, "delivery_status": x.delivery_status, "address_override": x.address_override, "notes": x.notes}
             for x in subs
+        ],
+        "pauses": [
+            {"id": p.id, "subscription_id": p.subscription_id, "pause_start_date": p.pause_start_date,
+             "pause_end_date": p.pause_end_date, "reason": p.reason}
+            for p in pauses
         ],
         "returns": [
             {"id": r.id, "subscription_id": r.subscription_id, "issue_month_year": r.issue_month_year,

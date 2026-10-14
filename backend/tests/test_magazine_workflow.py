@@ -302,3 +302,16 @@ def test_an_e_copy_member_gets_no_posted_label(client, admin_headers):
     assert client.put(f"{API}/members/{mid}", headers=h, json={"magazine_kind": "PHYSICAL"}).status_code == 200
     again = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": "2026-08", "only_paid": False})
     assert mid in _label_members(client, h, again.json()["batch_id"])
+
+
+def test_the_profile_lists_the_members_pauses(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]
+    sub = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"][0]
+    made = client.post(f"{API}/magazines/pauses", headers=h, json={
+        "subscription_id": sub["id"], "pause_start_date": "2026-10-01", "pause_end_date": None, "reason": "returned twice",
+    })
+    assert made.status_code in (200, 201), made.text
+    prof = client.get(f"{API}/members/{mid}/profile/magazine", headers=h).json()
+    assert [p["reason"] for p in prof["pauses"]] == ["returned twice"]
+    assert prof["pauses"][0]["pause_end_date"] is None

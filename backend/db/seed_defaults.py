@@ -331,8 +331,7 @@ MENU_PAGE_CATALOG = [
     # Magazine, Reports and Notifications: one sidebar page per section (no tab rows). Each page opens with the
     # module's own privilege (magazines.read / reports.read / notifications.read).
     ("magazines.subscribers", "Subscriptions", "magazines", "/dashboard/magazine/subscriptions", "book-open", 1, "magazines.read", None),
-    ("magazines.pauses_returns", "Pauses & Returns", "magazines", "/dashboard/magazine/pauses-returns", "pause", 2, "magazines.read", None),
-    ("magazines.labels_delivery", "Labels & Delivery", "magazines", "/dashboard/magazine/labels-delivery", "printer", 3, "magazines.read", None),
+    ("magazines.labels_delivery", "Labels & Delivery", "magazines", "/dashboard/magazine/labels-delivery", "printer", 2, "magazines.read", None),
     # PR & Communications group: Events first, then the registries (the "events" module stays as the privilege owner but is no longer a group)
     ("events.management", "Events", "engagements", "/dashboard/events", "calendar", 1, "events.read", None),
     ("engagements.affiliations", "Affiliations", "engagements", "/dashboard/engagements/affiliations", "users", 2, "engagements.affiliations.read", None),
@@ -390,6 +389,8 @@ MENU_ORDER_FIXES = {
     # Quick Send became a popup on Send Messages: Templates 3 -> 2, System Inbox 4 -> 3
     "notifications.message_templates": (3, 2),
     "notifications.inbox": (4, 3),
+    # Pauses & Returns became row actions on Subscriptions: Labels & Delivery 3 -> 2
+    "magazines.labels_delivery": (3, 2),
 }
 # Page privilege changes, applied only while the row still has the old one: code -> (old, new)
 MENU_PERMISSION_FIXES = {
