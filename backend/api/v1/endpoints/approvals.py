@@ -307,7 +307,7 @@ def request_type_change(
     notify_approvers(
         db,
         title="Approval needed: Membership type change",
-        body=f"{current_user.name} requested a membership type change for member #{member_id} to '{requested_type.name_en}'.",
+        body=f"{current_user.name} requested a membership type change for member {member_id} to '{requested_type.name_en}'.",
         data={"type_change_request_id": req.id, "member_id": member_id},
     )
     return {"message": "Membership type change request submitted", "id": req.id}
@@ -504,7 +504,7 @@ def request_deletion(
     notify_approvers(
         db,
         title=f"Approval needed: Delete member ({deletion_type})",
-        body=f"{current_user.name} requested to delete member #{member_id}. Reason: {reason}",
+        body=f"{current_user.name} requested to delete member {member_id}. Reason: {reason}",
         data={"deletion_request_id": req.id, "member_id": member_id},
     )
     return {"message": "Deletion request submitted"}

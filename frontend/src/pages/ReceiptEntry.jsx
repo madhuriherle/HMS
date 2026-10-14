@@ -71,7 +71,7 @@ const ageFrom = (iso) => {
 };
 
 // What to show for a member's number: the real membership number (given on approval), else their application ID.
-const numberTag = (m) => (m.membershipNumber ? `#${m.membershipNumber}` : `ID #${m.registrationNumber || m.id}`);
+const numberTag = (m) => (m.membershipNumber ? `${m.membershipNumber}` : `ID ${m.registrationNumber || m.id}`);
 
 const toEntryMember = (m, loc) => {
   const nameOf = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '';
@@ -1021,7 +1021,7 @@ export default function ReceiptEntry() {
           receipt_date: formData.receiptDate,
           is_cancelled: true
         });
-        showToast(`Receipt #${data?.receipt_number || formData.receiptNumber.trim()} saved as Cancelled.`, 'success');
+        showToast(`Receipt ${data?.receipt_number || formData.receiptNumber.trim()} saved as Cancelled.`, 'success');
         const keepDate = formData.receiptDate;
         handleClearForm();
         setFormData((prev) => ({ ...prev, receiptDate: keepDate }));
@@ -1118,16 +1118,16 @@ export default function ReceiptEntry() {
 
       // Route Navigation strictly based on entrySource
       if (entrySource === 'unapproved-assignment') {
-        showToast(`Receipt #${receiptNo} successfully linked to ${memberDisplayName}'s unapproved profile!`, 'success');
+        showToast(`Receipt ${receiptNo} successfully linked to ${memberDisplayName}'s unapproved profile!`, 'success');
         // go back to the Unapproved Members page only when the role can open it; otherwise stay and start a new receipt
         if (hasPermission('members.unapproved.read')) navigate('/dashboard/membership/unapproved');
         else handleClearForm();
       } else if (entrySource === 'membership-assignment') {
-        showToast(`Receipt #${receiptNo} successfully linked to member "${memberDisplayName}"!`, 'success');
+        showToast(`Receipt ${receiptNo} successfully linked to member "${memberDisplayName}"!`, 'success');
         handleClearForm();
         await reloadData();
       } else if (saveMode.current === 'new') {
-        showToast(`Receipt #${receiptNo} saved. Ready for the next one.`, 'success');
+        showToast(`Receipt ${receiptNo} saved. Ready for the next one.`, 'success');
         // keep the date and payment details for the next receipt of the batch
         const keep = { receiptDate: formData.receiptDate, paymentMode: formData.paymentMode, bankAccount: formData.bankAccount };
         handleClearForm();
@@ -1135,7 +1135,7 @@ export default function ReceiptEntry() {
         loadReceiptDefaults(keep.receiptDate, { keepDate: true });
         await reloadData();
       } else {
-        showToast(`Receipt #${receiptNo} saved successfully! Navigating to Receipt Tracking...`, 'success');
+        showToast(`Receipt ${receiptNo} saved successfully! Navigating to Receipt Tracking...`, 'success');
         navigate('/dashboard/receipts/tracking');
       }
     } catch (error) {
@@ -1208,7 +1208,7 @@ export default function ReceiptEntry() {
       if (newMemberId && (!old || Number(old.member_id) !== newMemberId)) {
         await api.post(`/receipts/${editId}/allocate`, { member_id: newMemberId, allocated_amount: allocated });
       }
-      showToast(`Receipt #${payload.receiptNumber} updated.`, 'success');
+      showToast(`Receipt ${payload.receiptNumber} updated.`, 'success');
       navigate('/dashboard/receipts/tracking');
     } catch (error) {
       if (error.response?.status === 409 && /Receipt number/i.test(error.response?.data?.detail || '')) {
@@ -1508,7 +1508,7 @@ export default function ReceiptEntry() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-              {isEdit ? `Edit Receipt${formData.receiptNumber ? ` #${formData.receiptNumber}` : ''}` : 'Receipt Entry'}
+              {isEdit ? `Edit Receipt${formData.receiptNumber ? ` ${formData.receiptNumber}` : ''}` : 'Receipt Entry'}
             </h1>
           </div>
           <div className="flex items-center gap-2">
@@ -1848,7 +1848,6 @@ export default function ReceiptEntry() {
                         return (
                           <div key={l.key} className="relative grid grid-cols-12 gap-3 items-end">
                             <div className={`col-span-12 ${needsDescription ? 'sm:col-span-5' : 'sm:col-span-7'}`}>
-                              <label className="block text-xs font-bold text-[#180200] mb-1">Particulars #{index + 2}</label>
                               <ParticularPicker
                                 particulars={activeParticulars}
                                 particular={l.particular}
@@ -1861,9 +1860,9 @@ export default function ReceiptEntry() {
                             </div>
                             {needsDescription && (
                               <div className="col-span-12 sm:col-span-4">
-                                <label className="block text-xs font-bold text-[#180200] mb-1">Description</label>
                                 <input
                                   type="text"
+                                  placeholder="Description"
                                   value={l.description}
                                   onChange={(e) => updateExtraLine(l.key, { description: e.target.value })}
                                   className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
@@ -1871,7 +1870,6 @@ export default function ReceiptEntry() {
                               </div>
                             )}
                             <div className={`col-span-9 ${needsDescription ? 'sm:col-span-2' : 'sm:col-span-4'}`}>
-                              <label className="block text-xs font-bold text-[#180200] mb-1">Amount</label>
                               <div className="relative">
                                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#863221]/70">₹</span>
                                 <input
@@ -2049,17 +2047,20 @@ export default function ReceiptEntry() {
                     />
                   </div>
 
-                  {/* Grand total card matching mockup */}
-                  <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-2xl p-4 flex flex-col justify-center items-center text-center shadow-2xs">
+                  {/* Grand total card: starts level with the Description box (an invisible label takes the label's height) */}
+                  <div className="flex flex-col">
+                  <span className="block text-xs font-bold mb-1 invisible select-none" aria-hidden="true">Total</span>
+                  <div className="flex-1 min-h-[96px] bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl px-3 py-2 flex flex-col justify-center items-center text-center">
                     <div className="text-[10px] sm:text-xs font-bold text-[#510601] uppercase tracking-wider mb-1">
                       GRAND TOTAL AMOUNT
                     </div>
-                    <div className="text-2xl sm:text-3xl font-extrabold text-[#180200] font-mono tracking-tight">
+                    <div className="text-xl sm:text-2xl font-extrabold text-[#180200] font-mono tracking-tight">
                       {formatMoney(receiptTotal)}
                     </div>
                     <div className="text-[11px] font-medium text-[#863221] italic mt-1 truncate max-w-full" title={receiptTotal > 0 ? numberToWords(receiptTotal) : 'Zero Rupees Only'}>
                       {receiptTotal > 0 ? numberToWords(receiptTotal) : 'Zero Rupees Only'}
                     </div>
+                  </div>
                   </div>
                 </div>
 
@@ -2422,8 +2423,8 @@ export default function ReceiptEntry() {
                     ].filter(Boolean).join(', ');
 
                     const shortCode = member.membershipNumber
-                      ? `#${String(member.membershipNumber).split('-').pop()}`
-                      : `ID #${member.registrationNumber || member.id || '—'}`;
+                      ? `${String(member.membershipNumber).split('-').pop()}`
+                      : `ID ${member.registrationNumber || member.id || '—'}`;
                     const mobile = member.contactNumber || member.mobile || member.phone || '';
                     const isAssigned = selectedMember && (
                       String(member.id) === String(selectedMember.id) ||
@@ -2442,7 +2443,7 @@ export default function ReceiptEntry() {
                         <div className="flex items-center gap-3 min-w-0">
                           <div
                             className="text-xs sm:text-sm font-mono font-bold text-[#510601] pr-3 border-r border-[#E8DFD8] shrink-0"
-                            title={member.membershipNumber ? `Membership #${member.membershipNumber}` : `App ID #${member.registrationNumber || member.id}`}
+                            title={member.membershipNumber ? `Membership ${member.membershipNumber}` : `App ID ${member.registrationNumber || member.id}`}
                           >
                             {shortCode}
                           </div>

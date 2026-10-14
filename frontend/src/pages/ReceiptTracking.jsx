@@ -284,7 +284,7 @@ export default function ReceiptTracking() {
           required: true,
           options: members.map((m) => ({
             value: m.id,
-            label: `${m.name || m.first_name_en || ''}${(m.membership_number || m.member_code) ? ` (${m.membership_number || m.member_code})` : ` (App ID #${m.id})`}`
+            label: `${m.name || m.first_name_en || ''}${(m.membership_number || m.member_code) ? ` (${m.membership_number || m.member_code})` : ` (App ID ${m.id})`}`
           }))
         }
       ]
@@ -301,7 +301,7 @@ export default function ReceiptTracking() {
         );
         done += 1;
       } catch (error) {
-        failed.push(`#${r.receiptNumber}: ${apiErrorMessage(error, 'failed')}`);
+        failed.push(`${r.receiptNumber}: ${apiErrorMessage(error, 'failed')}`);
       }
     }
     setSelectedIds(new Set());
@@ -331,7 +331,7 @@ export default function ReceiptTracking() {
 
   const handleMapReceipt = async (receipt) => {
     const v = await askForm({
-      title: `Map receipt #${receipt.receiptNumber} to a member`,
+      title: `Map receipt ${receipt.receiptNumber} to a member`,
       confirmText: 'Map receipt',
       fields: [
         {
@@ -341,7 +341,7 @@ export default function ReceiptTracking() {
           required: true,
           options: members.map((m) => ({
             value: m.id,
-            label: `${m.name || m.first_name_en || ''}${(m.membership_number || m.member_code) ? ` (${m.membership_number || m.member_code})` : ` (App ID #${m.id})`}`
+            label: `${m.name || m.first_name_en || ''}${(m.membership_number || m.member_code) ? ` (${m.membership_number || m.member_code})` : ` (App ID ${m.id})`}`
           }))
         },
         { name: 'amount', label: 'Amount to allocate', type: 'number', required: true, value: receipt.amount }
@@ -378,7 +378,7 @@ export default function ReceiptTracking() {
             required: true,
             options: allocations.map((a) => ({
               value: a.id,
-              label: `${a.member_name || a.associate_name || `#${a.id}`} - ${a.allocated_amount}`
+              label: `${a.member_name || a.associate_name || `${a.id}`} - ${a.allocated_amount}`
             }))
           }]
         });
@@ -387,7 +387,7 @@ export default function ReceiptTracking() {
       } else {
         const ok = await confirmYesNo({
           title: 'Remove the mapping?',
-          text: `Receipt #${receipt.receiptNumber} will no longer be mapped to ${target.member_name || 'this member'}.`,
+          text: `Receipt ${receipt.receiptNumber} will no longer be mapped to ${target.member_name || 'this member'}.`,
           confirmText: 'Yes, remove',
           danger: true
         });
@@ -402,7 +402,7 @@ export default function ReceiptTracking() {
 
   const handleRefundReceipt = async (receipt) => {
     const v = await askForm({
-      title: `Refund receipt #${receipt.receiptNumber}`,
+      title: `Refund receipt ${receipt.receiptNumber}`,
       confirmText: 'Record refund',
       fields: [
         { name: 'amount', label: 'Refund amount', type: 'number', required: true, value: receipt.amount },
@@ -424,7 +424,7 @@ export default function ReceiptTracking() {
 
   const handleCancelReceipt = async (receipt) => {
     const reason = await askReason({
-      title: `Cancel receipt #${receipt.receiptNumber}?`,
+      title: `Cancel receipt ${receipt.receiptNumber}?`,
       text: 'A cancelled receipt stays on record but no longer counts as paid.',
       confirmText: 'Yes, cancel receipt',
       danger: true
@@ -448,12 +448,12 @@ export default function ReceiptTracking() {
     try {
       await api.delete(`/receipts/${deletingReceipt.id}`, { params: { reason: 'Deleted via UI' } });
       setReceipts((prev) => prev.filter((r) => r.id !== deletingReceipt.id));
-      showToast(`Receipt #${num} deleted successfully.`);
+      showToast(`Receipt ${num} deleted successfully.`);
     } catch (error) {
       if (error.response?.status === 404) {
         // Already removed (e.g. a repeated click): just refresh the list.
         setReceipts((prev) => prev.filter((r) => r.id !== deletingReceipt.id));
-        showToast(`Receipt #${num} was already deleted.`);
+        showToast(`Receipt ${num} was already deleted.`);
         reloadData();
       } else {
         console.error('Failed to delete receipt.', error);
@@ -471,7 +471,7 @@ export default function ReceiptTracking() {
     () => setDeletingReceipt(null),
     (d) => ({
       title: 'Delete receipt?',
-      text: `Are you sure you want to delete receipt #${d.receiptNumber}? This will permanently remove the record.`,
+      text: `Are you sure you want to delete receipt ${d.receiptNumber}? This will permanently remove the record.`,
       confirmText: 'Yes, delete',
       danger: true,
     }),
@@ -668,7 +668,7 @@ export default function ReceiptTracking() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-mono font-bold text-xs text-[#510601]">#{receipt.receiptNumber}</div>
+                  <div className="font-mono font-bold text-xs text-[#510601]">{receipt.receiptNumber}</div>
                   <div className="text-sm font-bold text-[#180200] truncate">{receipt.name || '—'}</div>
                   <div className="text-[11px] text-[#863221]">
                     {formatDate(receipt.receiptDate)} · {receipt.paymentMode || '—'}
@@ -771,7 +771,7 @@ export default function ReceiptTracking() {
                       </td>}
                       {/* Column 1: Receipt Number */}
                       <td className="py-3.5 px-4 font-mono font-bold text-xs">
-                        <span className="text-[#510601] tracking-wider">#{receipt.receiptNumber}</span>
+                        <span className="text-[#510601] tracking-wider">{receipt.receiptNumber}</span>
                       </td>
 
                       {/* Column 2: Receipt Date */}
@@ -785,7 +785,7 @@ export default function ReceiptTracking() {
                           <span className="font-bold text-[#180200]">{receipt.name || '—'}</span>
                           {(receipt.mobile || (!isUnmapped && receipt.membershipNo)) && (
                             <div className="text-[11px] font-mono text-[#863221] mt-0.5">
-                              {[!isUnmapped && receipt.membershipNo ? `#${receipt.membershipNo}` : '', receipt.mobile].filter(Boolean).join(' · ')}
+                              {[!isUnmapped && receipt.membershipNo ? `${receipt.membershipNo}` : '', receipt.mobile].filter(Boolean).join(' · ')}
                             </div>
                           )}
                         </div>
@@ -893,7 +893,7 @@ export default function ReceiptTracking() {
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-[#180200]">
-                    Receipt #{viewingReceipt.receiptNumber}
+                    Receipt {viewingReceipt.receiptNumber}
                   </h2>
                   <p className="text-xs text-[#863221]">
                     Issued on {formatDate(viewingReceipt.receiptDate)}
@@ -922,7 +922,7 @@ export default function ReceiptTracking() {
                   ) : (
                     <span className="inline-flex items-center gap-1 mt-0.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                      <span>Assigned to Member #{viewingReceipt.membershipNo || viewingReceipt.memberId}</span>
+                      <span>Assigned to Member {viewingReceipt.membershipNo || viewingReceipt.memberId}</span>
                     </span>
                   )}
                 </div>

@@ -110,7 +110,7 @@ def was_soft_deleted(changes: Optional[dict]) -> bool:
 def describe(action: str, table: Optional[str], hint: Optional[str], entity_id: Any, changes: Optional[dict] = None) -> str:
     label = label_for(table)
     verb = "Deleted" if (action == "UPDATE" and was_soft_deleted(changes)) else VERBS.get(action, action.title())
-    who = f"{label} {hint}" if hint else f"{label} #{entity_id}" if entity_id else label
+    who = f"{label} {hint}" if hint else f"{label} {entity_id}" if entity_id else label
     text = f"{verb} {who}"
     if action == "UPDATE" and verb == "Updated":
         summary = summarize_changes(changes)

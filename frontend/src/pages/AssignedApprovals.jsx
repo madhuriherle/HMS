@@ -177,7 +177,7 @@ export default function AssignedApprovals() {
                       </td>
                       <td className="py-3.5 px-4 text-xs font-semibold text-[#510601]">{m.membershipType || '—'}</td>
                       <td className="py-3.5 px-4">
-                        <span className="font-mono font-bold text-xs text-[#510601]">#{m.assignedReceiptNumber}</span>
+                        <span className="font-mono font-bold text-xs text-[#510601]">{m.assignedReceiptNumber}</span>
                         <div className="text-[11px] text-[#863221] mt-0.5">{formatDate(m.receipt?.receiptDate)}</div>
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-xs whitespace-nowrap">{inr(m.receipt?.amount)}</td>

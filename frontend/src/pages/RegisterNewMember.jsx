@@ -980,7 +980,7 @@ export default function RegisterNewMember() {
               )}
               {(isViewMode || isEditMode) && targetMember?.membershipNumber && targetMember.membershipNumber !== 'Not Assigned' && targetMember.approvalStatus === 'Approved' && (
                 <span className="font-mono text-sm font-bold bg-emerald-50 text-emerald-800 px-3 py-1 rounded-xl border border-emerald-200" title="Membership Number">
-                  #{targetMember.membershipNumber}
+                  {targetMember.membershipNumber}
                 </span>
               )}
             </h1>

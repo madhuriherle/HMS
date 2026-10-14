@@ -280,7 +280,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
         setSelectedIds(next);
       }
       showToast(
-        `Membership for ${memberToApprove.fullName} approved successfully! Moved to Membership List${data?.member_code ? ` (#${data.member_code})` : ''}.`,
+        `Membership for ${memberToApprove.fullName} approved successfully! Moved to Membership List${data?.member_code ? ` (${data.member_code})` : ''}.`,
         'success'
       );
       if (viewingMember) setViewingMember(null);
@@ -558,7 +558,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                         </span>
                         {m.assignedReceiptNumber && (
                           <div className="text-[10px] font-mono text-[#510601] font-bold mt-0.5">
-                            #{m.assignedReceiptNumber}
+                            {m.assignedReceiptNumber}
                           </div>
                         )}
                       </td>
@@ -571,7 +571,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                             type="button"
                             onClick={() => navigate('/dashboard/receipts/entry', { state: { selectedMember: m } })}
                             className="btn-act"
-                            title={isAssigned ? `Receipt #${m.assignedReceiptNumber} assigned. Click to view or create another receipt.` : 'Open Receipt Entry and assign receipt to this applicant'}
+                            title={isAssigned ? `Receipt ${m.assignedReceiptNumber} assigned. Click to view or create another receipt.` : 'Open Receipt Entry and assign receipt to this applicant'}
                           >
                             <FileText className="w-3.5 h-3.5 shrink-0" />
                             <span>{isAssigned ? 'Receipt' : 'Assign Receipt'}</span>
@@ -756,7 +756,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                   <div className="text-right">
                     <span className="text-[10px] uppercase font-bold text-[#863221] block">Assigned Receipt</span>
                     <span className="font-mono font-bold text-xs text-[#510601]">
-                      #{viewingMember.assignedReceiptNumber}
+                      {viewingMember.assignedReceiptNumber}
                     </span>
                   </div>
                 )}

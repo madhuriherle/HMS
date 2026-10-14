@@ -951,7 +951,7 @@ def get_unassigned_candidates(
             full_name = f"{matched_m.first_name_en} {matched_m.last_name_en or ''}".strip()
             item["matched_member"] = {
                 "id": matched_m.id,
-                "name": full_name or matched_m.full_name_kn or f"Member #{matched_m.id}",
+                "name": full_name or matched_m.full_name_kn or f"Member {matched_m.id}",
                 "membership_number": matched_m.membership_number or matched_m.member_code,
                 "mobile": matched_m.mobile,
                 "status": matched_m.approval_status,

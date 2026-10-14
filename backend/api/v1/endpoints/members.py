@@ -542,7 +542,7 @@ def lookup_member(
         full_name = " ".join(p for p in (m.name_title, m.first_name_en, m.middle_name_en, m.last_name_en) if p)
         matches.append({
             "id": m.id,
-            "name": full_name or m.full_name_kn or f"Member #{m.id}",
+            "name": full_name or m.full_name_kn or f"Member {m.id}",
             "member_code": m.member_code,
             "membership_number": membership.membership_number if membership else None,
             "mobile": m.mobile,
@@ -1195,7 +1195,7 @@ def delete_member(
         notify_approvers(
             db,
             title=f"Approval needed: Delete member ({mode})",
-            body=f"{current_user.name} requested to delete member #{id}. Reason: {reason}",
+            body=f"{current_user.name} requested to delete member {id}. Reason: {reason}",
             data={"deletion_request_id": req.id, "member_id": id},
         )
         return {
@@ -2251,7 +2251,7 @@ def request_profile_change(
     notify_approvers(
         db,
         title="Approval needed: Member profile change",
-        body=f"{current_user.name} requested a profile change for member #{req_in.member_id}.",
+        body=f"{current_user.name} requested a profile change for member {req_in.member_id}.",
         data={"profile_change_request_id": created.id, "member_id": req_in.member_id},
     )
     return created

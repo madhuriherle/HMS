@@ -436,7 +436,7 @@ export default function Dashboard() {
                     </h3>
                     {viewingMember.membershipNumber && (
                       <span className="font-mono font-bold text-xs bg-white text-[#510601] px-2 py-0.5 rounded-md border border-[#E8DFD8]">
-                        #{viewingMember.membershipNumber}
+                        {viewingMember.membershipNumber}
                       </span>
                     )}
                   </div>

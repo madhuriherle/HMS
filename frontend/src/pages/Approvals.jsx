@@ -121,7 +121,7 @@ export default function Approvals() {
             kind: 'requests',
             kindLabel: 'Change Request',
             module: r.module || 'system',
-            summary: `${r.action} ${r.entity_type}${r.entity_id ? ` #${r.entity_id}` : ''}`,
+            summary: `${r.action} ${r.entity_type}${r.entity_id ? ` ${r.entity_id}` : ''}`,
             detail: detailText,
             hasWarning: Boolean(warning),
             warningText: warning,
@@ -145,7 +145,7 @@ export default function Approvals() {
             kind: 'deletions',
             kindLabel: 'Member Deletion',
             module: 'members',
-            summary: `Delete Member #${r.member_id} (${r.deletion_type || 'Termination'})`,
+            summary: `Delete Member ${r.member_id} (${r.deletion_type || 'Termination'})`,
             detail: r.reason || 'No reason specified',
             hasWarning: false,
             warningText: null,
@@ -173,7 +173,7 @@ export default function Approvals() {
             kind: 'profile',
             kindLabel: 'Profile Change',
             module: 'members',
-            summary: `Profile Change for Member #${r.member_id}`,
+            summary: `Profile Change for Member ${r.member_id}`,
             detail: detailText,
             hasWarning: false,
             warningText: null,
@@ -197,7 +197,7 @@ export default function Approvals() {
             kind: 'types',
             kindLabel: 'Type Change',
             module: 'members',
-            summary: `Member #${r.member_id}: Change to Type #${r.requested_type_id}`,
+            summary: `Member ${r.member_id}: Change to Type ${r.requested_type_id}`,
             detail: r.reason || 'No reason specified',
             hasWarning: false,
             warningText: null,
@@ -321,9 +321,9 @@ export default function Approvals() {
         {
           field: 'Membership Type',
           previous: raw.current_membership_id
-            ? `Membership #${raw.current_membership_id}`
+            ? `Membership ${raw.current_membership_id}`
             : 'Current Membership',
-          proposed: `Requested Type #${raw.requested_type_id}`,
+          proposed: `Requested Type ${raw.requested_type_id}`,
           changed: true,
         },
         {
@@ -340,7 +340,7 @@ export default function Approvals() {
       return [
         {
           field: 'Member Status',
-          previous: `Active (Member #${raw.member_id})`,
+          previous: `Active (Member ${raw.member_id})`,
           proposed: `Deleted (${raw.deletion_type || 'SOFT'})`,
           changed: true,
         },
@@ -539,7 +539,7 @@ export default function Approvals() {
                   filteredRows.map((r) => (
                     <tr key={r.id} className="hover:bg-[#FAF7F2]/40 transition-colors">
                       <td className="py-3 px-4 font-mono font-semibold text-[#510601]">
-                        #{r.rawId}
+                        {r.rawId}
                       </td>
                       <td className="py-3 px-4">
                         <span
@@ -572,7 +572,7 @@ export default function Approvals() {
                       <td className="py-3 px-4 text-[#863221]">
                         <div>{formatDateTime(r.created_at, '—', false)}</div>
                         {r.requested_by ? (
-                          <div className="text-[10px] text-[#863221]/60">by user #{r.requested_by}</div>
+                          <div className="text-[10px] text-[#863221]/60">by user {r.requested_by}</div>
                         ) : null}
                       </td>
                       <td className="py-3 px-4 text-center">
@@ -646,7 +646,7 @@ export default function Approvals() {
             <div className="h-14 px-6 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <span className="text-base font-bold text-[#180200]">
-                  Request Details #{viewItem.rawId}
+                  Request Details {viewItem.rawId}
                 </span>
                 <span
                   className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${kindBadge(
@@ -694,7 +694,7 @@ export default function Approvals() {
                     Requested By
                   </span>
                   <span className="font-semibold text-[#180200]">
-                    {viewItem.requested_by ? `User #${viewItem.requested_by}` : 'System'}
+                    {viewItem.requested_by ? `User ${viewItem.requested_by}` : 'System'}
                   </span>
                 </div>
                 <div>

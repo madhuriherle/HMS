@@ -519,7 +519,7 @@ export default function MembershipList() {
         const { data } = await api.post('/members/', memberToApiPayload(formData));
         const newMember = normalizeMember(data);
         setMembers((prev) => [newMember, ...prev]);
-        showToast(`Member "${newMember.fullName}" (#${newMember.membershipNumber}) registered successfully.`);
+        showToast(`Member "${newMember.fullName}" (${newMember.membershipNumber}) registered successfully.`);
       } catch (error) {
         console.error('Failed to create member.', error);
         showToast(error.response?.data?.detail || 'Failed to register member through API.', 'error');
@@ -662,7 +662,7 @@ export default function MembershipList() {
     () => setDeleteDialog(null),
     (m) => ({
       title: 'Delete membership?',
-      text: `Are you sure you want to delete ${m.fullName || m.name}${m.membershipNumber ? ` (#${m.membershipNumber})` : ''}?`,
+      text: `Are you sure you want to delete ${m.fullName || m.name}${m.membershipNumber ? ` (${m.membershipNumber})` : ''}?`,
       confirmText: 'Yes, delete',
       danger: true,
     }),
@@ -883,7 +883,7 @@ export default function MembershipList() {
 
                       {/* Membership No. */}
                       <td className="py-3 px-4 font-mono font-bold text-xs text-[#510601] whitespace-nowrap">
-                        {m.membershipNumber ? `#${m.membershipNumber}` : '—'}
+                        {m.membershipNumber ? `${m.membershipNumber}` : '—'}
                       </td>
 
                       {/* Name */}
@@ -1047,7 +1047,7 @@ export default function MembershipList() {
                     </h3>
                     {viewingMember.membershipNumber && (
                       <span className="font-mono font-bold text-xs bg-[#FAF7F2] text-[#510601] px-2 py-0.5 rounded border border-[#E8DFD8]">
-                        #{viewingMember.membershipNumber}
+                        {viewingMember.membershipNumber}
                       </span>
                     )}
                   </div>
@@ -1191,7 +1191,7 @@ export default function MembershipList() {
                               className="flex items-center justify-between p-1.5 bg-white rounded-lg border border-[#E8DFD8] text-[11px]"
                             >
                               <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold text-[#510601]">#{r.receiptNumber}</span>
+                                <span className="font-mono font-bold text-[#510601]">{r.receiptNumber}</span>
                                 <span className="text-stone-400">•</span>
                                 <span className="text-[#863221]">{r.receiptDate || '—'}</span>
                                 <span className="text-stone-400">•</span>
@@ -1256,7 +1256,7 @@ export default function MembershipList() {
                                 return (
                                   <tr key={r.id || r.receiptNumber} className="hover:bg-[#FAF7F2]/40 transition-colors">
                                     <td className="py-2 px-2.5 font-mono font-bold text-[#510601]">
-                                      #{r.receiptNumber}
+                                      {r.receiptNumber}
                                     </td>
                                     <td className="py-2 px-2.5 text-[#863221] font-mono text-[11px]">
                                       {r.receiptDate || '—'}
@@ -1471,7 +1471,7 @@ export default function MembershipList() {
                       Akhila Havyaka Mahasabha
                     </span>
                     <span className="font-mono text-[10px] font-bold bg-[#FAF7F2] text-[#510601] px-1.5 py-0.5 rounded border border-[#E8DFD8]">
-                      {m.membershipNumber ? `#${m.membershipNumber}` : '—'}
+                      {m.membershipNumber ? `${m.membershipNumber}` : '—'}
                     </span>
                   </div>
 

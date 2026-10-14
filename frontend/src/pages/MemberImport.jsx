@@ -441,7 +441,7 @@ export default function MemberImport() {
                   <div className="max-h-36 overflow-y-auto text-xs divide-y divide-[#E8DFD8]/60">
                     {skippedList.slice(0, 50).map((s, idx) => (
                       <div key={idx} className="py-1 flex items-center justify-between text-[#863221]">
-                        <span className="font-mono font-medium">#{s.membership_number}</span>
+                        <span className="font-mono font-medium">{s.membership_number}</span>
                         <span className="text-[11px] text-amber-700">{s.reason}</span>
                       </div>
                     ))}

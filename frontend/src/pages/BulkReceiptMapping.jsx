@@ -184,7 +184,7 @@ export default function BulkReceiptMapping() {
         ]
       });
 
-      notify(`Receipt #${candidate.receipt_number} mapped to ${candidate.matched_member.name}!`, 'success');
+      notify(`Receipt ${candidate.receipt_number} mapped to ${candidate.matched_member.name}!`, 'success');
       await fetchCandidates();
     } catch (err) {
       console.error(err);
@@ -236,7 +236,7 @@ export default function BulkReceiptMapping() {
         ]
       });
 
-      notify(`Receipt #${activeReceiptForManual.receipt_number} mapped to ${member.name || member.first_name_en}!`, 'success');
+      notify(`Receipt ${activeReceiptForManual.receipt_number} mapped to ${member.name || member.first_name_en}!`, 'success');
       setManualModalOpen(false);
       await fetchCandidates();
     } catch (err) {
@@ -523,7 +523,7 @@ export default function BulkReceiptMapping() {
                         {/* Receipt Details */}
                         <td className="py-3 px-3">
                           <span className="font-mono font-bold text-[#510601] block">
-                            #{cand.receipt_number}
+                            {cand.receipt_number}
                           </span>
                           <span className="text-[11px] text-[#863221]/70 block">
                             {formatDate(cand.receipt_date)}
@@ -642,7 +642,7 @@ export default function BulkReceiptMapping() {
             <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
               <div>
                 <h3 className="text-base font-bold text-[#180200]">
-                  Map Receipt #{activeReceiptForManual?.receipt_number}
+                  Map Receipt {activeReceiptForManual?.receipt_number}
                 </h3>
                 <p className="text-xs text-[#863221]">
                   Amount: {formatMoney(activeReceiptForManual?.net_amount)} · Payer: {activeReceiptForManual?.payer_name}

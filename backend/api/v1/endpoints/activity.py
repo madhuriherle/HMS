@@ -95,7 +95,7 @@ def read_user_activity(
         )
         for uid, name, uname, rname in user_rows:
             users_map[uid] = {
-                "name": name or uname or f"User #{uid}",
+                "name": name or uname or f"User {uid}",
                 "role_name": rname or "User",
             }
 

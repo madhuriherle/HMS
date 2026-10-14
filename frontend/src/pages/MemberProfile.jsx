@@ -620,7 +620,7 @@ function MagazineTab({ id }) {
                 {d.subscriptions.map((s) => (
                   <div key={s.id} className="border-b last:border-b-0 border-[#E8DFD8]/70 pb-2">
                     <div className="flex justify-between">
-                      <span>Subscription #{s.id}</span>
+                      <span>Subscription {s.id}</span>
                       <span className="text-xs font-semibold text-[#863221]">{s.delivery_status}</span>
                     </div>
                     {s.address_override && <div className="text-xs text-[#863221]">Deliver to: {s.address_override}</div>}
@@ -870,7 +870,7 @@ export default function MemberProfile() {
                   {s.full_name_kn && <div className="text-xs text-[#863221]">{s.full_name_kn}</div>}
                   <p className="text-xs text-[#863221] mt-0.5 truncate">
                     {[
-                      s.member_code ? `#${s.member_code}` : `ID ${s.id}`,
+                      s.member_code ? `${s.member_code}` : `ID ${s.id}`,
                       s.active_membership?.type_name_en,
                       [s.locality, s.city].filter(Boolean).join(', '),
                       phone(s.mobile_country_code, s.mobile)
