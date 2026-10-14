@@ -73,7 +73,7 @@ export default function GlobalSearch() {
                   <span className="min-w-0">
                     <span className="block text-xs font-semibold text-[#180200] truncate">{m.name}</span>
                     <span className="block text-[11px] text-[#863221]">
-                      {m.member_code || 'Applicant'} {m.mobile ? `· ${m.mobile}` : ''}
+                      {m.membership_number || m.member_code || 'Applicant'} {m.mobile ? `· ${m.mobile}` : ''}
                     </span>
                   </span>
                 </button>

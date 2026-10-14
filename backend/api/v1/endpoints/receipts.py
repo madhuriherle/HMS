@@ -585,12 +585,13 @@ def _member_card(db: Session, member: Member, today: date) -> dict:
     if valid_till and valid_till < today:
         warnings.append({"code": "expired", "text": f"Membership expired on {valid_till.strftime('%d-%m-%Y')}"})
 
+    mem_code = (membership.membership_number if membership and membership.membership_number else None) or member.member_code or member.membership_number
     return {
         "id": member.id,
         "kind": "member" if member.approval_status == "APPROVED" else "applicant",
         "name": " ".join(p for p in (member.name_title, member.first_name_en, member.middle_name_en, member.last_name_en) if p),
-        "member_code": member.member_code,
-        "membership_number": membership.membership_number if membership else None,
+        "member_code": mem_code,
+        "membership_number": mem_code,
         "registration_number": str(member.id),
         "membership_type": mtype.name_en if mtype else None,
         "mobile": member.mobile,

@@ -284,7 +284,7 @@ export default function ReceiptTracking() {
           required: true,
           options: members.map((m) => ({
             value: m.id,
-            label: `${m.name || m.first_name_en || ''}${m.member_code ? ` (${m.member_code})` : ` (App ID #${m.id})`}`
+            label: `${m.name || m.first_name_en || ''}${(m.membership_number || m.member_code) ? ` (${m.membership_number || m.member_code})` : ` (App ID #${m.id})`}`
           }))
         }
       ]
@@ -341,7 +341,7 @@ export default function ReceiptTracking() {
           required: true,
           options: members.map((m) => ({
             value: m.id,
-            label: `${m.name || m.first_name_en || ''}${m.member_code ? ` (${m.member_code})` : ` (App ID #${m.id})`}`
+            label: `${m.name || m.first_name_en || ''}${(m.membership_number || m.member_code) ? ` (${m.membership_number || m.member_code})` : ` (App ID #${m.id})`}`
           }))
         },
         { name: 'amount', label: 'Amount to allocate', type: 'number', required: true, value: receipt.amount }

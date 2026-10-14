@@ -86,7 +86,7 @@ const toEntryMember = (m, loc) => {
   return {
     id: m.id,
     registrationNumber: String(m.id),
-    membershipNumber: m.member_code || '',
+    membershipNumber: m.membership_number || m.member_code || m.membershipNumber || (m.memberships && m.memberships[0]?.membership_number) || '',
     fullName,
     name: fullName,
     mobile: m.mobile || '',
@@ -419,7 +419,7 @@ export default function ReceiptEntry() {
     setSelectedMember(member);
     // the Membership No. box holds the real membership number only (given on approval); the member id (MID) is
     // not a membership number, so an unapproved member leaves it blank and is linked by id
-    const memNo = member.membershipNumber || '';
+    const memNo = member.membershipNumber || member.membership_number || member.member_code || '';
     const memType = member.membershipType || member.membershipTypeCategory || '';
 
     // Only who is paying is filled in: name, membership no., mobile and PAN (members hold no PAN, so it is the
@@ -447,13 +447,28 @@ export default function ReceiptEntry() {
         .get(`/members/${member.id}/profile`)
         .then(({ data }) => {
           const ms = (data?.memberships || [])[0];
-          if (!ms) return;
-          setSelectedMember((prev) => (prev && prev.id === member.id ? { ...prev, membershipType: ms.type_name_en || '' } : prev));
-          setFormData((prev) => ({
-            ...prev,
-            membershipType: ms.type_name_en || prev.membershipType,
-            membershipTypeId: ms.membership_type_id || prev.membershipTypeId
-          }));
+          const realMemNo = ms?.membership_number || data?.personal?.membership_number || data?.personal?.member_code || '';
+          if (realMemNo) {
+            setLookupMembershipNo((prev) => prev || realMemNo);
+            setFormData((prev) => ({
+              ...prev,
+              membershipNo: prev.membershipNo || realMemNo,
+              membershipType: ms?.type_name_en || prev.membershipType,
+              membershipTypeId: ms?.membership_type_id || prev.membershipTypeId
+            }));
+            setSelectedMember((prev) => (prev && prev.id === member.id ? {
+              ...prev,
+              membershipNumber: prev.membershipNumber || realMemNo,
+              membershipType: ms?.type_name_en || prev.membershipType
+            } : prev));
+          } else if (ms) {
+            setSelectedMember((prev) => (prev && prev.id === member.id ? { ...prev, membershipType: ms.type_name_en || '' } : prev));
+            setFormData((prev) => ({
+              ...prev,
+              membershipType: ms.type_name_en || prev.membershipType,
+              membershipTypeId: ms.membership_type_id || prev.membershipTypeId
+            }));
+          }
         })
         .catch(() => {});
     }
@@ -689,7 +704,7 @@ export default function ReceiptEntry() {
   // "ASSIGN TO RECEIPT" FROM BOTTOM UNAPPROVED MEMBERS TABLE (FLOW 1)
   const handleAssignFromUnapproved = (member) => {
     setEntrySource('unapproved-assignment');
-    const memNo = member.membershipNumber || '';
+    const memNo = member.membershipNumber || member.membership_number || member.member_code || '';
     setLookupMembershipNo(memNo);
     applyMemberToForm(member);
     setLookupError('');
@@ -698,7 +713,7 @@ export default function ReceiptEntry() {
   // "ASSIGN TO RECEIPT" FROM RIGHT-SIDE MEMBERSHIP LIST TABLE (FLOW 2)
   const handleAssignFromMembership = (member) => {
     setEntrySource('membership-assignment');
-    const memNo = member.membershipNumber || '';
+    const memNo = member.membershipNumber || member.membership_number || member.member_code || '';
     setLookupMembershipNo(memNo);
     applyMemberToForm(member);
     setLookupError('');

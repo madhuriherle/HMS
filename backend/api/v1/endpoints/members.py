@@ -105,15 +105,19 @@ def _attach_membership_types(db: Session, rows: list) -> None:
         .order_by(MemberMembership.id.asc())
         .all()
     ):
-        latest[ms.member_id] = (t.id, t.name_en)
+        latest[ms.member_id] = (t.id, t.name_en, ms.membership_number)
     from services import membership_credit
     credit = membership_credit.credit_totals(db, ids)
     for r in rows:
         if isinstance(r, dict):
-            tid, name = latest.get(r.get("id"), (None, None))
+            tid, name, ms_number = latest.get(r.get("id"), (None, None, None))
             r["membership_type_id"] = tid
             r["membership_type"] = name
             r["credit_total"] = credit.get(r.get("id"), 0.0)  # what the member has paid toward membership
+            mem_no = r.get("membership_number") or r.get("member_code") or ms_number
+            if mem_no:
+                r["membership_number"] = mem_no
+                r["member_code"] = mem_no
 
 
 @router.post("/", response_model=Union[schemas_members.Member, PendingApproval], status_code=201)

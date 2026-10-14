@@ -267,7 +267,7 @@ export default function RegisterNewMember() {
           id: m.id,
           fullName: [m.name_title, m.first_name_en, m.middle_name_en, m.last_name_en].filter(Boolean).join(' '),
           registrationNumber: String(m.id),
-          membershipNumber: m.member_code || membership?.membership_number || '',
+          membershipNumber: m.membership_number || m.member_code || membership?.membership_number || '',
           approvalStatus: approved ? 'Approved' : 'Unapproved',
           status: approved ? 'Approved' : 'Unapproved',
           assignedReceiptNumber: ''
@@ -1229,7 +1229,7 @@ export default function RegisterNewMember() {
                         ...dupInfo.similar.map((d) => ({ ...d, why: 'has the same name and date of birth' }))].map((d) => (
                         <div key={`${d.id}${d.why}`} className="mt-1.5 flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-800">
                           <span>
-                            {d.name} {d.member_code ? `(${d.member_code})` : '(applicant)'} already {d.why}.
+                            {d.name} {(d.membership_number || d.member_code) ? `(${d.membership_number || d.member_code})` : '(applicant)'} already {d.why}.
                           </span>
                           <a
                             href={`/dashboard/membership/profile/${d.id}`}

@@ -857,18 +857,18 @@ export default function MemberProfile() {
         {s && (
           <>
             {/* Header strip */}
-            <div className="bg-gradient-to-r from-[#2E0502] via-[#510601] to-[#180200] text-white rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="bg-white border border-[#E8DFD8] text-[#180200] rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4 min-w-0">
-                <div className="w-14 h-14 rounded-xl bg-white/10 border border-white/20 overflow-hidden flex items-center justify-center font-bold text-xl text-amber-300 shrink-0">
+                <div className="w-14 h-14 rounded-xl bg-[#FAF1EE] border border-[#E8DFD8] overflow-hidden flex items-center justify-center font-semibold text-xl text-[#510601] shrink-0">
                   {photoUrl ? <img src={photoUrl} alt={fullName} className="w-full h-full object-cover" /> : initialOf(fullName)}
                 </div>
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate">{fullName}</h1>
-                    <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{s.approval_status}</span>
+                    <h1 className="text-lg sm:text-xl font-semibold text-[#180200] tracking-tight truncate">{fullName}</h1>
+                    <span className="chip chip-on">{s.approval_status}</span>
                   </div>
-                  {s.full_name_kn && <div className="text-xs text-amber-100/80">{s.full_name_kn}</div>}
-                  <p className="text-xs text-white/70 mt-0.5 truncate">
+                  {s.full_name_kn && <div className="text-xs text-[#863221]">{s.full_name_kn}</div>}
+                  <p className="text-xs text-[#863221] mt-0.5 truncate">
                     {[
                       s.member_code ? `#${s.member_code}` : `ID ${s.id}`,
                       s.active_membership?.type_name_en,
@@ -880,13 +880,13 @@ export default function MemberProfile() {
               </div>
               <div className="flex items-center gap-4 shrink-0">
                 <div className="text-right">
-                  <div className="text-[10px] uppercase font-bold text-amber-300 tracking-wider">Paid so far</div>
-                  <div className="text-lg font-bold font-mono">{inr(s.paid_so_far)}</div>
+                  <div className="text-[10px] uppercase font-semibold text-[#863221]/80 tracking-wider">Paid so far</div>
+                  <div className="text-base font-semibold font-mono text-[#180200]">{inr(s.paid_so_far)}</div>
                 </div>
                 {hasPermission('members.list.write') && (
                   <Link
                     to={`/dashboard/membership/edit/${s.id}`}
-                    className="text-xs bg-amber-400 hover:bg-amber-300 text-[#2E0502] px-3.5 py-2 rounded-lg font-bold inline-flex items-center gap-1.5 transition"
+                    className="text-xs bg-white hover:bg-[#FAF7F2] border border-[#E8DFD8] text-[#510601] px-3.5 py-2 rounded-lg font-semibold inline-flex items-center gap-1.5 transition"
                   >
                     <Pencil className="w-3.5 h-3.5" /> Edit
                   </Link>
@@ -921,7 +921,7 @@ export default function MemberProfile() {
                       aria-current={selected ? 'page' : undefined}
                       onClick={() => openTab(t.key)}
                       className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                        selected ? 'bg-[#510601] text-white shadow-sm' : 'text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2]'
+                        selected ? 'bg-[#FAF1EE] text-[#510601] border border-[#E8DFD8]' : 'text-[#863221] border border-transparent hover:text-[#180200] hover:bg-[#FAF7F2]'
                       }`}
                     >
                       <span className="flex items-center gap-2.5">
@@ -929,7 +929,7 @@ export default function MemberProfile() {
                         <span>{t.label}</span>
                       </span>
                       {count > 0 && (
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${selected ? 'bg-white/20 text-white' : 'bg-[#FAF7F2] border border-[#E8DFD8] text-[#863221]'}`}>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${selected ? 'bg-white border border-[#E8DFD8] text-[#510601]' : 'bg-[#FAF7F2] border border-[#E8DFD8] text-[#863221]'}`}>
                           {count}
                         </span>
                       )}

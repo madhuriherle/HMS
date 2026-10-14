@@ -31,6 +31,15 @@ RULE 1: MEMBER RECORD ID (id) vs. PERMANENT MEMBERSHIP NUMBER (member_code)
        firstDefined(member.member_code, member.membership_number, member.membershipNumber, '')
        NEVER append `, member.id` as a fallback!
 
+1.4  MEMBERSHIP NUMBER RETRIEVAL & ASSIGNMENT:
+     - Across all components (Receipt Entry, Receipt Tracking, Member Lookup, Global Search, etc.),
+       always inspect both `member.membership_number` and `member.member_code`
+       (e.g., `member.membership_number || member.member_code || member.membershipNumber || ''`).
+     - In Receipt Entry, clicking "Assign" from the Membership List must populate the
+       form's `membershipNo` with the approved member's permanent number and display `#<number>`.
+     - Backend endpoints serializing dictionary rows or plain models must ensure both
+       `membership_number` and `member_code` are populated for approved members.
+
 --------------------------------------------------------------------------------
 RULE 2: MEMBER vs. USER SEPARATION
 --------------------------------------------------------------------------------
