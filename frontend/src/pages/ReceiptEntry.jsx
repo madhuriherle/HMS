@@ -316,6 +316,29 @@ export default function ReceiptEntry() {
     setExtraLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)));
     setFormErrors((prev) => ({ ...prev, extraLines: '' }));
   };
+  const handleAddLine = () => {
+    if (!formData.particulars) {
+      setFormErrors((prev) => ({ ...prev, particulars: 'Please select a particular for the first item.' }));
+      return;
+    }
+    if (!formData.amount || Number(formData.amount) <= 0) {
+      setFormErrors((prev) => ({ ...prev, amount: 'Please enter an amount for the first item before adding another.' }));
+      return;
+    }
+    for (const [i, l] of extraLines.entries()) {
+      const n = i + 2;
+      if (!l.particular) {
+        setFormErrors((prev) => ({ ...prev, extraLines: `Line ${n}: please select a particular before adding another item.` }));
+        return;
+      }
+      if (!(Number(l.amount) > 0)) {
+        setFormErrors((prev) => ({ ...prev, extraLines: `Line ${n}: please enter an amount before adding another item.` }));
+        return;
+      }
+    }
+    setExtraLines((prev) => [...prev, emptyLine()]);
+    setFormErrors((prev) => ({ ...prev, extraLines: '' }));
+  };
   const receiptTotal = useMemo(
     () => (Number(formData.amount) || 0) + extraLines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0),
     [formData.amount, extraLines]
@@ -892,7 +915,11 @@ export default function ReceiptEntry() {
       errors.mobile = mobileProblem(rules, formData.mobile);
     }
 
-    // Extra particular lines: each needs a particular, an amount, and its sub-type / description
+    // Extra particular lines: each needs a particular, an amount, its sub-type / description, and no duplicate line
+    const lineKey = (particular, subType) => `${(particular || '').trim().toLowerCase()}::${(subType || '').trim().toLowerCase()}`;
+    const seen = new Map();
+    seen.set(lineKey(formData.particulars, formData.donationSubType), 1);
+
     for (const [i, l] of extraLines.entries()) {
       const n = i + 2;
       if (!l.particular || !activeParticulars.some((p) => p.name === l.particular)) {
@@ -911,6 +938,14 @@ export default function ReceiptEntry() {
         errors.extraLines = `Line ${n}: describe the Others amount.`;
         break;
       }
+      const k = lineKey(l.particular, l.subType);
+      if (seen.has(k)) {
+        const firstLine = seen.get(k);
+        const nameDisplay = l.subType ? `${l.particular} (${l.subType})` : l.particular;
+        errors.extraLines = `Line ${n}: "${nameDisplay}" is already added on Line ${firstLine}. Please combine the amounts into one line.`;
+        break;
+      }
+      seen.set(k, n);
     }
 
     // 10. PAN (If entered, validate standard format)
@@ -1706,11 +1741,11 @@ export default function ReceiptEntry() {
                   </div>
                 </div>
 
-                {/* Row 4: Particulars (with sub-type), Amount & Add Item */}
-                <div className="space-y-2.5">
+                {/* Row 4: Particulars (with sub-type), Amount & Multi-Line Items */}
+                <div className="space-y-3">
                   <div className="relative grid grid-cols-12 gap-3 items-end">
                     {/* Particulars + Sub-Type in one picker */}
-                    <div className={`col-span-12 ${showDescription ? 'sm:col-span-4' : 'sm:col-span-6'}`}>
+                    <div className={`col-span-12 ${showDescription ? 'sm:col-span-5' : 'sm:col-span-7'}`}>
                       <label className="block text-xs font-bold text-[#180200] mb-1">
                         Particulars <span className="text-[#ED4636]">*</span>
                       </label>
@@ -1732,7 +1767,7 @@ export default function ReceiptEntry() {
 
                     {/* Description (Others without sub-types) */}
                     {showDescription && (
-                      <div className="col-span-12 sm:col-span-3">
+                      <div className="col-span-12 sm:col-span-4">
                         <label className="block text-xs font-bold text-[#180200] mb-1">
                           Description <span className="text-[#ED4636]">*</span>
                         </label>
@@ -1756,7 +1791,7 @@ export default function ReceiptEntry() {
                     )}
 
                     {/* Amount */}
-                    <div className="col-span-7 sm:col-span-3">
+                    <div className={`col-span-12 ${showDescription ? 'sm:col-span-3' : 'sm:col-span-5'}`}>
                       <label className="block text-xs font-bold text-[#180200] mb-1">
                         Amount <span className="text-[#ED4636]">*</span>
                       </label>
@@ -1782,30 +1817,18 @@ export default function ReceiptEntry() {
                         </p>
                       )}
                     </div>
-
-                    {/* Add Item button inline */}
-                    <div className={`col-span-5 ${showDescription ? 'sm:col-span-2' : 'sm:col-span-3'} pb-0.5`}>
-                      <button
-                        type="button"
-                        onClick={() => setExtraLines((prev) => [...prev, emptyLine()])}
-                        className="inline-flex items-center gap-1 px-2.5 py-2 text-xs font-bold text-[#510601] hover:text-[#180200] transition-colors cursor-pointer whitespace-nowrap"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Add Item</span>
-                      </button>
-                    </div>
                   </div>
 
                   {/* Extra Lines if any */}
                   {extraLines.length > 0 && (
-                    <div className="space-y-2 pt-1 border-t border-dashed border-[#E8DFD8]">
-                      {extraLines.map((l) => {
+                    <div className="space-y-2 pt-2 border-t border-dashed border-[#E8DFD8]">
+                      {extraLines.map((l, index) => {
                         const subs = activeSubTypesOf(l.particular);
                         const needsDescription = isOthersName(l.particular) && subs.length === 0;
                         return (
                           <div key={l.key} className="relative grid grid-cols-12 gap-3 items-end">
-                            <div className={`col-span-12 ${needsDescription ? 'sm:col-span-4' : 'sm:col-span-6'}`}>
-                              <label className="block text-xs font-bold text-[#180200] mb-1">Particulars</label>
+                            <div className={`col-span-12 ${needsDescription ? 'sm:col-span-5' : 'sm:col-span-7'}`}>
+                              <label className="block text-xs font-bold text-[#180200] mb-1">Particulars #{index + 2}</label>
                               <ParticularPicker
                                 particulars={activeParticulars}
                                 particular={l.particular}
@@ -1817,7 +1840,7 @@ export default function ReceiptEntry() {
                               />
                             </div>
                             {needsDescription && (
-                              <div className="col-span-12 sm:col-span-3">
+                              <div className="col-span-12 sm:col-span-4">
                                 <label className="block text-xs font-bold text-[#180200] mb-1">Description</label>
                                 <input
                                   type="text"
@@ -1827,7 +1850,7 @@ export default function ReceiptEntry() {
                                 />
                               </div>
                             )}
-                            <div className="col-span-9 sm:col-span-3">
+                            <div className={`col-span-9 ${needsDescription ? 'sm:col-span-2' : 'sm:col-span-4'}`}>
                               <label className="block text-xs font-bold text-[#180200] mb-1">Amount</label>
                               <div className="relative">
                                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-[#863221]/70">₹</span>
@@ -1839,12 +1862,12 @@ export default function ReceiptEntry() {
                                 />
                               </div>
                             </div>
-                            <div className="col-span-3 sm:col-span-2 flex items-center justify-end pb-1">
+                            <div className="col-span-3 sm:col-span-1 flex items-center justify-end pb-1">
                               <button
                                 type="button"
                                 title="Remove this line"
                                 onClick={() => setExtraLines((prev) => prev.filter((x) => x.key !== l.key))}
-                                className="p-1.5 rounded-lg text-[#ED4636] hover:bg-red-50 cursor-pointer transition-colors"
+                                className="p-2 rounded-lg text-[#ED4636] hover:bg-red-50 cursor-pointer transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
@@ -1854,6 +1877,23 @@ export default function ReceiptEntry() {
                       })}
                     </div>
                   )}
+
+                  {/* Add Item button at bottom of items section */}
+                  <div className="pt-1 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={handleAddLine}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-[#510601] bg-[#FAF1EE] border border-[#E8DFD8] hover:bg-[#510601] hover:text-white transition-colors cursor-pointer shadow-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Item</span>
+                    </button>
+                    {extraLines.length > 0 && (
+                      <span className="text-[11px] font-semibold text-[#863221]">
+                        {extraLines.length + 1} items total
+                      </span>
+                    )}
+                  </div>
 
                   {formErrors.extraLines && (
                     <p className="text-[11px] text-[#ED4636] font-medium flex items-center gap-1">
