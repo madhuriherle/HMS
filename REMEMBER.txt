@@ -66,6 +66,26 @@ RULE 3: RECEIPT ENTRY & ALLOCATION (LINKING)
        * If member is approved     -> Receipt status = "APPROVED"
      - A receipt linked at entry MUST NEVER be left as "UNASSIGNED".
 
+3.2  RECEIPT & TRANSACTION DATES (NO FUTURE DATES):
+     - Receipt Date (Receipt.receipt_date) MUST NEVER be in the future. Money cannot
+       be received on a future date. Enforced in schema validator and frontend DateInput.
+     - Transaction Date (Receipt.transaction_date) MUST NEVER be in the future.
+     - On frontend DateInput, pass max={getTodayISODate()} for both fields so the
+       calendar picker physically disables future dates, and validate immediately.
+     - Service / Booking period dates (From Date / To Date) CAN be in the future (e.g.
+       advance Hall / Kalyana Mantapa bookings or festival sevas).
+
+3.3  MULTI-LINE PARTICULAR ITEMS & "ADD ITEM":
+     - The first particular row is the primary item; "Add Item" is ONLY for receipts
+       covering multiple distinct heads (e.g., Membership + Donation).
+     - The "Add Item" button sits at the BOTTOM beneath all item rows, NEVER squeezed
+       into the top-right corner of Row 1.
+     - "Add Item" MUST NOT allow adding an empty row if the current/previous item's
+       amount is empty or not > 0.
+     - DUPLICATE PARTICULARS ARE BLOCKED: A receipt cannot have duplicate lines for
+       the same particular (or same particular + sub-type). Form validation rejects
+       duplicates with an explicit instruction to combine amounts into one line.
+
 --------------------------------------------------------------------------------
 RULE 4: BULK RECEIPT AUTO-MAPPING RULES
 --------------------------------------------------------------------------------
@@ -400,4 +420,8 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
 15.7 Approvals does NOT use siloed tabs: all requests (change requests, deletions, profile
      updates, type changes) appear together in one unified list with category filter pills,
      and each row provides a View button opening a Previous vs. Proposed comparison modal.
+15.8 Receipt Entry's "Add Item" button sits at the bottom beneath all particular items,
+     never in the top-right of Row 1. Duplicate particulars on the same receipt are blocked.
+15.9 Receipt Date and Transaction Date cannot be in the future. Calendar picker disables future
+     dates (max=today) and forms block future dates on input.
 ================================================================================
