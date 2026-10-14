@@ -342,3 +342,25 @@ def test_an_issue_shows_as_sent_once_its_delivery_batch_is_dispatched(client, ad
         "subscription_id": sub["id"], "issue_month_year": issue, "return_date": f"{year}-05-20",
     }).status_code in (200, 201)
     assert may()["mark"] == "R"
+
+
+def test_the_delivery_history_lists_each_issue(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]
+    sub = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"][0]
+    year = 1980 + int(s) % 9
+    for month in (3, 4, 5):
+        assert client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": f"{year}-{month:02d}", "only_paid": False}).status_code in (200, 201)
+    batch = client.post(f"{API}/magazines/delivery-batches", headers=h, json={
+        "batch_name": f"Dispatch {year}-03", "issue_month_year": f"{year}-03", "dispatch_date": f"{year}-03-04", "status": "DISPATCHED"}).json()
+    assert batch["id"]
+    assert client.post(f"{API}/magazines/returns", headers=h, json={
+        "subscription_id": sub["id"], "issue_month_year": f"{year}-04", "return_date": f"{year}-04-20", "return_reason": "address wrong"}).status_code in (200, 201)
+    got = client.get(f"{API}/magazines/subscriptions/{sub['id']}/history", headers=h).json()["issues"]
+    by_issue = {i["issue_month_year"]: i for i in got if i["issue_month_year"].startswith(str(year))}
+    assert by_issue[f"{year}-03"]["result"] == "SENT"
+    assert by_issue[f"{year}-04"]["result"] == "RETURNED" and by_issue[f"{year}-04"]["detail"] == "address wrong"
+    assert by_issue[f"{year}-05"]["result"] == "LISTED"
+    assert [i["issue_month_year"] for i in got] == sorted((i["issue_month_year"] for i in got), reverse=True)
+    prof = client.get(f"{API}/members/{mid}/profile/magazine", headers=h).json()
+    assert {i["issue_month_year"] for i in prof["issues"]} >= {f"{year}-03", f"{year}-04", f"{year}-05"}

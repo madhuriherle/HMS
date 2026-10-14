@@ -662,6 +662,19 @@ function MagazineTab({ id }) {
                 ))}
               </div>
             )}
+            {(d.issues || []).length > 0 && (
+              <div className="mt-4">
+                <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mb-1">Delivery history</div>
+                <div className="space-y-1 text-xs">
+                  {d.issues.map((i) => (
+                    <div key={i.issue_month_year} className="flex justify-between gap-3">
+                      <span>{i.issue_month_year} — {{ SENT: 'Sent', RETURNED: 'Returned', PAUSED: 'Paused', LISTED: 'On label list' }[i.result] || i.result}</span>
+                      <span className="text-[#863221] whitespace-nowrap">{[i.date ? formatDate(i.date) : '', i.detail].filter(Boolean).join(' · ')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {(d.pauses || []).length > 0 && (
               <div className="mt-4">
                 <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mb-1">Delivery pauses</div>

@@ -55,6 +55,10 @@ const CHIP_STYLES = {
   RESOLVED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
+// the words staff see for a delivery status
+const STATUS_LABELS = { ACTIVE: 'Subscribed', PAUSED: 'Paused', STOPPED: 'Stopped', CANCELLED: 'Cancelled' };
+const statusLabel = (v) => STATUS_LABELS[v] || v;
+
 const RECIPIENT_TYPE_CHIPS = {
   MEMBER: 'bg-slate-100 text-slate-700 border-slate-200',
   AFFILIATION: 'bg-purple-50 text-purple-700 border-purple-200',
@@ -69,7 +73,7 @@ function Chip({ value }) {
   if (!value) return <span className="text-gray-400">—</span>;
   return (
     <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${CHIP_STYLES[value] || 'bg-stone-100 text-stone-600 border-stone-200'}`}>
-      {value}
+      {statusLabel(value)}
     </span>
   );
 }
@@ -492,7 +496,7 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
           <FilterSelect
             value={statusFilter}
             onChange={(v) => { setStatusFilter(v); setPage(1); }}
-            options={[{ value: 'ALL', label: 'All Statuses' }, ...DELIVERY_STATUSES.map((s) => ({ value: s, label: s }))]}
+            options={[{ value: 'ALL', label: 'All Statuses' }, ...DELIVERY_STATUSES.map((s) => ({ value: s, label: statusLabel(s) }))]}
             widthClass="w-44"
           />
           <FilterSelect
@@ -522,7 +526,7 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
               <tr>
                 <TH>Recipient</TH>
                 <TH>Type</TH>
-                <TH>Delivery</TH>
+                <TH>Magazine</TH>
                 <TH>Address</TH>
                 <TH className="text-center">Actions</TH>
               </tr>
@@ -609,12 +613,12 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
                               </button>
                               {canWrite && (
                                 <button type="button" onClick={() => { setEditing(sub); setFormOpen(true); }} className="btn-act" title="Edit">
-                                  <Pencil className="w-3.5 h-3.5" />
+                                  <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
                                 </button>
                               )}
                               {canDelete && (
                                 <button type="button" onClick={() => remove(sub)} className="btn-act btn-act-danger" title="Remove">
-                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <Trash2 className="w-3.5 h-3.5" /><span>Remove</span>
                                 </button>
                               )}
                             </>
@@ -667,7 +671,7 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
       {monthlyFor && <MonthlyModal sub={monthlyFor} memberName={memberName} onClose={() => setMonthlyFor(null)} />}
       {pauseFor && (
         <PauseForm
-          subOptions={subscriptions.map((x) => ({ value: x.id, label: `${memberName(x.member_id)} — ${x.delivery_status}` }))}
+          subOptions={subscriptions.map((x) => ({ value: x.id, label: `${memberName(x.member_id)} — ${statusLabel(x.delivery_status)}` }))}
           presetSubscriptionId={pauseFor.id}
           onClose={() => setPauseFor(null)}
           onSaved={() => { setPauseFor(null); refreshAll(); }}
@@ -675,7 +679,7 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
       )}
       {returnFor && (
         <ReturnForm
-          subOptions={subscriptions.map((x) => ({ value: x.id, label: `${memberName(x.member_id)} — ${x.delivery_status}` }))}
+          subOptions={subscriptions.map((x) => ({ value: x.id, label: `${memberName(x.member_id)} — ${statusLabel(x.delivery_status)}` }))}
           presetSubscriptionId={returnFor.id}
           onClose={() => setReturnFor(null)}
           onSaved={() => { setReturnFor(null); refreshAll(); }}
@@ -689,6 +693,10 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
               <button type="button" onClick={() => setHistoryFor(null)} className="rounded-lg p-1 text-gray-400 hover:bg-stone-200 hover:text-gray-700 cursor-pointer"><X className="h-5 w-5" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
+              <section className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#510601]">Magazine delivery history</h4>
+                <IssueHistory subscriptionId={historyFor.id} />
+              </section>
               <section className="space-y-3">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-[#510601]">Delivery pauses</h4>
                 <PausesTab subscriptions={subscriptions} memberName={memberName} canWrite={canWrite} canDelete={canDelete} subscriptionId={historyFor.id} onChanged={refreshAll} />
@@ -896,6 +904,53 @@ function MonthlyModal({ sub, memberName, onClose }) {
   );
 }
 
+// ── Issue-by-issue delivery history of one subscription ───────
+const ISSUE_RESULTS = {
+  SENT: { label: 'Sent', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  RETURNED: { label: 'Returned', cls: 'bg-red-50 text-red-700 border-red-200' },
+  PAUSED: { label: 'Paused', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  LISTED: { label: 'On label list', cls: 'bg-stone-100 text-stone-600 border-stone-200' },
+};
+
+function IssueHistory({ subscriptionId }) {
+  const [issues, setIssues] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    api.get(`/magazines/subscriptions/${subscriptionId}/history`)
+      .then(({ data }) => { if (!cancelled) setIssues(Array.isArray(data?.issues) ? data.issues : []); })
+      .catch((err) => { if (!cancelled) { setIssues([]); notify(err.response?.data?.detail || 'Could not load the delivery history.', 'error'); } });
+    return () => { cancelled = true; };
+  }, [subscriptionId]);
+
+  if (!issues) return <p className="text-sm text-gray-500">Loading…</p>;
+  if (issues.length === 0) return <p className="text-sm text-gray-500">No issue has been listed, sent, paused or returned yet.</p>;
+  return (
+    <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+      <table className="w-full text-left text-sm text-gray-700">
+        <thead className="bg-[#FAF7F2] border-b border-stone-200 text-xs font-semibold uppercase tracking-wider text-[#180200]">
+          <tr><TH>Issue</TH><TH>What happened</TH><TH>Detail</TH></tr>
+        </thead>
+        <tbody className="divide-y divide-stone-200">
+          {issues.map((i) => {
+            const r = ISSUE_RESULTS[i.result] || ISSUE_RESULTS.LISTED;
+            return (
+              <tr key={i.issue_month_year}>
+                <td className="px-4 py-3 text-xs font-mono text-gray-800">{i.issue_month_year}</td>
+                <td className="px-4 py-3">
+                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${r.cls}`}>{r.label}</span>
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-600">
+                  {[i.date ? formatDate(i.date) : '', i.detail].filter(Boolean).join(' — ') || '—'}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Delivery Pauses ──────────────────────────────────────────
 function PausesTab({ subscriptions, memberName, canWrite, canDelete, subscriptionId, onChanged }) {
   const [pauses, setPauses] = useState([]);
@@ -907,7 +962,7 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete, subscriptio
   const [editing, setEditing] = useState(null);
 
   const subOptions = useMemo(
-    () => subscriptions.map((s) => ({ value: s.id, label: `${memberName(s.member_id)} — ${s.delivery_status}` })),
+    () => subscriptions.map((s) => ({ value: s.id, label: `${memberName(s.member_id)} — ${statusLabel(s.delivery_status)}` })),
     [subscriptions, memberName]
   );
   const subLabel = useCallback(
@@ -1013,12 +1068,12 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete, subscriptio
                           )}
                           {canWrite && (
                             <button type="button" onClick={() => { setEditing(p); setFormOpen(true); }} className="btn-act" title="Edit">
-                              <Pencil className="w-3.5 h-3.5" />
+                              <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
                             </button>
                           )}
                           {canDelete && (
                             <button type="button" onClick={() => remove(p)} className="btn-act btn-act-danger" title="Delete">
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-3.5 h-3.5" /><span>Delete</span>
                             </button>
                           )}
                         </div>
@@ -1155,7 +1210,7 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete, subscripti
   const [formOpen, setFormOpen] = useState(false);
 
   const subOptions = useMemo(
-    () => subscriptions.map((s) => ({ value: s.id, label: `${memberName(s.member_id)} — ${s.delivery_status}` })),
+    () => subscriptions.map((s) => ({ value: s.id, label: `${memberName(s.member_id)} — ${statusLabel(s.delivery_status)}` })),
     [subscriptions, memberName]
   );
   const subToMember = useMemo(() => new Map(subscriptions.map((s) => [String(s.id), s.member_id])), [subscriptions]);
@@ -1260,7 +1315,7 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete, subscripti
                         ))}
                         {canDelete && (
                           <button type="button" onClick={() => remove(r)} className="btn-act btn-act-danger" title="Delete">
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5" /><span>Delete</span>
                           </button>
                         )}
                       </div>
@@ -1829,7 +1884,7 @@ function DeliveryBatchesTab({ canWrite, canDelete }) {
                           <button type="button" onClick={() => { setEditing(b); setFormOpen(true); }} className="btn-act" title="Edit"><Pencil className="w-3.5 h-3.5" /><span>Edit</span></button>
                         )}
                         {canDelete && (
-                          <button type="button" onClick={() => remove(b)} className="btn-act btn-act-danger" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                          <button type="button" onClick={() => remove(b)} className="btn-act btn-act-danger" title="Delete"><Trash2 className="w-3.5 h-3.5" /><span>Delete</span></button>
                         )}
                       </div>
                     </td>

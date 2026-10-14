@@ -416,7 +416,7 @@ function AffiliationsView({ canWrite, canDelete }) {
                             className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg transition-colors cursor-pointer"
                             title="Edit"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
                           </button>
                         )}
                         {canDelete && (
@@ -426,7 +426,7 @@ function AffiliationsView({ canWrite, canDelete }) {
                             className="p-1.5 text-[#ED4636] hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                             title="Delete"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5" /><span>Delete</span>
                           </button>
                         )}
                       </div>
@@ -596,7 +596,7 @@ function AffiliationsView({ canWrite, canDelete }) {
                                 onClick={() => openEditContact(c)}
                                 className="p-1 text-[#863221] hover:text-[#510601]"
                               >
-                                <Pencil className="w-3.5 h-3.5" />
+                                <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
                               </button>
                             )}
                             {canDelete && (
@@ -605,7 +605,7 @@ function AffiliationsView({ canWrite, canDelete }) {
                                 onClick={() => handleDeleteContact(c)}
                                 className="p-1 text-[#ED4636] hover:text-red-700"
                               >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                <Trash2 className="w-3.5 h-3.5" /><span>Delete</span>
                               </button>
                             )}
                           </div>
@@ -947,7 +947,7 @@ function AssociatesView({ canWrite, canDelete }) {
                             className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg transition-colors cursor-pointer"
                             title="Edit"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
                           </button>
                         )}
                         {canDelete && (
@@ -957,7 +957,7 @@ function AssociatesView({ canWrite, canDelete }) {
                             className="p-1.5 text-[#ED4636] hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                             title="Delete"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5" /><span>Delete</span>
                           </button>
                         )}
                       </div>
@@ -1317,7 +1317,7 @@ function PressMediaView({ canWrite, canDelete }) {
                             className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg transition-colors cursor-pointer"
                             title="Edit"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
                           </button>
                         )}
                         {canDelete && (
@@ -1327,7 +1327,7 @@ function PressMediaView({ canWrite, canDelete }) {
                             className="p-1.5 text-[#ED4636] hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                             title="Delete"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5" /><span>Delete</span>
                           </button>
                         )}
                       </div>
@@ -1860,7 +1860,7 @@ function CommitteeView({ canWrite, canDelete }) {
                             className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg transition-colors cursor-pointer"
                             title="Edit"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
                           </button>
                         )}
                         {canDelete && (
@@ -1870,7 +1870,7 @@ function CommitteeView({ canWrite, canDelete }) {
                             className="p-1.5 text-[#ED4636] hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                             title="Remove"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5" /><span>Remove</span>
                           </button>
                         )}
                       </div>

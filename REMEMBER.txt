@@ -341,6 +341,9 @@ RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
 12.14 A SELECT / CHECKBOX MODE IS OFFERED ONLY TO A ROLE THAT CAN USE IT, and only valid rows get a
      checkbox. Receipt Tracking has NO mapping and NO Select mode: linking receipts to members is
      done on the Bulk Receipt Mapping page and on Receipt Entry (edit), never from the receipt list.
+12.15 EVERY ROW ACTION SHOWS AN ICON AND ITS NAME (Edit, Delete, Remove, Resume, Pause ...), never an icon alone.
+     Only pagination arrows and a popup's close X stay icon-only. The Magazine, Engagements, Events,
+     Notifications and Reports pages follow it; older pages are changed when they are next touched.
 
 --------------------------------------------------------------------------------
 RULE 13: PERMISSIONS AND ACCESS

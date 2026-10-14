@@ -1477,7 +1477,7 @@ function SavedReportsAndLogsTab({ onDownload, canSave }) {
                             className="p-1 text-stone-400 hover:text-red-700 rounded transition-colors cursor-pointer"
                             title="Delete Saved Report"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-4 h-4" /><span>Delete</span>
                           </button>
                         )}
                       </div>

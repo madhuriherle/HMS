@@ -300,6 +300,68 @@ def _grid_response(db: Session, sub: MagazineSubscription, year: int) -> dict:
     }
 
 
+def build_subscription_history(db: Session, sub: MagazineSubscription) -> list:
+    """Issue-by-issue history of one subscription, newest first. Per issue month: RETURNED (the copy came back),
+    SENT (the member was on that month's label list and a delivery batch for the issue is Dispatched/Completed),
+    PAUSED (delivery was paused that month) or LISTED (on the label list, not sent yet)."""
+    issues: dict = {}
+
+    labels = (
+        db.query(MagazineLabelBatch.issue_month_year, MagazineLabelBatch.generation_date)
+        .join(MagazineLabelBatchItem, MagazineLabelBatchItem.label_batch_id == MagazineLabelBatch.id)
+        .filter(
+            MagazineLabelBatchItem.recipient_type == "MEMBER",
+            MagazineLabelBatchItem.recipient_id == sub.member_id,
+            MagazineLabelBatch.is_deleted == False,  # noqa: E712
+        ).all()
+    )
+    delivery = {
+        b.issue_month_year: b for b in db.query(MagazineDeliveryBatch).filter(
+            MagazineDeliveryBatch.status.in_(("DISPATCHED", "COMPLETED")),
+            MagazineDeliveryBatch.is_deleted == False,  # noqa: E712
+        ).all()
+    }
+    for issue, generated in labels:
+        batch = delivery.get(issue)
+        if batch:
+            issues[issue] = {"result": "SENT", "date": batch.dispatch_date, "detail": batch.batch_name}
+        else:
+            issues[issue] = {"result": "LISTED", "date": generated, "detail": "labels generated, not marked sent"}
+
+    today = date.today()
+    for p in db.query(MagazineDeliveryPause).filter(
+        MagazineDeliveryPause.subscription_id == sub.id, MagazineDeliveryPause.is_deleted == False,  # noqa: E712
+    ).all():
+        y, m = p.pause_start_date.year, p.pause_start_date.month
+        end = p.pause_end_date or today
+        for _ in range(36):
+            if (y, m) > (end.year, end.month):
+                break
+            key = f"{y}-{m:02d}"
+            if issues.get(key, {}).get("result") != "SENT":
+                issues[key] = {"result": "PAUSED", "date": p.pause_start_date, "detail": p.reason or "delivery paused"}
+            y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+
+    for r in db.query(MagazineReturn).filter(
+        MagazineReturn.subscription_id == sub.id, MagazineReturn.is_deleted == False,  # noqa: E712
+    ).all():
+        issues[r.issue_month_year] = {"result": "RETURNED", "date": r.return_date, "detail": r.return_reason or "returned"}
+
+    return [{"issue_month_year": k, **v} for k, v in sorted(issues.items(), reverse=True)]
+
+
+@router.get("/subscriptions/{sub_id}/history")
+def subscription_history(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    sub_id: int,
+) -> Any:
+    sub = db.query(MagazineSubscription).filter(MagazineSubscription.id == sub_id, MagazineSubscription.is_deleted == False).first()  # noqa: E712
+    if not sub:
+        raise HTTPException(404, "Subscription not found")
+    return {"subscription_id": sub.id, "member_id": sub.member_id, "issues": build_subscription_history(db, sub)}
+
+
 @router.get("/subscriptions/{sub_id}/monthly")
 def subscription_monthly_marks(
     *, db: Session = Depends(deps.get_db),

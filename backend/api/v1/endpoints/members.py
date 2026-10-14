@@ -2184,6 +2184,12 @@ def _profile_service_usage(db: Session, member: Member) -> dict:
     return {"usage": detail, "usage_summary": summary}
 
 
+def _issue_history(db: Session, sub) -> list:
+    from api.v1.endpoints.magazines import build_subscription_history
+
+    return build_subscription_history(db, sub)
+
+
 def _profile_magazine(db: Session, member: Member) -> dict:
     from models.magazines import MagazineReturn, MagazineSubscription
     from models.members import MemberKycRequest
@@ -2229,6 +2235,7 @@ def _profile_magazine(db: Session, member: Member) -> dict:
         "magazine_delivery_address": getattr(member, "magazine_delivery_address", None),
         "magazine_kind": member.magazine_kind,
         "magazine_email": member.magazine_email,
+        "issues": [i for sub in subs for i in _issue_history(db, sub)],
         "subscriptions": [
             {"id": x.id, "delivery_status": x.delivery_status, "address_override": x.address_override, "notes": x.notes}
             for x in subs

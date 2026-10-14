@@ -375,7 +375,7 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
                               className="p-1 text-stone-400 hover:text-red-700 rounded transition-colors cursor-pointer"
                               title="Delete Campaign"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4" /><span>Delete</span>
                             </button>
                           )}
                         </div>
@@ -767,7 +767,7 @@ function TemplatesTab({ canWrite, canDelete }) {
                               className="p-1 text-stone-500 hover:text-[#510601] rounded transition-colors cursor-pointer"
                               title="Edit Template"
                             >
-                              <Pencil className="w-4 h-4" />
+                              <Pencil className="w-4 h-4" /><span>Edit</span>
                             </button>
                           )}
                           {canDelete && (
@@ -776,7 +776,7 @@ function TemplatesTab({ canWrite, canDelete }) {
                               className="p-1 text-stone-400 hover:text-red-700 rounded transition-colors cursor-pointer"
                               title="Delete Template"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4" /><span>Delete</span>
                             </button>
                           )}
                         </div>

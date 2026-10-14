@@ -681,7 +681,7 @@ export default function EventsManagement() {
                                 className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg transition-colors cursor-pointer"
                                 title="Edit event"
                               >
-                                <Pencil className="w-4 h-4" />
+                                <Pencil className="w-4 h-4" /><span>Edit</span>
                               </button>
                             )}
                             {canDelete && (
@@ -691,7 +691,7 @@ export default function EventsManagement() {
                                 className="p-1.5 text-[#ED4636] hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                                 title="Delete event"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-4 h-4" /><span>Delete</span>
                               </button>
                             )}
                           </div>
@@ -1020,7 +1020,7 @@ export default function EventsManagement() {
                                       className="p-1 text-[#863221] hover:text-[#510601] transition-colors"
                                       title="Edit"
                                     >
-                                      <Pencil className="w-3.5 h-3.5" />
+                                      <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
                                     </button>
                                   )}
                                   {canDelete && (
@@ -1030,7 +1030,7 @@ export default function EventsManagement() {
                                       className="p-1 text-[#ED4636] hover:text-red-700 transition-colors"
                                       title="Remove"
                                     >
-                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <Trash2 className="w-3.5 h-3.5" /><span>Remove</span>
                                     </button>
                                   )}
                                 </div>
@@ -1079,7 +1079,7 @@ export default function EventsManagement() {
                                       className="p-1 text-[#863221] hover:text-[#510601] transition-colors"
                                       title="Edit"
                                     >
-                                      <Pencil className="w-3.5 h-3.5" />
+                                      <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
                                     </button>
                                   )}
                                   {canDelete && (
@@ -1089,7 +1089,7 @@ export default function EventsManagement() {
                                       className="p-1 text-[#ED4636] hover:text-red-700 transition-colors"
                                       title="Remove"
                                     >
-                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <Trash2 className="w-3.5 h-3.5" /><span>Remove</span>
                                     </button>
                                   )}
                                 </div>
