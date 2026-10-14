@@ -311,7 +311,7 @@ export default function UserManagement() {
     // email and mobile are optional; when given they must be valid and not already used
     if (email && !matchesPattern(email, rules?.email?.pattern)) {
       errors.email = 'Please enter a valid email address';
-    } else {
+    } else if (email) {
       const isDuplicateEmail = users.some(
         u => (u.id !== editingUser?.id && String(u.id) !== String(editingUser?.id)) &&
           (u.email || '').toLowerCase() === email.toLowerCase()
