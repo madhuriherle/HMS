@@ -238,45 +238,6 @@ export default function MemberImport() {
           </div>
         </div>
 
-        {/* 3 Steps Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-2xl p-4 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold text-sm shrink-0">
-              1
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wide">Prepare Data</h4>
-              <p className="text-[11px] text-[#863221] mt-0.5">
-                Download the CSV template and populate your live members list with existing Membership Numbers.
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-2xl p-4 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold text-sm shrink-0">
-              2
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wide">Upload & Validate</h4>
-              <p className="text-[11px] text-[#863221] mt-0.5">
-                Select your file. The parser inspects records and renders an instant 10-row preview.
-              </p>
-            </div>
-          </div>
-
-          <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-2xl p-4 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold text-sm shrink-0">
-              3
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wide">Batch Ingestion</h4>
-              <p className="text-[11px] text-[#863221] mt-0.5">
-                Streamed processing in high-performance batches with live progress tracking and zero page freezing.
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Upload & Progress Card */}
         <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-sm p-6 space-y-6">
           {!importCompleted && (

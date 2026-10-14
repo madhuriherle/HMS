@@ -3,6 +3,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Award, TrendingUp, CalendarDays, Pencil } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
+import Modal from '../components/Modal';
+import ModalFooter from '../components/ModalFooter';
 import api from '../api';
 import { formatDate, formatDateTime } from '../utils/dateUtils';
 import { apiErrorMessage } from '../utils/apiError';
@@ -66,7 +68,13 @@ function Relative({ relation, name, number, links }) {
 function useSection(id, section, params) {
   const cache = useRef({});
   const [state, setState] = useState({ loading: true, data: null, error: false });
+  const [version, setVersion] = useState(0);
   const key = `${id}/${section}/${JSON.stringify(params || {})}`;
+
+  const reload = useCallback(() => {
+    delete cache.current[key];
+    setVersion((v) => v + 1);
+  }, [key]);
 
   useEffect(() => {
     let alive = true;
@@ -91,7 +99,20 @@ function useSection(id, section, params) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  return state;
+  useEffect(() => { /* refetches after a local change when cache was cleared */
+    if (!cache.current[key]) {
+      api
+        .get(`/members/${id}/profile/${section}`, { params })
+        .then(({ data }) => {
+          cache.current[key] = data;
+          setState({ loading: false, data, error: false });
+        })
+        .catch((error) => notify(apiErrorMessage(error, 'Could not load this tab.'), 'error'));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
+
+  return { ...state, reload };
 }
 
 function Loading({ state, children }) {
@@ -604,11 +625,13 @@ function ReceiptsTab({ id }) {
 }
 
 function MagazineTab({ id }) {
-  const state = useSection(id, 'magazine');
+  const { hasPermission } = useAuth();
+  const section = useSection(id, 'magazine');
   return (
-    <Loading state={state}>
+    <Loading state={section}>
       {(d) => (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <KycUpdateCard id={id} kyc={d.kyc} reload={section.reload} canSend={hasPermission('magazines.write')} />
           <Card icon={BookOpen} title="Magazine">
             <div className="grid grid-cols-2 gap-4 mb-3">
               <Field label="Magazine needed" value={d.magazine_needed} />
@@ -657,9 +680,131 @@ function MagazineTab({ id }) {
               </div>
             )}
           </Card>
+          <Card icon={FileText} title="Services used" className="lg:col-span-2">
+            {(!d.usage_summary || d.usage_summary.length === 0) ? (
+              <Empty>No paid service on record yet.</Empty>
+            ) : (
+              <>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {d.usage_summary.map((s) => (
+                    <span key={s.service_code} className="chip chip-on" title={`${s.times} time(s)`}>
+                      {s.service_name_en} · {s.times} · {formatMoney(s.total_amount)}
+                    </span>
+                  ))}
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead>
+                      <tr className="text-[10px] uppercase tracking-wider text-[#863221]">
+                        <th className="py-2 pr-3 font-bold">Service</th>
+                        <th className="py-2 pr-3 font-bold">Particular</th>
+                        <th className="py-2 pr-3 font-bold">Receipt</th>
+                        <th className="py-2 pr-3 font-bold">Date</th>
+                        <th className="py-2 pr-3 font-bold text-right">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {d.usage.map((u, i) => (
+                        <tr key={`${u.receipt_id}-${i}`} className="border-t border-[#E8DFD8]/70">
+                          <td className="py-2 pr-3">{u.service_name_en}</td>
+                          <td className="py-2 pr-3">{u.particular_name}{u.description ? ` — ${u.description}` : ''}</td>
+                          <td className="py-2 pr-3">{u.receipt_number}</td>
+                          <td className="py-2 pr-3 whitespace-nowrap">{u.receipt_date ? formatDate(u.receipt_date) : ''}</td>
+                          <td className="py-2 pr-3 text-right whitespace-nowrap">{formatMoney(u.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </Card>
         </div>
       )}
     </Loading>
+  );
+}
+
+// KYC update: one card with the request status and the Send action (magazines.write).
+function KycUpdateCard({ id, kyc, reload, canSend }) {
+  const [sending, setSending] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [channel, setChannel] = useState('LINK');
+
+  const statusChip = kyc ? (
+    <span className={`chip ${kyc.status === 'SUBMITTED' ? 'chip-on' : kyc.status === 'REJECTED' ? 'chip-bad' : 'chip-warn'}`}>
+      {kyc.status === 'SUBMITTED' ? 'Submitted · awaiting approval' : kyc.status === 'SENT' ? 'Sent · waiting for member' : kyc.status}
+    </span>
+  ) : (
+    <span className="chip chip-off">Not asked yet</span>
+  );
+
+  const send = () => {
+    setSending(true);
+    api
+      .post(`/members/${id}/send-kyc-link`, null, { params: { channel } })
+      .then(({ data }) => {
+        setModalOpen(false);
+        notify(data.message || 'KYC request sent.', 'success');
+        if (reload) reload();
+      })
+      .catch((error) => {
+        notify(apiErrorMessage(error, 'Could not send the KYC request.'), 'error');
+      })
+      .finally(() => setSending(false));
+  };
+
+  return (
+    <Card icon={Phone} title="KYC update">
+      <div className="mb-3">{statusChip}</div>
+      {kyc ? (
+        <div className="space-y-1 text-xs text-[#863221]">
+          {kyc.sent_at && <div>Sent: {formatDateTime(kyc.sent_at)}</div>}
+          {kyc.expires_at && kyc.status === 'SENT' && <div>Link valid till: {formatDateTime(kyc.expires_at)}</div>}
+          {kyc.submitted_at && <div>Submitted: {formatDateTime(kyc.submitted_at)}</div>}
+        </div>
+      ) : (
+        <Empty>No KYC request sent to this member yet.</Empty>
+      )}
+      {canSend && (
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className="mt-3 px-4 py-2 text-xs font-semibold rounded-xl bg-[#510601] hover:bg-[#863221] text-white transition-colors"
+        >
+          Send KYC Update
+        </button>
+      )}
+      <p className="mt-2 text-xs text-[#863221]/80">
+        The member updates their details through the link or the app; the change reaches you as a request on the Approvals screen.
+      </p>
+
+      <Modal isOpen={modalOpen} onClose={() => !sending && setModalOpen(false)}>
+        <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+          <div className="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <span className="text-sm font-bold text-[#180200]">Send KYC Update Request</span>
+            <button type="button" onClick={() => setModalOpen(false)} disabled={sending} className="text-[#863221] hover:text-[#510601]" aria-label="Close">✕</button>
+          </div>
+          <div className="p-6 space-y-3">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input type="radio" name="kyc-channel" checked={channel === 'LINK'} onChange={() => setChannel('LINK')} className="mt-1" />
+              <span className="text-xs">
+                <span className="font-semibold text-[#180200] block">WhatsApp link</span>
+                For members without the app: opens a form where they update mobile, email and address. Valid till tonight.
+              </span>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input type="radio" name="kyc-channel" checked={channel === 'APP'} onChange={() => setChannel('APP')} className="mt-1" />
+              <span className="text-xs">
+                <span className="font-semibold text-[#180200] block">App nudge</span>
+                For members who have the app: a WhatsApp nudge to open the KYC screen in the HMS MMA app.
+              </span>
+            </label>
+          </div>
+          <ModalFooter kind="confirm" submitLabel="Send" busyLabel="Sending..." busy={sending} onSubmit={send} onCancel={() => setModalOpen(false)} />
+        </div>
+      </Modal>
+    </Card>
   );
 }
 

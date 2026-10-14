@@ -32,6 +32,7 @@ export default function ReceiptTypeManagement() {
 
   // Master state
   const [receiptTypes, setReceiptTypes] = useState([]);
+  const [serviceTypes, setServiceTypes] = useState([]);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,6 +51,7 @@ export default function ReceiptTypeManagement() {
   const [editingType, setEditingType] = useState(null);
   const [typeFormData, setTypeFormData] = useState({
     name: '',
+    serviceTypeId: '',
     status: 'Active',
     subTypes: []
   });
@@ -107,6 +109,7 @@ export default function ReceiptTypeManagement() {
 
   const fetchReceiptTypes = async () => {
     api.get('/masters/usage/particulars').then(({ data }) => setUsage(data?.counts || {})).catch(() => {});
+    api.get('/masters/service-types?limit=200').then(({ data }) => setServiceTypes(data?.data || [])).catch(() => {});
     try {
       const res = await api.get('/masters/particulars?limit=2000');
       const allItems = res.data?.data || [];
@@ -121,6 +124,7 @@ export default function ReceiptTypeManagement() {
         return {
           id: p.id,
           name: p.name_en,
+          serviceTypeId: p.service_type_id ?? '',
           status: p.status ? 'Active' : 'Inactive',
           subTypes: subs
         };
@@ -184,6 +188,7 @@ export default function ReceiptTypeManagement() {
     setEditingType(null);
     setTypeFormData({
       name: '',
+      serviceTypeId: '',
       status: 'Active',
       subTypes: []
     });
@@ -196,6 +201,7 @@ export default function ReceiptTypeManagement() {
     setEditingType(type);
     setTypeFormData({
       name: type.name || '',
+      serviceTypeId: type.serviceTypeId ?? '',
       status: type.status || 'Active',
       subTypes: type.subTypes ? [...type.subTypes] : []
     });
@@ -239,17 +245,20 @@ export default function ReceiptTypeManagement() {
 
     const trimmedName = typeFormData.name.trim();
     const isActive = typeFormData.status === 'Active';
+    const serviceTypeId = typeFormData.serviceTypeId ? Number(typeFormData.serviceTypeId) : null;
 
     try {
       if (typeModalMode === 'add') {
         await api.post('/masters/particulars', {
           name_en: trimmedName,
+          service_type_id: serviceTypeId,
           status: isActive
         });
         showToast(`Particular "${trimmedName}" created successfully.`);
       } else {
         await api.put(`/masters/particulars/${editingType.id}`, {
           name_en: trimmedName,
+          service_type_id: serviceTypeId,
           status: isActive
         });
         showToast(`Particular "${trimmedName}" updated successfully.`);
@@ -632,6 +641,14 @@ export default function ReceiptTypeManagement() {
                               <GripVertical className="w-4 h-4 text-[#863221]/50 cursor-grab shrink-0" title="Drag to change the order" />
                             )}
                             <span className="text-sm text-[#180200]">{type.name}</span>
+                            {serviceTypes.find((s) => String(s.id) === String(type.serviceTypeId)) && (
+                              <span
+                                className="ml-2 px-1.5 py-0.5 rounded-full bg-[#510601]/10 border border-[#510601]/20 text-[10px] font-semibold text-[#510601]"
+                                title="Service this particular is counted under"
+                              >
+                                {serviceTypes.find((s) => String(s.id) === String(type.serviceTypeId)).name_en}
+                              </span>
+                            )}
                             {usage[type.id]?.used > 0 && (
                               <span
                                 className="ml-2 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-semibold text-[#863221]"
@@ -978,6 +995,27 @@ export default function ReceiptTypeManagement() {
                   {typeFormErrors.name}
                 </p>
               )}
+            </div>
+
+            {/* Service (optional) */}
+            <div>
+              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
+                Service
+              </label>
+              <select
+                name="serviceTypeId"
+                value={typeFormData.serviceTypeId}
+                onChange={handleTypeFormChange}
+                className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-medium text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
+              >
+                <option value="">No service</option>
+                {serviceTypes.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name_en}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-[#863221]/70 mt-1">
+                Optional. Ties this particular to a service (Temple, Mangalya, Hall...) so it is counted on the member profile under Services.
+              </p>
             </div>
 
             {/* Status Radio */}

@@ -2056,9 +2056,83 @@ def _profile_receipts(db: Session, member: Member, page: int, limit: int) -> dic
     }
 
 
+def _profile_service_usage(db: Session, member: Member) -> dict:
+    """Services the member has actually *used*, derived from their assigned receipts.
+
+    A receipt line counts when its particular is tied to a service
+    (particulars.service_type_id, master setup). We never guess by name. The
+    member's share of a partially-allocated receipt is applied to each line
+    (allocated_amount / net_amount), so the figures stay honest. Cancelled and
+    soft-deleted receipts/items are skipped.
+    """
+    from models.masters import Particular
+    from models.receipts import Receipt, ReceiptAllocation, ReceiptItem
+
+    rows = (
+        db.query(Receipt, ReceiptItem, Particular, ServiceType, ReceiptAllocation)
+        .join(ReceiptItem, ReceiptItem.receipt_id == Receipt.id)
+        .join(Particular, Particular.id == ReceiptItem.particular_id)
+        .join(ServiceType, ServiceType.id == Particular.service_type_id)
+        .join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id)
+        .filter(
+            ReceiptAllocation.member_id == member.id,
+            ReceiptAllocation.is_deleted == False,  # noqa: E712
+            ReceiptItem.is_deleted == False,  # noqa: E712
+            Receipt.is_deleted == False,  # noqa: E712
+            Receipt.receipt_status != "CANCELLED",
+            Particular.is_deleted == False,  # noqa: E712
+            Particular.service_type_id.isnot(None),
+            ServiceType.is_deleted == False,  # noqa: E712
+        )
+        .order_by(Receipt.receipt_date.desc(), Receipt.id.desc())
+        .all()
+    )
+
+    detail = []
+    summary: dict = {}
+    for receipt, item, particular, service, allocation in rows:
+        net = float(receipt.net_amount or 0)
+        allocated = float(allocation.allocated_amount or 0)
+        share = (allocated / net) if net > 0 else 1.0
+        amount = round(float(item.amount or 0) * share, 2)
+        detail.append({
+            "service_code": service.code,
+            "service_name_en": service.name_en,
+            "service_name_kn": service.name_kn,
+            "receipt_id": receipt.id,
+            "receipt_number": receipt.receipt_number,
+            "receipt_date": receipt.receipt_date,
+            "particular_name": item.particular_name or particular.name_en,
+            "description": item.description,
+            "amount": amount,
+        })
+        bucket = summary.setdefault(service.code, {
+            "service_code": service.code,
+            "service_name_en": service.name_en,
+            "service_name_kn": service.name_kn,
+            "times": 0,
+            "total_amount": 0.0,
+            "last_used": None,
+        })
+        bucket["times"] += 1
+        bucket["total_amount"] = round(bucket["total_amount"] + amount, 2)
+        if receipt.receipt_date and (bucket["last_used"] is None or receipt.receipt_date > bucket["last_used"]):
+            bucket["last_used"] = receipt.receipt_date
+
+    summary = sorted(summary.values(), key=lambda x: x["total_amount"], reverse=True)
+    return {"usage": detail, "usage_summary": summary}
+
+
 def _profile_magazine(db: Session, member: Member) -> dict:
     from models.magazines import MagazineReturn, MagazineSubscription
+    from models.members import MemberKycRequest
 
+    latest_kyc = (
+        db.query(MemberKycRequest)
+        .filter(MemberKycRequest.member_id == member.id, MemberKycRequest.is_deleted == False)  # noqa: E712
+        .order_by(MemberKycRequest.sent_at.desc())
+        .first()
+    )
     subs = (
         db.query(MagazineSubscription)
         .filter(MagazineSubscription.member_id == member.id, MagazineSubscription.is_deleted == False)  # noqa: E712
@@ -2096,6 +2170,12 @@ def _profile_magazine(db: Session, member: Member) -> dict:
              "opted_at": o.opted_at, "opted_via": o.opted_via, "notes": o.notes}
             for o, t in opted
         ],
+        **_profile_service_usage(db, member),
+        "kyc": (
+            {"id": latest_kyc.id, "status": latest_kyc.status, "sent_at": latest_kyc.sent_at,
+             "expires_at": latest_kyc.expires_at, "submitted_at": latest_kyc.submitted_at}
+            if latest_kyc else None
+        ),
     }
 
 

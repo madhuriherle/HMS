@@ -143,6 +143,7 @@ export default function RegisterNewMember() {
     photoUrl: '',
     nameTitle: 'SRI.',
     name: '',
+    nameKn: '',
     fatherHusbandName: '',
     fatherName: '',
     fatherMembershipNo: '',
@@ -166,8 +167,10 @@ export default function RegisterNewMember() {
     bloodGroup: '',
     aadharNumber: '',
     address: '',
+    addressKn: '',
     postalCode: '',
     locality: '',
+    localityKn: '',
     taluk: '',
     district: '',
     state: '',
@@ -280,6 +283,7 @@ export default function RegisterNewMember() {
           photoUrl,
           nameTitle: m.name_title || (gender === 'Female' ? 'MS.' : 'SRI.'),
           name: [m.first_name_en, m.middle_name_en, m.last_name_en].filter(Boolean).join(' '),
+          nameKn: m.full_name_kn || '',
           fatherHusbandName: m.father_name || m.father_husband_name || '',
           fatherName: m.father_name || m.father_husband_name || '',
           fatherMembershipNo: m.father_membership_number || '',
@@ -310,8 +314,10 @@ export default function RegisterNewMember() {
           bloodGroup: m.blood_group || '',
           aadharNumber: m.aadhaar_number || '',
           address: m.address_line1 || '',
+          addressKn: m.address_line1_kn || '',
           postalCode: pin?.postalCode || '',
           locality: m.locality || m.post || pin?.area || '',
+          localityKn: m.locality_kn || '',
           taluk: nameOf(locations.taluks, m.taluk_id),
           district: nameOf(locations.districts, m.district_id),
           state: nameOf(locations.states, m.state_id),
@@ -845,6 +851,7 @@ export default function RegisterNewMember() {
       first_name_en: parts[0],
       middle_name_en: parts.length > 2 ? parts.slice(1, -1).join(' ') : null,
       last_name_en: parts.length > 1 ? parts[parts.length - 1] : null,
+      full_name_kn: (formData.nameKn || '').trim() || null,
       father_husband_name: (formData.fatherName || formData.spouseName || formData.fatherHusbandName || '').trim() || null,
       father_name: (formData.fatherName || formData.fatherHusbandName || '').trim() || null,
       father_membership_number: (formData.fatherMembershipNo || '').trim() || null,
@@ -877,7 +884,9 @@ export default function RegisterNewMember() {
       occupation: formData.employment.trim() || null,
       native_place_text: formData.nativePlace.trim() || null,
       address_line1: formData.address.trim(),
+      address_line1_kn: (formData.addressKn || '').trim() || null,
       locality: (formData.locality || '').trim() || null,
+      locality_kn: (formData.localityKn || '').trim() || null,
       post: (formData.locality || '').trim() || null,
       state_id: pinRow?.stateId || null,
       district_id: pinRow?.districtId || null,
@@ -1171,6 +1180,20 @@ export default function RegisterNewMember() {
                       )}
                     </div>
 
+                    {/* Name (Kannada) */}
+                    <div>
+                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
+                        Name (Kannada):
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="ಹೆಸರು (Kannada)"
+                        value={formData.nameKn}
+                        onChange={(e) => setFormData({ ...formData, nameKn: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                      />
+                    </div>
+
                     {/* Father Name */}
                     <div>
                       <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
@@ -1438,6 +1461,20 @@ export default function RegisterNewMember() {
                     )}
                   </div>
 
+                  {/* Communication Address (Kannada) */}
+                  <div>
+                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
+                      Communication Address (Kannada):
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="ವಿಳಾಸ (Kannada)"
+                      value={formData.addressKn}
+                      onChange={(e) => setFormData({ ...formData, addressKn: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                    />
+                  </div>
+
                   {/* Pin Code with Autocomplete */}
                   <div className="relative" ref={pinWrapperRef}>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
@@ -1511,6 +1548,20 @@ export default function RegisterNewMember() {
                         Taluk: <span className="text-[#510601] font-semibold">{formData.taluk || '—'}</span> &bull; District: <span className="text-[#510601] font-semibold">{formData.district || '—'}</span>
                       </p>
                     )}
+                  </div>
+
+                  {/* Post Office / Locality (Kannada) */}
+                  <div>
+                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
+                      Post Office / Locality (Kannada):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="ಸ್ಥಳ (Kannada)"
+                      value={formData.localityKn}
+                      onChange={(e) => setFormData({ ...formData, localityKn: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                    />
                   </div>
 
                   {/* Native Place */}

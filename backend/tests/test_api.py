@@ -6635,3 +6635,87 @@ def test_member_profile_comes_one_tab_at_a_time(client, admin_headers):
     assert client.get(f"/api/v1/members/{mid}/profile/nope", headers=H).status_code == 404
     assert client.get("/api/v1/members/999999/profile/summary", headers=H).status_code == 404
     assert client.get(f"/api/v1/members/{mid}/profile/summary").status_code == 401
+
+
+def test_member_registration_keeps_kannada_fields(client, admin_headers):
+    """The register/edit form's Kannada fields (name, address, locality) are
+    stored on create and changed on update."""
+    created = client.post(
+        "/api/v1/members/",
+        headers=admin_headers,
+        json={
+            "first_name_en": "Rama",
+            "mobile": "9711000011",
+            "full_name_kn": "ರಾಮ",
+            "address_line1_kn": "ಬೆಂಗಳೂರು",
+            "locality_kn": "ಜಯನಗರ",
+        },
+    )
+    assert created.status_code in (200, 201), created.text
+    body = created.json()
+    assert body["full_name_kn"] == "ರಾಮ"
+    assert body["address_line1_kn"] == "ಬೆಂಗಳೂರು"
+    assert body["locality_kn"] == "ಜಯನಗರ"
+
+    updated = client.put(
+        f"/api/v1/members/{body['id']}",
+        headers=admin_headers,
+        json={"first_name_en": "Rama", "full_name_kn": "ರಾಮ ಕೃಷ್ಣ", "locality_kn": "ಮೈಸೂರು"},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["full_name_kn"] == "ರಾಮ ಕೃಷ್ಣ"
+    assert updated.json()["locality_kn"] == "ಮೈಸೂರು"
+
+
+def test_member_profile_service_usage_from_receipts(client, admin_headers):
+    """Services used on the profile come from the member's assigned receipts,
+    matched through a particular's service_type_id — never guessed by name."""
+    member = _create_member(client, admin_headers, "9711000022", "Seva Person")
+    temple = _service_type(client, admin_headers, "TEMPLE")
+
+    particular = client.post(
+        "/api/v1/masters/particulars",
+        headers=admin_headers,
+        json={"name_en": "Temple Seva", "service_type_id": temple["id"]},
+    )
+    assert particular.status_code in (200, 201), particular.text
+    assert particular.json()["service_type_id"] == temple["id"]
+    particular_id = particular.json()["id"]
+
+    receipt = _make_receipt(
+        client, admin_headers,
+        receipt_type="OTHER", gross_amount=500, net_amount=500,
+        items=[{"item_type": "SEVA", "particular_id": particular_id, "amount": 500}],
+    )
+    allocated = client.post(
+        f"/api/v1/receipts/{receipt['id']}/allocate",
+        headers=admin_headers,
+        json={"member_id": member["id"], "allocated_amount": 500},
+    )
+    assert allocated.status_code == 201, allocated.text
+
+    profile = client.get(f"/api/v1/members/{member['id']}/profile/magazine", headers=admin_headers)
+    assert profile.status_code == 200, profile.text
+    body = profile.json()
+    summary = {s["service_code"]: s for s in body["usage_summary"]}
+    assert summary["TEMPLE"]["times"] == 1
+    assert summary["TEMPLE"]["total_amount"] == 500
+    assert body["usage"][0]["receipt_number"] == receipt["receipt_number"]
+
+    # a particular with no service_type_id is not attributed to a service
+    plain = client.post(
+        "/api/v1/masters/particulars", headers=admin_headers, json={"name_en": "Plain Donation"},
+    )
+    assert plain.status_code in (200, 201), plain.text
+    plain_receipt = _make_receipt(
+        client, admin_headers,
+        receipt_type="OTHER", gross_amount=100, net_amount=100,
+        items=[{"item_type": "DONATION", "particular_id": plain.json()["id"], "amount": 100}],
+    )
+    client.post(
+        f"/api/v1/receipts/{plain_receipt['id']}/allocate",
+        headers=admin_headers, json={"member_id": member["id"], "allocated_amount": 100},
+    )
+    after = client.get(f"/api/v1/members/{member['id']}/profile/magazine", headers=admin_headers).json()
+    assert len(after["usage_summary"]) == 1
+    assert all(u["particular_name"] != "Plain Donation" for u in after["usage"])

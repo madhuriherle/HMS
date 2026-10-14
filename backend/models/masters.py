@@ -88,6 +88,9 @@ class Particular(AuditMixin, Base):
     name_en: Mapped[str] = mapped_column(String(100), nullable=False)
     name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
     parent_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("particulars.id"), nullable=True)
+    # Optional service this particular belongs to (Temple / Mangalya / Hall / Magazine),
+    # so a receipt line can be attributed to a service on the member profile.
+    service_type_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("service_types.id"), nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
     
     children = relationship("Particular", backref=backref("parent", remote_side=[id]))

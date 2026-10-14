@@ -219,6 +219,7 @@ class ParticularBase(BaseModel):
     name_en: str
     name_kn: Optional[str] = None
     parent_id: Optional[int] = None
+    service_type_id: Optional[int] = None
     status: bool = True
 
 class ParticularCreate(_AutoCode, ParticularBase):
@@ -229,6 +230,7 @@ class ParticularUpdate(BaseModel):
     name_en: Optional[str] = None
     name_kn: Optional[str] = None
     parent_id: Optional[int] = None
+    service_type_id: Optional[int] = None
     status: Optional[bool] = None
 
 class Particular(ParticularBase):
