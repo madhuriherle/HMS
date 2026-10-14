@@ -258,12 +258,12 @@ RULE 11: HOW WE WORK (ALL AGENTS)
      and the test flakes (this is what made test_number_formats fail with "expected 0001, got 0011").
      Give each test a distinct far-past year reserved for it (e.g. a module-level counter), or seed the
      randomness, so a year can never repeat within a run.
-11.11 db/seed_defaults.py NOT_BUILT_YET is read at RUNTIME by migration 0032 and by the sidebar tests:
-     building a module means removing it from NOT_BUILT_YET, which changes what 0032 does when it is
-     (re)run. When a module is built, always do all of it: remove it from NOT_BUILT_YET, add its page to
-     MENU_PAGE_CATALOG, write a migration that switches the module on (status = true) for existing
-     databases, and update tests/test_screen_privileges.py and tests/test_sidebar_has_no_dead_items.py
-     (both assert the old "not built" list). See magazines + 20261014_0064.
+11.11 ALL MODULES ARE BUILT AND ACTIVE: db/seed_defaults.py NOT_BUILT_YET is empty (NOT_BUILT_YET = ()).
+      Every module in MODULE_AREAS has status = True (magazines in 0064, events and engagements in
+      0067, reports in 0068, notifications in 0069, imports in 0070). If a new module is ever introduced,
+      follow the full lifecycle: define it in MODULE_AREAS, add its pages to MENU_PAGE_CATALOG, create
+      its privileges in SUB_MODULE_AREAS, write an Alembic migration switching it on for existing
+      databases, and verify tests/test_screen_privileges.py and tests/test_sidebar_has_no_dead_items.py.
 11.13 PROD IS LIVE: ITS DATA CHANGES BETWEEN UPDATES (users, roles, receipts, privileges are edited
      there by the office). Always take a FRESH backup and look at the live rows right before an
      update; never copy UAT data or role settings over prod; a migration must not undo what the
@@ -516,5 +516,23 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
       member is edited. Do not show them until the user asks. The panel stays English only.
 15.13 NO USER IS CREATED WHEN A MEMBER IS REGISTERED OR APPROVED (confirmed again 14-Oct-2026, even
       though the original spec says "a user with a membership role will be created"). Rule 2.1 wins.
+15.14 THE EVENTS MODULE IS BUILT. Events, Honoured Guests, Invitations and WhatsApp notify live on
+      the tabbed screen /dashboard/events (privilege events.read); the module is switched on
+      (migration 20261014_0067). Do not put "events" back into NOT_BUILT_YET or switch the module off.
+15.15 THE ENGAGEMENTS MODULE IS BUILT. Affiliations, Associates, Press & Media, and Managing Committee
+      live on /dashboard/engagements/{affiliations,associates,press-media,committee} (privileges
+      engagements.affiliations.read, etc.); the module is switched on (migration 20261014_0067).
+15.16 THE REPORTS & ANALYTICS MODULE IS BUILT. Summary KPIs, Members demographics & geography,
+      Receipts & Finance, Magazine logistics, and Saved reports / audit trail live on /dashboard/reports
+      (privilege reports.management.read); the module is switched on (migration 20261014_0068).
+15.17 THE NOTIFICATIONS & COMMUNICATIONS MODULE IS BUILT. Campaigns & Broadcasts, Message Templates,
+      Quick Send direct messaging, and System Inbox live on /dashboard/notifications (privilege
+      notifications.campaigns.read); the module is switched on (migration 20261014_0069).
+15.18 THE IMPORTS MODULE HAS NO STANDALONE SIDEBAR SCREEN (route = None). Its bulk import capabilities
+      are embedded directly into their respective operational screens: Member bulk import in
+      /dashboard/membership/import (MemberImport.jsx), Location / Postal PIN code bulk import in
+      /dashboard/master/location-setup (LocationSetup.jsx), and Notification recipient CSV import in
+      NotificationsManagement.jsx (migration 20261014_0070).
 
 ================================================================================
+
