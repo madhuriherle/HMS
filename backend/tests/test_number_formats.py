@@ -150,25 +150,35 @@ def test_number_check_says_whether_a_number_is_free_in_the_year(client, admin_he
     assert client.get(f"{API}/receipts/number-check", params={"number": "1", "date": f"{y}-06-01"}).status_code == 401
 
 
-def test_a_deleted_receipt_gives_its_number_back(client, admin_headers):
+def test_a_deleted_receipt_keeps_its_number_until_it_is_purged(client, admin_headers):
     import random
 
     h = admin_headers
     y = random.randint(1700, 1990)
     assert _put(client, h, "RECEIPT", **DEFAULT_RECEIPT).status_code == 200
-    nxt = lambda: client.get(f"{API}/receipts/next-number", headers=h, params={"date": f"{y}-06-01"}).json()["receipt_number"]  # noqa: E731
+    day = lambda m: f"{y}-{m:02d}-01"  # noqa: E731
+    nxt = lambda: client.get(f"{API}/receipts/next-number", headers=h, params={"date": day(6)}).json()["receipt_number"]  # noqa: E731
+    check = lambda n: client.get(f"{API}/receipts/number-check", headers=h, params={"number": n, "date": day(6)}).json()  # noqa: E731
     assert nxt() == "0001"
-    first = client.post(f"{API}/receipts/", headers=h, json=_entry_payload(None, "One", receipt_date=f"{y}-06-01")).json()
-    second = client.post(f"{API}/receipts/", headers=h, json=_entry_payload(None, "Two", receipt_date=f"{y}-06-02")).json()
+    first = client.post(f"{API}/receipts/", headers=h, json=_entry_payload(None, "One", receipt_date=day(6))).json()
+    second = client.post(f"{API}/receipts/", headers=h, json=_entry_payload(None, "Two", receipt_date=day(7))).json()
     assert (first["receipt_number"], second["receipt_number"]) == ("0001", "0002") and nxt() == "0003"
-    # delete the last one: its number comes back
+
+    # a soft delete (the Delete button) keeps the number: it is in the Recycle Bin and can come back
     assert client.delete(f"{API}/receipts/{second['id']}", headers=h).status_code == 200
-    assert nxt() == "0002"
-    # delete the first too: the series starts again at 0001
-    assert client.delete(f"{API}/receipts/{first['id']}", headers=h).status_code == 200
-    assert nxt() == "0001"
+    assert nxt() == "0003", "the number of a receipt in the Recycle Bin is not offered again"
+    taken = check("0002")
+    assert taken["available"] is False and taken["existing"]["in_recycle_bin"] is True and "Recycle Bin" in taken["message"]
+    typed = client.post(f"{API}/receipts/", headers=h, json=_entry_payload("0002", "Typed", receipt_date=day(8)))
+    assert typed.status_code == 409 and "Recycle Bin" in typed.json()["detail"]
+    item = {"entity": "receipt", "id": second["id"]}
+    assert client.post(f"{API}/system/recycle-bin/restore", headers=h, json={"items": [item]}).json()["restored"] == 1
+
+    # a permanent delete gives the number back
+    assert client.delete(f"{API}/receipts/{second['id']}", headers=h).status_code == 200
+    assert client.post(f"{API}/system/recycle-bin/purge", headers=h, json={"items": [item]}).json()["deleted"] == 1
+    assert nxt() == "0002" and check("0002")["available"] is True
+
     # a cancelled receipt keeps its number (it still exists in the register)
-    kept = client.post(f"{API}/receipts/", headers=h, json=_entry_payload(None, "Kept", receipt_date=f"{y}-06-03")).json()
-    assert kept["receipt_number"] == "0001"
-    assert client.post(f"{API}/receipts/{kept['id']}/cancel", headers=h, json={"reason": "test"}).status_code == 200
+    assert client.post(f"{API}/receipts/{first['id']}/cancel", headers=h, json={"reason": "test"}).status_code == 200
     assert nxt() == "0002"

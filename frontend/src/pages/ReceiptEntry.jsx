@@ -1634,9 +1634,15 @@ export default function ReceiptEntry() {
                       ) : (
                         <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
                           <AlertCircle className="w-3 h-3 shrink-0" />
-                          {numberCheck.number} already exists in FY {numberCheck.financial_year}
-                          {numberCheck.existing?.payer_name ? ` (${numberCheck.existing.payer_name}` : ''}
-                          {numberCheck.existing?.receipt_date ? `, ${formatDate(numberCheck.existing.receipt_date)})` : numberCheck.existing?.payer_name ? ')' : ''}
+                          {numberCheck.existing?.in_recycle_bin ? (
+                            <>{numberCheck.number} belongs to a deleted receipt in the Recycle Bin (FY {numberCheck.financial_year}). Restore it or delete it permanently first.</>
+                          ) : (
+                            <>
+                              {numberCheck.number} already exists in FY {numberCheck.financial_year}
+                              {numberCheck.existing?.payer_name ? ` (${numberCheck.existing.payer_name}` : ''}
+                              {numberCheck.existing?.receipt_date ? `, ${formatDate(numberCheck.existing.receipt_date)})` : numberCheck.existing?.payer_name ? ')' : ''}
+                            </>
+                          )}
                         </p>
                       )
                     )}

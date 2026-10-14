@@ -11,7 +11,6 @@ def test_recreate_after_delete_and_in_use_guards(client, admin_headers):
         ("/masters/membership-types", {"name_en": "M" + s, "code": "M" + s, "status": True}),
         ("/masters/document-types", {"name_en": "D" + s, "code": "D" + s}),
         ("/users/roles", {"name": "R" + s, "code": "R" + s}),
-        ("/receipts/", _entry_payload("RC" + s, "X")),
     ]:
         first = P(path, json=body)
         assert first.status_code in (200, 201), (path, first.text)

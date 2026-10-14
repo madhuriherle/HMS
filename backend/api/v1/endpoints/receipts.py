@@ -653,16 +653,15 @@ def check_receipt_number(
     }
     if not typed:
         return out
-    q = db.query(Receipt).filter(
-        Receipt.financial_year == fy, Receipt.receipt_number == typed, Receipt.is_deleted == False  # noqa: E712
-    )
+    q = db.query(Receipt).filter(Receipt.financial_year == fy, Receipt.receipt_number == typed)
     if exclude_id is not None:
         q = q.filter(Receipt.id != exclude_id)
-    found = q.first()
+    found = q.order_by(Receipt.is_deleted).first()  # a live one is reported before one in the Recycle Bin
     if found:
         out["available"] = False
-        out["existing"] = {"id": found.id, "payer_name": found.payer_name, "receipt_date": found.receipt_date}
-        out["message"] = receipt_numbers.duplicate_message(typed, fy)
+        out["existing"] = {"id": found.id, "payer_name": found.payer_name, "receipt_date": found.receipt_date,
+                           "in_recycle_bin": bool(found.is_deleted)}
+        out["message"] = receipt_numbers.duplicate_message(typed, fy, in_bin=bool(found.is_deleted))
     out["matches_format"] = bool(numbering._regex(fmt, date).match(typed))
     return out
 

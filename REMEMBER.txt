@@ -154,6 +154,11 @@ RULE 6: NUMBERING (RECEIPTS AND MEMBERSHIP NUMBERS)
        and again when the date changes; the server check on save is the final guard.
 6.2  MEMBERSHIP NUMBER: one permanent number per member, minted at approval from
      Number Formats (MEMBER_CODE). It is copied to MemberMembership.membership_number.
+6.3  A RECEIPT IN THE RECYCLE BIN KEEPS ITS NUMBER. The Delete button is a soft delete: the receipt can
+     be restored, so its number is not offered again and cannot be typed for another receipt (the
+     message names the Recycle Bin). Only a PERMANENT delete (purge) gives the number back, and the
+     series then carries on from the highest receipt that still exists in that financial year. A
+     cancelled receipt keeps its number too.
 
 --------------------------------------------------------------------------------
 RULE 7: LOOKUPS

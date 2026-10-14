@@ -183,7 +183,8 @@ def _legacy_highest(db: Session, f: Fmt, d: date) -> int:
     from models.receipts import Receipt
 
     rx = _regex(f, d)
-    q = db.query(Receipt.receipt_number).filter(Receipt.is_deleted == False)  # noqa: E712
+    # a receipt in the Recycle Bin still holds its number (it can be restored); only a permanent delete frees it
+    q = db.query(Receipt.receipt_number)
     if f.restart == "FY":
         q = q.filter(Receipt.financial_year == financial_year_for(d))
     highest = 0
@@ -223,7 +224,7 @@ def _issue(db: Session, doc_type: str, on: date, exists: Optional[Callable[[str]
     seq = _locked_sequence(db, _sequence_name(f, on), lambda: _legacy_highest(db, f, on))
     current = int(seq.current_value or 0)
     if doc_type == "RECEIPT":
-        # a deleted receipt gives its number back: the series carries on from the highest receipt that still exists
+        # the series carries on from the highest receipt that still exists (a purged one gives its number back)
         current = min(current, _legacy_highest(db, f, on))
     value = max(current, f.start_value - 1)
     for _ in range(2000):
