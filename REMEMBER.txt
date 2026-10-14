@@ -500,11 +500,11 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
 15.10 THE MAGAZINE MODULE IS BUILT. Subscriptions, delivery pauses, returns and label batches live on
       the tabbed screen /dashboard/magazine (privilege magazines.read); the module is switched on
       (migration 20261014_0064). Do not put "magazines" back into NOT_BUILT_YET or switch the module off.
-15.10 KANNADA INPUTS ARE OFF FOR NOW. The Name / Communication Address / Post Office (Kannada)
+15.12 KANNADA INPUTS ARE OFF FOR NOW. The Name / Communication Address / Post Office (Kannada)
       fields on Register New Member are hidden (SHOW_KANNADA_FIELDS = false in RegisterNewMember.jsx).
       The data fields and the server still support them, and an existing Kannada value is kept when a
       member is edited. Do not show them until the user asks. The panel stays English only.
-15.11 NO USER IS CREATED WHEN A MEMBER IS REGISTERED OR APPROVED (confirmed again 14-Oct-2026, even
+15.13 NO USER IS CREATED WHEN A MEMBER IS REGISTERED OR APPROVED (confirmed again 14-Oct-2026, even
       though the original spec says "a user with a membership role will be created"). Rule 2.1 wins.
 
 ================================================================================
