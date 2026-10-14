@@ -261,12 +261,12 @@ RULE 11: HOW WE WORK (ALL AGENTS)
      MENU_PAGE_CATALOG, write a migration that switches the module on (status = true) for existing
      databases, and update tests/test_screen_privileges.py and tests/test_sidebar_has_no_dead_items.py
      (both assert the old "not built" list). See magazines + 20261014_0064.
-11.11 PROD IS LIVE: ITS DATA CHANGES BETWEEN UPDATES (users, roles, receipts, privileges are edited
+11.13 PROD IS LIVE: ITS DATA CHANGES BETWEEN UPDATES (users, roles, receipts, privileges are edited
      there by the office). Always take a FRESH backup and look at the live rows right before an
      update; never copy UAT data or role settings over prod; a migration must not undo what the
      office changed (it may only add privileges, never remove ones the office gave). Fix prod data
      through the app's own API (audit log), not by editing tables, and say what was changed.
-11.12 UAT AND PROD RUN THE SAME COMMIT. After any prod update the live web bundle name and the
+11.14 UAT AND PROD RUN THE SAME COMMIT. After any prod update the live web bundle name and the
      alembic version must be identical on both; check both and report them.
 
 --------------------------------------------------------------------------------
