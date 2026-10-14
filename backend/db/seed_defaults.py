@@ -134,7 +134,7 @@ AREA_ACTIONS = {
 }
 
 # Modules whose screens are not built yet: switched off (status = false) by migration 0032
-NOT_BUILT_YET = ("imports",)
+NOT_BUILT_YET = ()
 
 # ── modules ──────────────────────────────────────────────────
 # (code, name, parent_code, route, icon, display_order, min_rank_level)
@@ -153,7 +153,7 @@ MODULE_CATALOG = [
     ("activity", "Activity Logs", "users", "/dashboard/users/activity", "activity", 5, None),
     ("events", "Events", None, "/events", "calendar", 90, None),
     ("engagements", "Affiliation, Associates & Press", None, "/engagements", "link", 100, None),
-    ("imports", "Imports", None, "/imports", "upload", 110, None),
+    ("imports", "Imports", None, None, "upload", 110, None),
     ("system", "Settings", None, None, "settings", 120, 1),  # holds Organisation Settings (a Masters page) and future screens
 ]
 # Settings tools reached from the System Settings page (no sidebar entry of their own, so no route).

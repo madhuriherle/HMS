@@ -115,18 +115,24 @@ def test_migration_0032_moves_roles_retires_old_module_and_switches_off_unbuilt(
             page = db.query(Module).filter(Module.code == "approvals.requests").first()
             assert page.permission_code == "approvals.read"
             assert db.query(Module).filter(Module.id == page.parent_id).first().code == "approvals"
-            # "notifications" is built now and switched on by migration 0069
-            for code in ("imports",):
-                assert db.query(Module).filter(Module.code == code).first().status is False, code
-            for code in ("masters", "members", "receipts", "approvals", "users", "system", "magazines", "events", "engagements", "reports", "notifications"):
+            # All modules are now built and enabled!
+            for code in ("masters", "members", "receipts", "approvals", "users", "system", "magazines", "events", "engagements", "reports", "notifications", "imports"):
                 assert db.query(Module).filter(Module.code == code).first().status is True, code
         # a switched-off module blocks even the Super Admin on the API
-        blocked = client.post(
-            f"{API}/imports/postal-codes/import",
-            headers=admin_headers,
-            files={"file": ("sample.csv", b"pincode\n560001", "text/csv")},
-        )
-        assert blocked.status_code == 403 and "disabled" in blocked.text.lower(), blocked.text
+        with SessionLocal() as db:
+            db.query(Module).filter(Module.code == "imports").first().status = False
+            db.commit()
+        try:
+            blocked = client.post(
+                f"{API}/imports/postal-codes/import",
+                headers=admin_headers,
+                files={"file": ("sample.csv", b"pincode\n560001", "text/csv")},
+            )
+            assert blocked.status_code == 403 and "disabled" in blocked.text.lower(), blocked.text
+        finally:
+            with SessionLocal() as db:
+                db.query(Module).filter(Module.code == "imports").first().status = True
+                db.commit()
     finally:
         with SessionLocal() as db:  # leave the shared test database as the other tests expect it
             for row in db.query(Module).all():
