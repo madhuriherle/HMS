@@ -75,7 +75,9 @@ export default function FilterSelect({
                     : 'text-[#180200] hover:bg-[#FAF7F2]/80 hover:text-[#510601]'
                 }`}
               >
-                <span className="truncate flex-1">{opt.label}</span>
+                <span className={`truncate flex-1 ${opt.indent ? 'pl-4 font-normal text-[#863221]' : ''} ${opt.bold ? 'font-bold' : ''}`}>
+                  {opt.indent ? '\u21B3 ' : ''}{opt.label}
+                </span>
                 {isSelected && <Check className="w-3.5 h-3.5 text-[#510601] shrink-0" />}
               </button>
             );

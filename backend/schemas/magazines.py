@@ -100,3 +100,32 @@ class MagazineDeliveryBatch(BaseModel):
     filters_applied: Optional[str] = None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+
+class BackfillSubscriptionsRequest(BaseModel):
+    member_ids: List[int]
+
+
+class UnsubscribedPaidMember(BaseModel):
+    member_id: int
+    member_code: Optional[str] = None
+    name: str
+    mobile: Optional[str] = None
+    magazine_needed: bool = True
+    magazine_delivery_address: Optional[str] = None
+    total_allocated: float = 0.0
+
+
+class MagazineRecipientItem(BaseModel):
+    recipient_type: str  # MEMBER, AFFILIATION, ASSOCIATE, PRESS
+    recipient_id: int
+    name: str
+    code_or_reg: Optional[str] = None
+    mobile: Optional[str] = None
+    delivery_status: str  # ACTIVE, PAUSED, STOPPED
+    address: Optional[str] = None
+    address_override: Optional[str] = None
+    state_id: Optional[int] = None
+    district_id: Optional[int] = None
+    taluk_id: Optional[int] = None
+

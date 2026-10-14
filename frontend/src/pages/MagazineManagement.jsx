@@ -61,6 +61,13 @@ const CHIP_STYLES = {
   RESOLVED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
+const RECIPIENT_TYPE_CHIPS = {
+  MEMBER: 'bg-slate-100 text-slate-700 border-slate-200',
+  AFFILIATION: 'bg-purple-50 text-purple-700 border-purple-200',
+  ASSOCIATE: 'bg-blue-50 text-blue-700 border-blue-200',
+  PRESS: 'bg-rose-50 text-rose-700 border-rose-200',
+};
+
 const thisMonth = () => new Date().toISOString().slice(0, 7);
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -170,18 +177,29 @@ export default function MagazineManagement() {
 
   // subscriptions are shared: the pause/return pickers need the same list
   const [subscriptions, setSubscriptions] = useState([]);
+  const [unsubscribedPaid, setUnsubscribedPaid] = useState([]);
+  const [backfillOpen, setBackfillOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const memberById = useMemo(() => new Map(members.map((m) => [String(m.id), m])), [members]);
 
   const memberName = useCallback(
-    (id) => memberById.get(String(id))?.fullName || `Member #${id}`,
+    (id) => memberById.get(String(id))?.fullName || `Member ${id}`,
     [memberById]
   );
 
   const loadSubscriptions = useCallback(async () => {
     const { data } = await api.get('/magazines/subscriptions', { params: { limit: 5000 } });
     setSubscriptions(Array.isArray(data?.data) ? data.data : []);
+  }, []);
+
+  const loadUnsubscribed = useCallback(async () => {
+    try {
+      const { data } = await api.get('/magazines/unsubscribed-paid-members');
+      setUnsubscribedPaid(Array.isArray(data) ? data : []);
+    } catch {
+      // Non-critical
+    }
   }, []);
 
   useEffect(() => {
@@ -195,7 +213,7 @@ export default function MagazineManagement() {
         if (cancelled) return;
         setMembers(mems);
         setLocations(locs);
-        await loadSubscriptions();
+        await Promise.all([loadSubscriptions(), loadUnsubscribed()]);
       } catch (error) {
         if (!cancelled) notify(error.response?.data?.detail || 'Could not load magazine data.', 'error');
       } finally {
@@ -203,16 +221,13 @@ export default function MagazineManagement() {
       }
     })();
     return () => { cancelled = true; };
-  }, [loadSubscriptions]);
+  }, [loadSubscriptions, loadUnsubscribed]);
 
   return (
     <PermissionGate required="magazines.read" title="Access Restricted" message="You need the Magazine privilege to open this page.">
       <div className="space-y-6 pb-12">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Magazine</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Subscriptions, delivery pauses, returns and label batches.</p>
-          </div>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Magazine</h1>
           <Link
             to="/dashboard/magazine/labels"
             className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-stone-50 transition-colors"
@@ -221,6 +236,26 @@ export default function MagazineManagement() {
             <span>Quick Label List</span>
           </Link>
         </div>
+
+        {unsubscribedPaid.length > 0 && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[#510601]">
+            <div className="flex items-center gap-2.5">
+              <AlertCircle className="w-5 h-5 text-amber-700 shrink-0" />
+              <span>
+                <strong>{unsubscribedPaid.length}</strong> paid member{unsubscribedPaid.length === 1 ? '' : 's'} requested the magazine but {unsubscribedPaid.length === 1 ? 'has' : 'have'} no active subscription.
+              </span>
+            </div>
+            {canWrite && (
+              <button
+                type="button"
+                onClick={() => setBackfillOpen(true)}
+                className="px-3.5 py-1.5 rounded-lg bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                Review &amp; Start Subscriptions
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex flex-wrap gap-1.5 border-b border-[#E8DFD8]">
@@ -283,6 +318,18 @@ export default function MagazineManagement() {
             )}
           </>
         )}
+
+        {backfillOpen && (
+          <BackfillModal
+            isOpen={backfillOpen}
+            onClose={() => setBackfillOpen(false)}
+            onBackfilled={() => {
+              loadSubscriptions();
+              loadUnsubscribed();
+            }}
+            canWrite={canWrite}
+          />
+        )}
       </div>
     </PermissionGate>
   );
@@ -290,7 +337,10 @@ export default function MagazineManagement() {
 
 // ── Subscriptions ────────────────────────────────────────────
 function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite, canDelete }) {
+  const [recipients, setRecipients] = useState([]);
+  const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -298,6 +348,36 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [monthlyFor, setMonthlyFor] = useState(null);
+  const [nonMemberSetting, setNonMemberSetting] = useState(null);
+
+  const loadRecipients = useCallback(async () => {
+    setLoadingRecipients(true);
+    try {
+      const { data } = await api.get('/magazines/all-recipients');
+      setRecipients(Array.isArray(data) ? data : []);
+    } catch {
+      // Fallback gracefully
+    } finally {
+      setLoadingRecipients(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRecipients();
+  }, [loadRecipients, subscriptions]);
+
+  const stats = useMemo(() => {
+    let active = 0;
+    let paused = 0;
+    let stopped = 0;
+    const list = recipients.length > 0 ? recipients : subscriptions;
+    for (const item of list) {
+      if (item.delivery_status === 'ACTIVE') active++;
+      else if (item.delivery_status === 'PAUSED') paused++;
+      else stopped++;
+    }
+    return { total: list.length, active, paused, stopped };
+  }, [recipients, subscriptions]);
 
   const memberOptions = useMemo(
     () => members.map((m) => ({ value: m.id, label: `${m.fullName} (${m.membershipNumber})` })),
@@ -306,14 +386,27 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return subscriptions.filter((s) => {
-      const name = memberName(s.member_id).toLowerCase();
-      const code = String(members.find((m) => String(m.id) === String(s.member_id))?.membershipNumber || '').toLowerCase();
+    const sourceList = recipients.length > 0
+      ? recipients
+      : subscriptions.map((s) => ({
+          recipient_type: 'MEMBER',
+          recipient_id: s.member_id,
+          name: memberName(s.member_id),
+          code_or_reg: members.find((m) => String(m.id) === String(s.member_id))?.membershipNumber || '',
+          delivery_status: s.delivery_status,
+          address_override: s.address_override,
+          notes: s.notes,
+        }));
+
+    return sourceList.filter((r) => {
+      const name = (r.name || '').toLowerCase();
+      const code = String(r.code_or_reg || '').toLowerCase();
       const matchSearch = !q || name.includes(q) || code.includes(q);
-      const matchStatus = statusFilter === 'ALL' || s.delivery_status === statusFilter;
-      return matchSearch && matchStatus;
+      const matchType = typeFilter === 'ALL' || r.recipient_type === typeFilter;
+      const matchStatus = statusFilter === 'ALL' || r.delivery_status === statusFilter;
+      return matchSearch && matchType && matchStatus;
     });
-  }, [subscriptions, search, statusFilter, memberName, members]);
+  }, [recipients, subscriptions, search, typeFilter, statusFilter, memberName, members]);
 
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const current = Math.min(page, pages);
@@ -348,6 +441,26 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
 
   return (
     <div className="space-y-5">
+      {/* Summary KPI Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase text-[#863221]">Total Recipients</p>
+          <p className="text-xl font-bold text-[#510601] mt-0.5">{stats.total}</p>
+        </div>
+        <div className="rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase text-[#863221]">Active Deliveries</p>
+          <p className="text-xl font-bold text-emerald-700 mt-0.5">{stats.active}</p>
+        </div>
+        <div className="rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase text-[#863221]">Paused Deliveries</p>
+          <p className="text-xl font-bold text-amber-700 mt-0.5">{stats.paused}</p>
+        </div>
+        <div className="rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase text-[#863221]">Stopped / Inactive</p>
+          <p className="text-xl font-bold text-gray-600 mt-0.5">{stats.stopped}</p>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative w-64">
@@ -356,10 +469,22 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
               type="text"
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Search member…"
+              placeholder="Search recipient name or code…"
               className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]"
             />
           </div>
+          <FilterSelect
+            value={typeFilter}
+            onChange={(v) => { setTypeFilter(v); setPage(1); }}
+            options={[
+              { value: 'ALL', label: 'All Recipient Types' },
+              { value: 'MEMBER', label: 'Members' },
+              { value: 'AFFILIATION', label: 'Affiliations' },
+              { value: 'ASSOCIATE', label: 'Associates' },
+              { value: 'PRESS', label: 'Press & Media' },
+            ]}
+            widthClass="w-48"
+          />
           <FilterSelect
             value={statusFilter}
             onChange={(v) => { setStatusFilter(v); setPage(1); }}
@@ -380,57 +505,101 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
           <table className="w-full text-left text-sm text-gray-700">
             <thead className="bg-[#FAF7F2] border-b border-stone-200 text-xs font-semibold uppercase tracking-wider text-[#180200]">
               <tr>
-                <TH>Member</TH>
+                <TH>Recipient</TH>
+                <TH>Type</TH>
                 <TH>Delivery</TH>
                 <TH>Address</TH>
-                <TH>Notes</TH>
                 <TH className="text-center">Actions</TH>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-200">
               {rows.length === 0 ? (
-                <EmptyRow colSpan={5} icon={BookOpen} title="No magazine subscriptions" hint="Start a subscription to deliver magazines to a member." />
+                <EmptyRow colSpan={5} icon={BookOpen} title="No recipients found" hint="Start a subscription or enable magazine delivery for affiliates, associates or press." />
               ) : (
-                rows.map((sub) => (
-                  <tr key={sub.id} className="hover:bg-amber-50/40 transition-colors">
-                    <td className="px-4 py-3.5">
-                      <div className="font-semibold text-gray-900">{memberName(sub.member_id)}</div>
-                      <div className="text-[11px] text-gray-500 font-mono">{members.find((m) => String(m.id) === String(sub.member_id))?.membershipNumber || `#${sub.member_id}`}</div>
-                    </td>
-                    <td className="px-4 py-3.5"><Chip value={sub.delivery_status} /></td>
-                    <td className="px-4 py-3.5 text-xs text-gray-600 max-w-[240px]">
-                      {sub.address_override ? <span className="text-amber-700">Override: {sub.address_override}</span> : <span className="text-gray-400">Member address</span>}
-                    </td>
-                    <td className="px-4 py-3.5 text-xs text-gray-600 max-w-[200px] truncate" title={sub.notes || ''}>{sub.notes || '—'}</td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                        <button type="button" onClick={() => setMonthlyFor(sub)} className="btn-act" title="Monthly marks">
-                          <Calendar className="w-3.5 h-3.5" /><span>Monthly</span>
-                        </button>
-                        {canWrite && sub.delivery_status !== 'ACTIVE' && (
-                          <button type="button" onClick={() => changeStatus(sub, 'ACTIVE')} className="btn-act" title="Start delivery">
-                            <Play className="w-3.5 h-3.5" /><span>Start</span>
-                          </button>
+                rows.map((row) => {
+                  const sub = row.recipient_type === 'MEMBER'
+                    ? subscriptions.find((s) => String(s.member_id) === String(row.recipient_id))
+                    : null;
+                  return (
+                    <tr key={`${row.recipient_type}-${row.recipient_id}`} className="hover:bg-amber-50/40 transition-colors">
+                      <td className="px-4 py-3.5">
+                        <div className="font-semibold text-gray-900">{row.name}</div>
+                        {row.code_or_reg ? (
+                          <div className="text-[11px] text-gray-500 font-mono">{row.code_or_reg}</div>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${RECIPIENT_TYPE_CHIPS[row.recipient_type] || 'bg-stone-100 text-stone-700 border-stone-200'}`}>
+                          {row.recipient_type}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5"><Chip value={row.delivery_status} /></td>
+                      <td className="px-4 py-3.5 text-xs text-gray-600 max-w-[240px]">
+                        {row.address_override ? (
+                          <span className="text-amber-700 font-medium">Override: {row.address_override}</span>
+                        ) : row.address ? (
+                          <span className="truncate block" title={row.address}>{row.address}</span>
+                        ) : (
+                          <span className="text-gray-400">Standard address</span>
                         )}
-                        {canWrite && sub.delivery_status === 'ACTIVE' && (
-                          <button type="button" onClick={() => changeStatus(sub, 'STOPPED')} className="btn-act" title="Stop delivery">
-                            <Pause className="w-3.5 h-3.5" /><span>Stop</span>
-                          </button>
-                        )}
-                        {canWrite && (
-                          <button type="button" onClick={() => { setEditing(sub); setFormOpen(true); }} className="btn-act" title="Edit">
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                        {canDelete && (
-                          <button type="button" onClick={() => remove(sub)} className="btn-act btn-act-danger" title="Remove">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                          {row.recipient_type === 'MEMBER' && sub && (
+                            <>
+                              <button type="button" onClick={() => setMonthlyFor(sub)} className="btn-act" title="Monthly marks">
+                                <Calendar className="w-3.5 h-3.5" /><span>Monthly</span>
+                              </button>
+                              {canWrite && sub.delivery_status !== 'ACTIVE' && (
+                                <button type="button" onClick={() => changeStatus(sub, 'ACTIVE')} className="btn-act" title="Start delivery">
+                                  <Play className="w-3.5 h-3.5" /><span>Start</span>
+                                </button>
+                              )}
+                              {canWrite && sub.delivery_status === 'ACTIVE' && (
+                                <button type="button" onClick={() => changeStatus(sub, 'STOPPED')} className="btn-act" title="Stop delivery">
+                                  <Pause className="w-3.5 h-3.5" /><span>Stop</span>
+                                </button>
+                              )}
+                              {canWrite && (
+                                <button type="button" onClick={() => { setEditing(sub); setFormOpen(true); }} className="btn-act" title="Edit">
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              {canDelete && (
+                                <button type="button" onClick={() => remove(sub)} className="btn-act btn-act-danger" title="Remove">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {row.recipient_type === 'MEMBER' && !sub && canWrite && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditing(null);
+                                setFormOpen(true);
+                              }}
+                              className="btn-act"
+                              title="Start Subscription"
+                            >
+                              <Plus className="w-3.5 h-3.5" /><span>Start</span>
+                            </button>
+                          )}
+                          {row.recipient_type !== 'MEMBER' && canWrite && (
+                            <button
+                              type="button"
+                              onClick={() => setNonMemberSetting(row)}
+                              className="btn-act"
+                              title="Edit Delivery Setting"
+                            >
+                              <Pencil className="w-3.5 h-3.5" /><span>Edit Setting</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -445,10 +614,17 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
           editing={editing}
           memberOptions={memberOptions}
           onClose={() => setFormOpen(false)}
-          onSaved={() => { setFormOpen(false); reload(); }}
+          onSaved={() => { setFormOpen(false); reload(); loadRecipients(); }}
         />
       )}
       {monthlyFor && <MonthlyModal sub={monthlyFor} memberName={memberName} onClose={() => setMonthlyFor(null)} />}
+      {nonMemberSetting && (
+        <NonMemberSettingModal
+          recipient={nonMemberSetting}
+          onClose={() => setNonMemberSetting(null)}
+          onSaved={loadRecipients}
+        />
+      )}
     </div>
   );
 }
@@ -506,7 +682,7 @@ function SubscriptionForm({ editing, memberOptions, onClose, onSaved }) {
             <label className={LABEL}>Member <span className="text-[#ED4636]">*</span></label>
             {editing ? (
               <div className="px-3.5 py-2.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg text-sm text-[#180200]">
-                {memberOptions.find((o) => String(o.value) === String(editing.member_id))?.label || `Member #${editing.member_id}`}
+                {memberOptions.find((o) => String(o.value) === String(editing.member_id))?.label || `Member ${editing.member_id}`}
               </div>
             ) : (
               <SearchableFormSelect
@@ -643,7 +819,7 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete }) {
   const subLabel = useCallback(
     (id) => {
       const s = subscriptions.find((x) => String(x.id) === String(id));
-      return s ? `${memberName(s.member_id)} — ${s.delivery_status}` : `Subscription #${id}`;
+      return s ? `${memberName(s.member_id)} — ${s.delivery_status}` : `Subscription ${id}`;
     },
     [subscriptions, memberName]
   );
@@ -824,7 +1000,7 @@ function PauseForm({ editing, subOptions, onClose, onSaved }) {
             <label className={LABEL}>Subscription <span className="text-[#ED4636]">*</span></label>
             {editing ? (
               <div className="px-3.5 py-2.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg text-sm text-[#180200]">
-                {subOptions.find((o) => String(o.value) === String(editing.subscription_id))?.label || `Subscription #${editing.subscription_id}`}
+                {subOptions.find((o) => String(o.value) === String(editing.subscription_id))?.label || `Subscription ${editing.subscription_id}`}
               </div>
             ) : (
               <SearchableFormSelect
@@ -1296,9 +1472,12 @@ function LabelsTab({ locations, canWrite }) {
             </button>
           )}
         </div>
-        <p className="mt-3 text-[11px] text-gray-500">
-          Active subscriptions only. Paused spans are skipped and returned issues are flagged “RETURNED ISSUE” on the labels.
-        </p>
+        <div className="mt-4 rounded-lg bg-[#FAF7F2] border border-[#E8DFD8] p-3 text-xs text-[#863221] flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-[#8C1801] shrink-0 mt-0.5" />
+          <div>
+            <span className="font-semibold text-[#510601]">Smart Auto-Exclusion Active:</span> Active subscriptions only. Paused delivery spans are skipped automatically, and returned issues are flagged on the dispatch labels.
+          </div>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
@@ -1346,9 +1525,17 @@ function LabelsTab({ locations, canWrite }) {
   );
 }
 
+const RECIPIENT_TYPE_CHIP = {
+  MEMBER: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  AFFILIATION: 'bg-blue-50 text-blue-700 border-blue-200',
+  ASSOCIATE: 'bg-purple-50 text-purple-700 border-purple-200',
+  PRESS: 'bg-amber-50 text-amber-700 border-amber-200',
+};
+
 function LabelBatchModal({ batch, onClose }) {
   const [data, setData] = useState(null);
   const [returnsOnly, setReturnsOnly] = useState(false);
+  const [typeFilter, setTypeFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1361,13 +1548,19 @@ function LabelBatchModal({ batch, onClose }) {
     return () => { cancelled = true; };
   }, [batch.id, returnsOnly]);
 
+  const items = useMemo(() => {
+    if (!data?.data) return [];
+    if (typeFilter === 'ALL') return data.data;
+    return data.data.filter((item) => item.recipient_type === typeFilter);
+  }, [data, typeFilter]);
+
   return (
     <Modal isOpen onClose={onClose}>
       <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col">
         <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-[#180200]">{batch.batch_name}</h3>
-            <p className="text-xs text-gray-500">{data?.total ?? 0} label{(data?.total ?? 0) === 1 ? '' : 's'} shown</p>
+            <p className="text-xs text-gray-500">{items.length} label{items.length === 1 ? '' : 's'} shown</p>
           </div>
           <div className="flex items-center gap-3">
             <label className="inline-flex items-center gap-2 text-xs font-semibold text-[#863221] cursor-pointer">
@@ -1377,10 +1570,29 @@ function LabelBatchModal({ batch, onClose }) {
             <button type="button" onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-stone-200 hover:text-gray-700"><X className="h-5 w-5" /></button>
           </div>
         </div>
+
+        {/* Recipient Filter Tabs */}
+        <div className="px-6 py-2 border-b border-[#E8DFD8] bg-white flex flex-wrap gap-1.5 text-xs">
+          {['ALL', 'MEMBER', 'AFFILIATION', 'ASSOCIATE', 'PRESS'].map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTypeFilter(t)}
+              className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
+                typeFilter === t
+                  ? 'bg-[#510601] text-white'
+                  : 'bg-[#FAF7F2] text-[#863221] hover:bg-stone-100'
+              }`}
+            >
+              {t === 'ALL' ? 'All Recipients' : t}
+            </button>
+          ))}
+        </div>
+
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <p className="p-6 text-sm text-gray-500">Loading…</p>
-          ) : !data || data.data.length === 0 ? (
+          ) : items.length === 0 ? (
             <p className="p-6 text-sm text-gray-500">No labels to show.</p>
           ) : (
             <table className="w-full text-left text-sm text-gray-700">
@@ -1388,13 +1600,17 @@ function LabelBatchModal({ batch, onClose }) {
                 <tr><TH>Recipient</TH><TH>Type</TH><TH>Address</TH></tr>
               </thead>
               <tbody className="divide-y divide-stone-200">
-                {data.data.map((item) => (
+                {items.map((item) => (
                   <tr key={item.id} className={item.is_return ? 'bg-red-50/40' : ''}>
                     <td className="px-4 py-3 font-semibold text-gray-900">
-                      {item.recipient_name || `${item.recipient_type} #${item.recipient_id}`}
+                      {item.recipient_name || `${item.recipient_type} ${item.recipient_id}`}
                       {item.is_return && <span className="ml-2 inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">RETURNED ISSUE</span>}
                     </td>
-                    <td className="px-4 py-3 text-[11px] uppercase text-gray-500">{item.recipient_type}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${RECIPIENT_TYPE_CHIP[item.recipient_type] || 'bg-stone-100 text-stone-600 border-stone-200'}`}>
+                        {item.recipient_type}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-xs text-gray-600 whitespace-pre-line">{item.label_address}</td>
                   </tr>
                 ))}
@@ -1580,3 +1796,229 @@ function DeliveryBatchForm({ editing, onClose, onSaved }) {
     </Modal>
   );
 }
+
+function NonMemberSettingModal({ recipient, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    enabled: recipient?.delivery_status === 'ACTIVE',
+    address_override: recipient?.address_override || '',
+  });
+  const [busy, setBusy] = useState(false);
+
+  const endpointMap = {
+    AFFILIATION: `/engagements/affiliations/${recipient?.recipient_id}/magazine-setting`,
+    ASSOCIATE: `/engagements/associates/${recipient?.recipient_id}/magazine-setting`,
+    PRESS: `/engagements/press-media/${recipient?.recipient_id}/magazine-setting`,
+  };
+
+  const save = async () => {
+    const url = endpointMap[recipient.recipient_type];
+    if (!url) return;
+    setBusy(true);
+    try {
+      await api.put(url, {
+        enabled: form.enabled,
+        address_override: form.address_override.trim() || null,
+      });
+      notify('Magazine delivery setting updated.');
+      onSaved();
+      onClose();
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Could not update setting.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal isOpen onClose={onClose}>
+      <ModalShell
+        title={`Edit Delivery: ${recipient.name}`}
+        footer={<ModalFooter kind="edit" onCancel={onClose} onSubmit={save} busy={busy} />}
+      >
+        <div className="p-6 space-y-4">
+          <div>
+            <label className={LABEL}>Recipient Type</label>
+            <div className="text-sm font-semibold text-gray-800">{recipient.recipient_type}</div>
+          </div>
+          <div>
+            <label className={LABEL}>Delivery Enabled</label>
+            <select
+              value={form.enabled ? 'YES' : 'NO'}
+              onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.value === 'YES' }))}
+              className={INPUT}
+            >
+              <option value="YES">YES - Deliver magazine</option>
+              <option value="NO">NO - Stop delivery</option>
+            </select>
+          </div>
+          <div>
+            <label className={LABEL}>Delivery Address Override</label>
+            <textarea
+              rows={2}
+              value={form.address_override}
+              onChange={(e) => setForm((f) => ({ ...f, address_override: e.target.value }))}
+              placeholder={`Leave blank to use registered address: ${recipient.address || 'None'}`}
+              className={INPUT}
+            />
+            {recipient.address && (
+              <p className="mt-1 text-xs text-gray-500">Registered address: {recipient.address}</p>
+            )}
+          </div>
+        </div>
+      </ModalShell>
+    </Modal>
+  );
+}
+
+function BackfillModal({ isOpen, onClose, onBackfilled, canWrite }) {
+  const [candidates, setCandidates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [busy, setBusy] = useState(false);
+
+  const loadCandidates = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/magazines/unsubscribed-paid-members');
+      const list = Array.isArray(data) ? data : [];
+      setCandidates(list);
+      setSelectedIds(list.map((c) => c.member_id));
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Could not load candidates.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) loadCandidates();
+  }, [isOpen, loadCandidates]);
+
+  const toggleAll = () => {
+    if (selectedIds.length === candidates.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(candidates.map((c) => c.member_id));
+    }
+  };
+
+  const toggleOne = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const submit = async () => {
+    if (selectedIds.length === 0) {
+      notify('Select at least one member to activate.', 'error');
+      return;
+    }
+    setBusy(true);
+    try {
+      const { data } = await api.post('/magazines/backfill-subscriptions', {
+        member_ids: selectedIds,
+      });
+      notify(data.message || `Activated ${data.created_count} subscriptions.`);
+      onBackfilled();
+      onClose();
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Could not activate subscriptions.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <Modal isOpen onClose={onClose}>
+      <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
+        <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
+          <h3 className="text-lg font-bold text-[#180200]">Paid Members Awaiting Magazine Subscription</h3>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-6 flex-1 overflow-y-auto space-y-4">
+          <p className="text-xs text-gray-600">
+            These members indicated <strong>Magazine Needed: YES</strong> during registration and have a paid receipt allocation, but do not have an active subscription record. Select the members you wish to activate:
+          </p>
+
+          {loading ? (
+            <div className="p-8 text-center text-sm text-gray-500">Loading candidates…</div>
+          ) : candidates.length === 0 ? (
+            <div className="p-8 text-center text-sm text-gray-500">
+              No paid members found without an active subscription.
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between text-xs font-semibold text-[#863221]">
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="hover:underline cursor-pointer"
+                >
+                  {selectedIds.length === candidates.length ? 'Deselect All' : 'Select All'}
+                </button>
+                <span>{selectedIds.length} of {candidates.length} selected</span>
+              </div>
+
+              <div className="border border-[#E8DFD8] rounded-xl overflow-hidden divide-y divide-[#E8DFD8]">
+                {candidates.map((c) => (
+                  <label
+                    key={c.member_id}
+                    className="flex items-center gap-3 p-3 hover:bg-[#FAF7F2]/60 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(c.member_id)}
+                      onChange={() => toggleOne(c.member_id)}
+                      className="rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] h-4 w-4"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-gray-900">{c.name}</span>
+                        {c.member_code && (
+                          <span className="font-mono text-xs text-gray-500">{c.member_code}</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 truncate">
+                        {c.mobile && <span className="mr-3">Mob: {c.mobile}</span>}
+                        <span>Paid: ₹{c.total_allocated}</span>
+                        {c.magazine_delivery_address && (
+                          <span className="ml-3 text-amber-800">
+                            Deliver to: {c.magazine_delivery_address}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <div className="px-6 py-3.5 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-end gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-stone-100 rounded-lg border border-stone-200"
+          >
+            Cancel
+          </button>
+          {canWrite && candidates.length > 0 && (
+            <button
+              type="button"
+              disabled={busy || selectedIds.length === 0}
+              onClick={submit}
+              className="px-4 py-2 text-xs font-bold bg-[#510601] hover:bg-[#3D0400] text-white rounded-lg shadow-sm disabled:opacity-50"
+            >
+              {busy ? 'Activating…' : `Activate ${selectedIds.length} Subscriptions`}
+            </button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+

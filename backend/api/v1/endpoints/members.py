@@ -758,7 +758,19 @@ def update_member(
     new_type_id = data.pop("membership_type_id", None)
     if new_type_id:
         _change_membership_type(db, member, new_type_id, current_user.id)
-    return crud_members.member.update(db=db, db_obj=member, obj_in=data, updated_by=current_user.id)
+    updated = crud_members.member.update(db=db, db_obj=member, obj_in=data, updated_by=current_user.id)
+    if "magazine_needed" in data or "magazine_delivery_address" in data:
+        from services.magazine_subscriptions import sync_member_magazine_subscription
+        sync_member_magazine_subscription(
+            db,
+            updated,
+            magazine_needed=data.get("magazine_needed"),
+            delivery_address=data.get("magazine_delivery_address"),
+            user_id=current_user.id,
+        )
+        db.commit()
+        db.refresh(updated)
+    return updated
 
 
 def _change_membership_type(db: Session, member: Member, new_type_id: int, user_id: int) -> None:
@@ -2163,6 +2175,7 @@ def _profile_magazine(db: Session, member: Member) -> dict:
     )
     return {
         "magazine_needed": member.magazine_needed,
+        "magazine_delivery_address": getattr(member, "magazine_delivery_address", None),
         "subscriptions": [
             {"id": x.id, "delivery_status": x.delivery_status, "address_override": x.address_override, "notes": x.notes}
             for x in subs
@@ -2308,6 +2321,7 @@ def _profile_overview(db: Session, member: Member, current_user: User) -> dict:
         "receipts": {"total": recent["total"], "latest": recent["data"]},
         "magazine": {
             "magazine_needed": magazine["magazine_needed"],
+            "magazine_delivery_address": magazine.get("magazine_delivery_address"),
             "subscriptions": [x["delivery_status"] for x in magazine["subscriptions"]],
             "services": [x["service_name_en"] for x in magazine["services"]],
         },

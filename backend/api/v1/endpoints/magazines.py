@@ -706,7 +706,7 @@ def generate_labels(
     for sub, member in rows:
         if sub.id in paused_sub_ids:
             continue
-        address = sub.address_override or _member_label_address(member)
+        address = sub.address_override or getattr(member, "magazine_delivery_address", None) or _member_label_address(member)
         items.append(MagazineLabelBatchItem(
             label_batch_id=batch.id,
             recipient_type="MEMBER",
@@ -1088,3 +1088,231 @@ def download_label_pdf(
         media_type="application/pdf",
         filename=filename,
     )
+
+
+# ─────────────── BACKFILL & UNIFIED RECIPIENTS ───────────────
+@router.get("/unsubscribed-paid-members", response_model=List[schemas_magazines.UnsubscribedPaidMember])
+def read_unsubscribed_paid_members(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("magazines.read")),
+) -> Any:
+    """Members who requested the magazine (magazine_needed=True) and have paid receipt allocations,
+    but have no active magazine subscription."""
+    from models.receipts import ReceiptAllocation
+    from sqlalchemy import func
+
+    # All member IDs with at least one active magazine subscription
+    active_member_ids = {
+        row[0] for row in
+        db.query(MagazineSubscription.member_id)
+        .filter(
+            MagazineSubscription.is_deleted == False,  # noqa: E712
+            MagazineSubscription.delivery_status == "ACTIVE",
+        )
+        .distinct()
+        .all()
+    }
+
+    # Find paid members with magazine_needed == True
+    paid_members_query = (
+        db.query(
+            Member,
+            func.sum(ReceiptAllocation.allocated_amount).label("total_allocated"),
+        )
+        .join(ReceiptAllocation, ReceiptAllocation.member_id == Member.id)
+        .filter(
+            Member.is_deleted == False,  # noqa: E712
+            Member.magazine_needed == True,  # noqa: E712
+            ReceiptAllocation.is_deleted == False,  # noqa: E712
+        )
+        .group_by(Member.id)
+    )
+
+    results = []
+    for member, total_allocated in paid_members_query.all():
+        if member.id not in active_member_ids:
+            name_parts = [p for p in (member.first_name_en, member.last_name_en) if p]
+            full_name = " ".join(name_parts) or member.full_name_kn or f"Member {member.id}"
+            results.append(
+                schemas_magazines.UnsubscribedPaidMember(
+                    member_id=member.id,
+                    member_code=member.member_code or member.membership_number,
+                    name=full_name,
+                    mobile=member.mobile,
+                    magazine_needed=member.magazine_needed,
+                    magazine_delivery_address=member.magazine_delivery_address,
+                    total_allocated=float(total_allocated or 0.0),
+                )
+            )
+
+    return results
+
+
+@router.post("/backfill-subscriptions")
+def backfill_subscriptions(
+    payload: schemas_magazines.BackfillSubscriptionsRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
+) -> Any:
+    """One-time creation of magazine subscriptions for approved existing paid members."""
+    from services.magazine_subscriptions import ensure_subscription_on_receipt_assigned
+
+    created_count = ensure_subscription_on_receipt_assigned(
+        db, payload.member_ids, user_id=current_user.id
+    )
+    db.commit()
+    return {
+        "created_count": created_count,
+        "processed_ids": payload.member_ids,
+        "message": f"Successfully activated {created_count} magazine subscription(s)."
+    }
+
+
+@router.get("/all-recipients", response_model=List[schemas_magazines.MagazineRecipientItem])
+def read_all_recipients(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("magazines.read")),
+    recipient_type: Optional[str] = None,
+    delivery_status: Optional[str] = None,
+    search: Optional[str] = None,
+) -> Any:
+    """Combined list of all magazine recipients: members with subscriptions, affiliations, associates, and press."""
+    from models.engagements import Affiliation, AffiliationMagazineSetting, Associate, AssociateMagazineSetting, PressMedia, PressMediaMagazineSetting
+
+    recipients: List[schemas_magazines.MagazineRecipientItem] = []
+
+    # 1. MEMBERS
+    if not recipient_type or recipient_type.upper() in ("ALL", "MEMBER"):
+        q = (
+            db.query(MagazineSubscription, Member)
+            .join(Member, Member.id == MagazineSubscription.member_id)
+            .filter(
+                MagazineSubscription.is_deleted == False,  # noqa: E712
+                Member.is_deleted == False,  # noqa: E712
+            )
+        )
+        if delivery_status and delivery_status.upper() != "ALL":
+            q = q.filter(MagazineSubscription.delivery_status == delivery_status.upper())
+        if search:
+            s = f"%{search}%"
+            q = q.filter(
+                (Member.first_name_en.ilike(s)) |
+                (Member.last_name_en.ilike(s)) |
+                (Member.member_code.ilike(s)) |
+                (Member.mobile.ilike(s))
+            )
+        for sub, m in q.all():
+            name = " ".join(p for p in (m.first_name_en, m.last_name_en) if p) or m.full_name_kn or f"Member {m.id}"
+            recipients.append(
+                schemas_magazines.MagazineRecipientItem(
+                    recipient_type="MEMBER",
+                    recipient_id=m.id,
+                    name=name,
+                    code_or_reg=m.member_code or m.membership_number,
+                    mobile=m.mobile,
+                    delivery_status=sub.delivery_status,
+                    address=_member_label_address(m),
+                    address_override=sub.address_override or getattr(m, "magazine_delivery_address", None),
+                    state_id=m.state_id,
+                    district_id=m.district_id,
+                    taluk_id=m.taluk_id,
+                )
+            )
+
+    # Helper for non-members
+    def _get_setting(setting_model, fk_field, owner_id):
+        return db.query(setting_model).filter(
+            getattr(setting_model, fk_field) == owner_id,
+            setting_model.is_deleted == False,  # noqa: E712
+        ).first()
+
+    # 2. AFFILIATIONS
+    if not recipient_type or recipient_type.upper() in ("ALL", "AFFILIATION"):
+        q_aff = db.query(Affiliation).filter(Affiliation.is_deleted == False)  # noqa: E712
+        if search:
+            s = f"%{search}%"
+            q_aff = q_aff.filter(
+                (Affiliation.group_name.ilike(s)) |
+                (Affiliation.contact_person.ilike(s)) |
+                (Affiliation.contact_number.ilike(s))
+            )
+        for aff in q_aff.all():
+            setting = _get_setting(AffiliationMagazineSetting, "affiliation_id", aff.id)
+            is_enabled = aff.magazine_enabled and (setting.enabled if setting else True)
+            stat = "ACTIVE" if is_enabled else "STOPPED"
+            if delivery_status and delivery_status.upper() != "ALL" and stat != delivery_status.upper():
+                continue
+            recipients.append(
+                schemas_magazines.MagazineRecipientItem(
+                    recipient_type="AFFILIATION",
+                    recipient_id=aff.id,
+                    name=aff.group_name,
+                    code_or_reg=aff.contact_person,
+                    mobile=aff.contact_number,
+                    delivery_status=stat,
+                    address=aff.address,
+                    address_override=setting.address_override if setting else None,
+                )
+            )
+
+    # 3. ASSOCIATES
+    if not recipient_type or recipient_type.upper() in ("ALL", "ASSOCIATE"):
+        q_asc = db.query(Associate).filter(Associate.is_deleted == False)  # noqa: E712
+        if search:
+            s = f"%{search}%"
+            q_asc = q_asc.filter(
+                (Associate.name.ilike(s)) |
+                (Associate.organization.ilike(s)) |
+                (Associate.associate_number.ilike(s)) |
+                (Associate.mobile.ilike(s))
+            )
+        for asc in q_asc.all():
+            setting = _get_setting(AssociateMagazineSetting, "associate_id", asc.id)
+            is_enabled = asc.magazine_enabled and (setting.enabled if setting else True)
+            stat = "ACTIVE" if is_enabled else "STOPPED"
+            if delivery_status and delivery_status.upper() != "ALL" and stat != delivery_status.upper():
+                continue
+            recipients.append(
+                schemas_magazines.MagazineRecipientItem(
+                    recipient_type="ASSOCIATE",
+                    recipient_id=asc.id,
+                    name=asc.name,
+                    code_or_reg=asc.associate_number or asc.organization,
+                    mobile=asc.mobile,
+                    delivery_status=stat,
+                    address=asc.address,
+                    address_override=setting.address_override if setting else None,
+                )
+            )
+
+    # 4. PRESS & MEDIA
+    if not recipient_type or recipient_type.upper() in ("ALL", "PRESS"):
+        q_prs = db.query(PressMedia).filter(PressMedia.is_deleted == False)  # noqa: E712
+        if search:
+            s = f"%{search}%"
+            q_prs = q_prs.filter(
+                (PressMedia.organization_name.ilike(s)) |
+                (PressMedia.reporter_name.ilike(s)) |
+                (PressMedia.mobile.ilike(s))
+            )
+        for prs in q_prs.all():
+            setting = _get_setting(PressMediaMagazineSetting, "press_media_id", prs.id)
+            is_enabled = prs.magazine_enabled and (setting.enabled if setting else True)
+            stat = "ACTIVE" if is_enabled else "STOPPED"
+            if delivery_status and delivery_status.upper() != "ALL" and stat != delivery_status.upper():
+                continue
+            recipients.append(
+                schemas_magazines.MagazineRecipientItem(
+                    recipient_type="PRESS",
+                    recipient_id=prs.id,
+                    name=prs.organization_name,
+                    code_or_reg=prs.reporter_name,
+                    mobile=prs.mobile,
+                    delivery_status=stat,
+                    address=prs.address,
+                    address_override=setting.address_override if setting else None,
+                )
+            )
+
+    return recipients
+

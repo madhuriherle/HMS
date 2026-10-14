@@ -183,6 +183,8 @@ export default function RegisterNewMember() {
     qualification: '',
     employment: '',
     magazineNeeded: 'YES',
+    magazineDeliveryChoice: 'COMMUNICATION',
+    magazineDeliveryAddress: '',
     referredMembershipNo: '',
     referredMembershipName: '',
     familyMembershipNo: '',
@@ -330,6 +332,8 @@ export default function RegisterNewMember() {
           qualification: m.qualification_text || '',
           employment: m.occupation || '',
           magazineNeeded: m.magazine_needed === false ? 'NO' : 'YES',
+          magazineDeliveryChoice: m.magazine_delivery_address ? 'DIFFERENT' : 'COMMUNICATION',
+          magazineDeliveryAddress: m.magazine_delivery_address || '',
           referredMembershipNo: m.referred_by_number || '',
           referredMembershipName: m.referred_by_name || '',
           familyMembershipNo: m.family_membership_number || '',
@@ -898,6 +902,7 @@ export default function RegisterNewMember() {
       pincode_id: pinRow?.id || null,
       applied_on_behalf_of: formData.appliedOnBehalfOf || null,
       magazine_needed: formData.magazineNeeded === 'YES',
+      magazine_delivery_address: formData.magazineNeeded === 'YES' && formData.magazineDeliveryChoice === 'DIFFERENT' ? (formData.magazineDeliveryAddress || '').trim() || null : null,
       membership_type_category: formData.membershipTypeCategory || null,
       ...(isEditMode && formData.membershipTypeId ? { membership_type_id: Number(formData.membershipTypeId) } : {}),
       referred_by_number: formData.referredMembershipNo.trim() || null,
@@ -1675,6 +1680,50 @@ export default function RegisterNewMember() {
                       <p className="text-[11px] text-red-600 mt-1">{formErrors.magazineNeeded}</p>
                     )}
                   </div>
+
+                  {/* Magazine Delivery Address (shown when YES) */}
+                  {formData.magazineNeeded === 'YES' && (
+                    <div className="md:col-span-2 bg-[#FAF7F2] p-4 rounded-xl border border-[#E8DFD8] space-y-3">
+                      <label className="block text-xs font-bold text-[#510601] uppercase tracking-wider">
+                        Magazine Delivery Destination
+                      </label>
+                      <div className="flex flex-wrap gap-5 text-xs font-semibold text-[#863221]">
+                        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="radio"
+                            name="magazineDeliveryChoice"
+                            value="COMMUNICATION"
+                            checked={formData.magazineDeliveryChoice !== 'DIFFERENT'}
+                            onChange={() => setFormData({ ...formData, magazineDeliveryChoice: 'COMMUNICATION' })}
+                            className="w-4 h-4 text-[#510601] focus:ring-[#510601] accent-[#510601] cursor-pointer"
+                          />
+                          <span>Deliver to Communication Address</span>
+                        </label>
+                        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="radio"
+                            name="magazineDeliveryChoice"
+                            value="DIFFERENT"
+                            checked={formData.magazineDeliveryChoice === 'DIFFERENT'}
+                            onChange={() => setFormData({ ...formData, magazineDeliveryChoice: 'DIFFERENT' })}
+                            className="w-4 h-4 text-[#510601] focus:ring-[#510601] accent-[#510601] cursor-pointer"
+                          />
+                          <span>Deliver to a Different Address</span>
+                        </label>
+                      </div>
+                      {formData.magazineDeliveryChoice === 'DIFFERENT' && (
+                        <div className="pt-1">
+                          <textarea
+                            rows={2}
+                            value={formData.magazineDeliveryAddress || ''}
+                            onChange={(e) => setFormData({ ...formData, magazineDeliveryAddress: e.target.value })}
+                            placeholder="Enter delivery address (House/Door No, Street, Locality, City/Taluk, District, PIN code)..."
+                            className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* ═══════════════════════════════════════════════════════ */}

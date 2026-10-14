@@ -250,9 +250,11 @@ def create_receipt(
         db.rollback()
         raise HTTPException(409, receipt_numbers.duplicate_message(receipt_no, fy))
     if receipt_in.allocations:
-        membership_credit.recompute_members(
-            db, [a.member_id for a in receipt_in.allocations], current_user.id
-        )
+        member_ids = [a.member_id for a in receipt_in.allocations if a.member_id]
+        if member_ids:
+            membership_credit.recompute_members(db, member_ids, current_user.id)
+            from services.magazine_subscriptions import ensure_subscription_on_receipt_assigned
+            ensure_subscription_on_receipt_assigned(db, member_ids, current_user.id)
         db.commit()
         db.refresh(created)
     return created
@@ -1027,6 +1029,8 @@ def bulk_allocate_receipts(
 
     if affected_member_ids:
         membership_credit.recompute_members(db, list(affected_member_ids), current_user.id)
+        from services.magazine_subscriptions import ensure_subscription_on_receipt_assigned
+        ensure_subscription_on_receipt_assigned(db, list(affected_member_ids), current_user.id)
 
     db.commit()
     return {
@@ -1191,6 +1195,9 @@ def allocate_receipt(
     db.flush()
     # Payments add up: reaching a membership type's price upgrades the member.
     membership_credit.recompute_members(db, [alloc.member_id], current_user.id)
+    if alloc.member_id:
+        from services.magazine_subscriptions import ensure_subscription_on_receipt_assigned
+        ensure_subscription_on_receipt_assigned(db, [alloc.member_id], current_user.id)
     receipt_status.refresh(db, receipt)
     db.commit()
     db.refresh(alloc)

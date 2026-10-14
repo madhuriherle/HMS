@@ -635,6 +635,9 @@ function MagazineTab({ id }) {
           <Card icon={BookOpen} title="Magazine" className="lg:col-span-2">
             <div className="grid grid-cols-2 gap-4 mb-3">
               <Field label="Magazine needed" value={d.magazine_needed} />
+              {d.magazine_delivery_address && (
+                <Field label="Delivery address" value={d.magazine_delivery_address} />
+              )}
             </div>
             {d.subscriptions.length === 0 ? (
               <Empty>No magazine subscription.</Empty>

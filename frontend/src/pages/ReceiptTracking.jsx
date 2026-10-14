@@ -98,6 +98,7 @@ export default function ReceiptTracking() {
   const [modeFilter, setModeFilter] = useState('ALL');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [periodMode, setPeriodMode] = useState('ALL'); // ALL, TODAY, MONTH, FY, CUSTOM
   const [dayBook, setDayBook] = useState(null); // { date, data }
 
   // Modals State
@@ -180,7 +181,13 @@ export default function ReceiptTracking() {
 
       // 3. Status Filter (Assigned vs Unassigned)
       if (fyFilter !== 'ALL' && fyOf(r.receiptDate) !== fyFilter) return false;
-      if (modeFilter !== 'ALL' && (r.paymentMode || '').toLowerCase() !== modeFilter.toLowerCase()) return false;
+      if (
+        modeFilter !== 'ALL' &&
+        (r.paymentMode || '').toLowerCase() !== modeFilter.toLowerCase() &&
+        (r.bankAccount || '').toLowerCase() !== modeFilter.toLowerCase()
+      ) {
+        return false;
+      }
       if (fromDate && String(r.receiptDate || '') < fromDate) return false;
       if (toDate && String(r.receiptDate || '') > toDate) return false;
 
@@ -193,20 +200,78 @@ export default function ReceiptTracking() {
     });
   }, [receipts, searchQuery, particularsFilter, subTypeFilter, statusFilter, fyFilter, modeFilter, fromDate, toDate]);
 
-  // sub types actually used on the receipt lines
-  const subTypeOptions = useMemo(
-    () => [...new Set(receipts.flatMap((r) => (r.items || []).map((i) => (i.description || '').trim())).filter(Boolean))].sort(),
-    [receipts]
-  );
+  // Receipt Type and Sub Type as one list: each type, then its sub types under it
+  const typeOptions = useMemo(() => {
+    const subsOf = {};
+    receipts.forEach((r) => {
+      (r.items || []).forEach((i) => {
+        const d = (i.description || '').trim();
+        if (d && d.toLowerCase() !== String(r.particulars || '').toLowerCase()) {
+          if (!subsOf[r.particulars]) subsOf[r.particulars] = new Set();
+          subsOf[r.particulars].add(d);
+        }
+      });
+    });
+    const out = [{ value: 'ALL', label: 'All Receipt Types' }];
+    particularOptions.forEach((t) => {
+      const subs = [...(subsOf[t] || [])].sort();
+      out.push({ value: `T|${t}`, label: subs.length ? `${t} (all)` : t, bold: true });
+      subs.forEach((s) => out.push({ value: `S|${s}`, label: s, indent: true }));
+    });
+    return out;
+  }, [receipts, particularOptions]);
+
+  const chooseType = (val) => {
+    if (val === 'ALL') {
+      setParticularsFilter('ALL');
+      setSubTypeFilter('ALL');
+    } else if (val.startsWith('T|')) {
+      setParticularsFilter(val.slice(2));
+      setSubTypeFilter('ALL');
+    } else {
+      setParticularsFilter('ALL');
+      setSubTypeFilter(val.slice(2));
+    }
+  };
+
+  const choosePeriod = (val) => {
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const now = new Date();
+    setFyFilter('ALL');
+    setFromDate('');
+    setToDate('');
+    if (val.startsWith('FY|')) {
+      setPeriodMode('FY');
+      setFyFilter(val.slice(3));
+    } else if (val === 'TODAY') {
+      setPeriodMode('TODAY');
+      setFromDate(iso(now));
+      setToDate(iso(now));
+    } else if (val === 'MONTH') {
+      setPeriodMode('MONTH');
+      setFromDate(iso(new Date(now.getFullYear(), now.getMonth(), 1)));
+      setToDate(iso(new Date(now.getFullYear(), now.getMonth() + 1, 0)));
+    } else {
+      setPeriodMode(val);
+    }
+  };
 
   const fyOptions = useMemo(
     () => [...new Set(receipts.map((r) => fyOf(r.receiptDate)).filter(Boolean))].sort().reverse(),
     [receipts]
   );
-  const modeOptions = useMemo(
-    () => [...new Set(receipts.map((r) => r.paymentMode).filter(Boolean))].sort(),
-    [receipts]
-  );
+  // every active mode from Payment Mode Setup, plus any mode a receipt already carries that the master lacks
+  const modeOptions = useMemo(() => {
+    const out = [...paymentModeOptions];
+    const have = new Set(out.map((m) => m.toLowerCase()));
+    receipts.forEach((r) => {
+      if (r.paymentMode && !have.has(r.paymentMode.toLowerCase()) && !(r.bankAccount && have.has(r.bankAccount.toLowerCase()))) {
+        have.add(r.paymentMode.toLowerCase());
+        out.push(r.paymentMode);
+      }
+    });
+    return out.sort((a, b) => a.localeCompare(b));
+  }, [receipts, paymentModeOptions]);
   // ----------------------------------------------------
   // EXPORT, DAY BOOK
   // ----------------------------------------------------
@@ -389,6 +454,7 @@ export default function ReceiptTracking() {
           setModeFilter('ALL');
           setFromDate('');
           setToDate('');
+          setPeriodMode('ALL');
         }}
         rightSlot={
           <>
@@ -412,51 +478,44 @@ export default function ReceiptTracking() {
           </>
         }
       >
-        {/* Financial Year / Payment Mode / Date range */}
+        {/* Period: one dropdown for the financial year and the date range */}
         <FilterSelect
-          value={fyFilter}
-          onChange={(val) => setFyFilter(val)}
-          options={[{ value: 'ALL', label: 'All Financial Years' }, ...fyOptions.map((f) => ({ value: f, label: `FY ${f}` }))]}
+          value={periodMode === 'FY' ? `FY|${fyFilter}` : periodMode}
+          onChange={choosePeriod}
+          options={[
+            { value: 'ALL', label: 'All Time' },
+            { value: 'TODAY', label: 'Today' },
+            { value: 'MONTH', label: 'This Month' },
+            ...fyOptions.map((f) => ({ value: `FY|${f}`, label: `FY ${f}` })),
+            { value: 'CUSTOM', label: 'Custom Dates...' }
+          ]}
           widthClass="w-full sm:w-44"
         />
-        <FilterSelect
-          value={modeFilter}
-          onChange={(val) => setModeFilter(val)}
-          options={[{ value: 'ALL', label: 'All Payment Modes' }, ...modeOptions.map((m) => ({ value: m, label: m }))]}
-          widthClass="w-full sm:w-48"
-        />
-        <input
-          type="date"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-          title="From date"
-          className="px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601]"
-        />
-        <input
-          type="date"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-          title="To date"
-          className="px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601]"
-        />
+        {periodMode === 'CUSTOM' && (
+          <>
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              title="From date"
+              className="px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601]"
+            />
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              title="To date"
+              className="px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601]"
+            />
+          </>
+        )}
 
-        {/* Receipt Type Filter */}
+        {/* Receipt Type and Sub Type in one list: each type, then its sub types under it */}
         <FilterSelect
-          value={particularsFilter}
-          onChange={(val) => setParticularsFilter(val)}
-          options={[
-            { value: 'ALL', label: 'All Receipt Types' },
-            ...particularOptions.map((opt) => ({ value: opt, label: opt }))
-          ]}
+          value={subTypeFilter !== 'ALL' ? `S|${subTypeFilter}` : particularsFilter !== 'ALL' ? `T|${particularsFilter}` : 'ALL'}
+          onChange={chooseType}
+          options={typeOptions}
           widthClass="w-full sm:w-56"
-        />
-
-        {/* Sub Type Filter */}
-        <FilterSelect
-          value={subTypeFilter}
-          onChange={(val) => setSubTypeFilter(val)}
-          options={[{ value: 'ALL', label: 'All Sub Types' }, ...subTypeOptions.map((t) => ({ value: t, label: t }))]}
-          widthClass="w-full sm:w-52"
         />
 
         {/* Status Filter */}
@@ -469,6 +528,14 @@ export default function ReceiptTracking() {
             { value: 'Unassigned', label: 'Unassigned' },
             { value: 'Cancelled', label: 'Cancelled' }
           ]}
+          widthClass="w-full sm:w-48"
+        />
+
+        {/* Payment Mode */}
+        <FilterSelect
+          value={modeFilter}
+          onChange={(val) => setModeFilter(val)}
+          options={[{ value: 'ALL', label: 'All Payment Modes' }, ...modeOptions.map((m) => ({ value: m, label: m }))]}
           widthClass="w-full sm:w-48"
         />
       </SearchFilterBar>

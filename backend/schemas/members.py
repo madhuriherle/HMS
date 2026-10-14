@@ -61,6 +61,7 @@ class MemberBase(BaseModel):
     whatsapp_country_code: Optional[str] = None
     applied_on_behalf_of: Optional[str] = None
     magazine_needed: Optional[bool] = None
+    magazine_delivery_address: Optional[str] = None
     membership_type_category: Optional[str] = None
     referred_by_number: Optional[str] = None
     referred_by_name: Optional[str] = None
@@ -193,6 +194,7 @@ class MemberUpdate(BaseModel):
     whatsapp_country_code: Optional[str] = None
     applied_on_behalf_of: Optional[str] = None
     magazine_needed: Optional[bool] = None
+    magazine_delivery_address: Optional[str] = None
     membership_type_category: Optional[str] = None
     referred_by_number: Optional[str] = None
     referred_by_name: Optional[str] = None
