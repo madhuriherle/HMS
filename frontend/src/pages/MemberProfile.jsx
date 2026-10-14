@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Award, TrendingUp, CalendarDays } from 'lucide-react';
+import { User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Award, TrendingUp, CalendarDays, Pencil } from 'lucide-react';
+import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
 import api from '../api';
 import { formatDate, formatDateTime } from '../utils/dateUtils';
@@ -10,21 +11,25 @@ import { formatMoney } from '../utils/money';
 
 const inr = formatMoney;
 
-const Card = ({ icon: Icon, title, children, className = '' }) => (
-  <section className={`bg-white rounded-2xl border border-[#E8DFD8] shadow-sm ${className}`}>
-    <header className="flex items-center gap-2 px-5 py-3 border-b border-[#E8DFD8] bg-[#FAF7F2]/60 rounded-t-2xl">
-      <Icon className="w-4 h-4 text-[#863221]" />
-      <h2 className="text-sm font-bold text-[#180200]">{title}</h2>
-    </header>
-    <div className="p-5">{children}</div>
+const Card = ({ icon: Icon, title, badge = null, children, className = '' }) => (
+  <section className={`bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 sm:p-6 ${className}`}>
+    <div className="flex items-center justify-between gap-3 border-b border-[#F1E9E2] pb-3 mb-4">
+      <h3 className="flex items-center gap-2 text-sm font-bold text-[#180200] uppercase tracking-wide">
+        <Icon className="w-4 h-4 text-[#863221]" />
+        {title}
+      </h3>
+      {badge}
+    </div>
+    {children}
   </section>
 );
 
+// a field box: tiny label over a bold value; an empty value is not drawn
 const Field = ({ label, value }) =>
   value ? (
-    <div>
-      <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider">{label}</div>
-      <div className="text-sm text-[#180200] mt-0.5 break-words">{value}</div>
+    <div className="p-3 rounded-lg bg-[#FAF7F2] border border-[#E8DFD8] min-w-0">
+      <span className="block text-[10px] uppercase font-bold text-[#863221]/80 tracking-wider">{label}</span>
+      <span className="block mt-0.5 text-sm font-semibold text-[#180200] break-words">{value}</span>
     </div>
   ) : null;
 
@@ -169,34 +174,28 @@ function CreditBanner({ credit }) {
 
 // ── tabs ──
 
-// ── Overview: key facts up top, tidy details below ──
-const Tile = ({ label, children }) => (
-  <div className="rounded-xl border border-[#E8DFD8] bg-white px-4 py-3 min-w-0">
-    <div className="text-[10px] uppercase font-bold tracking-wider text-[#863221]">{label}</div>
-    <div className="mt-1">{children}</div>
-  </div>
-);
-
-const SectionTitle = ({ icon: Icon, children }) => (
-  <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#510601] mb-3">
-    <Icon className="w-4 h-4 text-[#863221]" />
-    {children}
-  </h2>
-);
-
-// a small label over a bold value; an empty value is not drawn at all
-const Item = ({ label, children }) =>
-  children ? (
-    <div className="min-w-0">
-      <div className="text-[10px] uppercase font-bold tracking-wider text-[#863221]/80">{label}</div>
-      <div className="mt-0.5 text-sm font-semibold text-[#180200] break-words">{children}</div>
-    </div>
-  ) : null;
-
+// ── Overview: one neat card per section ──
 const NotProvided = ({ labels }) =>
   labels.length > 0 ? <p className="mt-3 text-[11px] text-[#863221]/60">Not provided: {labels.join(', ')}</p> : null;
 
 const initialOf = (name) => String(name || '?').trim().charAt(0).toUpperCase();
+
+function PersonRow({ name, relation, number }) {
+  return (
+    <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] min-w-0">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="w-10 h-10 rounded-full bg-white border border-[#E8DFD8] text-[#510601] text-sm font-bold flex items-center justify-center shrink-0">
+          {initialOf(name)}
+        </span>
+        <div className="min-w-0">
+          <div className="text-sm font-bold text-[#180200] truncate">{name}</div>
+          {number && <div className="text-[11px] font-mono text-[#863221] truncate">{number}</div>}
+        </div>
+      </div>
+      <span className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-white border border-[#E8DFD8] text-[#510601] shrink-0">{relation}</span>
+    </div>
+  );
+}
 
 function OverviewTab({ id }) {
   const state = useSection(id, 'overview');
@@ -211,10 +210,11 @@ function OverviewTab({ id }) {
         const target = credit?.target_type;
         const pct = target?.price ? Math.min(100, Math.round((credit.credit_total / target.price) * 100)) : 100;
         const since = m.current?.activated_at || m.current?.applied_at;
-
         const missing = (pairs) => pairs.filter(([, v]) => !v).map(([l]) => l);
         const personal = [
+          ['Gender', b.gender],
           ['Date of birth', b.date_of_birth ? formatDate(b.date_of_birth) : ''],
+          ['Blood group', b.blood_group],
           ['Gotra', b.gotra],
           ['Qualification', b.qualification],
           ['Occupation', b.occupation],
@@ -234,143 +234,91 @@ function OverviewTab({ id }) {
         const hasMagazine = d.magazine.magazine_needed || d.magazine.subscriptions.length > 0 || d.magazine.services.length > 0;
 
         return (
-          <div className="space-y-5">
-            {/* Key facts */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <Tile label="Membership">
-                {m.current ? (
-                  <>
-                    <div className="text-sm font-bold text-[#180200] truncate">{m.current.type_name_en}</div>
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className={`chip ${m.current.status === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>{m.current.status}</span>
-                      <span className="text-[11px] font-mono text-[#863221] truncate">{m.current.membership_number || 'No. on approval'}</span>
+          <div className="space-y-4">
+            <Card icon={CreditCard} title="Membership" badge={m.current && <span className={`chip ${m.current.status === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>{m.current.status}</span>}>
+              {!m.current ? (
+                <Empty>No membership yet.</Empty>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <Field label="Type" value={m.current.type_name_en} />
+                  <Field label="Membership number" value={m.current.membership_number || 'Given on approval'} />
+                  <Field label="Member since" value={since ? formatDate(since) : ''} />
+                  <Field label="Valid till" value={m.current.expires_at ? formatDate(m.current.expires_at) : ''} />
+                  <Field label="Receipts" value={d.receipts.total ? `${d.receipts.total} · last ${formatDate(d.receipts.latest[0]?.receipt_date)}` : 'None yet'} />
+                  <div className="p-3 rounded-lg bg-[#FAF7F2] border border-[#E8DFD8] min-w-0">
+                    <span className="block text-[10px] uppercase font-bold text-[#863221]/80 tracking-wider">Credit</span>
+                    <span className="block mt-0.5 text-sm font-semibold font-mono text-[#180200]">
+                      {inr(credit?.credit_total || 0)}
+                      {target && <span className="font-normal text-[#863221]"> / {inr(target.price)}</span>}
+                    </span>
+                    <div className="mt-1.5 w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-[#510601] h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                     </div>
-                  </>
-                ) : (
-                  <div className="text-sm text-[#863221]/70">No membership yet</div>
-                )}
-              </Tile>
-              <Tile label="Credit">
-                <div className="text-sm font-bold font-mono text-[#180200]">
-                  {inr(credit?.credit_total || 0)}
-                  {target && <span className="font-normal text-[#863221]"> / {inr(target.price)}</span>}
-                </div>
-                <div className="mt-1.5 w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-[#510601] h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
-                </div>
-                <div className="mt-1 text-[11px] text-[#863221]">
-                  {target ? `${pct}% to ${target.name_en}` : 'Highest tier reached'}
-                </div>
-              </Tile>
-              <Tile label="Receipts">
-                <div className="text-sm font-bold text-[#180200]">{d.receipts.total}</div>
-                <div className="mt-1 text-[11px] text-[#863221] truncate">
-                  {d.receipts.latest[0]
-                    ? `Last ${d.receipts.latest[0].receipt_number} · ${formatDate(d.receipts.latest[0].receipt_date)}`
-                    : 'None yet'}
-                </div>
-              </Tile>
-              <Tile label="Member since">
-                <div className="text-sm font-bold text-[#180200]">{since ? formatDate(since) : '—'}</div>
-                {m.current?.expires_at && <div className="mt-1 text-[11px] text-[#863221]">Valid till {formatDate(m.current.expires_at)}</div>}
-              </Tile>
-            </div>
-
-            {/* Details | activity */}
-            <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm grid grid-cols-1 lg:grid-cols-3 lg:divide-x divide-[#E8DFD8]">
-              <div className="lg:col-span-2 divide-y divide-[#E8DFD8]">
-                <section className="p-5">
-                  <SectionTitle icon={User}>Personal</SectionTitle>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {b.gender && <span className="chip chip-off">{b.gender}</span>}
-                    {b.blood_group && <span className="chip chip-bad">Blood {b.blood_group}</span>}
+                    <span className="block mt-1 text-[11px] text-[#863221]">{target ? `${pct}% to ${target.name_en}` : 'Highest tier reached'}</span>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
-                    {personal.map(([label, value]) => <Item key={label} label={label}>{value}</Item>)}
-                  </div>
-                  <NotProvided labels={[...missing(personal), ...(b.blood_group ? [] : ['Blood group'])]} />
-                </section>
+                </div>
+              )}
+            </Card>
 
-                <section className="p-5">
-                  <SectionTitle icon={Phone}>Contact &amp; address</SectionTitle>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-                    {contact.map(([label, value]) => (
-                      <div key={label} className={label === 'Address' ? 'sm:col-span-2' : ''}>
-                        <Item label={label}>{value}</Item>
-                      </div>
-                    ))}
-                  </div>
-                  <NotProvided labels={missing(contact)} />
-                </section>
-
-                <section className="p-5">
-                  <SectionTitle icon={Users}>Family</SectionTitle>
-                  {relatives.length === 0 && f.children_count === 0 ? (
-                    <p className="text-xs text-[#863221]/60">Not provided yet.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {relatives.map(([relation, name, number]) => (
-                        <div key={relation} className="flex items-center gap-3 min-w-0">
-                          <span className="w-8 h-8 rounded-full bg-[#FAF1EE] text-[#510601] text-xs font-bold flex items-center justify-center shrink-0">
-                            {initialOf(name)}
-                          </span>
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold text-[#180200] truncate">{name}</div>
-                            <div className="text-[11px] text-[#863221] truncate">
-                              {relation}
-                              {number ? ` · ${number}` : ''}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                      {f.children_count > 0 && (
-                        <div className="flex items-center gap-3">
-                          <span className="w-8 h-8 rounded-full bg-[#FAF1EE] text-[#510601] text-xs font-bold flex items-center justify-center shrink-0">
-                            {f.children_count}
-                          </span>
-                          <div className="text-sm font-semibold text-[#180200]">{f.children_count === 1 ? 'Child' : 'Children'}</div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </section>
-
-                {hasMagazine && (
-                  <section className="p-5">
-                    <SectionTitle icon={BookOpen}>Magazine &amp; services</SectionTitle>
-                    <div className="flex flex-wrap gap-2">
-                      {d.magazine.magazine_needed && (
-                        <span className={`chip ${String(d.magazine.magazine_needed).toUpperCase() === 'YES' ? 'chip-on' : 'chip-off'}`}>
-                          Magazine: {d.magazine.magazine_needed}
-                        </span>
-                      )}
-                      {d.magazine.subscriptions.map((st, i) => <span key={`s${i}`} className="chip chip-on">Subscription: {st}</span>)}
-                      {d.magazine.services.map((sv, i) => <span key={`v${i}`} className="chip chip-off">{sv}</span>)}
-                    </div>
-                  </section>
-                )}
+            <Card icon={User} title="Personal">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {personal.map(([label, value]) => <Field key={label} label={label} value={value} />)}
               </div>
+              <NotProvided labels={missing(personal)} />
+            </Card>
 
-              {/* Activity timeline */}
-              <section className="p-5 border-t border-[#E8DFD8] lg:border-t-0">
-                <SectionTitle icon={History}>Recent activity</SectionTitle>
-                {d.activity.length === 0 ? (
-                  <p className="text-xs text-[#863221]/60">No activity recorded yet.</p>
-                ) : (
-                  <ol className="relative border-l border-[#E8DFD8] ml-1.5 space-y-4">
-                    {d.activity.map((e) => (
-                      <li key={e.id} className="ml-4">
-                        <span className="absolute -left-[5px] mt-1.5 w-2.5 h-2.5 rounded-full bg-[#510601] border-2 border-white" />
-                        <div className="text-xs font-semibold text-[#180200]">{e.description}</div>
-                        <div className="text-[11px] text-[#863221]">
-                          {e.acted_by_name || 'System'} · {e.created_at ? formatDateTime(e.created_at) : ''}
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </section>
-            </div>
+            <Card icon={Phone} title="Contact & address">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {contact.map(([label, value]) => (
+                  <div key={label} className={label === 'Address' ? 'sm:col-span-2' : ''}>
+                    <Field label={label} value={value} />
+                  </div>
+                ))}
+              </div>
+              <NotProvided labels={missing(contact)} />
+            </Card>
+
+            <Card icon={Users} title="Family">
+              {relatives.length === 0 && f.children_count === 0 ? (
+                <Empty>Not provided yet.</Empty>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {relatives.map(([relation, name, number]) => <PersonRow key={relation} name={name} relation={relation} number={number} />)}
+                  {f.children_count > 0 && <PersonRow name={`${f.children_count} ${f.children_count === 1 ? 'child' : 'children'}`} relation="Children" />}
+                </div>
+              )}
+            </Card>
+
+            {hasMagazine && (
+              <Card icon={BookOpen} title="Magazine & services">
+                <div className="flex flex-wrap gap-2">
+                  {d.magazine.magazine_needed && (
+                    <span className={`chip ${String(d.magazine.magazine_needed).toUpperCase() === 'YES' ? 'chip-on' : 'chip-off'}`}>
+                      Magazine: {d.magazine.magazine_needed}
+                    </span>
+                  )}
+                  {d.magazine.subscriptions.map((st, i) => <span key={`s${i}`} className="chip chip-on">Subscription: {st}</span>)}
+                  {d.magazine.services.map((sv, i) => <span key={`v${i}`} className="chip chip-off">{sv}</span>)}
+                </div>
+              </Card>
+            )}
+
+            <Card icon={History} title="Recent activity">
+              {d.activity.length === 0 ? (
+                <Empty>No activity recorded yet.</Empty>
+              ) : (
+                <div className="space-y-2">
+                  {d.activity.map((e) => (
+                    <div key={e.id} className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-[#FAF7F2] border border-[#E8DFD8]">
+                      <span className="text-sm font-semibold text-[#180200]">{e.description}</span>
+                      <span className="text-[11px] text-[#863221] font-mono">
+                        {e.acted_by_name || 'System'} · {e.created_at ? formatDateTime(e.created_at) : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
           </div>
         );
       }}
@@ -854,6 +802,7 @@ const TABS = [
 
 export default function MemberProfile() {
   const { id } = useParams();
+  const { hasPermission } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -907,52 +856,61 @@ export default function MemberProfile() {
 
         {s && (
           <>
-            {/* Header */}
-            <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-5 flex flex-wrap items-center gap-5">
-              <div className="w-24 h-28 rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] overflow-hidden flex items-center justify-center shrink-0">
-                {photoUrl ? (
-                  <img src={photoUrl} alt={fullName} className="w-full h-full object-cover" />
-                ) : (
-                  <User className="w-10 h-10 text-[#863221]/40" />
+            {/* Header strip */}
+            <div className="bg-gradient-to-r from-[#2E0502] via-[#510601] to-[#180200] text-white rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="w-14 h-14 rounded-xl bg-white/10 border border-white/20 overflow-hidden flex items-center justify-center font-bold text-xl text-amber-300 shrink-0">
+                  {photoUrl ? <img src={photoUrl} alt={fullName} className="w-full h-full object-cover" /> : initialOf(fullName)}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate">{fullName}</h1>
+                    <span className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{s.approval_status}</span>
+                  </div>
+                  {s.full_name_kn && <div className="text-xs text-amber-100/80">{s.full_name_kn}</div>}
+                  <p className="text-xs text-white/70 mt-0.5 truncate">
+                    {[
+                      s.member_code ? `#${s.member_code}` : `ID ${s.id}`,
+                      s.active_membership?.type_name_en,
+                      [s.locality, s.city].filter(Boolean).join(', '),
+                      phone(s.mobile_country_code, s.mobile)
+                    ].filter(Boolean).join(' • ')}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 shrink-0">
+                <div className="text-right">
+                  <div className="text-[10px] uppercase font-bold text-amber-300 tracking-wider">Paid so far</div>
+                  <div className="text-lg font-bold font-mono">{inr(s.paid_so_far)}</div>
+                </div>
+                {hasPermission('members.list.write') && (
+                  <Link
+                    to={`/dashboard/membership/edit/${s.id}`}
+                    className="text-xs bg-amber-400 hover:bg-amber-300 text-[#2E0502] px-3.5 py-2 rounded-lg font-bold inline-flex items-center gap-1.5 transition"
+                  >
+                    <Pencil className="w-3.5 h-3.5" /> Edit
+                  </Link>
                 )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">{fullName}</h1>
-                {s.full_name_kn && <div className="text-sm text-[#863221]">{s.full_name_kn}</div>}
-                <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold">
-                  {s.member_code && (
-                    <span className="px-2 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] font-mono">{s.member_code}</span>
-                  )}
-                  <span className="px-2 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8]">{s.approval_status}</span>
-                  {s.active_membership && (
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800">
-                      {s.active_membership.type_name_en} · {s.active_membership.status}
-                    </span>
-                  )}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-[#863221]">
-                  {s.mobile && (
-                    <span className="inline-flex items-center gap-1">
-                      <Phone className="w-3.5 h-3.5" /> {phone(s.mobile_country_code, s.mobile)}
-                    </span>
-                  )}
-                  {(s.city || s.locality) && (
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5" /> {[s.locality, s.city, s.post].filter(Boolean).join(', ')}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider">Paid so far</div>
-                <div className="text-2xl font-bold font-mono text-[#510601]">{inr(s.paid_so_far)}</div>
-                <div className="text-[11px] text-[#863221]">{s.counts.receipts} receipt(s)</div>
               </div>
             </div>
 
-            {/* Tabs */}
-            <div className="border-b border-[#E8DFD8] overflow-x-auto">
-              <div role="tablist" className="flex gap-1 min-w-max">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+              {/* Section menu: a vertical list on desktop, one dropdown on a phone (nothing scrolls sideways) */}
+              <div className="md:hidden">
+                <select
+                  value={tabKey}
+                  onChange={(e) => openTab(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-semibold text-[#180200]"
+                  aria-label="Section"
+                >
+                  {TABS.map((t) => {
+                    const count = t.count ? s.counts[t.count] : 0;
+                    return <option key={t.key} value={t.key}>{t.label}{count > 0 ? ` (${count})` : ''}</option>;
+                  })}
+                </select>
+              </div>
+              <nav className="hidden md:block md:col-span-3 bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-2 space-y-1 md:sticky md:top-2">
+                <div className="px-3 py-2 text-[10px] font-bold text-[#863221]/70 uppercase tracking-wider">Sections</div>
                 {TABS.map((t) => {
                   const count = t.count ? s.counts[t.count] : null;
                   const selected = t.key === tabKey;
@@ -960,29 +918,30 @@ export default function MemberProfile() {
                     <button
                       key={t.key}
                       type="button"
-                      role="tab"
-                      aria-selected={selected}
+                      aria-current={selected ? 'page' : undefined}
                       onClick={() => openTab(t.key)}
-                      className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 -mb-px cursor-pointer whitespace-nowrap transition-colors ${
-                        selected
-                          ? 'border-[#510601] text-[#510601]'
-                          : count === 0
-                            ? 'border-transparent text-[#863221]/50 hover:text-[#863221]'
-                            : 'border-transparent text-[#863221] hover:text-[#510601]'
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                        selected ? 'bg-[#510601] text-white shadow-sm' : 'text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2]'
                       }`}
                     >
-                      <t.icon className="w-3.5 h-3.5" />
-                      {t.label}
+                      <span className="flex items-center gap-2.5">
+                        <t.icon className={`w-4 h-4 ${selected ? '' : 'text-[#863221]/60'}`} />
+                        <span>{t.label}</span>
+                      </span>
                       {count > 0 && (
-                        <span className="px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px]">{count}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${selected ? 'bg-white/20 text-white' : 'bg-[#FAF7F2] border border-[#E8DFD8] text-[#863221]'}`}>
+                          {count}
+                        </span>
                       )}
                     </button>
                   );
                 })}
+              </nav>
+
+              <div className="md:col-span-9 min-w-0">
+            <ActiveTab key={`${id}-${tabKey}`} id={id} onOpen={openTab} />
               </div>
             </div>
-
-            <ActiveTab key={`${id}-${tabKey}`} id={id} onOpen={openTab} />
           </>
         )}
       </div>
