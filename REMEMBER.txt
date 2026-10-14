@@ -533,6 +533,18 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
       /dashboard/membership/import (MemberImport.jsx), Location / Postal PIN code bulk import in
       /dashboard/master/location-setup (LocationSetup.jsx), and Notification recipient CSV import in
       NotificationsManagement.jsx (migration 20261014_0070).
+15.19 NO TAB ROWS ON A PAGE FOR SEPARATE SCREENS. Magazine (Subscriptions, Pauses & Returns, Labels & Delivery),
+      Reports (Summary, Members, Receipts & Finance, Magazine & Logistics, Saved & Audit Logs),
+      Notifications (Campaigns, Quick Send, Templates, System Inbox) and the registries below each
+      have ONE SIDEBAR PAGE PER SECTION; the page title is the section name (migration 0071).
+      Each page opens with its module's privilege (magazines.read, reports.read, notifications.read).
+15.20 THE "PR & Communications" GROUP (modules "engagements" + "events", migration 0073/0074) holds five
+      separate pages: Events, Affiliations, Associates, Press & Media, Managing Committee. Each opens with
+      its OWN page privilege (events.read, engagements.<page>.read) and has no tab row.
+15.21 A PAGE'S ACTION BUTTONS (Add, Export, Refresh, Manage ...) GO IN THE HEADING ROW, NOT THE FILTER ROW
+      (rule 12.1). In a list that holds its own state, wrap the buttons in <PageActions> and put
+      <PageActionsSlot /> in the page heading row (components/PageActions.jsx). Row buttons and buttons
+      inside popups stay where they are.
 
 ================================================================================
 

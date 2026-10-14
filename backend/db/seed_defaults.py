@@ -152,7 +152,7 @@ MODULE_CATALOG = [
     ("notifications", "Notifications", None, "/notifications", "bell", 70, None),
     ("activity", "Activity Logs", "users", "/dashboard/users/activity", "activity", 5, None),
     ("events", "Events", None, "/events", "calendar", 90, None),
-    ("engagements", "Community", None, "/engagements", "link", 100, None),
+    ("engagements", "PR & Communications", None, "/engagements", "link", 100, None),
     ("imports", "Imports", None, None, "upload", 110, None),
     ("system", "Settings", None, None, "settings", 120, 1),  # holds Organisation Settings (a Masters page) and future screens
 ]
@@ -333,7 +333,7 @@ MENU_PAGE_CATALOG = [
     ("magazines.subscribers", "Subscriptions", "magazines", "/dashboard/magazine/subscriptions", "book-open", 1, "magazines.read", None),
     ("magazines.pauses_returns", "Pauses & Returns", "magazines", "/dashboard/magazine/pauses-returns", "pause", 2, "magazines.read", None),
     ("magazines.labels_delivery", "Labels & Delivery", "magazines", "/dashboard/magazine/labels-delivery", "printer", 3, "magazines.read", None),
-    # Community group: Events first, then the registries (the "events" module stays as the privilege owner but is no longer a group)
+    # PR & Communications group: Events first, then the registries (the "events" module stays as the privilege owner but is no longer a group)
     ("events.management", "Events", "engagements", "/dashboard/events", "calendar", 1, "events.read", None),
     ("engagements.affiliations", "Affiliations", "engagements", "/dashboard/engagements/affiliations", "users", 2, "engagements.affiliations.read", None),
     ("engagements.associates", "Associates", "engagements", "/dashboard/engagements/associates", "user-check", 3, "engagements.associates.read", None),
@@ -358,8 +358,12 @@ MENU_PAGE_CATALOG = [
 MENU_NAME_FIXES = {
     "members.unapproved": ("Unapproved Membership", "Unapproved Members"),
     "system": ("System", "Settings"),
-    "engagements": ("Affiliation, Associates & Press", "Community"),
 }
+# the group holding Events, Affiliations, Associates, Press & Media and Committee: both older names become the current one
+MENU_NAME_FIXES_EXTRA = [
+    ("engagements", "Affiliation, Associates & Press", "PR & Communications"),
+    ("engagements", "Community", "PR & Communications"),
+]
 
 # Pages moved to a new group: code -> (old parent, new parent, new order). Applied only while the row is
 # still under the old parent, so a move an admin made by hand is kept.
@@ -378,7 +382,7 @@ MENU_ORDER_FIXES = {
     "system.number_formats": (3, 2),
     "system.files": (1, 3),  # make room: Organisation Settings 1, Number Formats 2
     "system.error_logs": (2, 4),
-    # Events joins the Community group at the top; the registries move down one place
+    # Events joins the PR & Communications group at the top; the registries move down one place
     "engagements.committee": (4, 5),
     "engagements.press_media": (3, 4),
     "engagements.associates": (2, 3),
@@ -438,7 +442,7 @@ def seed_menu_pages(db) -> int:
         m = rows.get(code)
         if m is not None and m.route == old:
             m.route = new
-    for code, (old, new) in MENU_NAME_FIXES.items():
+    for code, (old, new) in [*MENU_NAME_FIXES.items(), *[(c, (o, n)) for c, o, n in MENU_NAME_FIXES_EXTRA]]:
         m = rows.get(code)
         if m is not None and m.name_en == old:
             m.name_en = new
