@@ -5516,13 +5516,41 @@ def test_profile_lists_active_optins(client, admin_headers):
         headers=admin_headers, json={"status": "CANCELLED"},
     )
     assert r.status_code == 200, r.text
-
     opted_after = client.get(
         f"/api/v1/members/{member['id']}/profile", headers=admin_headers
     ).json()["services"]["opted"]
     codes_after = {row["service_code"] for row in opted_after}
     assert "TEMPLE" not in codes_after
     assert "HALL" in codes_after
+
+
+def test_profile_services_tab_shows_optins_and_available(client, admin_headers):
+    """The tabbed section GET /members/{id}/profile/services carries every opt-in
+    (cancelled ones included as Cancelled), and the opt-in dropdown excludes
+    services the member is already ACTIVE in but includes cancelled ones."""
+    member = _create_member(client, admin_headers, "9700000009", "OptinTab")
+    temple = _service_type(client, admin_headers, "TEMPLE")
+    r = client.post(
+        f"/api/v1/members/{member['id']}/service-optins", headers=admin_headers,
+        json={"service_type_id": temple["id"]},
+    )
+    assert r.status_code == 201, r.text
+
+    section = client.get(f"/api/v1/members/{member['id']}/profile/services", headers=admin_headers)
+    assert section.status_code == 200, section.text
+    body = section.json()
+    assert [o["service_code"] for o in body["optins"]] == ["TEMPLE"]
+    assert "TEMPLE" not in [a["code"] for a in body["available"]], "an ACTIVE service is not offered again"
+
+    client.put(
+        f"/api/v1/members/{member['id']}/service-optins/{body['optins'][0]['id']}",
+        headers=admin_headers, json={"status": "CANCELLED"},
+    )
+    section = client.get(f"/api/v1/members/{member['id']}/profile/services", headers=admin_headers)
+    body = section.json()
+    assert len(body["optins"]) == 1 and body["optins"][0]["status"] == "CANCELLED"
+    assert "TEMPLE" in [a["code"] for a in body["available"]], "a cancelled service can be offered again"
+
 
 
 def test_magazine_subscription_syncs_the_optin(client, admin_headers):
@@ -6661,7 +6689,7 @@ def test_member_profile_comes_one_tab_at_a_time(client, admin_headers):
     assert summary.status_code == 200, summary.text
     body = summary.json()
     assert body["id"] == mid and body["first_name_en"] == "Tabbed Person" and set(body["counts"]) == {
-        "family", "membership", "receipts", "magazine", "events"}
+        "family", "membership", "receipts", "magazine", "services", "events"}
     assert body["membership_credit"] is not None and body["paid_so_far"] == 0
     ov = client.get(f"/api/v1/members/{mid}/profile/overview", headers=H)
     assert ov.status_code == 200, ov.text

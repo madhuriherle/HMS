@@ -632,7 +632,7 @@ function MagazineTab({ id }) {
       {(d) => (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <KycUpdateCard id={id} kyc={d.kyc} reload={section.reload} canSend={hasPermission('magazines.write')} />
-          <Card icon={BookOpen} title="Magazine">
+          <Card icon={BookOpen} title="Magazine" className="lg:col-span-2">
             <div className="grid grid-cols-2 gap-4 mb-3">
               <Field label="Magazine needed" value={d.magazine_needed} />
             </div>
@@ -666,62 +666,237 @@ function MagazineTab({ id }) {
               </div>
             )}
           </Card>
-          <Card icon={BookOpen} title="Other services">
-            {d.services.length === 0 ? (
-              <Empty>No services opted.</Empty>
-            ) : (
-              <div className="space-y-1.5 text-sm">
-                {d.services.map((o) => (
-                  <div key={o.id} className="flex justify-between">
-                    <span>{o.service_name_en}</span>
-                    <span className="text-xs font-semibold text-[#863221]">{o.status}{o.opted_at ? ` · ${formatDate(o.opted_at)}` : ''}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-          <Card icon={FileText} title="Services used" className="lg:col-span-2">
-            {(!d.usage_summary || d.usage_summary.length === 0) ? (
-              <Empty>No paid service on record yet.</Empty>
-            ) : (
-              <>
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {d.usage_summary.map((s) => (
-                    <span key={s.service_code} className="chip chip-on" title={`${s.times} time(s)`}>
-                      {s.service_name_en} · {s.times} · {formatMoney(s.total_amount)}
-                    </span>
-                  ))}
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead>
-                      <tr className="text-[10px] uppercase tracking-wider text-[#863221]">
-                        <th className="py-2 pr-3 font-bold">Service</th>
-                        <th className="py-2 pr-3 font-bold">Particular</th>
-                        <th className="py-2 pr-3 font-bold">Receipt</th>
-                        <th className="py-2 pr-3 font-bold">Date</th>
-                        <th className="py-2 pr-3 font-bold text-right">Amount</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {d.usage.map((u, i) => (
-                        <tr key={`${u.receipt_id}-${i}`} className="border-t border-[#E8DFD8]/70">
-                          <td className="py-2 pr-3">{u.service_name_en}</td>
-                          <td className="py-2 pr-3">{u.particular_name}{u.description ? ` — ${u.description}` : ''}</td>
-                          <td className="py-2 pr-3">{u.receipt_number}</td>
-                          <td className="py-2 pr-3 whitespace-nowrap">{u.receipt_date ? formatDate(u.receipt_date) : ''}</td>
-                          <td className="py-2 pr-3 text-right whitespace-nowrap">{formatMoney(u.amount)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
+        </div>
+      )}
+    </Loading>
+  );
+}
+
+// ── Services tab: what the member is opted into and what they have actually used ──
+function ServicesTab({ id }) {
+  const { hasPermission } = useAuth();
+  const section = useSection(id, 'services');
+  return (
+    <Loading state={section}>
+      {(d) => (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <ServiceOptinsCard id={id} data={d} reload={section.reload} canWrite={hasPermission('members.write')} />
+          <Card icon={FileText} title="Services used">
+            <UsedServicesBlock usage_summary={d.usage_summary} usage={d.usage} />
           </Card>
         </div>
       )}
     </Loading>
+  );
+}
+
+// one card: the service opt-ins of this member, and the opt-in action (members.write)
+function ServiceOptinsCard({ id, data, reload, canWrite }) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [serviceTypeId, setServiceTypeId] = useState('');
+  const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [cancelling, setCancelling] = useState(null); // optin row
+  const [cancelReason, setCancelReason] = useState('');
+
+  const active = data.optins.filter((o) => o.status === 'ACTIVE');
+  const cancelled = data.optins.filter((o) => o.status !== 'ACTIVE');
+
+  const optIn = () => {
+    if (!serviceTypeId) return;
+    setBusy(true);
+    api
+      .post(`/members/${id}/service-optins`, { service_type_id: Number(serviceTypeId), notes: notes.trim() || undefined })
+      .then(({ data: res }) => {
+        setModalOpen(false);
+        notify(res?.status === 'PENDING' ? 'Sent for approval.' : 'Member opted into the service.', 'success');
+        setServiceTypeId('');
+        setNotes('');
+        if (reload) reload();
+      })
+      .catch((error) => notify(apiErrorMessage(error, 'The opt-in could not be saved.'), 'error'))
+      .finally(() => setBusy(false));
+  };
+
+  // Withdraw = PUT status CANCELLED (keeps the history and shows as Cancelled);
+  // the typed reason is recorded in the opt-in's notes.
+  const cancelOptIn = () => {
+    if (!cancelling) return;
+    setBusy(true);
+    const reason = cancelReason.trim();
+    const newNotes = [cancelling.notes, reason && `Cancelled: ${reason}`].filter(Boolean).join(' | ');
+    api
+      .put(`/members/${id}/service-optins/${cancelling.id}`, { status: 'CANCELLED', notes: newNotes || undefined })
+      .then(({ data: res }) => {
+        setCancelling(null);
+        setCancelReason('');
+        notify(res?.status === 'PENDING' ? 'Cancellation sent for approval.' : 'Service cancelled.', 'success');
+        if (reload) reload();
+      })
+      .catch((error) => notify(apiErrorMessage(error, 'The cancellation could not be saved.'), 'error'))
+      .finally(() => setBusy(false));
+  };
+
+  const row = (o, done = false) => (
+    <div key={o.id} className={`flex items-center justify-between gap-3 border-b last:border-b-0 border-[#E8DFD8]/70 pb-2 ${done ? 'opacity-60' : ''}`}>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold text-[#180200] truncate">{o.service_name_en}</div>
+        <div className="text-xs text-[#863221]">
+          {o.status}{o.opted_at ? ` · ${formatDate(o.opted_at)}` : ''}{o.opted_via ? ` · via ${o.opted_via}` : ''}{o.notes ? ` · ${o.notes}` : ''}
+        </div>
+      </div>
+      <div className="shrink-0 flex items-center gap-2">
+        <span className={`chip ${o.status === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>{o.status === 'ACTIVE' ? 'Active' : 'Cancelled'}</span>
+        {canWrite && o.status === 'ACTIVE' && (
+          <button
+            type="button"
+            onClick={() => { setCancelling(o); setCancelReason(''); }}
+            className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-[#ED4636] text-[#ED4636] hover:bg-[#ED4636]/5 transition-colors"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  const needsReason = (value) => (value || '').trim().length >= 3;
+
+  return (
+    <Card icon={MapPin} title="Services opted" badge={<span className="chip chip-on">{active.length} active</span>}>
+      {data.optins.length === 0 ? (
+        <Empty>No services opted.</Empty>
+      ) : (
+        <div className="space-y-2">
+          {active.map((o) => row(o))}
+          {cancelled.length > 0 && (
+            <div className="pt-2 mt-1 border-t border-[#E8DFD8]">
+              <div className="text-[10px] uppercase font-bold text-[#863221]/70 tracking-wider mb-1">Cancelled</div>
+              <div className="space-y-2">{cancelled.map((o) => row(o, true))}</div>
+            </div>
+          )}
+        </div>
+      )}
+      {canWrite && data.available.length > 0 && (
+        <button
+          type="button"
+          onClick={() => { setServiceTypeId(''); setNotes(''); setModalOpen(true); }}
+          className="mt-3 px-4 py-2 text-xs font-semibold rounded-xl bg-[#510601] hover:bg-[#863221] text-white transition-colors"
+        >
+          Opt into a Service
+        </button>
+      )}
+
+      <Modal isOpen={modalOpen} onClose={() => !busy && setModalOpen(false)}>
+        <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
+          <div className="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <span className="text-sm font-bold text-[#180200]">Opt into a Service</span>
+            <button type="button" onClick={() => setModalOpen(false)} disabled={busy} className="text-[#863221] hover:text-[#510601]" aria-label="Close">✕</button>
+          </div>
+          <form
+            onSubmit={(e) => { e.preventDefault(); optIn(); }}
+            className="p-6 space-y-4"
+          >
+            <label className="block">
+              <span className="block text-[11px] font-semibold text-[#180200] mb-1">Service</span>
+              <select
+                value={serviceTypeId}
+                onChange={(e) => setServiceTypeId(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm border border-[#E8DFD8] bg-white focus:border-[#510601] outline-none"
+              >
+                <option value="">Choose a service…</option>
+                {data.available.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name_en}{s.name_kn ? ` · ${s.name_kn}` : ''}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="block text-[11px] font-semibold text-[#180200] mb-1">Notes (optional)</span>
+              <input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm border border-[#E8DFD8] bg-white focus:border-[#510601] outline-none"
+              />
+            </label>
+            <ModalFooter kind="add" busy={busy} inForm onCancel={() => setModalOpen(false)} />
+          </form>
+        </div>
+      </Modal>
+
+      <Modal isOpen={Boolean(cancelling)} onClose={() => !busy && setCancelling(null)}>
+        <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
+          <div className="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <span className="text-sm font-bold text-[#180200]">Cancel {cancelling?.service_name_en}?</span>
+            <button type="button" onClick={() => setCancelling(null)} disabled={busy} className="text-[#863221] hover:text-[#510601]" aria-label="Close">✕</button>
+          </div>
+          <form
+            onSubmit={(e) => { e.preventDefault(); cancelOptIn(); }}
+            className="p-6 space-y-4"
+          >
+            <p className="text-xs text-[#863221]">
+              The member stops receiving this service. What they already paid stays on record.
+            </p>
+            <label className="block">
+              <span className="block text-[11px] font-semibold text-[#180200] mb-1">Reason</span>
+              <input
+                type="text"
+                autoFocus
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl text-sm border border-[#E8DFD8] bg-white focus:border-[#ED4636] outline-none"
+              />
+            </label>
+            <ModalFooter kind="delete" submitLabel="Cancel Service" disabled={!needsReason(cancelReason)} title={needsReason(cancelReason) ? undefined : 'Give a short reason first'} busy={busy} inForm onCancel={() => setCancelling(null)} />
+          </form>
+        </div>
+      </Modal>
+    </Card>
+  );
+}
+
+// the receipt-sourced "what they used" block (shared by the Services tab layout)
+function UsedServicesBlock({ usage_summary, usage }) {
+  return (
+    <>
+      {(!usage_summary || usage_summary.length === 0) ? (
+        <Empty>No paid service on record yet.</Empty>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {usage_summary.map((s) => (
+              <span key={s.service_code} className="chip chip-on" title={`${s.times} time(s)`}>
+                {s.service_name_en} · {s.times} · {formatMoney(s.total_amount)}{s.last_used ? ` · till ${formatDate(s.last_used)}` : ''}
+              </span>
+            ))}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-wider text-[#863221]">
+                  <th className="py-2 pr-3 font-bold">Service</th>
+                  <th className="py-2 pr-3 font-bold">Particular</th>
+                  <th className="py-2 pr-3 font-bold">Receipt</th>
+                  <th className="py-2 pr-3 font-bold">Date</th>
+                  <th className="py-2 pr-3 font-bold text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {usage.map((u, i) => (
+                  <tr key={`${u.receipt_id}-${i}`} className="border-t border-[#E8DFD8]/70">
+                    <td className="py-2 pr-3">{u.service_name_en}</td>
+                    <td className="py-2 pr-3">{u.particular_name}{u.description ? ` — ${u.description}` : ''}</td>
+                    <td className="py-2 pr-3">{u.receipt_number}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap">{u.receipt_date ? formatDate(u.receipt_date) : ''}</td>
+                    <td className="py-2 pr-3 text-right whitespace-nowrap">{formatMoney(u.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </>
   );
 }
 
@@ -940,7 +1115,8 @@ const TABS = [
   { key: 'family', label: 'Family', icon: Users, Component: FamilyTab, count: 'family' },
   { key: 'membership', label: 'Membership', icon: CreditCard, Component: MembershipTab, count: 'membership' },
   { key: 'receipts', label: 'Receipts', icon: FileText, Component: ReceiptsTab, count: 'receipts' },
-  { key: 'magazine', label: 'Magazine & Services', icon: BookOpen, Component: MagazineTab, count: 'magazine' },
+  { key: 'magazine', label: 'Magazine', icon: BookOpen, Component: MagazineTab, count: 'magazine' },
+  { key: 'services', label: 'Services', icon: MapPin, Component: ServicesTab, count: 'services' },
   { key: 'events', label: 'Events', icon: CalendarDays, Component: EventsTab, count: 'events' },
   { key: 'activity', label: 'Activity & History', icon: History, Component: ActivityTab }
 ];

@@ -1820,7 +1820,7 @@ def read_member_profile(
 # GET /members/{id}/profile/{section} returns only that tab's data, so the screen loads what is open and nothing
 # else. "summary" is the header (name, photo, status, credit and a count for each tab).
 PROFILE_SECTIONS = (
-    "summary", "overview", "personal", "contact", "family", "membership", "receipts", "magazine", "events", "history",
+    "summary", "overview", "personal", "contact", "family", "membership", "receipts", "magazine", "services", "events", "history",
 )
 
 
@@ -1869,6 +1869,12 @@ def _profile_summary(db: Session, member: Member) -> dict:
         .filter(EventParticipant.member_id == mid, EventParticipant.is_deleted == False)  # noqa: E712
         .scalar() or 0
     )
+    services_count = (
+        db.query(func.count(MemberServiceOptin.id))
+        .filter(MemberServiceOptin.member_id == mid, MemberServiceOptin.is_deleted == False,  # noqa: E712
+                MemberServiceOptin.status == "ACTIVE")
+        .scalar() or 0
+    )
     membership_count = (
         db.query(func.count(MemberMembership.id))
         .filter(MemberMembership.member_id == mid, MemberMembership.is_deleted == False)  # noqa: E712
@@ -1905,6 +1911,7 @@ def _profile_summary(db: Session, member: Member) -> dict:
             "membership": membership_count,
             "receipts": receipt_count,
             "magazine": magazine_count,
+            "services": services_count,
             "events": event_count,
         },
     }
@@ -2179,6 +2186,35 @@ def _profile_magazine(db: Session, member: Member) -> dict:
     }
 
 
+def _profile_services(db: Session, member: Member) -> dict:
+    """The tab the spec calls 'service opted details': every service this member is
+    opted into (with status and when), the service types still available to opt
+    into, and what they have actually used (receipt-sourced)."""
+    optins = (
+        db.query(MemberServiceOptin)
+        .filter(MemberServiceOptin.member_id == member.id, MemberServiceOptin.is_deleted == False)  # noqa: E712
+        .order_by(MemberServiceOptin.opted_at.desc())
+        .all()
+    )
+    opted_type_ids = {o.service_type_id for o in optins}
+    available = (
+        db.query(ServiceType)
+        .filter(ServiceType.is_deleted == False)  # noqa: E712
+        .order_by(ServiceType.name_en)
+        .all()
+    )
+    return {
+        "optins": [_optin_payload(db, o) for o in optins],
+        "available": [
+            {"id": st.id, "code": st.code, "name_en": st.name_en, "name_kn": st.name_kn}
+            for st in available if st.id not in opted_type_ids or any(
+                o.service_type_id == st.id and o.status == "CANCELLED" for o in optins
+            )
+        ],
+        **_profile_service_usage(db, member),
+    }
+
+
 def _profile_events(db: Session, member: Member) -> dict:
     from models.events import Event, EventMemberLink, EventParticipant
 
@@ -2309,7 +2345,7 @@ def read_member_profile_section(
     builders = {
         "summary": _profile_summary, "personal": _profile_personal, "contact": _profile_contact,
         "family": _profile_family, "membership": _profile_membership, "magazine": _profile_magazine,
-        "events": _profile_events, "history": _profile_history,
+        "services": _profile_services, "events": _profile_events, "history": _profile_history,
     }
     return builders[section](db, member)
 
