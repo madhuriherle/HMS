@@ -13,7 +13,6 @@ LOOKUP_DEFAULTS = {
     "receipt_statuses": [
         ("UNASSIGNED", "Unassigned", "chip-warn"),
         ("ASSIGNED", "Assigned", "chip-on"),
-        ("APPROVED", "Approved", "chip-brand"),
         ("CANCELLED", "Cancelled", "chip-bad"),
     ],
     "organisation_types": [

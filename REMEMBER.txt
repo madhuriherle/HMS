@@ -62,8 +62,7 @@ RULE 3: RECEIPT ENTRY & ALLOCATION (LINKING)
        Their Membership No box remains BLANK because they do not have a permanent
        membership number yet.
      - Once linked:
-       * If applicant is unapproved -> Receipt status = "ASSIGNED"
-       * If member is approved     -> Receipt status = "APPROVED"
+       * Whether applicant or approved member -> Receipt status = "ASSIGNED"
      - A receipt linked at entry MUST NEVER be left as "UNASSIGNED".
 
 3.2  RECEIPT & TRANSACTION DATES (NO FUTURE DATES):
@@ -85,6 +84,19 @@ RULE 3: RECEIPT ENTRY & ALLOCATION (LINKING)
      - DUPLICATE PARTICULARS ARE BLOCKED: A receipt cannot have duplicate lines for
        the same particular (or same particular + sub-type). Form validation rejects
        duplicates with an explicit instruction to combine amounts into one line.
+
+3.4  STRICT SEPARATION OF RECEIPT STATUS VS MEMBER STATUS:
+     - Receipts have ONLY THREE statuses:
+       * UNASSIGNED: Receipt created without any member/applicant allocation.
+       * ASSIGNED: Receipt linked to an applicant or approved member.
+       * CANCELLED: Spoiled/void paper receipt (zero amount, preserves sequence number).
+     - "APPROVED" IS STRICTLY A MEMBER STATUS (Member.approval_status), NEVER A RECEIPT STATUS.
+     - Receipts MUST NEVER be labelled "APPROVED". A receipt is only about money and whether
+       it is mapped to a person (ASSIGNED) or unmapped (UNASSIGNED), or void (CANCELLED).
+     - Membership List displays already-approved members, showing their standing
+       ("Active" / "Inactive"). No redundant "Approved" badges.
+     - Unapproved Memberships displays applicants awaiting approval, showing their receipt
+       assignment status ("Receipt Assigned" vs "Receipt Unassigned").
 
 --------------------------------------------------------------------------------
 RULE 4: BULK RECEIPT AUTO-MAPPING RULES

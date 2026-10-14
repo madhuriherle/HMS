@@ -33,7 +33,7 @@ class Receipt(AuditMixin, Base):
     cheque_number: Mapped[str] = mapped_column(String(50), nullable=True)
     cheque_date: Mapped[Date] = mapped_column(Date, nullable=True)
     notes: Mapped[str] = mapped_column(Text, nullable=True)
-    # One visible status: UNASSIGNED | ASSIGNED | APPROVED | CANCELLED (see services/receipt_status.py).
+    # One visible status: UNASSIGNED | ASSIGNED | CANCELLED (see services/receipt_status.py).
     # payment_status keeps describing the money.
     receipt_status: Mapped[str] = mapped_column(String(20), default="UNASSIGNED", server_default="UNASSIGNED", nullable=False)
     # Optional period the receipt covers (a seva slot, a sponsorship year...). All four are optional.

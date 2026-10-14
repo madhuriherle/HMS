@@ -62,7 +62,7 @@ def test_full_membership_flow(client, admin_headers):
     assert client.post(f"{API}/receipts/{free['id']}/cancel", headers=h, json={"reason": "typo"}).status_code == 200
     by_id = {x["id"]: x for x in _tracking(client, h)}
     assert by_id[free["id"]]["receipt_status"] == "CANCELLED"
-    assert by_id[rec["id"]]["receipt_status"] == "APPROVED"
+    assert by_id[rec["id"]]["receipt_status"] == "ASSIGNED"
 
 
 def test_membership_list_default_includes_unapproved_members(client, admin_headers):

@@ -1,11 +1,10 @@
-"""One visible status per receipt: UNASSIGNED -> ASSIGNED -> APPROVED, or CANCELLED.
+"""One visible status per receipt: UNASSIGNED -> ASSIGNED, or CANCELLED.
 
 Stored on receipts.receipt_status (words, like every other status column). payment_status keeps
 describing the money; deletion stays on is_deleted.
 
-  UNASSIGNED  entered, not mapped to a member yet
-  ASSIGNED    mapped to a member / associate
-  APPROVED    mapped to a member whose profile is approved
+  UNASSIGNED  entered, not mapped to a member / applicant yet
+  ASSIGNED    mapped to a member / applicant
   CANCELLED   spoiled or void paper receipt (sticky: mapping or approval never changes it)
 """
 
@@ -13,11 +12,10 @@ from typing import Iterable
 
 from sqlalchemy.orm import Session
 
-from models.members import Member
 from models.receipts import Receipt, ReceiptAllocation
 
-UNASSIGNED, ASSIGNED, APPROVED, CANCELLED = "UNASSIGNED", "ASSIGNED", "APPROVED", "CANCELLED"
-ALL = (UNASSIGNED, ASSIGNED, APPROVED, CANCELLED)
+UNASSIGNED, ASSIGNED, CANCELLED = "UNASSIGNED", "ASSIGNED", "CANCELLED"
+ALL = (UNASSIGNED, ASSIGNED, CANCELLED)
 
 
 def is_cancelled(receipt: Receipt) -> bool:
@@ -27,18 +25,13 @@ def is_cancelled(receipt: Receipt) -> bool:
 def compute(db: Session, receipt: Receipt) -> str:
     if is_cancelled(receipt):
         return CANCELLED
-    allocs = (
-        db.query(ReceiptAllocation)
+    has_alloc = (
+        db.query(ReceiptAllocation.id)
         .filter(ReceiptAllocation.receipt_id == receipt.id, ReceiptAllocation.is_deleted == False)  # noqa: E712
-        .all()
+        .first()
     )
-    if not allocs:
+    if not has_alloc:
         return UNASSIGNED
-    member_ids = [a.member_id for a in allocs if a.member_id]
-    if member_ids and db.query(Member.id).filter(
-        Member.id.in_(member_ids), Member.approval_status == "APPROVED", Member.is_deleted == False  # noqa: E712
-    ).first():
-        return APPROVED
     return ASSIGNED
 
 

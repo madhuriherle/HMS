@@ -164,7 +164,7 @@ def test_receipt_period_is_saved_validated_and_printed(client, admin_headers):
     assert plain.status_code in (200, 201), plain.text
 
 
-def test_receipt_status_unassigned_assigned_approved_cancelled(client, admin_headers):
+def test_receipt_status_unassigned_assigned_cancelled(client, admin_headers):
     from test_frontend_contract import API, _sfx
     s = _sfx()
     item = [{"item_type": "DONATION", "particular_name": "Seva", "amount": 100}]
@@ -188,7 +188,7 @@ def test_receipt_status_unassigned_assigned_approved_cancelled(client, admin_hea
 
     act = client.post(f"{API}/receipts/{rid}/activate-member", headers=admin_headers)
     if act.status_code == 200:
-        assert status_of(rid) == "APPROVED"
+        assert status_of(rid) == "ASSIGNED"
 
     # un-mapping a not-yet-approved receipt goes back to UNASSIGNED
     r2 = client.post(f"{API}/receipts/", headers=admin_headers, json={**base, "receipt_number": "2026-27/U" + s}).json()

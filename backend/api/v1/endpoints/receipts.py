@@ -269,7 +269,7 @@ def read_receipt_tracking(
     receipt_type: Optional[str] = None,
     is_renewal: Optional[bool] = None,
     member_id: Optional[int] = None,
-    receipt_status: Optional[str] = None,  # UNASSIGNED | ASSIGNED | APPROVED | CANCELLED
+    receipt_status: Optional[str] = None,  # UNASSIGNED | ASSIGNED | CANCELLED
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
     search: Optional[str] = None,

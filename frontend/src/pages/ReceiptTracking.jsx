@@ -198,9 +198,8 @@ export default function ReceiptTracking() {
       if (toDate && String(r.receiptDate || '') > toDate) return false;
 
       const rs = r.receiptStatus || (isUnmapped ? 'UNASSIGNED' : 'ASSIGNED');
-      if (statusFilter === 'Assigned' && rs !== 'ASSIGNED' && rs !== 'APPROVED') return false;
+      if (statusFilter === 'Assigned' && rs !== 'ASSIGNED') return false;
       if (statusFilter === 'Unassigned' && rs !== 'UNASSIGNED') return false;
-      if (statusFilter === 'Approved' && rs !== 'APPROVED') return false;
       if (statusFilter === 'Cancelled' && rs !== 'CANCELLED') return false;
 
       return true;
@@ -622,7 +621,6 @@ export default function ReceiptTracking() {
             { value: 'ALL', label: 'All Statuses' },
             { value: 'Assigned', label: 'Assigned' },
             { value: 'Unassigned', label: 'Unassigned' },
-            { value: 'Approved', label: 'Approved' },
             { value: 'Cancelled', label: 'Cancelled' }
           ]}
           widthClass="w-full sm:w-48"

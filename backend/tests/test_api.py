@@ -6599,7 +6599,7 @@ def test_lists_come_from_the_lookup_table(client, admin_headers):
     for name in ("child_relations", "yes_no", "receipt_statuses", "organisation_types",
                  "activity_action_groups", "activity_statuses", "activity_clients", "country_codes"):
         assert lists.get(name), name
-    assert [r["code"] for r in lists["receipt_statuses"]] == ["UNASSIGNED", "ASSIGNED", "APPROVED", "CANCELLED"]
+    assert [r["code"] for r in lists["receipt_statuses"]] == ["UNASSIGNED", "ASSIGNED", "CANCELLED"]
     assert lists["receipt_statuses"][0]["extra"] == "chip-warn"
     india = next(c for c in lists["country_codes"] if c["code"] == "IN")
     assert india["label"] == "India" and india["extra"] == "+91"

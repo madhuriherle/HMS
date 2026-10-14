@@ -87,10 +87,10 @@ def test_bulk_member_import_and_receipt_auto_mapping(client, admin_headers):
     assert alloc_res.status_code == 200, alloc_res.text
     assert alloc_res.json()["allocated_count"] == 1
 
-    # 6. Verify receipt status is now ASSIGNED / APPROVED
+    # 6. Verify receipt status is now ASSIGNED
     rec_check = client.get(f"/api/v1/receipts/{receipt_id}", headers=admin_headers)
     assert rec_check.status_code == 200
-    assert rec_check.json()["receipt_status"] in ("ASSIGNED", "APPROVED")
+    assert rec_check.json()["receipt_status"] == "ASSIGNED"
 
 
 def test_modules_seeded_and_gated(client, admin_headers):
