@@ -148,3 +148,27 @@ def test_number_check_says_whether_a_number_is_free_in_the_year(client, admin_he
     assert check("A-1", f"{y}-06-01")["matches_format"] is False
     assert check("", f"{y}-06-01")["available"] is True
     assert client.get(f"{API}/receipts/number-check", params={"number": "1", "date": f"{y}-06-01"}).status_code == 401
+
+
+def test_a_deleted_receipt_gives_its_number_back(client, admin_headers):
+    import random
+
+    h = admin_headers
+    y = random.randint(1700, 1990)
+    assert _put(client, h, "RECEIPT", **DEFAULT_RECEIPT).status_code == 200
+    nxt = lambda: client.get(f"{API}/receipts/next-number", headers=h, params={"date": f"{y}-06-01"}).json()["receipt_number"]  # noqa: E731
+    assert nxt() == "0001"
+    first = client.post(f"{API}/receipts/", headers=h, json=_entry_payload(None, "One", receipt_date=f"{y}-06-01")).json()
+    second = client.post(f"{API}/receipts/", headers=h, json=_entry_payload(None, "Two", receipt_date=f"{y}-06-02")).json()
+    assert (first["receipt_number"], second["receipt_number"]) == ("0001", "0002") and nxt() == "0003"
+    # delete the last one: its number comes back
+    assert client.delete(f"{API}/receipts/{second['id']}", headers=h).status_code == 200
+    assert nxt() == "0002"
+    # delete the first too: the series starts again at 0001
+    assert client.delete(f"{API}/receipts/{first['id']}", headers=h).status_code == 200
+    assert nxt() == "0001"
+    # a cancelled receipt keeps its number (it still exists in the register)
+    kept = client.post(f"{API}/receipts/", headers=h, json=_entry_payload(None, "Kept", receipt_date=f"{y}-06-03")).json()
+    assert kept["receipt_number"] == "0001"
+    assert client.post(f"{API}/receipts/{kept['id']}/cancel", headers=h, json={"reason": "test"}).status_code == 200
+    assert nxt() == "0002"

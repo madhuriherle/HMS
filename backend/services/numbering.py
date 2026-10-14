@@ -221,7 +221,11 @@ def _locked_sequence(db: Session, name: str, seed: Callable[[], int]) -> NumberS
 def _issue(db: Session, doc_type: str, on: date, exists: Optional[Callable[[str], bool]], consume: bool) -> str:
     f = get_format(db, doc_type)
     seq = _locked_sequence(db, _sequence_name(f, on), lambda: _legacy_highest(db, f, on))
-    value = max(int(seq.current_value or 0), f.start_value - 1)
+    current = int(seq.current_value or 0)
+    if doc_type == "RECEIPT":
+        # a deleted receipt gives its number back: the series carries on from the highest receipt that still exists
+        current = min(current, _legacy_highest(db, f, on))
+    value = max(current, f.start_value - 1)
     for _ in range(2000):
         value += 1
         number = render(f, on, value)
