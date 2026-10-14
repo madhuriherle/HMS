@@ -2,7 +2,7 @@
                     HMS CORE ARCHITECTURAL & DATA RULES
                          (DO NOT VIOLATE OR MODIFY)
 ================================================================================
-Last Updated: 13-October-2026 (rules 6-15 added, 8.4 / 11.7-11.8 / 12.9-12.11 added)
+Last Updated: 14-October-2026 (rules 6-15 added, 8.4 / 11.7-11.8 / 12.9-12.11 added; 11.11 and 15.10 added)
 
 --------------------------------------------------------------------------------
 RULE 1: MEMBER RECORD ID (id) vs. PERMANENT MEMBERSHIP NUMBER (member_code)
@@ -251,6 +251,12 @@ RULE 11: HOW WE WORK (ALL AGENTS)
      the old backend folder, the web copy and the tagged image.
 11.10 Tests that create dated receipts use a random far-past year, because the test database
      keeps its rows between runs and a fixed year or number would collide.
+11.11 db/seed_defaults.py NOT_BUILT_YET is read at RUNTIME by migration 0032 and by the sidebar tests:
+     building a module means removing it from NOT_BUILT_YET, which changes what 0032 does when it is
+     (re)run. When a module is built, always do all of it: remove it from NOT_BUILT_YET, add its page to
+     MENU_PAGE_CATALOG, write a migration that switches the module on (status = true) for existing
+     databases, and update tests/test_screen_privileges.py and tests/test_sidebar_has_no_dead_items.py
+     (both assert the old "not built" list). See magazines + 20261014_0064.
 
 --------------------------------------------------------------------------------
 RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
@@ -487,4 +493,7 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
      never in the top-right of Row 1. Duplicate particulars on the same receipt are blocked.
 15.9 Receipt Date and Transaction Date cannot be in the future. Calendar picker disables future
      dates (max=today) and forms block future dates on input.
+15.10 THE MAGAZINE MODULE IS BUILT. Subscriptions, delivery pauses, returns and label batches live on
+      the tabbed screen /dashboard/magazine (privilege magazines.read); the module is switched on
+      (migration 20261014_0064). Do not put "magazines" back into NOT_BUILT_YET or switch the module off.
 ================================================================================

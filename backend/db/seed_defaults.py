@@ -134,7 +134,7 @@ AREA_ACTIONS = {
 }
 
 # Modules whose screens are not built yet: switched off (status = false) by migration 0032
-NOT_BUILT_YET = ("magazines", "reports", "notifications", "events", "engagements", "imports")
+NOT_BUILT_YET = ("reports", "notifications", "events", "engagements", "imports")
 
 # sub-modules that are not menu pages need a module row of their own (menu pages already have one)
 _ENGAGEMENT_SUBS = [
@@ -338,6 +338,8 @@ MENU_PAGE_CATALOG = [
     # ("masters.personal", "Personal Masters", "masters", "/dashboard/master/personal-masters", "list-checks", 7, "masters.read", None),
     # parent may list alternatives ("a|b"): the first module code that exists is used
     ("approvals.requests", "Approval Requests", "approvals", "/dashboard/approvals", "check-circle", 1, "approvals.read", None),
+    # Magazine module: subscriptions / pauses / returns / label batches live on one tabbed page
+    ("magazines.management", "Magazine", "magazines", "/dashboard/magazine", "book-open", 1, "magazines.read", None),
 ]
 
 # Older rows were seeded with API-style routes; point them at the real pages,

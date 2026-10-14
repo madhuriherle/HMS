@@ -12,6 +12,22 @@ def _put(client, h, doc, **body):
     return client.put(f"{API}/system/number-formats/{doc}", headers=h, json=body)
 
 
+def _empty_year(client, h):
+    """A far-past year whose financial years (and the next two) hold no receipts yet. The test database keeps its
+    rows between runs, so a year is checked, not assumed."""
+    import random
+
+    assert _put(client, h, "RECEIPT", **DEFAULT_RECEIPT).status_code == 200
+    for _ in range(300):
+        y = random.randint(1700, 1990)
+        if all(
+            client.get(f"{API}/receipts/next-number", headers=h, params={"date": f"{y + k}-06-01"}).json()["receipt_number"] == "0001"
+            for k in range(3)
+        ):
+            return y
+    raise AssertionError("no empty year found")
+
+
 def test_defaults_match_the_old_formats(client, admin_headers):
     rows = {r["doc_type"]: r for r in client.get(f"{API}/system/number-formats", headers=admin_headers).json()["data"]}
     assert re.fullmatch(r"HMS-\d{8}-000001", rows["MEMBER_CODE"]["example"])
@@ -90,7 +106,7 @@ def test_receipt_numbers_can_restart_every_year_with_no_year_in_the_number(clien
     import random
 
     h = admin_headers
-    y = random.randint(1700, 1990)  # a year no other test uses, so the run can be repeated on the same database
+    y = _empty_year(client, h)
     r = _put(client, h, "RECEIPT", prefix="", date_part="NONE", separator="", digits=4, start_value=1,
              restart="FY", suffix="", allow_manual=True)
     assert r.status_code == 200, r.text
@@ -113,7 +129,7 @@ def test_a_receipt_number_is_unique_within_each_financial_year(client, admin_hea
     import random
 
     h = admin_headers
-    y = random.randint(1700, 1990)
+    y = _empty_year(client, h)
     assert _put(client, h, "RECEIPT", **DEFAULT_RECEIPT).status_code == 200
     first = client.post(f"{API}/receipts/", headers=h, json=_entry_payload("0010", "First", receipt_date=f"{y}-06-01"))
     assert first.status_code == 201, first.text
@@ -134,7 +150,7 @@ def test_number_check_says_whether_a_number_is_free_in_the_year(client, admin_he
     import random
 
     h = admin_headers
-    y = random.randint(1700, 1990)
+    y = _empty_year(client, h)
     assert _put(client, h, "RECEIPT", **DEFAULT_RECEIPT).status_code == 200
     check = lambda number, date, **extra: client.get(  # noqa: E731
         f"{API}/receipts/number-check", headers=h, params={"number": number, "date": date, **extra}).json()
@@ -154,7 +170,7 @@ def test_a_deleted_receipt_keeps_its_number_until_it_is_purged(client, admin_hea
     import random
 
     h = admin_headers
-    y = random.randint(1700, 1990)
+    y = _empty_year(client, h)
     assert _put(client, h, "RECEIPT", **DEFAULT_RECEIPT).status_code == 200
     day = lambda m: f"{y}-{m:02d}-01"  # noqa: E731
     nxt = lambda: client.get(f"{API}/receipts/next-number", headers=h, params={"date": day(6)}).json()["receipt_number"]  # noqa: E731

@@ -14,6 +14,7 @@ import ModulesManagement from './pages/ModulesManagement';
 import ReceiptEntry from './pages/ReceiptEntry';
 import ReceiptTracking from './pages/ReceiptTracking';
 import LabelList from './pages/LabelList';
+import MagazineManagement from './pages/MagazineManagement';
 import MembershipList from './pages/MembershipList';
 import UnapprovedMembership from './pages/UnapprovedMembership';
 import AssignedApprovals from './pages/AssignedApprovals';
@@ -138,6 +139,9 @@ function App() {
           <Route path="receipts/auto-map" element={<PermissionGate required="receipts.bulk_mapping.read" title="Access Restricted" message="You need the Bulk Receipt Mapping privilege to open this page."><BulkReceiptMapping /></PermissionGate>} />
           <Route path="receipts/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
           <Route path="receipts/label-list" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
+          <Route path="magazine" element={<MagazineManagement />} />
+          <Route path="magazine/management" element={<MagazineManagement />} />
+          <Route path="magazines" element={<Navigate to="/dashboard/magazine" replace />} />
           <Route path="magazine/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
 
         </Route>
