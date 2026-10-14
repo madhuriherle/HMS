@@ -45,6 +45,10 @@ const DEFAULT_CATEGORY = 'Only Havyaka Mahasabha Membership';
 
 const titleCase = (v) => (v ? String(v).charAt(0).toUpperCase() + String(v).slice(1).toLowerCase() : '');
 
+// Kannada name / address inputs are switched off for now (the data fields and the server still support them):
+// set to true to show them again.
+const SHOW_KANNADA_FIELDS = false;
+
 export default function RegisterNewMember() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -1181,6 +1185,7 @@ export default function RegisterNewMember() {
                     </div>
 
                     {/* Name (Kannada) */}
+                    {SHOW_KANNADA_FIELDS && (
                     <div>
                       <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
                         Name (Kannada):
@@ -1193,6 +1198,7 @@ export default function RegisterNewMember() {
                         className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                       />
                     </div>
+                    )}
 
                     {/* Father Name */}
                     <div>
@@ -1462,6 +1468,7 @@ export default function RegisterNewMember() {
                   </div>
 
                   {/* Communication Address (Kannada) */}
+                  {SHOW_KANNADA_FIELDS && (
                   <div>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
                       Communication Address (Kannada):
@@ -1474,6 +1481,7 @@ export default function RegisterNewMember() {
                       className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
                   </div>
+                  )}
 
                   {/* Pin Code with Autocomplete */}
                   <div className="relative" ref={pinWrapperRef}>
@@ -1551,6 +1559,7 @@ export default function RegisterNewMember() {
                   </div>
 
                   {/* Post Office / Locality (Kannada) */}
+                  {SHOW_KANNADA_FIELDS && (
                   <div>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
                       Post Office / Locality (Kannada):
@@ -1563,6 +1572,7 @@ export default function RegisterNewMember() {
                       className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
                   </div>
+                  )}
 
                   {/* Native Place */}
                   <div>
