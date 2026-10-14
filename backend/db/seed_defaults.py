@@ -344,10 +344,9 @@ MENU_PAGE_CATALOG = [
     ("reports.receipts_report", "Receipts & Finance", "reports", "/dashboard/reports/receipts", "receipt", 3, "reports.read", None),
     ("reports.magazines_report", "Magazine & Logistics", "reports", "/dashboard/reports/magazines", "book-open", 4, "reports.read", None),
     ("reports.saved_report", "Saved & Audit Logs", "reports", "/dashboard/reports/saved", "history", 5, "reports.read", None),
-    ("notifications.campaigns", "Campaigns", "notifications", "/dashboard/notifications/campaigns", "send", 1, "notifications.read", None),
-    ("notifications.quick_send", "Quick Send", "notifications", "/dashboard/notifications/quick-send", "smartphone", 2, "notifications.read", None),
-    ("notifications.message_templates", "Templates", "notifications", "/dashboard/notifications/templates", "message-square", 3, "notifications.read", None),
-    ("notifications.inbox", "System Inbox", "notifications", "/dashboard/notifications/inbox", "inbox", 4, "notifications.read", None),
+    ("notifications.campaigns", "Send Messages", "notifications", "/dashboard/notifications/campaigns", "send", 1, "notifications.read", None),
+    ("notifications.message_templates", "Templates", "notifications", "/dashboard/notifications/templates", "message-square", 2, "notifications.read", None),
+    ("notifications.inbox", "System Inbox", "notifications", "/dashboard/notifications/inbox", "inbox", 3, "notifications.read", None),
 ]
 
 # Older rows were seeded with API-style routes; point them at the real pages,
@@ -358,6 +357,7 @@ MENU_PAGE_CATALOG = [
 MENU_NAME_FIXES = {
     "members.unapproved": ("Unapproved Membership", "Unapproved Members"),
     "system": ("System", "Settings"),
+    "notifications.campaigns": ("Campaigns", "Send Messages"),
 }
 # the group holding Events, Affiliations, Associates, Press & Media and Committee: both older names become the current one
 MENU_NAME_FIXES_EXTRA = [
@@ -387,6 +387,9 @@ MENU_ORDER_FIXES = {
     "engagements.press_media": (3, 4),
     "engagements.associates": (2, 3),
     "engagements.affiliations": (1, 2),
+    # Quick Send became a popup on Send Messages: Templates 3 -> 2, System Inbox 4 -> 3
+    "notifications.message_templates": (3, 2),
+    "notifications.inbox": (4, 3),
 }
 # Page privilege changes, applied only while the row still has the old one: code -> (old, new)
 MENU_PERMISSION_FIXES = {

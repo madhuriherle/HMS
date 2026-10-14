@@ -23,9 +23,8 @@ import { notify } from '../utils/notify';
 import { loadLocations, loadMembershipTypes } from '../utils/serverData';
 
 const TABS = [
-  { key: 'campaigns', label: 'Campaigns & Broadcasts', icon: Send },
+  { key: 'campaigns', label: 'Send Messages', icon: Send },
   { key: 'templates', label: 'Message Templates', icon: MessageSquare },
-  { key: 'quick-send', label: 'Quick Send', icon: Smartphone },
   { key: 'inbox', label: 'System Inbox', icon: Inbox },
 ];
 
@@ -55,7 +54,6 @@ export default function NotificationsManagement() {
   const activeTab = useMemo(() => {
     const p = location.pathname.toLowerCase();
     if (p.includes('/templates')) return 'templates';
-    if (p.includes('/quick-send')) return 'quick-send';
     if (p.includes('/inbox')) return 'inbox';
     if (p.includes('/campaigns')) return 'campaigns';
     return searchParams.get('tab') || 'campaigns';
@@ -116,12 +114,6 @@ export default function NotificationsManagement() {
         />
       )}
 
-      {activeTab === 'quick-send' && (
-        <QuickSendTab
-          canWrite={canWrite}
-        />
-      )}
-
       {activeTab === 'inbox' && (
         <InboxTab
           canWrite={canWrite}
@@ -135,6 +127,7 @@ export default function NotificationsManagement() {
 // 1. CAMPAIGNS TAB
 // ==============================================================
 function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes }) {
+  const [quickSendOpen, setQuickSendOpen] = useState(false);
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -289,6 +282,16 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
               <span>Create Campaign</span>
             </button>
           )}
+          {canWrite && (
+            <button
+              type="button"
+              onClick={() => setQuickSendOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-[#FAF7F2] cursor-pointer shadow-sm transition-colors"
+            >
+              <Smartphone className="w-4 h-4" />
+              <span>Quick Send</span>
+            </button>
+          )}
         </PageActions>
       </div>
 
@@ -385,6 +388,8 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
           </table>
         </div>
       </div>
+
+      <QuickSendModal isOpen={quickSendOpen} onClose={() => setQuickSendOpen(false)} canWrite={canWrite} />
 
       {/* Create Campaign Modal */}
       <Modal
@@ -903,9 +908,9 @@ function TemplatesTab({ canWrite, canDelete }) {
 }
 
 // ==============================================================
-// 3. QUICK SEND TAB
+// 3. QUICK SEND (a popup on the Send Messages page)
 // ==============================================================
-function QuickSendTab({ canWrite }) {
+function QuickSendModal({ isOpen, onClose, canWrite }) {
   const [channel, setChannel] = useState('WHATSAPP');
   const [recipient, setRecipient] = useState('');
   const [templateId, setTemplateId] = useState('');
@@ -932,7 +937,7 @@ function QuickSendTab({ canWrite }) {
   };
 
   const handleSend = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     if (!recipient.trim() || !message.trim()) {
       notify('Recipient number/email and message body are required.', 'error');
       return;
@@ -950,6 +955,7 @@ function QuickSendTab({ canWrite }) {
       setRecipient('');
       setMessage('');
       setTemplateId('');
+      onClose();
     } catch (err) {
       console.error('Failed to send message:', err);
       notify(err.response?.data?.detail || 'Failed to dispatch message.', 'error');
@@ -959,15 +965,9 @@ function QuickSendTab({ canWrite }) {
   };
 
   return (
-    <div className="max-w-2xl bg-white border border-[#E8DFD8] rounded-xl p-6 shadow-sm space-y-5">
-      <div>
-        <h2 className="text-base font-bold text-[#180200]">Direct Message Dispatch</h2>
-        <span className="text-xs text-stone-500">
-          Send an instant communication to an individual member or phone number
-        </span>
-      </div>
-
-      <form onSubmit={handleSend} className="space-y-4">
+    <Modal isOpen={isOpen} onClose={onClose} title="Quick Send">
+      <form onSubmit={handleSend}>
+        <div className="p-4 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Communication Channel</label>
@@ -1023,20 +1023,10 @@ function QuickSendTab({ canWrite }) {
           />
         </div>
 
-        {canWrite && (
-          <div className="pt-2 flex justify-end">
-            <button
-              type="submit"
-              disabled={sending}
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-bold text-white bg-[#510601] hover:bg-[#3D0400] rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <Send className="w-4 h-4" />
-              <span>{sending ? 'Sending...' : 'Send Communication'}</span>
-            </button>
-          </div>
-        )}
+        </div>
+        <ModalFooter onCancel={onClose} busy={sending} disabled={!canWrite} submitLabel="Send" />
       </form>
-    </div>
+    </Modal>
   );
 }
 

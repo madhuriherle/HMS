@@ -179,7 +179,7 @@ function App() {
           <Route path="notifications" element={<Navigate to="/dashboard/notifications/campaigns" replace />} />
           <Route path="notifications/campaigns" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
           <Route path="notifications/templates" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
-          <Route path="notifications/quick-send" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
+          <Route path="notifications/quick-send" element={<Navigate to="/dashboard/notifications/campaigns" replace />} />
           <Route path="notifications/inbox" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
         </Route>
 
