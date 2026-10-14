@@ -90,7 +90,7 @@ def test_receipt_numbers_can_restart_every_year_with_no_year_in_the_number(clien
     import random
 
     h = admin_headers
-    y = random.randint(1960, 1990)  # a year no other test uses, so the run can be repeated on the same database
+    y = random.randint(1700, 1990)  # a year no other test uses, so the run can be repeated on the same database
     r = _put(client, h, "RECEIPT", prefix="", date_part="NONE", separator="", digits=4, start_value=1,
              restart="FY", suffix="", allow_manual=True)
     assert r.status_code == 200, r.text
@@ -113,7 +113,7 @@ def test_a_receipt_number_is_unique_within_each_financial_year(client, admin_hea
     import random
 
     h = admin_headers
-    y = random.randint(1960, 1990)
+    y = random.randint(1700, 1990)
     assert _put(client, h, "RECEIPT", **DEFAULT_RECEIPT).status_code == 200
     first = client.post(f"{API}/receipts/", headers=h, json=_entry_payload("0010", "First", receipt_date=f"{y}-06-01"))
     assert first.status_code == 201, first.text
@@ -134,7 +134,7 @@ def test_number_check_says_whether_a_number_is_free_in_the_year(client, admin_he
     import random
 
     h = admin_headers
-    y = random.randint(1960, 1990)
+    y = random.randint(1700, 1990)
     assert _put(client, h, "RECEIPT", **DEFAULT_RECEIPT).status_code == 200
     check = lambda number, date, **extra: client.get(  # noqa: E731
         f"{API}/receipts/number-check", headers=h, params={"number": number, "date": date, **extra}).json()
