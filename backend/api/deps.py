@@ -177,9 +177,12 @@ def require_permission(permission_code: str):
         if not usable:
             raise HTTPException(403, f"Not enough permissions. Required: {' or '.join(options)}")
         last = None
+        owner = options[0]  # the page that owns this data: switching it off (or its rank gate) still applies
         for code in usable:
             try:
                 _module_gate(db, current_user, code)
+                if code != owner:
+                    _module_gate(db, current_user, owner)
                 return current_user
             except HTTPException as exc:
                 last = exc

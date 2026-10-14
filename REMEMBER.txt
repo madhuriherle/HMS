@@ -349,6 +349,15 @@ RULE 13: PERMISSIONS AND ACCESS
      - The backend approval gate captures prior record state (_previous) on UPDATE and DELETE
        requests to support side-by-side comparison during review.
 
+13.14 A PAGE WORKS COMPLETELY WITH ITS OWN PRIVILEGE. Read opens the page and everything it needs
+      to load (including read-only lists that belong to other pages); Write saves and edits on
+      that page; Delete deletes. Those extra reads are listed in ONE place, SHARED_READS in
+      db/seed_defaults.py (e.g. Receipt Entry and Tracking may read particulars, payment modes,
+      banks, membership types, locations and the member picker). Writes always stay on the
+      page that owns the data. A button, link or redirect to something the role cannot open is
+      HIDDEN, never shown and refused. A test (tests/test_receptionist_role.py) builds a role
+      with only the Receipt Entry and Receipt Tracking privileges and loads both screens.
+
 --------------------------------------------------------------------------------
 RULE 14: SETTINGS AND ADMIN TOOLS
 --------------------------------------------------------------------------------

@@ -85,7 +85,8 @@ def test_lookup_needs_only_receipt_entry_access(client, admin_headers):
     _mid, _t, code = _approved_member(client, h, s)
     clerk = _role_user(client, h, ["receipts.entry.read", "receipts.entry.write"])
     assert _lookup(client, clerk, code)["found"], "a Receipt Entry clerk can look a member up"
-    assert client.get(f"{API}/members/", headers=clerk).status_code == 403, "but gets no access to the member list"
+    assert client.get(f"{API}/members/", headers=clerk).status_code == 200, "and reads the member picker the entry screen shows"
+    assert client.post(f"{API}/members/", headers=clerk, json={"first_name_en": "X"}).status_code == 403, "but cannot add members"
 
     nobody = _role_user(client, h, ["members.list.read"])
     assert client.get(f"{API}/receipts/member-lookup", headers=nobody, params={"number": code}).status_code == 403

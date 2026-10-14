@@ -34,8 +34,8 @@ logger = logging.getLogger("hms.seed")
 SUB_MODULE_AREAS = {
     "masters": [
         ("masters.location", "Location Setup", ["/masters/states", "/masters/districts", "/masters/taluks", "/masters/postal-codes", "/masters/states-summary", "/masters/districts-summary", "/masters/taluks-summary"]),
-        ("masters.membership_types", "Membership Types", ["/masters/membership-types", "/masters/membership-credit-settings"]),
-        ("masters.particulars", "Particulars Master", ["/masters/particulars", "/masters/service-types"]),
+        ("masters.membership_types", "Membership Types", ["/masters/membership-types", "/masters/membership-credit-settings", "/masters/usage/membership-types"]),
+        ("masters.particulars", "Particulars Master", ["/masters/particulars", "/masters/service-types", "/masters/usage/particulars"]),
         # banks are made and listed from the Payment Mode Setup screen; there is no separate Bank Master screen
         ("masters.payment_modes", "Payment Mode Setup", ["/masters/payment-modes", "/masters/banks"]),
     ],
@@ -66,10 +66,11 @@ SUB_MODULE_AREAS = {
             ("POST", r"^/receipts/?$"),
             ("GET", r"^/receipts/tracking/?$"),  # the entry screen checks existing receipt numbers
             ("GET", r"^/receipts/member-lookup/?$"),  # "who is this membership number?"
+            ("GET", r"^/receipts/(next-number|number-check|duplicate-check)/?$"),  # the entry form's own helpers
         ]),
         ("receipts.tracking", "Receipt Tracking", [
             ("GET", r"^/receipts/?$"),
-            ("GET", r"^/receipts/(tracking|allocations|unassigned-candidates)/?$"),
+            ("GET", r"^/receipts/(tracking|allocations|unassigned-candidates|day-book)/?$"),
             ("GET", r"^/receipts/\d+(/allocations)?/?$"),
             ("PUT|DELETE", r"^/receipts/\d+/?$"),
             ("POST", r"^/receipts/\d+/(allocate|cancel|refund|payment-transactions)/?$"),
@@ -93,6 +94,31 @@ SUB_MODULE_AREAS = {
     ],
 }
 # Areas that do not have all three actions (default: read, write, delete)
+# A page works completely with its own privilege: the reads it needs from other pages are served to the holders of
+# these privileges too, read-only. (Writes always stay on the page that owns the data.) Paths are GET requests,
+# relative to /api/v1; the codes are the privileges that may use them.
+SHARED_READS = [
+    # reference lists the screens fill their dropdowns and filters from
+    (r"^/masters/(states|districts|taluks|postal-codes)(/.*)?$",
+     ["receipts.entry.read", "receipts.tracking.read", "members.list.read", "members.unapproved.read",
+      "members.register.write"]),
+    (r"^/masters/membership-types(/.*)?$",
+     ["receipts.entry.read", "receipts.tracking.read", "members.list.read", "members.unapproved.read",
+      "members.register.write"]),
+    (r"^/masters/(gotras|qualifications|native-places)(/.*)?$",
+     ["members.list.read", "members.unapproved.read", "members.register.write"]),
+    (r"^/masters/(particulars|payment-modes|banks)(/.*)?$",
+     ["receipts.entry.read", "receipts.tracking.read", "members.register.write"]),
+    # the member picker and member checks used by the receipt screens and the registration form
+    (r"^/members/?$", ["receipts.entry.read", "receipts.tracking.read"]),
+    (r"^/members/lookup/?$", ["receipts.entry.read", "members.register.write"]),
+    (r"^/members/duplicate-check/?$", ["members.register.write"]),
+    (r"^/members/\d+(/profile(/[a-z]+)?)?/?$", ["receipts.entry.read", "members.register.write"]),
+    # existing receipts: the entry form checks numbers and loads a receipt's allocations when it edits one
+    (r"^/receipts/?$", ["receipts.entry.read", "members.list.read", "masters.payment_modes.read"]),  # also: member status popup, payment-mode usage counts
+    (r"^/receipts/\d+/allocations/?$", ["receipts.entry.read"]),
+]
+
 AREA_ACTIONS = {
     "members.unapproved": ("read", "write"),
     "members.register": ("write",),

@@ -1102,7 +1102,9 @@ export default function ReceiptEntry() {
       // Route Navigation strictly based on entrySource
       if (entrySource === 'unapproved-assignment') {
         showToast(`Receipt #${receiptNo} successfully linked to ${memberDisplayName}'s unapproved profile!`, 'success');
-        navigate('/dashboard/membership/unapproved');
+        // go back to the Unapproved Members page only when the role can open it; otherwise stay and start a new receipt
+        if (hasPermission('members.unapproved.read')) navigate('/dashboard/membership/unapproved');
+        else handleClearForm();
       } else if (entrySource === 'membership-assignment') {
         showToast(`Receipt #${receiptNo} successfully linked to member "${memberDisplayName}"!`, 'success');
         handleClearForm();
@@ -2661,15 +2663,17 @@ export default function ReceiptEntry() {
                               </button>
                             )}
 
-                            <button
-                              type="button"
-                              onClick={() => navigate(`/dashboard/membership/profile/${member.id}`)}
-                              className="btn-act"
-                              title="View full applicant registration profile"
-                            >
-                              <Eye className="w-3.5 h-3.5 shrink-0 text-[#863221]" />
-                              <span>View</span>
-                            </button>
+                            {(hasPermission('members.unapproved.read') || hasPermission('members.list.read')) && (
+                              <button
+                                type="button"
+                                onClick={() => navigate(`/dashboard/membership/profile/${member.id}`)}
+                                className="btn-act"
+                                title="View full applicant registration profile"
+                              >
+                                <Eye className="w-3.5 h-3.5 shrink-0 text-[#863221]" />
+                                <span>View</span>
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

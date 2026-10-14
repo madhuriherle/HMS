@@ -15,7 +15,7 @@ import re
 from contextvars import ContextVar
 from typing import Dict, List, Optional
 
-from db.seed_defaults import AREA_ACTIONS, SUB_MODULE_AREAS
+from db.seed_defaults import AREA_ACTIONS, SHARED_READS, SUB_MODULE_AREAS
 
 # Set once per request by RequestPathMiddleware (main.py); dependencies read it.
 request_info: ContextVar[tuple] = ContextVar("request_info", default=("", "", ""))
@@ -30,6 +30,8 @@ def _compile(rule):
     methods = rule[0]
     return (methods, re.compile(rule[1]), rule[2] if len(rule) > 2 else None)
 
+
+_SHARED = [(re.compile(rx), codes) for rx, codes in SHARED_READS]
 
 _AREAS: Dict[str, List[tuple]] = {
     module: [(sub, [_compile(r) for r in rules]) for sub, _label, rules in areas]
@@ -67,7 +69,14 @@ def candidates(code: str, path: Optional[str] = None, method: Optional[str] = No
                 continue
             found.append(f"{sub}.{action}")
             break
-    return found or [code]
+    own = bool(found)
+    if action == "read" and (method or "").upper() in ("GET", "HEAD"):
+        for rx, codes in _SHARED:  # a page's own privilege also covers the read-only data it needs from other pages
+            if rx.match(path):
+                found.extend(c for c in codes if c not in found)
+    if not own:
+        found.append(code)  # no page owns this route: the module-level privilege still opens it
+    return found
 
 
 def resolve(code: str, path: Optional[str] = None) -> str:
