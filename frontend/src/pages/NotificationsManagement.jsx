@@ -91,33 +91,9 @@ export default function NotificationsManagement() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-            Notifications & Communications
+            {TABS.find((t) => t.key === activeTab)?.label || 'Notifications'}
           </h1>
         </div>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="border-b border-[#E8DFD8]">
-        <nav className="flex space-x-2 sm:space-x-4 overflow-x-auto no-scrollbar">
-          {TABS.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setTab(tab.key)}
-                className={`flex items-center gap-2 py-3 px-3.5 border-b-2 text-sm font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                  isActive
-                    ? 'border-[#510601] text-[#510601]'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-[#510601]' : 'text-gray-400'}`} />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </nav>
       </div>
 
       {/* Tab Views */}

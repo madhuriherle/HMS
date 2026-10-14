@@ -147,8 +147,11 @@ function App() {
           <Route path="receipts/auto-map" element={<PermissionGate required="receipts.bulk_mapping.read" title="Access Restricted" message="You need the Bulk Receipt Mapping privilege to open this page."><BulkReceiptMapping /></PermissionGate>} />
           <Route path="receipts/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
           <Route path="receipts/label-list" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
-          <Route path="magazine" element={<MagazineManagement />} />
-          <Route path="magazine/management" element={<MagazineManagement />} />
+          <Route path="magazine" element={<Navigate to="/dashboard/magazine/subscriptions" replace />} />
+          <Route path="magazine/management" element={<Navigate to="/dashboard/magazine/subscriptions" replace />} />
+          <Route path="magazine/subscriptions" element={<MagazineManagement />} />
+          <Route path="magazine/pauses-returns" element={<MagazineManagement />} />
+          <Route path="magazine/labels-delivery" element={<MagazineManagement />} />
           <Route path="magazines" element={<Navigate to="/dashboard/magazine" replace />} />
           <Route path="magazine/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
 
@@ -165,7 +168,7 @@ function App() {
           <Route path="engagements/committee" element={<PermissionGate required={['engagements.read', 'engagements.committee.read']} title="Access Restricted"><EngagementsManagement /></PermissionGate>} />
 
           {/* Reports Module Routes */}
-          <Route path="reports" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
+          <Route path="reports" element={<Navigate to="/dashboard/reports/summary" replace />} />
           <Route path="reports/summary" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
           <Route path="reports/members" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
           <Route path="reports/receipts" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
@@ -173,7 +176,7 @@ function App() {
           <Route path="reports/saved" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
         
           {/* Notifications Module Routes */}
-          <Route path="notifications" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
+          <Route path="notifications" element={<Navigate to="/dashboard/notifications/campaigns" replace />} />
           <Route path="notifications/campaigns" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
           <Route path="notifications/templates" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
           <Route path="notifications/quick-send" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />

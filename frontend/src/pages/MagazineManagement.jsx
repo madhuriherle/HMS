@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import Modal from '../components/Modal';
 import ModalFooter from '../components/ModalFooter';
 import SearchFilterBar from '../components/SearchFilterBar';
@@ -37,14 +37,6 @@ import {
 } from 'lucide-react';
 
 // ── constants ────────────────────────────────────────────────
-const TABS = [
-  { key: 'subscriptions', label: 'Subscriptions', icon: BookOpen },
-  { key: 'pauses', label: 'Delivery Pauses', icon: Pause },
-  { key: 'returns', label: 'Returns', icon: Undo2 },
-  { key: 'labels', label: 'Label Batches', icon: Printer },
-  { key: 'batches', label: 'Delivery Batches', icon: PackageCheck },
-];
-
 const DELIVERY_STATUSES = ['ACTIVE', 'PAUSED', 'STOPPED', 'CANCELLED'];
 // The server only accepts these three when starting/stopping (PAUSED is set by a pause).
 const SETTABLE_STATUSES = ['ACTIVE', 'STOPPED', 'CANCELLED'];
@@ -171,7 +163,10 @@ export default function MagazineManagement() {
   const canWrite = hasPermission('magazines.write');
   const canDelete = hasPermission('magazines.delete');
 
-  const [tab, setTab] = useState('subscriptions');
+  // the sidebar picks the section; each one is its own page
+  const { pathname } = useLocation();
+  const tab = pathname.includes('/pauses-returns') ? 'pauses-returns' : pathname.includes('/labels-delivery') ? 'labels-delivery' : 'subscriptions';
+  const sectionTitle = { subscriptions: 'Subscriptions', 'pauses-returns': 'Pauses & Returns', 'labels-delivery': 'Labels & Delivery' }[tab];
   const [members, setMembers] = useState([]);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [] });
 
@@ -227,7 +222,7 @@ export default function MagazineManagement() {
     <PermissionGate required="magazines.read" title="Access Restricted" message="You need the Magazine privilege to open this page.">
       <div className="space-y-6 pb-12">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Magazine</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">{sectionTitle}</h1>
           <Link
             to="/dashboard/magazine/labels"
             className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-stone-50 transition-colors"
@@ -257,29 +252,6 @@ export default function MagazineManagement() {
           </div>
         )}
 
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-1.5 border-b border-[#E8DFD8]">
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            const active = tab === t.key;
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setTab(t.key)}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 transition-colors cursor-pointer ${
-                  active
-                    ? 'border-[#8C1801] text-[#8C1801] bg-[#FAF7F2]'
-                    : 'border-transparent text-[#863221]/70 hover:text-[#8C1801] hover:bg-[#FAF7F2]/60'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
         {loading ? (
           <div className="rounded-xl border border-stone-200 bg-white p-12 text-center text-sm text-gray-500">Loading…</div>
         ) : (
@@ -294,7 +266,7 @@ export default function MagazineManagement() {
                 canDelete={canDelete}
               />
             )}
-            {tab === 'pauses' && (
+            {tab === 'pauses-returns' && (
               <PausesTab
                 subscriptions={subscriptions}
                 memberName={memberName}
@@ -302,7 +274,7 @@ export default function MagazineManagement() {
                 canDelete={canDelete}
               />
             )}
-            {tab === 'returns' && (
+            {tab === 'pauses-returns' && (
               <ReturnsTab
                 subscriptions={subscriptions}
                 memberName={memberName}
@@ -310,11 +282,11 @@ export default function MagazineManagement() {
                 canDelete={canDelete}
               />
             )}
-            {tab === 'labels' && (
-              <LabelsTab locations={locations} canWrite={canWrite} />
-            )}
-            {tab === 'batches' && (
-              <DeliveryBatchesTab canWrite={canWrite} canDelete={canDelete} />
+            {tab === 'labels-delivery' && (
+              <>
+                <LabelsTab locations={locations} canWrite={canWrite} />
+                <DeliveryBatchesTab canWrite={canWrite} canDelete={canDelete} />
+              </>
             )}
           </>
         )}

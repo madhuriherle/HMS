@@ -328,15 +328,25 @@ MENU_PAGE_CATALOG = [
     # ("masters.personal", "Personal Masters", "masters", "/dashboard/master/personal-masters", "list-checks", 7, "masters.read", None),
     # parent may list alternatives ("a|b"): the first module code that exists is used
     ("approvals.requests", "Approval Requests", "approvals", "/dashboard/approvals", "check-circle", 1, "approvals.read", None),
-    # Magazine module: subscriptions / pauses / returns / label batches live on one tabbed page
-    ("magazines.management", "Magazine", "magazines", "/dashboard/magazine", "book-open", 1, "magazines.read", None),
+    # Magazine, Reports and Notifications: one sidebar page per section (no tab rows). Each page opens with the
+    # module's own privilege (magazines.read / reports.read / notifications.read).
+    ("magazines.subscribers", "Subscriptions", "magazines", "/dashboard/magazine/subscriptions", "book-open", 1, "magazines.read", None),
+    ("magazines.pauses_returns", "Pauses & Returns", "magazines", "/dashboard/magazine/pauses-returns", "pause", 2, "magazines.read", None),
+    ("magazines.labels_delivery", "Labels & Delivery", "magazines", "/dashboard/magazine/labels-delivery", "printer", 3, "magazines.read", None),
     ("events.management", "Events", "events", "/dashboard/events", "calendar", 1, "events.read", None),
     ("engagements.affiliations", "Affiliations", "engagements", "/dashboard/engagements/affiliations", "users", 1, "engagements.affiliations.read", None),
     ("engagements.associates", "Associates", "engagements", "/dashboard/engagements/associates", "user-check", 2, "engagements.associates.read", None),
     ("engagements.press_media", "Press & Media", "engagements", "/dashboard/engagements/press-media", "newspaper", 3, "engagements.press_media.read", None),
     ("engagements.committee", "Managing Committee", "engagements", "/dashboard/engagements/committee", "shield", 4, "engagements.committee.read", None),
-    ("reports.management", "Reports", "reports", "/dashboard/reports", "bar-chart", 1, "reports.read", None),
-    ("notifications.management", "Notifications", "notifications", "/dashboard/notifications", "bell", 1, "notifications.read", None),
+    ("reports.summary_report", "Summary", "reports", "/dashboard/reports/summary", "bar-chart", 1, "reports.read", None),
+    ("reports.members_report", "Members", "reports", "/dashboard/reports/members", "users", 2, "reports.read", None),
+    ("reports.receipts_report", "Receipts & Finance", "reports", "/dashboard/reports/receipts", "receipt", 3, "reports.read", None),
+    ("reports.magazines_report", "Magazine & Logistics", "reports", "/dashboard/reports/magazines", "book-open", 4, "reports.read", None),
+    ("reports.saved_report", "Saved & Audit Logs", "reports", "/dashboard/reports/saved", "history", 5, "reports.read", None),
+    ("notifications.campaigns", "Campaigns", "notifications", "/dashboard/notifications/campaigns", "send", 1, "notifications.read", None),
+    ("notifications.quick_send", "Quick Send", "notifications", "/dashboard/notifications/quick-send", "smartphone", 2, "notifications.read", None),
+    ("notifications.message_templates", "Templates", "notifications", "/dashboard/notifications/templates", "message-square", 3, "notifications.read", None),
+    ("notifications.inbox", "System Inbox", "notifications", "/dashboard/notifications/inbox", "inbox", 4, "notifications.read", None),
 ]
 
 # Older rows were seeded with API-style routes; point them at the real pages,
