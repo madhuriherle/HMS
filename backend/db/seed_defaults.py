@@ -113,7 +113,7 @@ SHARED_READS = [
     (r"^/masters/(particulars|payment-modes|banks)(/.*)?$",
      ["receipts.entry.read", "receipts.tracking.read", "members.register.write"]),
     # the member picker and member checks used by the receipt screens and the registration form
-    (r"^/members/?$", ["receipts.entry.read", "receipts.tracking.read", "receipts.bulk_mapping.read"]),
+    (r"^/members/?$", ["receipts.entry.read", "receipts.tracking.read", "receipts.bulk_mapping.read", "events.write", "engagements.write"]),
     (r"^/members/lookup/?$", ["receipts.entry.read", "members.register.write"]),
     (r"^/members/duplicate-check/?$", ["members.register.write"]),
     (r"^/members/\d+(/profile(/[a-z]+)?)?/?$", ["receipts.entry.read", "members.register.write"]),
@@ -134,13 +134,7 @@ AREA_ACTIONS = {
 }
 
 # Modules whose screens are not built yet: switched off (status = false) by migration 0032
-NOT_BUILT_YET = ("reports", "notifications", "events", "engagements", "imports")
-
-# sub-modules that are not menu pages need a module row of their own (menu pages already have one)
-_ENGAGEMENT_SUBS = [
-    (code, label, "engagements", None, None, i + 1, None)
-    for i, (code, label, _paths) in enumerate(SUB_MODULE_AREAS["engagements"])
-]
+NOT_BUILT_YET = ("reports", "notifications", "imports")
 
 # ── modules ──────────────────────────────────────────────────
 # (code, name, parent_code, route, icon, display_order, min_rank_level)
@@ -167,10 +161,6 @@ MODULE_CATALOG = [
 MODULE_CATALOG += [
     ("system.recycle_bin", "Recycle Bin", "system", None, None, 4, None),
     ("system.cleanup", "Data Cleanup", "system", None, None, 5, 1),
-]
-MODULE_CATALOG += [  # sub-modules of Affiliation, Associates & Press (no menu page yet, so no route)
-    (code, label, parent, route, icon, order, rank)
-    for code, label, parent, route, icon, order, rank in _ENGAGEMENT_SUBS
 ]
 
 _READ_WRITE_DELETE = (
@@ -340,6 +330,11 @@ MENU_PAGE_CATALOG = [
     ("approvals.requests", "Approval Requests", "approvals", "/dashboard/approvals", "check-circle", 1, "approvals.read", None),
     # Magazine module: subscriptions / pauses / returns / label batches live on one tabbed page
     ("magazines.management", "Magazine", "magazines", "/dashboard/magazine", "book-open", 1, "magazines.read", None),
+    ("events.management", "Events", "events", "/dashboard/events", "calendar", 1, "events.read", None),
+    ("engagements.affiliations", "Affiliations", "engagements", "/dashboard/engagements/affiliations", "users", 1, "engagements.affiliations.read", None),
+    ("engagements.associates", "Associates", "engagements", "/dashboard/engagements/associates", "user-check", 2, "engagements.associates.read", None),
+    ("engagements.press_media", "Press & Media", "engagements", "/dashboard/engagements/press-media", "newspaper", 3, "engagements.press_media.read", None),
+    ("engagements.committee", "Managing Committee", "engagements", "/dashboard/engagements/committee", "shield", 4, "engagements.committee.read", None),
 ]
 
 # Older rows were seeded with API-style routes; point them at the real pages,
@@ -382,6 +377,12 @@ MENU_ROUTE_FIXES = {
     "users.management": ("/users", "/dashboard/users/list"),
     "roles": ("/users/roles", "/dashboard/users/roles"),
     "users.privileges": ("/users/privileges", None),  # privileges are edited inside Role Management
+    "events": ("/events", None),
+    "engagements": ("/engagements", None),
+    "engagements.affiliations": (None, "/dashboard/engagements/affiliations"),
+    "engagements.associates": (None, "/dashboard/engagements/associates"),
+    "engagements.press_media": (None, "/dashboard/engagements/press-media"),
+    "engagements.committee": (None, "/dashboard/engagements/committee"),
 }
 
 

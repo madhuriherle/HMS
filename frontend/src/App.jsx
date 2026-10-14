@@ -33,6 +33,8 @@ import FormModalHost from './components/FormModalHost';
 import MemberImport from './pages/MemberImport';
 import BulkReceiptMapping from './pages/BulkReceiptMapping';
 import KycForm from './pages/KycForm';
+import EventsManagement from './pages/EventsManagement';
+import EngagementsManagement from './pages/EngagementsManagement';
 // Personal Masters (gotra / qualification / native place) screen is switched off for now:
 // import PersonalMasters from './pages/MasterLists';
 
@@ -63,6 +65,8 @@ function App() {
         <Route path="/membership/list" element={<Navigate to="/dashboard/membership/list" replace />} />
         <Route path="/membership/unapproved" element={<Navigate to="/dashboard/membership/unapproved" replace />} />
         <Route path="/membership" element={<Navigate to="/dashboard/membership/list" replace />} />
+        <Route path="/events" element={<Navigate to="/dashboard/events" replace />} />
+        <Route path="/engagements" element={<Navigate to="/dashboard/engagements" replace />} />
 
         <Route path="/dashboard" element={<RequireLogin><MainLayout /></RequireLogin>}>
           <Route index element={<Dashboard />} />
@@ -144,6 +148,17 @@ function App() {
           <Route path="magazines" element={<Navigate to="/dashboard/magazine" replace />} />
           <Route path="magazine/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
 
+          {/* Events Module Routes */}
+          <Route path="events" element={<PermissionGate required="events.read" title="Access Restricted" message="You need the Events privilege to view this page."><EventsManagement /></PermissionGate>} />
+          <Route path="events/management" element={<PermissionGate required="events.read" title="Access Restricted" message="You need the Events privilege to view this page."><EventsManagement /></PermissionGate>} />
+
+          {/* Engagements Module Routes */}
+          <Route path="engagements" element={<PermissionGate required={['engagements.read', 'engagements.affiliations.read', 'engagements.associates.read', 'engagements.press_media.read', 'engagements.committee.read']} title="Access Restricted" message="You need Engagements privilege to view this page."><EngagementsManagement /></PermissionGate>} />
+          <Route path="engagements/management" element={<PermissionGate required={['engagements.read', 'engagements.affiliations.read', 'engagements.associates.read', 'engagements.press_media.read', 'engagements.committee.read']} title="Access Restricted" message="You need Engagements privilege to view this page."><EngagementsManagement /></PermissionGate>} />
+          <Route path="engagements/affiliations" element={<PermissionGate required={['engagements.read', 'engagements.affiliations.read']} title="Access Restricted"><EngagementsManagement /></PermissionGate>} />
+          <Route path="engagements/associates" element={<PermissionGate required={['engagements.read', 'engagements.associates.read']} title="Access Restricted"><EngagementsManagement /></PermissionGate>} />
+          <Route path="engagements/press-media" element={<PermissionGate required={['engagements.read', 'engagements.press_media.read']} title="Access Restricted"><EngagementsManagement /></PermissionGate>} />
+          <Route path="engagements/committee" element={<PermissionGate required={['engagements.read', 'engagements.committee.read']} title="Access Restricted"><EngagementsManagement /></PermissionGate>} />
         </Route>
 
         {/* Any unknown address: a full-screen page, no panel around it */}
