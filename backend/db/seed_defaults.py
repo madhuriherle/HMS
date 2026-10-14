@@ -380,6 +380,11 @@ MENU_ORDER_FIXES = {
 MENU_PERMISSION_FIXES = {
     "system.number_formats": ("system.read", "system.number_formats.read"),
     "masters.organisation": ("system.read", "masters.organisation.read"),
+    # each Engagements page opens with its own privilege (nobody held them yet, so no role loses access)
+    "engagements.affiliations": (None, "engagements.affiliations.read"),
+    "engagements.associates": (None, "engagements.associates.read"),
+    "engagements.press_media": (None, "engagements.press_media.read"),
+    "engagements.committee": (None, "engagements.committee.read"),
     # the dashboard opens only for roles holding dashboard.read (migration 0046);
     # applied only while the row still has no privilege, so admin edits are kept.
     "dashboard": (None, "dashboard.read"),

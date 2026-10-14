@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import {
   Users,
   UserCheck,
@@ -42,7 +42,6 @@ export default function EngagementsManagement() {
   const canDelete = hasPermission('engagements.delete');
 
   const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   const activeTab = useMemo(() => {
@@ -54,56 +53,26 @@ export default function EngagementsManagement() {
     return searchParams.get('tab') || 'affiliations';
   }, [location.pathname, searchParams]);
 
-  const setTab = (t) => {
-    navigate(`/dashboard/engagements/${t}`);
-  };
+  // the sidebar picks the section; each one is its own page
+  const section = {
+    affiliations: { title: 'Affiliations', privilege: 'engagements.affiliations.read' },
+    associates: { title: 'Associates', privilege: 'engagements.associates.read' },
+    'press-media': { title: 'Press & Media', privilege: 'engagements.press_media.read' },
+    committee: { title: 'Managing Committee', privilege: 'engagements.committee.read' },
+  }[activeTab];
 
   return (
     <PermissionGate
-      required={[
-        'engagements.read',
-        'engagements.affiliations.read',
-        'engagements.associates.read',
-        'engagements.press_media.read',
-        'engagements.committee.read',
-      ]}
+      required={['engagements.read', section.privilege]}
       title="Access Restricted"
-      message="You need Engagements privilege to view this page."
+      message="You need the privilege for this page to view it."
     >
       <div className="space-y-6 pb-12">
         {/* Page Heading - Rule 12.1 */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-            Engagements
+            {section.title}
           </h1>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex border-b border-[#E8DFD8] gap-1 overflow-x-auto">
-          {[
-            { id: 'affiliations', label: 'Affiliations', icon: Users },
-            { id: 'associates', label: 'Associates', icon: UserCheck },
-            { id: 'press-media', label: 'Press & Media', icon: Newspaper },
-            { id: 'committee', label: 'Managing Committee', icon: Shield },
-          ].map((t) => {
-            const Icon = t.icon;
-            const active = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold rounded-t-xl border-b-2 transition-colors cursor-pointer whitespace-nowrap ${
-                  active
-                    ? 'border-[#8C1801] text-[#8C1801] bg-[#FAF7F2]'
-                    : 'border-transparent text-[#863221]/70 hover:text-[#8C1801] hover:bg-[#FAF7F2]/60'
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                <span>{t.label}</span>
-              </button>
-            );
-          })}
         </div>
 
         {/* Active Tab View */}
