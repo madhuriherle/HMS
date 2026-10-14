@@ -797,7 +797,7 @@ async def send_kyc_link(
         "expires_at": kyc.expires_at,
     }
     if channel == "LINK":
-        response["kyc_url"] = f"{kyc_service.KYC_BASE_URL}?token={token}"
+        response["kyc_url"] = kyc_service.kyc_link_url(token)
     return response
 
 

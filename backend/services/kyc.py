@@ -9,6 +9,7 @@ token is stored so a database leak cannot forge links.
 """
 
 import hashlib
+import os
 import secrets
 from datetime import datetime, timezone
 from typing import Optional, Tuple
@@ -17,7 +18,15 @@ from sqlalchemy.orm import Session
 
 from models.members import Member, MemberKycRequest
 
+# The mobile app's KYC screen; the DEFAULT, unused once KYC_WEB_BASE_URL is set.
 KYC_BASE_URL = "https://hms-mma.app/kyc"
+
+
+def kyc_link_url(token: str) -> str:
+    """The URL the LINK channel sends to members without the app: the web
+    panel's KYC form when configured, else the app screen."""
+    base = os.environ.get("KYC_WEB_BASE_URL") or KYC_BASE_URL
+    return f"{base}?token={token}"
 
 
 def create_kyc_request(
@@ -43,7 +52,7 @@ def create_kyc_request(
 def link_message(member: Member, token: str) -> str:
     return (
         f"Dear {member.first_name_en}, please update your KYC details using "
-        f"this link (valid today): {KYC_BASE_URL}?token={token}"
+        f"this link (valid today): {kyc_link_url(token)}"
     )
 
 

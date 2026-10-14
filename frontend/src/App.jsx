@@ -31,6 +31,7 @@ import ActivityLogs from './pages/ActivityLogs';
 import FormModalHost from './components/FormModalHost';
 import MemberImport from './pages/MemberImport';
 import BulkReceiptMapping from './pages/BulkReceiptMapping';
+import KycForm from './pages/KycForm';
 // Personal Masters (gotra / qualification / native place) screen is switched off for now:
 // import PersonalMasters from './pages/MasterLists';
 
@@ -51,6 +52,9 @@ function App() {
       <FormModalHost />
       <Routes>
         <Route path="/" element={<Login />} />
+
+        {/* Public, token-authenticated pages (no sign-in, not a panel page) */}
+        <Route path="/kyc" element={<KycForm />} />
 
         {/* Shortcuts without the /dashboard prefix */}
         <Route path="/membership/register" element={<Navigate to="/dashboard/membership/register" replace />} />

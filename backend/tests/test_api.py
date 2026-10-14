@@ -2547,6 +2547,48 @@ def test_kyc_link_channels(client, admin_headers, monkeypatch):
     assert len(profile.json()["profile_change_requests"]) == 1
 
 
+def test_magazine_profile_section_shows_kyc_status(client, admin_headers, monkeypatch):
+    """The member profile's magazine tab carries the latest KYC request status
+    (the card behind the Send KYC Update button)."""
+    import services.whatsapp as whatsapp
+
+    sent_messages = []
+
+    async def _capture(to, message, template_id=None):
+        sent_messages.append(message)
+        return {"ok": True}
+
+    monkeypatch.setattr(whatsapp.whatsapp_service, "send_message", _capture)
+
+    member = _create_member(client, admin_headers, "9000000051", "KYC Section Member")
+
+    sent = client.post(
+        f"/api/v1/magazines/members/{member['id']}/send-kyc-link",
+        headers=admin_headers,
+        params={"channel": "LINK"},
+    )
+    assert sent.status_code == 200, sent.text
+    token = sent.json()["kyc_url"].split("token=")[1]
+
+    section = client.get(f"/api/v1/members/{member['id']}/profile/magazine", headers=admin_headers)
+    assert section.status_code == 200, section.text
+    kyc = section.json().get("kyc")
+    assert kyc and kyc["status"] == "SENT" and kyc["sent_at"]
+
+    submitted = client.post(f"/api/v1/kyc/{token}", json={"values": {"email": "section@example.com"}})
+    assert submitted.status_code == 200, submitted.text
+    section = client.get(f"/api/v1/members/{member['id']}/profile/magazine", headers=admin_headers)
+    assert section.json()["kyc"]["status"] == "SUBMITTED" and section.json()["kyc"]["submitted_at"]
+
+
+# a member with no KYC yet shows none
+def test_magazine_profile_section_kyc_none(client, admin_headers):
+    member = _create_member(client, admin_headers, "9000000052", "KYC None Member")
+    section = client.get(f"/api/v1/members/{member['id']}/profile/magazine", headers=admin_headers)
+    assert section.status_code == 200, section.text
+    assert section.json()["kyc"] is None
+
+
 def test_kyc_reminders_batch_respects_interval_and_dedup(client, admin_headers, monkeypatch):
     """POST /magazines/members/kyc-reminders (the periodic-nudge batch job):
     never-asked and stale-asked members are queued, recently-asked members
