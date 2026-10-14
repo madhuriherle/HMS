@@ -152,7 +152,7 @@ MODULE_CATALOG = [
     ("notifications", "Notifications", None, "/notifications", "bell", 70, None),
     ("activity", "Activity Logs", "users", "/dashboard/users/activity", "activity", 5, None),
     ("events", "Events", None, "/events", "calendar", 90, None),
-    ("engagements", "Affiliation, Associates & Press", None, "/engagements", "link", 100, None),
+    ("engagements", "Community", None, "/engagements", "link", 100, None),
     ("imports", "Imports", None, None, "upload", 110, None),
     ("system", "Settings", None, None, "settings", 120, 1),  # holds Organisation Settings (a Masters page) and future screens
 ]
@@ -333,11 +333,12 @@ MENU_PAGE_CATALOG = [
     ("magazines.subscribers", "Subscriptions", "magazines", "/dashboard/magazine/subscriptions", "book-open", 1, "magazines.read", None),
     ("magazines.pauses_returns", "Pauses & Returns", "magazines", "/dashboard/magazine/pauses-returns", "pause", 2, "magazines.read", None),
     ("magazines.labels_delivery", "Labels & Delivery", "magazines", "/dashboard/magazine/labels-delivery", "printer", 3, "magazines.read", None),
-    ("events.management", "Events", "events", "/dashboard/events", "calendar", 1, "events.read", None),
-    ("engagements.affiliations", "Affiliations", "engagements", "/dashboard/engagements/affiliations", "users", 1, "engagements.affiliations.read", None),
-    ("engagements.associates", "Associates", "engagements", "/dashboard/engagements/associates", "user-check", 2, "engagements.associates.read", None),
-    ("engagements.press_media", "Press & Media", "engagements", "/dashboard/engagements/press-media", "newspaper", 3, "engagements.press_media.read", None),
-    ("engagements.committee", "Managing Committee", "engagements", "/dashboard/engagements/committee", "shield", 4, "engagements.committee.read", None),
+    # Community group: Events first, then the registries (the "events" module stays as the privilege owner but is no longer a group)
+    ("events.management", "Events", "engagements", "/dashboard/events", "calendar", 1, "events.read", None),
+    ("engagements.affiliations", "Affiliations", "engagements", "/dashboard/engagements/affiliations", "users", 2, "engagements.affiliations.read", None),
+    ("engagements.associates", "Associates", "engagements", "/dashboard/engagements/associates", "user-check", 3, "engagements.associates.read", None),
+    ("engagements.press_media", "Press & Media", "engagements", "/dashboard/engagements/press-media", "newspaper", 4, "engagements.press_media.read", None),
+    ("engagements.committee", "Managing Committee", "engagements", "/dashboard/engagements/committee", "shield", 5, "engagements.committee.read", None),
     ("reports.summary_report", "Summary", "reports", "/dashboard/reports/summary", "bar-chart", 1, "reports.read", None),
     ("reports.members_report", "Members", "reports", "/dashboard/reports/members", "users", 2, "reports.read", None),
     ("reports.receipts_report", "Receipts & Finance", "reports", "/dashboard/reports/receipts", "receipt", 3, "reports.read", None),
@@ -357,6 +358,7 @@ MENU_PAGE_CATALOG = [
 MENU_NAME_FIXES = {
     "members.unapproved": ("Unapproved Membership", "Unapproved Members"),
     "system": ("System", "Settings"),
+    "engagements": ("Affiliation, Associates & Press", "Community"),
 }
 
 # Pages moved to a new group: code -> (old parent, new parent, new order). Applied only while the row is
@@ -364,6 +366,7 @@ MENU_NAME_FIXES = {
 MENU_MOVES = {
     "masters.organisation": ("masters", "system", 1),
     "members.assigned": ("members", "approvals", 2),
+    "events.management": ("events", "engagements", 1),
 }
 # Pages nested one level deeper, under another page (the System Settings page holds its tools). Same rule as MENU_MOVES.
 MENU_NEST = {
@@ -375,6 +378,11 @@ MENU_ORDER_FIXES = {
     "system.number_formats": (3, 2),
     "system.files": (1, 3),  # make room: Organisation Settings 1, Number Formats 2
     "system.error_logs": (2, 4),
+    # Events joins the Community group at the top; the registries move down one place
+    "engagements.committee": (4, 5),
+    "engagements.press_media": (3, 4),
+    "engagements.associates": (2, 3),
+    "engagements.affiliations": (1, 2),
 }
 # Page privilege changes, applied only while the row still has the old one: code -> (old, new)
 MENU_PERMISSION_FIXES = {
