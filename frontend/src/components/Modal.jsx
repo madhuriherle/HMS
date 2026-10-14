@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { X } from 'lucide-react';
 
 /**
  * Global Viewport-Level Modal Backdrop & Dialog Container
@@ -10,6 +11,8 @@ export default function Modal({
   isOpen = true,
   onClose,
   children,
+  title,                 // given: the popup draws the standard card with a header bar (rule 12.9)
+  maxWidthClass = 'max-w-2xl',
   className = '',
   backdropClassName = 'bg-[#180200]/60 backdrop-blur-sm',
   closeOnBackdrop = true,
@@ -63,7 +66,28 @@ export default function Modal({
         }
       }}
     >
-      {children}
+      {title ? (
+        <div
+          className={`bg-white rounded-2xl ${maxWidthClass} w-full border border-[#E8DFD8] shadow-2xl overflow-y-auto flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between px-6 h-14 shrink-0 sticky top-0 z-10 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+            <h3 className="text-base font-bold text-[#180200] truncate">{title}</h3>
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-[#863221]/60 hover:text-[#180200] p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+          {children}
+        </div>
+      ) : (
+        children
+      )}
     </div>,
     document.body
   );

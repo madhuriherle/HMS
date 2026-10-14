@@ -324,6 +324,8 @@ RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
 12.9 EVERY POPUP HAS A HEADER BAR, EVEN A READ-ONLY ONE: title on the left, close X on the
      right, same height as the footer bar (h-14). A view popup ends with the shared
      ModalFooter (Close only). Never a bare card with the title inside the body.
+     The shared <Modal> draws the card and this header bar itself when given a title="..." prop;
+     without title it is only a backdrop and the page must draw its own card and header.
 12.10 DROPDOWN LISTS OPEN DOWNWARD and are only as tall as the room left below the field
      (they scroll inside). Do not flip a list upward.
 12.11 PROFILE OVERVIEW (member profile): a strip of key facts, then the details as small

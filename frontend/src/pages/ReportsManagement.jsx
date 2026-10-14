@@ -137,8 +137,8 @@ export default function ReportsManagement() {
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
             {TABS.find((t) => t.key === activeTab)?.label || 'Reports'}
           </h1>
-          <PageActionsSlot />
         </div>
+        <PageActionsSlot />
       </div>
 
       {/* Tab Panels */}
