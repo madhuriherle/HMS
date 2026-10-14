@@ -223,7 +223,8 @@ def _month_bounds(year: int, month: int):
 
 def _monthly_grid(db: Session, sub: MagazineSubscription, year: int) -> dict:
     """One box per month of `year`: 'R' = issue returned (not delivered),
-    'P' = service paused that month, '' = nothing recorded."""
+    'P' = service paused that month, 'S' = the issue was sent (the member was on that month's label list and a
+    delivery batch for that issue is Dispatched or Completed), '' = nothing recorded."""
     returns = {
         r.issue_month_year: r for r in db.query(MagazineReturn).filter(
             MagazineReturn.subscription_id == sub.id,
@@ -235,6 +236,24 @@ def _monthly_grid(db: Session, sub: MagazineSubscription, year: int) -> dict:
         MagazineDeliveryPause.subscription_id == sub.id,
         MagazineDeliveryPause.is_deleted == False,  # noqa: E712
     ).all()
+    on_labels = {
+        row[0] for row in db.query(MagazineLabelBatch.issue_month_year)
+        .join(MagazineLabelBatchItem, MagazineLabelBatchItem.label_batch_id == MagazineLabelBatch.id)
+        .filter(
+            MagazineLabelBatchItem.recipient_type == "MEMBER",
+            MagazineLabelBatchItem.recipient_id == sub.member_id,
+            MagazineLabelBatch.issue_month_year.like(f"{year}-%"),
+            MagazineLabelBatch.is_deleted == False,  # noqa: E712
+        ).all()
+    }
+    dispatched = {
+        row[0] for row in db.query(MagazineDeliveryBatch.issue_month_year).filter(
+            MagazineDeliveryBatch.status.in_(("DISPATCHED", "COMPLETED")),
+            MagazineDeliveryBatch.is_deleted == False,  # noqa: E712
+            MagazineDeliveryBatch.issue_month_year.like(f"{year}-%"),
+        ).all()
+    }
+    sent = on_labels & dispatched
     months = []
     for m in range(1, 13):
         first, last = _month_bounds(year, m)
@@ -243,7 +262,8 @@ def _monthly_grid(db: Session, sub: MagazineSubscription, year: int) -> dict:
         pause = next((p for p in pauses if p.pause_start_date <= last and (p.pause_end_date is None or p.pause_end_date >= first)), None)
         months.append({
             "month": m, "issue_month_year": key,
-            "mark": "R" if ret else ("P" if pause else ""),
+            "mark": "R" if ret else ("P" if pause else ("S" if key in sent else "")),
+            "sent": key in sent,
             "returned": bool(ret), "return_id": ret.id if ret else None,
             "return_reason": ret.return_reason if ret else None,
             "paused": bool(pause), "pause_reason": pause.reason if pause else None,

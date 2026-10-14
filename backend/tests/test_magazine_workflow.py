@@ -315,3 +315,30 @@ def test_the_profile_lists_the_members_pauses(client, admin_headers):
     prof = client.get(f"{API}/members/{mid}/profile/magazine", headers=h).json()
     assert [p["reason"] for p in prof["pauses"]] == ["returned twice"]
     assert prof["pauses"][0]["pause_end_date"] is None
+
+
+def test_an_issue_shows_as_sent_once_its_delivery_batch_is_dispatched(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]
+    sub = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"][0]
+    year = 1990 + int(s) % 9      # a year no other test uses, so older batches cannot interfere
+    issue = f"{year}-05"
+    made = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": issue, "only_paid": False})
+    assert made.status_code in (200, 201), made.text
+
+    def may():
+        grid = client.get(f"{API}/magazines/subscriptions/{sub['id']}/monthly", headers=h, params={"year": year}).json()
+        return grid["months"][4]
+
+    assert may()["mark"] == "" and may()["sent"] is False          # labels printed, nothing dispatched yet
+    batch = client.post(f"{API}/magazines/delivery-batches", headers=h, json={
+        "batch_name": f"Dispatch {issue}", "issue_month_year": issue, "dispatch_date": f"{year}-05-03", "status": "PENDING",
+    }).json()
+    assert may()["mark"] == ""                                      # a pending batch is not a send
+    assert client.put(f"{API}/magazines/delivery-batches/{batch['id']}", headers=h, json={"status": "DISPATCHED"}).status_code == 200
+    assert may()["mark"] == "S" and may()["sent"] is True
+    # a return still wins over the send
+    assert client.post(f"{API}/magazines/returns", headers=h, json={
+        "subscription_id": sub["id"], "issue_month_year": issue, "return_date": f"{year}-05-20",
+    }).status_code in (200, 201)
+    assert may()["mark"] == "R"

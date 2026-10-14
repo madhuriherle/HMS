@@ -104,7 +104,7 @@ function ModalShell({ title, children, footer }) {
 function Pager({ page, pages, total, pageSize, onPage, onPageSize }) {
   const totalPages = pages || 1;
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-stone-200 bg-[#FAF7F2]/60 px-4 py-3 text-xs text-gray-600">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3 text-xs text-[#863221]">
       <div>
         Showing <span className="font-semibold">{total}</span> record{total === 1 ? '' : 's'}
       </div>
@@ -859,12 +859,14 @@ function MonthlyModal({ sub, memberName, onClose }) {
                 {grid.months.map((m) => (
                   <div
                     key={m.issue_month_year}
-                    title={m.returned ? `Returned: ${m.return_reason || 'no reason'}` : m.paused ? `Paused: ${m.pause_reason || 'no reason'}` : 'Nothing recorded'}
+                    title={m.returned ? `Returned: ${m.return_reason || 'no reason'}` : m.paused ? `Paused: ${m.pause_reason || 'no reason'}` : m.sent ? 'Sent: on that month\'s label list and the issue was dispatched' : 'Nothing recorded'}
                     className={`rounded-lg border px-2 py-3 text-center ${
                       m.mark === 'R'
                         ? 'border-red-200 bg-red-50 text-red-700'
                         : m.mark === 'P'
                         ? 'border-amber-200 bg-amber-50 text-amber-700'
+                        : m.mark === 'S'
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                         : 'border-stone-200 bg-white text-stone-400'
                     }`}
                   >
@@ -876,6 +878,7 @@ function MonthlyModal({ sub, memberName, onClose }) {
               <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-gray-600">
                 <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm border border-red-200 bg-red-50" /> R = returned issue</span>
                 <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm border border-amber-200 bg-amber-50" /> P = paused that month</span>
+                <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm border border-emerald-200 bg-emerald-50" /> S = sent</span>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-semibold text-stone-700">Returned in {grid.year}: {grid.returned_in_year}</span>
@@ -1441,11 +1444,16 @@ function LabelsTab({ locations, canWrite }) {
   const [busy, setBusy] = useState(false);
 
   const [gen, setGen] = useState({ issue_month_year: thisMonth(), state_id: '', district_id: '', taluk_id: '', only_paid: true });
+  const [deliveries, setDeliveries] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/magazines/label-batches', { params: { limit: 5000 } });
+      const [{ data }, del] = await Promise.all([
+        api.get('/magazines/label-batches', { params: { limit: 5000 } }),
+        api.get('/magazines/delivery-batches', { params: { limit: 5000 } }),
+      ]);
+      setDeliveries(Array.isArray(del.data?.data) ? del.data.data : []);
       setBatches(Array.isArray(data?.data) ? data.data : []);
     } catch (error) {
       notify(error.response?.data?.detail || 'Could not load label batches.', 'error');
@@ -1455,6 +1463,29 @@ function LabelsTab({ locations, canWrite }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // the delivery batch of an issue month tells whether that month's labels were sent
+  const deliveryOf = (issue) => deliveries.find((d) => d.issue_month_year === issue && ['DISPATCHED', 'COMPLETED'].includes(d.status));
+
+  const markDispatched = async (batch) => {
+    try {
+      const open = deliveries.find((d) => d.issue_month_year === batch.issue_month_year);
+      if (open) {
+        await api.put(`/magazines/delivery-batches/${open.id}`, { status: 'DISPATCHED', dispatch_date: today() });
+      } else {
+        await api.post('/magazines/delivery-batches', {
+          batch_name: `Dispatch ${batch.issue_month_year}`,
+          issue_month_year: batch.issue_month_year,
+          dispatch_date: today(),
+          status: 'DISPATCHED',
+        });
+      }
+      notify('Marked as dispatched.');
+      load();
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Could not mark the issue as dispatched.', 'error');
+    }
+  };
 
   const stateOptions = locations.states.map((s) => ({ value: s.id, label: s.name }));
   const districtOptions = locations.districts
@@ -1576,14 +1607,15 @@ function LabelsTab({ locations, canWrite }) {
                 <TH>Issue</TH>
                 <TH>Generated</TH>
                 <TH className="text-center">Labels</TH>
+                <TH>Sent</TH>
                 <TH className="text-center">Actions</TH>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-200">
               {loading ? (
-                <EmptyRow colSpan={5} title="Loading…" />
+                <EmptyRow colSpan={6} title="Loading…" />
               ) : batches.length === 0 ? (
-                <EmptyRow colSpan={5} icon={FileText} title="No label batches yet" hint="Generate a batch above to print magazine labels." />
+                <EmptyRow colSpan={6} icon={FileText} title="No label batches yet" hint="Generate a batch above to print magazine labels." />
               ) : (
                 batches.map((b) => (
                   <tr key={b.id} className="hover:bg-amber-50/40 transition-colors">
@@ -1592,7 +1624,19 @@ function LabelsTab({ locations, canWrite }) {
                     <td className="px-4 py-3.5 text-xs text-gray-600">{formatDate(b.generation_date)}</td>
                     <td className="px-4 py-3.5 text-center text-xs font-bold text-gray-800">{b.total_labels ?? 0}</td>
                     <td className="px-4 py-3.5">
+                      {deliveryOf(b.issue_month_year) ? (
+                        <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                          Sent{deliveryOf(b.issue_month_year).dispatch_date ? ` on ${formatDate(deliveryOf(b.issue_month_year).dispatch_date)}` : ''}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-gray-400">Not sent yet</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5">
                       <div className="flex items-center justify-center gap-1.5">
+                        {canWrite && !deliveryOf(b.issue_month_year) && (
+                          <button type="button" onClick={() => markDispatched(b)} className="btn-act" title="Mark this issue as sent"><PackageCheck className="w-3.5 h-3.5" /><span>Mark sent</span></button>
+                        )}
                         <button type="button" onClick={() => setDetail(b)} className="btn-act" title="View labels"><Eye className="w-3.5 h-3.5" /><span>View</span></button>
                         {canWrite && (
                           <button type="button" onClick={() => onDownload(b)} className="btn-act" title="Download PDF"><Download className="w-3.5 h-3.5" /><span>PDF</span></button>
