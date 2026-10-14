@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import PageActions, { PageActionsSlot } from '../components/PageActions';
 import Modal from '../components/Modal';
 import ModalFooter from '../components/ModalFooter';
 import SearchFilterBar from '../components/SearchFilterBar';
@@ -223,13 +224,14 @@ export default function MagazineManagement() {
       <div className="space-y-6 pb-12">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">{sectionTitle}</h1>
-          <Link
+          <PageActions><Link
             to="/dashboard/magazine/labels"
             className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-stone-50 transition-colors"
           >
             <Printer className="h-4 w-4 text-[#8C1801]" />
             <span>Quick Label List</span>
-          </Link>
+          </Link></PageActions>
+          <PageActionsSlot />
         </div>
 
         {unsubscribedPaid.length > 0 && (
@@ -465,10 +467,10 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
           />
         </div>
         {canWrite && (
-          <button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
+          <PageActions><button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
             <Plus className="w-4 h-4" />
             <span>Start Subscription</span>
-          </button>
+          </button></PageActions>
         )}
       </div>
 
@@ -844,9 +846,9 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete }) {
           Show only pauses active today
         </label>
         {canWrite && (
-          <button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
+          <PageActions><button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
             <Plus className="w-4 h-4" /><span>Pause Delivery</span>
-          </button>
+          </button></PageActions>
         )}
       </div>
 
@@ -1105,9 +1107,9 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete }) {
           </button>
         </div>
         {canWrite && (
-          <button type="button" onClick={() => setFormOpen(true)} className={BTN_PRIMARY}>
+          <PageActions><button type="button" onClick={() => setFormOpen(true)} className={BTN_PRIMARY}>
             <Plus className="w-4 h-4" /><span>Mark Return</span>
-          </button>
+          </button></PageActions>
         )}
       </div>
 
@@ -1634,9 +1636,9 @@ function DeliveryBatchesTab({ canWrite, canDelete }) {
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-gray-500">Dispatch batches track when an issue was sent out.</p>
         {canWrite && (
-          <button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
+          <PageActions><button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
             <Plus className="w-4 h-4" /><span>New Delivery Batch</span>
-          </button>
+          </button></PageActions>
         )}
       </div>
 

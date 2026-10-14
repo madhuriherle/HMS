@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
+import PageActions, { PageActionsSlot } from '../components/PageActions';
 import {
   Bell,
   MessageSquare,
@@ -93,6 +94,7 @@ export default function NotificationsManagement() {
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
             {TABS.find((t) => t.key === activeTab)?.label || 'Notifications'}
           </h1>
+          <PageActionsSlot />
         </div>
       </div>
 
@@ -259,7 +261,7 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
         <div className="text-xs text-stone-600">
           Broadcast campaigns dispatched across WhatsApp, SMS, or Email
         </div>
-        <div className="flex items-center gap-2">
+        <PageActions>
           <button
             onClick={loadCampaigns}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-stone-700 bg-white border border-[#E8DFD8] rounded-lg hover:bg-stone-50 cursor-pointer shadow-sm transition-colors"
@@ -287,7 +289,7 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
               <span>Create Campaign</span>
             </button>
           )}
-        </div>
+        </PageActions>
       </div>
 
       {/* Campaigns Table */}
@@ -653,7 +655,7 @@ function TemplatesTab({ canWrite, canDelete }) {
         <div className="text-xs text-stone-600">
           Reusable message templates with dynamic tags like <code className="bg-stone-100 px-1 py-0.5 rounded text-[#510601]">{'{{name}}'}</code>, <code className="bg-stone-100 px-1 py-0.5 rounded text-[#510601]">{'{{member_code}}'}</code>
         </div>
-        <div className="flex items-center gap-2">
+        <PageActions>
           <button
             onClick={loadTemplates}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-stone-700 bg-white border border-[#E8DFD8] rounded-lg hover:bg-stone-50 cursor-pointer shadow-sm transition-colors"
@@ -682,7 +684,7 @@ function TemplatesTab({ canWrite, canDelete }) {
               <span>Create Template</span>
             </button>
           )}
-        </div>
+        </PageActions>
       </div>
 
       {/* Templates Table */}

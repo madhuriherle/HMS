@@ -32,6 +32,7 @@ import Modal from '../components/Modal';
 import ModalFooter from '../components/ModalFooter';
 import PermissionGate from '../components/PermissionGate';
 import DateInput from '../components/DateInput';
+import PageActions, { PageActionsSlot } from '../components/PageActions';
 import { formatDate } from '../utils/dateUtils';
 import { notify } from '../utils/notify';
 import Swal from 'sweetalert2';
@@ -73,6 +74,7 @@ export default function EngagementsManagement() {
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
             {section.title}
           </h1>
+          <PageActionsSlot />
         </div>
 
         {/* Active Tab View */}
@@ -337,14 +339,14 @@ function AffiliationsView({ canWrite, canDelete }) {
         </div>
 
         {canWrite && (
-          <button
+          <PageActions><button
             type="button"
             onClick={openAddModal}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Affiliate</span>
-          </button>
+          </button></PageActions>
         )}
       </div>
 
@@ -872,14 +874,14 @@ function AssociatesView({ canWrite, canDelete }) {
         </div>
 
         {canWrite && (
-          <button
+          <PageActions><button
             type="button"
             onClick={openAdd}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Register Associate</span>
-          </button>
+          </button></PageActions>
         )}
       </div>
 
@@ -1244,14 +1246,14 @@ function PressMediaView({ canWrite, canDelete }) {
         </div>
 
         {canWrite && (
-          <button
+          <PageActions><button
             type="button"
             onClick={openAdd}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Press / Media</span>
-          </button>
+          </button></PageActions>
         )}
       </div>
 
@@ -1750,7 +1752,7 @@ function CommitteeView({ canWrite, canDelete }) {
         <div className="flex items-center gap-2">
           {canWrite && (
             <>
-              <button
+              <PageActions><button
                 type="button"
                 onClick={() => {
                   setEditingCat(null);
@@ -1761,9 +1763,9 @@ function CommitteeView({ canWrite, canDelete }) {
               >
                 <Layers className="w-3.5 h-3.5 text-[#510601]" />
                 <span>Manage Categories</span>
-              </button>
+              </button></PageActions>
 
-              <button
+              <PageActions><button
                 type="button"
                 onClick={() => {
                   setEditingTerm(null);
@@ -1774,16 +1776,16 @@ function CommitteeView({ canWrite, canDelete }) {
               >
                 <Calendar className="w-3.5 h-3.5 text-[#510601]" />
                 <span>Manage Terms</span>
-              </button>
+              </button></PageActions>
 
-              <button
+              <PageActions><button
                 type="button"
                 onClick={openAddMember}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Member</span>
-              </button>
+              </button></PageActions>
             </>
           )}
         </div>

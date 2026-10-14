@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
+import PageActions, { PageActionsSlot } from '../components/PageActions';
 import {
   BarChart3,
   Users,
@@ -136,6 +137,7 @@ export default function ReportsManagement() {
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
             {TABS.find((t) => t.key === activeTab)?.label || 'Reports'}
           </h1>
+          <PageActionsSlot />
         </div>
       </div>
 
@@ -557,7 +559,7 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
         </div>
 
         {/* Export Buttons */}
-        <div className="flex items-center gap-2">
+        <PageActions>
           {subView === 'list' && (
             <button
               onClick={() => setColumnModalOpen(true)}
@@ -583,7 +585,7 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Export Excel</span>
           </button>
-        </div>
+        </PageActions>
       </div>
 
       {/* Filter Toolbar */}
@@ -967,7 +969,7 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <PageActions>
           <button
             onClick={() => handleExport('csv')}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-[#FAF7F2] cursor-pointer shadow-sm transition-colors"
@@ -982,7 +984,7 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Export Excel</span>
           </button>
-        </div>
+        </PageActions>
       </div>
 
       {/* Filter Toolbar */}
@@ -1193,7 +1195,7 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <PageActions>
           <button
             onClick={() => handleExport('csv')}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-[#FAF7F2] cursor-pointer shadow-sm transition-colors"
@@ -1208,7 +1210,7 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Export Excel</span>
           </button>
-        </div>
+        </PageActions>
       </div>
 
       {/* Filter toolbar */}
