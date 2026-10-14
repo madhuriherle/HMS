@@ -130,8 +130,8 @@ function App() {
           <Route path="receipts/edit/:id" element={<ReceiptEntry />} />
           <Route path="receipts/tracking" element={<ReceiptTracking />} />
           <Route path="receipt/tracking" element={<ReceiptTracking />} />
-          <Route path="receipts/bulk-mapping" element={<PermissionGate required={['receipts.tracking.read', 'receipts.read']} title="Access Restricted" message="You need permission to track receipts to access Bulk Mapping."><BulkReceiptMapping /></PermissionGate>} />
-          <Route path="receipts/auto-map" element={<PermissionGate required={['receipts.tracking.read', 'receipts.read']} title="Access Restricted" message="You need permission to track receipts to access Bulk Mapping."><BulkReceiptMapping /></PermissionGate>} />
+          <Route path="receipts/bulk-mapping" element={<PermissionGate required="receipts.bulk_mapping.read" title="Access Restricted" message="You need the Bulk Receipt Mapping privilege to open this page."><BulkReceiptMapping /></PermissionGate>} />
+          <Route path="receipts/auto-map" element={<PermissionGate required="receipts.bulk_mapping.read" title="Access Restricted" message="You need the Bulk Receipt Mapping privilege to open this page."><BulkReceiptMapping /></PermissionGate>} />
           <Route path="receipts/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
           <Route path="receipts/label-list" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
           <Route path="magazine/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />

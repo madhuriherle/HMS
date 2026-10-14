@@ -29,7 +29,7 @@ import { formatMoney } from '../utils/money';
 import ModalFooter from '../components/ModalFooter';
 export default function BulkReceiptMapping() {
   const { hasPermission } = useAuth();
-  const canWrite = hasPermission('receipts.tracking.write') || hasPermission('receipts.write');
+  const canWrite = hasPermission('receipts.bulk_mapping.write');
 
   const [loading, setLoading] = useState(true);
   const [candidates, setCandidates] = useState([]);

@@ -17,9 +17,11 @@ import {
 import api from '../api';
 import { notify } from '../utils/notify';
 import PermissionGate from '../components/PermissionGate';
+import useAuth from '../hooks/useAuth';
 
 export default function MemberImport() {
   const navigate = useNavigate();
+  const { hasPermission } = useAuth();
   const fileInputRef = useRef(null);
 
   const [file, setFile] = useState(null);
@@ -460,12 +462,14 @@ export default function MemberImport() {
                 >
                   Import Another File
                 </button>
-                <Link
-                  to="/dashboard/receipts/bulk-mapping"
-                  className="px-5 py-2.5 text-xs font-bold rounded-xl bg-[#510601] hover:bg-[#863221] text-white shadow-sm transition-colors"
-                >
-                  Go to Bulk Receipt Auto-Mapping →
-                </Link>
+                {hasPermission('receipts.bulk_mapping.read') && (
+                  <Link
+                    to="/dashboard/receipts/bulk-mapping"
+                    className="px-5 py-2.5 text-xs font-bold rounded-xl bg-[#510601] hover:bg-[#863221] text-white shadow-sm transition-colors"
+                  >
+                    Go to Bulk Receipt Auto-Mapping →
+                  </Link>
+                )}
                 <Link
                   to="/dashboard/membership/list"
                   className="px-5 py-2.5 text-xs font-bold rounded-xl border border-[#510601] text-[#510601] hover:bg-[#510601]/5 transition-colors"

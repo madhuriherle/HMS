@@ -848,7 +848,7 @@ def read_allocations(
 def get_unassigned_candidates(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_any_permission("receipts.tracking.read", "receipts.read")),
+    current_user: User = Depends(deps.require_permission("receipts.read")),  # the path decides: Bulk Receipt Mapping read
     search: Optional[str] = None,
     filter_type: Optional[str] = "ALL",  # ALL, MATCHED, UNMATCHED
     limit: int = 500,
@@ -980,7 +980,7 @@ class BulkAllocationPayload(_pydantic.BaseModel):
 def bulk_allocate_receipts(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_any_permission("receipts.tracking.write", "receipts.write")),
+    current_user: User = Depends(deps.require_permission("receipts.write")),  # the path decides: Bulk Receipt Mapping write
     payload: BulkAllocationPayload,
 ) -> Any:
     """Map multiple unassigned receipts to members in a single transaction."""

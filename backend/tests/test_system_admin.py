@@ -216,7 +216,7 @@ def test_sidebar_shows_only_what_the_role_may_open_and_parents_follow_their_chil
 
     # two pages in different groups: both groups appear, each with only its own page
     two = names(_role_user(client, admin_headers, ["masters.payment_modes.read", "receipts.tracking.read"]))
-    assert two["Masters"] == ["Payment Mode Setup"] and two["Receipts"] == ["Receipt Tracking", "Bulk Receipt Mapping"]  # Bulk Mapping is opened by the same privilege
+    assert two["Masters"] == ["Payment Mode Setup"] and two["Receipts"] == ["Receipt Tracking"]  # Bulk Mapping has its own privilege
 
 
 def test_my_profile_returns_contact_and_login_details_and_can_be_edited(client, admin_headers):

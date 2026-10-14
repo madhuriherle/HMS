@@ -70,12 +70,15 @@ SUB_MODULE_AREAS = {
         ]),
         ("receipts.tracking", "Receipt Tracking", [
             ("GET", r"^/receipts/?$"),
-            ("GET", r"^/receipts/(tracking|allocations|unassigned-candidates|day-book)/?$"),
+            ("GET", r"^/receipts/(tracking|allocations|day-book)/?$"),
             ("GET", r"^/receipts/\d+(/allocations)?/?$"),
             ("PUT|DELETE", r"^/receipts/\d+/?$"),
             ("POST", r"^/receipts/\d+/(allocate|cancel|refund|payment-transactions)/?$"),
-            ("POST", r"^/receipts/bulk-allocate/?$"),
             ("DELETE", r"^/receipts/\d+/allocations/\d+/?$"),
+        ]),
+        ("receipts.bulk_mapping", "Bulk Receipt Mapping", [
+            ("GET", r"^/receipts/unassigned-candidates/?$"),
+            ("POST", r"^/receipts/bulk-allocate/?$"),
         ]),
     ],
     "system": [
@@ -110,7 +113,7 @@ SHARED_READS = [
     (r"^/masters/(particulars|payment-modes|banks)(/.*)?$",
      ["receipts.entry.read", "receipts.tracking.read", "members.register.write"]),
     # the member picker and member checks used by the receipt screens and the registration form
-    (r"^/members/?$", ["receipts.entry.read", "receipts.tracking.read"]),
+    (r"^/members/?$", ["receipts.entry.read", "receipts.tracking.read", "receipts.bulk_mapping.read"]),
     (r"^/members/lookup/?$", ["receipts.entry.read", "members.register.write"]),
     (r"^/members/duplicate-check/?$", ["members.register.write"]),
     (r"^/members/\d+(/profile(/[a-z]+)?)?/?$", ["receipts.entry.read", "members.register.write"]),
@@ -123,6 +126,7 @@ AREA_ACTIONS = {
     "members.unapproved": ("read", "write"),
     "members.register": ("write",),
     "receipts.entry": ("read", "write"),
+    "receipts.bulk_mapping": ("read", "write"),
     "system.number_formats": ("read", "write"),
     "masters.organisation": ("read", "write"),
     "system.recycle_bin": ("read", "write"),
@@ -321,7 +325,7 @@ MENU_PAGE_CATALOG = [
     ("members.assigned", "Assigned for Approval", "approvals", "/dashboard/membership/assigned", "check-circle", 2, "members.unapproved.read", None),
     ("receipts.entry", "Receipt Entry", "receipts", "/dashboard/receipts/entry", "file-plus", 1, "receipts.entry.read", None),
     ("receipts.tracking", "Receipt Tracking", "receipts", "/dashboard/receipts/tracking", "search", 2, "receipts.tracking.read", None),
-    ("receipts.bulk_mapping", "Bulk Receipt Mapping", "receipts", "/dashboard/receipts/bulk-mapping", "link", 3, "receipts.tracking.read", None),
+    ("receipts.bulk_mapping", "Bulk Receipt Mapping", "receipts", "/dashboard/receipts/bulk-mapping", "link", 3, "receipts.bulk_mapping.read", None),
     ("users.modules", "Modules", "users", "/dashboard/users/modules", "layout-grid", 4, None, 1),
     ("masters.location", "Location Setup", "masters", "/dashboard/master/location-setup", "map-pin", 1, "masters.location.read", None),
     ("masters.membership_types", "Membership Types", "masters", "/dashboard/master/membership-type", "badge", 2, "masters.membership_types.read", None),

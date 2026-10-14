@@ -36,7 +36,30 @@ def test_receipt_screens_work_with_their_own_privileges_only(client, admin_heade
             walk(n.get("submodules", []))
     walk(menu)
     assert "Receipt Entry" in names and "Receipt Tracking" in names
+    assert "Bulk Receipt Mapping" not in names, "Bulk Mapping needs its own privilege"
+    assert client.get(f"{API}/receipts/unassigned-candidates", headers=h).status_code == 403
+    assert client.post(f"{API}/receipts/bulk-allocate", headers=h, json={"allocations": []}).status_code == 403
     assert not {"Particulars Master", "Payment Mode Setup", "Location Setup", "Membership List", "Unapproved Members"} & set(names)
+
+
+def test_bulk_receipt_mapping_has_its_own_privilege(client, admin_headers):
+    h = _role_user(client, admin_headers, ["receipts.bulk_mapping.read", "receipts.bulk_mapping.write"])
+    assert client.get(f"{API}/receipts/unassigned-candidates", headers=h).status_code == 200
+    assert client.get(f"{API}/members/?limit=5&search=a", headers=h).status_code == 200, "the member picker on the page"
+    assert client.post(f"{API}/receipts/bulk-allocate", headers=h, json={"allocations": []}).status_code in (200, 422)
+    assert client.get(f"{API}/receipts/tracking?limit=5", headers=h).status_code == 403, "but not Receipt Tracking"
+    menu = client.get(f"{API}/users/modules/menu", headers=h).json()
+    names = []
+
+    def walk(nodes):
+        for n in nodes:
+            names.append(n["name"])
+            walk(n.get("submodules", []))
+    walk(menu)
+    assert "Bulk Receipt Mapping" in names and "Receipt Tracking" not in names
+    # a tracking-only role cannot open it either
+    t = _role_user(client, admin_headers, ["receipts.tracking.read", "receipts.tracking.write"])
+    assert client.get(f"{API}/receipts/unassigned-candidates", headers=t).status_code == 403
 
 
 def test_a_role_with_only_the_page_read_cannot_save(client, admin_headers):
