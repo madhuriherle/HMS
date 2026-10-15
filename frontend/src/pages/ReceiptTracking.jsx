@@ -876,7 +876,16 @@ export default function ReceiptTracking() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div>
                     <span className="text-[10px] uppercase font-bold text-[#863221]">Receipt Type</span>
-                    <p className="font-bold text-[#510601] mt-0.5">{viewingReceipt.particulars || 'Membership'}</p>
+                    {viewingReceipt.items?.[0] ? (
+                      <>
+                        <p className="font-bold text-[#510601] mt-0.5">{lineLabel(viewingReceipt.items[0])}</p>
+                        {lineLabel(viewingReceipt.items[0]) !== viewingReceipt.items[0].particular && (
+                          <p className="text-[11px] text-[#863221]">{viewingReceipt.items[0].particular}</p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="font-bold text-[#510601] mt-0.5">{viewingReceipt.particulars || 'Membership'}</p>
+                    )}
                   </div>
                   {viewingReceipt.items?.length > 1 && (
                     <div className="col-span-2 sm:col-span-3">
