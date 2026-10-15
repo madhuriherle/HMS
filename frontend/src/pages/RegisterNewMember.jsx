@@ -1183,30 +1183,36 @@ export default function RegisterNewMember() {
                         {formErrors.mobile && (
                           <p className="text-[11px] text-red-600 mt-1">{formErrors.mobile}</p>
                         )}
-                        {/* Shared family mobile: one small line listing who already uses it (never blocks) */}
+                        {/* Shared family mobile: who already uses it (never blocks) */}
                         {dupInfo.same_mobile.length > 0 && (
-                          <p className="mt-1.5 text-[11px] leading-snug text-stone-600">
-                            <span className="font-semibold text-[#863221]">Also used by: </span>
-                            {(sharedOpen ? dupInfo.same_mobile : dupInfo.same_mobile.slice(0, 3)).map((d, i) => (
-                              <span key={d.id}>
-                                {i > 0 && ', '}
-                                <a
-                                  href={`/dashboard/membership/profile/${d.id}`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="font-semibold text-[#510601] hover:underline"
-                                >
-                                  {d.name}
-                                </a>
-                                {(d.membership_number || d.member_code) ? ` (${d.membership_number || d.member_code})` : ''}
-                              </span>
-                            ))}
+                          <div className="mt-2 text-[11px] text-stone-600">
+                            <p className="mb-0.5 font-semibold text-[#863221]">Also used by:</p>
+                            <ul className="divide-y divide-[#E8DFD8] border-y border-[#E8DFD8]">
+                              {(sharedOpen ? dupInfo.same_mobile : dupInfo.same_mobile.slice(0, 3)).map((d) => (
+                                <li key={d.id} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 py-1">
+                                  <a
+                                    href={`/dashboard/membership/profile/${d.id}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="font-bold text-[#510601] hover:underline"
+                                  >
+                                    {d.name || 'Unnamed'}
+                                  </a>
+                                  <span className="font-mono font-semibold text-[#180200]">{d.membership_number || `ID ${d.id}`}</span>
+                                  {d.relation && <span>· {d.relation}</span>}
+                                  {d.district && <span>· {d.district}</span>}
+                                  <span className={String(d.approval_status).toUpperCase() === 'APPROVED' ? 'font-semibold text-emerald-700' : 'font-semibold text-amber-700'}>
+                                    · {String(d.approval_status).toUpperCase() === 'APPROVED' ? 'Active' : 'Unapproved'}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
                             {!sharedOpen && dupInfo.same_mobile.length > 3 && (
-                              <button type="button" onClick={() => setSharedOpen(true)} className="ml-1 font-semibold text-[#510601] hover:underline cursor-pointer">
+                              <button type="button" onClick={() => setSharedOpen(true)} className="mt-0.5 font-semibold text-[#510601] hover:underline cursor-pointer">
                                 +{dupInfo.same_mobile.length - 3} more
                               </button>
                             )}
-                          </p>
+                          </div>
                         )}
                       </div>
 

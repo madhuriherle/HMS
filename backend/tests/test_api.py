@@ -3528,6 +3528,8 @@ def test_family_members_can_share_a_mobile(client, admin_headers):
     check = client.get("/api/v1/members/duplicate-check", headers=admin_headers, params={"mobile": "9000000022"})
     assert check.status_code == 200, check.text
     assert len(check.json()["same_mobile"]) == 2
+    card = check.json()["same_mobile"][0]
+    assert {"name", "membership_number", "relation", "district", "approval_status"} <= set(card)
 
 
 def test_permission_revoke_and_regrant(client, admin_headers):

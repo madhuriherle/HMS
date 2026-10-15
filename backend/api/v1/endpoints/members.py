@@ -469,7 +469,7 @@ def duplicate_check(
 ) -> Any:
     """Registration helper: is this person already on file?
 
-    ``same_mobile`` = a live member with that mobile number (the database allows only one);
+    ``same_mobile`` = the live members who use that mobile number (family members may share one, rule 2.2);
     ``similar`` = same first name + last name + date of birth on a different mobile.
     """
     live = [Member.is_deleted == False]  # noqa: E712
@@ -477,12 +477,18 @@ def duplicate_check(
         live.append(Member.id != exclude_id)
 
     def card(m):
+        from models.masters import District
+
+        district = db.query(District.name_en).filter(District.id == m.district_id).scalar() if m.district_id else None
         return {
             "id": m.id,
-            "name": " ".join(x for x in (m.first_name_en, m.last_name_en) if x),
+            "name": " ".join(x for x in (m.name_title, m.first_name_en, m.middle_name_en, m.last_name_en) if x),
             "member_code": m.member_code,
+            "membership_number": m.membership_number,
             "mobile": m.mobile,
             "approval_status": m.approval_status,
+            "relation": m.applied_on_behalf_of,
+            "district": district,
         }
 
     digits = re.sub(r"\D", "", mobile or "")[-10:]
