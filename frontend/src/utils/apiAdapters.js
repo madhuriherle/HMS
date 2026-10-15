@@ -182,9 +182,13 @@ export const normalizeReceipt = (receipt) => ({
   membershipNo: firstDefined(receipt.membership_number, receipt.member_code, receipt.payer_membership_no, receipt.membershipNo, ''),
   memberId: firstDefined(receipt.member_id, receipt.memberId, null),
   mobile: firstDefined(receipt.payer_mobile, receipt.mobile, ''),
-  particulars: receiptTypeFromApi(firstDefined(receipt.receipt_type, receipt.particulars, 'MEMBERSHIP')),
+  // the particular named on the receipt's first line (imported receipts all carry the type OTHER), else the head type
+  particulars: (receipt.items || [])[0]?.particular || receiptTypeFromApi(firstDefined(receipt.receipt_type, receipt.particulars, 'MEMBERSHIP')),
   amount: Number(firstDefined(receipt.amount, receipt.net_amount, receipt.gross_amount, 0)),
-  paymentMode: paymentModeFromApi(firstDefined(receipt.payment_mode, receipt.paymentMode, 'OTHER')),
+  // a mode named after a bank account ("CANARA BANK") is stored as NETBANKING plus the name: show the name
+  paymentMode: (['NETBANKING', 'OTHER'].includes(String(receipt.payment_mode || '').toUpperCase()) && receipt.bank_account)
+    ? receipt.bank_account
+    : paymentModeFromApi(firstDefined(receipt.payment_mode, receipt.paymentMode, 'OTHER')),
   bankName: firstDefined(receipt.bankName, receipt.bank_account, ''),
   bankAccount: firstDefined(receipt.bankAccount, receipt.bank_account, ''),
   transactionId: firstDefined(receipt.transaction_reference, receipt.cheque_number, receipt.transactionId, ''),

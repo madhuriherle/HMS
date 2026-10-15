@@ -648,7 +648,7 @@ export default function ReceiptTracking() {
 
                       {/* Column 5: Receipt Type */}
                       <td className="py-3.5 px-4 font-semibold text-[#510601] text-xs">
-                        {receipt.items?.length > 1 ? receipt.items[0].particular : receipt.particulars || 'Membership'}
+                        {receipt.items?.length > 1 ? receipt.items[0].particular : `${receipt.particulars || 'Membership'}${receipt.items?.[0]?.description && receipt.items[0].description !== receipt.particulars ? ` › ${receipt.items[0].description}` : ''}`}
                         {receipt.items?.length > 1 && (
                           <span
                             className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-bold text-[#863221]"
