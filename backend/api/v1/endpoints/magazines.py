@@ -1149,28 +1149,33 @@ def download_label_pdf(
         x = (slot % cols) * label_w
         y = (slot // cols) * label_h
 
-        pdf.set_draw_color(165, 165, 165)
+        # the pre-cut sticker sheet has its own outline: no box is drawn; Times like the printed stickers (Latin text),
+        # Noto only when a character is not Latin-1 (Kannada and the like)
         pdf.set_text_color(0, 0, 0)
-        pdf.rect(x + 1, y + 1, label_w - 2, label_h - 2)
-
-        inner_w = label_w - 6
-        pdf.set_xy(x + 3, y + 3)
         name = names.get((item.recipient_type, item.recipient_id), item.recipient_type.title())
         code = member_codes.get(item.recipient_id) if item.recipient_type == "MEMBER" else None
-        pdf.set_font("Lbl", "", 7.5)
-        if code:
-            pdf.multi_cell(inner_w, 3.5, str(code), max_line_height=3.5)
-        pdf.set_font("Lbl", "B", 8.5)
-        pdf.set_x(x + 3)
-        pdf.multi_cell(inner_w, 4, name, max_line_height=4)
-        pdf.set_font("Lbl", "", 8)
-        pdf.set_x(x + 3)
-        # keep the address inside the label box
-        remaining = (y + label_h - 8) - pdf.get_y()
-        max_lines = max(int(remaining // 3.6), 1)
         text = item.label_address or ""
-        wrapped = pdf.multi_cell(inner_w, 3.6, text, dry_run=True, output="LINES")
-        pdf.multi_cell(inner_w, 3.6, chr(10).join(wrapped[:max_lines]))
+        try:
+            f"{code or ''}{name}{text}".encode("latin-1")
+            face = "Times"
+        except UnicodeEncodeError:
+            face = "Lbl"
+        inner_w = label_w - 10
+        left = x + 5
+        pdf.set_xy(left, y + 7)
+        pdf.set_font(face, "", 10)
+        if code:
+            pdf.multi_cell(inner_w, 4.2, str(code), max_line_height=4.2)
+        pdf.set_font(face, "B", 10)
+        pdf.set_x(left)
+        pdf.multi_cell(inner_w, 4.4, name.upper() if face == "Times" else name, max_line_height=4.4)
+        pdf.set_font(face, "", 10.5)
+        pdf.set_x(left)
+        # keep the address inside the label
+        remaining = (y + label_h - 5) - pdf.get_y()
+        max_lines = max(int(remaining // 4.2), 1)
+        wrapped = pdf.multi_cell(inner_w, 4.2, text, dry_run=True, output="LINES")
+        pdf.multi_cell(inner_w, 4.2, chr(10).join(wrapped[:max_lines]))
         if item.is_return:
             pdf.set_text_color(190, 0, 0)
             pdf.set_font("Lbl", "B", 8)

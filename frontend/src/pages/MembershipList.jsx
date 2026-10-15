@@ -1463,22 +1463,22 @@ export default function MembershipList() {
             </div>
 
             {/* Labels Grid: 3 across, no gaps (the sheet's own stickers) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 print:grid-cols-3 print:gap-0">
+            <div className="label-sheet grid grid-cols-1 md:grid-cols-3 gap-0 print:grid-cols-3 print:gap-0">
               {selectedMembersForLabels.map((m) => (
                 <div
                   key={m.id}
-                  className="printable-label-card border border-stone-300 bg-white px-3 py-2.5 relative"
+                  className="printable-label-card border border-stone-200 bg-white px-3 py-2.5 relative"
                   style={{ minHeight: '42.4mm' }}
                 >
-                  <div className="text-[11px] leading-tight text-gray-900">
-                    <div className="font-mono text-[10px] text-gray-700 mb-1">{m.membershipNumber || ''}</div>
-                    <div className="font-bold text-[12px] text-[#180200] mb-1">{m.fullName || m.name}</div>
-                    <div className="text-[11px] text-gray-800 leading-snug">
+                  <div className="leading-tight text-black">
+                    <div className="text-[12px] mb-0.5">{m.membershipNumber || ''}</div>
+                    <div className="font-bold text-[12px] mb-0.5 uppercase">{m.fullName || m.name}</div>
+                    <div className="text-[13px] leading-snug">
                       {m.addressLine || m.address || ''}
                       <br />
                       {[m.talukName || m.post, m.districtName].filter(Boolean).join(', ')}
                       <br />
-                      {m.stateName}{m.stateName ? ' - ' : ''}<span className="font-bold font-mono">{m.postalCode || ''}</span>
+                      {m.stateName}{m.stateName ? ' - ' : ''}<span className="font-semibold">{m.postalCode || ''}</span>
                     </div>
                   </div>
                 </div>

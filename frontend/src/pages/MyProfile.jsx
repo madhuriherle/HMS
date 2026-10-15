@@ -145,7 +145,7 @@ export default function MyProfile() {
         <div className="min-w-0">
           <p className="text-lg font-bold text-[#180200] truncate">{me.name}</p>
           <p className="text-sm text-[#863221]">
-            {me.role_name || 'No role'} · {me.status ? 'Active' : 'Inactive'}
+            {me.role_name || 'No role'}{me.role_rank_level != null ? ` · Rank ${me.role_rank_level}` : ''} · {me.status ? 'Active' : 'Inactive'}
           </p>
         </div>
         <div className="ml-auto text-xs text-[#863221] text-right space-y-0.5">

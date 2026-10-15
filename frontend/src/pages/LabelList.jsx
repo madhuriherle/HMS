@@ -579,7 +579,7 @@ export default function LabelList() {
             </div>
 
             {/* Labels Grid: 3 across, no gaps */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 print:grid-cols-3 print:gap-0">
+            <div className="label-sheet grid grid-cols-1 md:grid-cols-3 gap-0 print:grid-cols-3 print:gap-0">
               {itemsToPrint.map((item) => {
                 const member = getMember(item.memberId);
                 if (!member) return null;
@@ -587,23 +587,23 @@ export default function LabelList() {
                 return (
                   <div
                     key={item.id}
-                    className="printable-label-card border border-stone-300 bg-white px-3 py-2.5 relative"
+                    className="printable-label-card border border-stone-200 bg-white px-3 py-2.5 relative"
                     style={{ minHeight: '42.4mm' }}
                   >
-                    {/* Recipient Details */}
-                    <div className="text-[11px] leading-tight text-gray-900">
-                      <div className="font-mono text-[10px] text-gray-700 mb-1">
+                    {/* Recipient Details: membership number, name in bold, address (the sticker sheet's own format) */}
+                    <div className="leading-tight text-black">
+                      <div className="text-[12px] mb-0.5">
                         {member.membershipNumber}
                       </div>
-                      <div className="font-bold text-[12px] text-[#180200] mb-1">
+                      <div className="font-bold text-[12px] mb-0.5 uppercase">
                         {member.fullName}
                       </div>
-                      <div className="text-[11px] text-gray-800 leading-snug">
+                      <div className="text-[13px] leading-snug">
                         {member.addressLine}
                         <br />
-                        {member.talukName}, {member.districtName}
+                        {[member.talukName, member.districtName].filter(Boolean).join(', ')}
                         <br />
-                        {member.stateName} - <span className="font-bold font-mono">{member.postalCode}</span>
+                        {member.stateName} - <span className="font-semibold">{member.postalCode}</span>
                       </div>
                     </div>
                   </div>

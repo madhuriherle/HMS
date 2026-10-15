@@ -204,14 +204,40 @@
     display: none !important;
   }
 
-  /* 6. Printable label cards formatting */
+  /* 6. Printable label cards formatting: the pre-cut sticker sheet (3 x 7, A4) - no lines, Times, edge to edge */
+  .label-sheet {
+    page: labels;
+    display: grid !important;
+    grid-template-columns: repeat(3, 70mm) !important;
+    grid-auto-rows: 42.43mm !important;
+    gap: 0 !important;
+    width: 210mm !important;
+  }
   .printable-label-card {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    border: 1px solid #bbb !important;
+    border: 0 !important;
     background: #ffffff !important;
     box-shadow: none !important;
+    box-sizing: border-box !important;
+    width: 70mm !important;
+    height: 42.43mm !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    padding: 7mm 5mm 2mm !important;
+    color: #000 !important;
   }
+}
+
+/* The label sheet prints on A4 with no page margin, so each label sits on its own sticker */
+@page labels {
+  size: A4 portrait;
+  margin: 0;
+}
+
+/* Labels use the same serif face as the printed sticker sheets */
+.printable-label-card {
+  font-family: "Times New Roman", Times, serif;
 }
 
 /* Popups must sit above every form modal (the app's Modal is z-index 9999) */

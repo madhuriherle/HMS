@@ -323,6 +323,13 @@ export default function RolesAndPrivileges() {
       }
     }
 
+    // a role can only be given a rank weaker (a bigger number) than your own
+    const rank = Number(formData.rank_level);
+    const lowest = myRankLevel + 1;
+    if (!Number.isInteger(rank) || rank < lowest || rank > 99) {
+      errors.rank_level = `Rank must be a whole number from ${lowest} to 99.`;
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -341,7 +348,7 @@ export default function RolesAndPrivileges() {
           name: formData.name.trim(),
           description: formData.description.trim(),
           status: statusActive,
-          rank_level: 99
+          rank_level: Number(formData.rank_level)
         });
         if (isPendingApproval(res.data)) {
           showToast('Role creation submitted for approval.');
@@ -352,7 +359,8 @@ export default function RolesAndPrivileges() {
         const res = await api.put(`/users/roles/${editingRole.id}`, {
           name: formData.name.trim(),
           description: formData.description.trim(),
-          status: statusActive
+          status: statusActive,
+          rank_level: Number(formData.rank_level)
         });
         if (isPendingApproval(res.data)) {
           showToast('Role update submitted for approval.');
@@ -973,6 +981,34 @@ export default function RolesAndPrivileges() {
               )}
             </div>
 
+            {/* Rank */}
+            <div>
+              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
+                Rank <span className="text-[#ED4636]">*</span>
+              </label>
+              <input
+                type="number"
+                name="rank_level"
+                min={myRankLevel + 1}
+                max={99}
+                value={formData.rank_level}
+                onChange={handleFormChange}
+                className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.rank_level
+                  ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
+                  : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
+                  }`}
+              />
+              <p className="text-[10px] text-[#863221]/70 mt-1">
+                A smaller number has more authority. Choose {myRankLevel + 1} to 99 (default 99).
+              </p>
+              {formErrors.rank_level && (
+                <p className="text-xs text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  {formErrors.rank_level}
+                </p>
+              )}
+            </div>
+
             {/* Description */}
             <div>
               <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
@@ -1389,9 +1425,12 @@ export default function RolesAndPrivileges() {
 
                 <div className="grid grid-cols-3 gap-3 text-xs">
                   <div className="p-3 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8]">
-                    <p className="text-[#863221] font-semibold uppercase">Access</p>
+                    <p className="text-[#863221] font-semibold uppercase">Rank</p>
                     <p className="text-base font-bold text-[#180200] mt-0.5">
-                      {viewingRole.is_all_access ? <span className="text-[#3D705C]">All-Access</span> : 'Selected privileges'}
+                      {viewingRole.rank_level ?? 99}
+                      {viewingRole.is_all_access && (
+                        <span className="ml-1.5 text-[10px] font-bold text-[#3D705C]">All-Access</span>
+                      )}
                     </p>
                   </div>
 

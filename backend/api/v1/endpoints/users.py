@@ -614,7 +614,7 @@ def _check_role_scope_module(db: Session, module_id: Optional[int]) -> None:
 @approval_gate.gated("users", "CREATE", "Role", "roles.write")
 def create_role(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("roles.write")), role_in: schemas_users.RoleCreate) -> Any:
     if role_in.rank_level <= deps.user_rank(db, current_user):
-        raise HTTPException(400, "Choose a lower rank for this role")
+        raise HTTPException(400, "You cannot set up this role that way")
     if role_in.is_all_access and not deps.is_all_access(db, current_user):
         raise HTTPException(403, "Only an all-access role can create another all-access role")
     if db.query(Role).filter(Role.code == role_in.code, Role.is_deleted == False).first():  # noqa: E712
@@ -632,7 +632,7 @@ def update_role(*, db: Session = Depends(deps.get_db), current_user: User = Depe
     data = role_in.model_dump(exclude_unset=True)
     my_rank = deps.user_rank(db, current_user)
     if data.get("rank_level") is not None and data["rank_level"] <= my_rank:
-        raise HTTPException(400, "Choose a lower rank for this role")
+        raise HTTPException(400, "You cannot set up this role that way")
     if data.get("is_all_access") and not deps.is_all_access(db, current_user):
         raise HTTPException(403, "Only an all-access role can grant all-access")
     if data.get("name") and data["name"] != role.name and db.query(Role).filter(Role.name == data["name"], Role.is_deleted == False, Role.id != role_id).first():  # noqa: E712
