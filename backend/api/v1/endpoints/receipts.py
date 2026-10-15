@@ -1135,6 +1135,7 @@ class BulkAllocationPayload(_pydantic.BaseModel):
     allocations: list[BulkAllocationItem]
 
 @router.post("/bulk-allocate")
+@approval_gate.gated("receipts", "CREATE", "ReceiptBulkAllocation", "receipts.write", id_param=None)
 def bulk_allocate_receipts(
     *,
     db: Session = Depends(deps.get_db),

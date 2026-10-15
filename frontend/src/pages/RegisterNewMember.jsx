@@ -716,7 +716,7 @@ export default function RegisterNewMember() {
     const cleanPin = formData.postalCode.trim();
 
     if (!cleanName) {
-      errors.name = 'New Member Name is required';
+      errors.name = 'Member Name is required';
     }
 
     // International Mobile Validation
@@ -1097,7 +1097,7 @@ export default function RegisterNewMember() {
                       {/* Member Name */}
                       <div className="sm:col-span-7">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
-                          New Member Name: <span className="text-red-600">*</span>
+                          Member Name: <span className="text-red-600">*</span>
                         </label>
                         <div className="flex gap-1.5">
                           <div className="w-24 shrink-0">

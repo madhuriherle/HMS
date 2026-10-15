@@ -1116,10 +1116,9 @@ def download_label_pdf(
     )
     names = _label_names(db, items)
     member_ids = {i.recipient_id for i in items if i.recipient_type == "MEMBER"}
-    names_kn = {
-        m.id: m.full_name_kn
+    member_codes = {
+        m.id: m.member_code or m.membership_number
         for m in db.query(Member).filter(Member.id.in_(member_ids or {0})).all()
-        if m.full_name_kn
     }
 
     # Noto Sans (Latin) + Noto Sans Kannada, with HarfBuzz shaping so Kannada
@@ -1156,13 +1155,14 @@ def download_label_pdf(
 
         inner_w = label_w - 6
         pdf.set_xy(x + 3, y + 3)
-        pdf.set_font("Lbl", "B", 9)
         name = names.get((item.recipient_type, item.recipient_id), item.recipient_type.title())
+        code = member_codes.get(item.recipient_id) if item.recipient_type == "MEMBER" else None
+        pdf.set_font("Lbl", "", 7.5)
+        if code:
+            pdf.multi_cell(inner_w, 3.5, str(code), max_line_height=3.5)
+        pdf.set_font("Lbl", "B", 8.5)
+        pdf.set_x(x + 3)
         pdf.multi_cell(inner_w, 4, name, max_line_height=4)
-        kn = names_kn.get(item.recipient_id) if item.recipient_type == "MEMBER" else None
-        if kn:
-            pdf.set_x(x + 3)
-            pdf.multi_cell(inner_w, 4, kn, max_line_height=4)
         pdf.set_font("Lbl", "", 8)
         pdf.set_x(x + 3)
         # keep the address inside the label box

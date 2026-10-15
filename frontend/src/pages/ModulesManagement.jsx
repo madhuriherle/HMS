@@ -501,7 +501,6 @@ export default function ModulesManagement() {
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-semibold text-[#863221] uppercase tracking-wider">
                 <th className="px-6 py-3.5">Module</th>
-                <th className="px-6 py-3.5">Route</th>
                 <th className="px-6 py-3.5 text-center">Order</th>
                 <th className="px-6 py-3.5 text-center">Rank Gate</th>
                 <th className="px-6 py-3.5 text-center">Privileges</th>
@@ -535,9 +534,6 @@ export default function ModulesManagement() {
                           <span className="text-[11px] text-[#863221]/70 font-mono">{m.code}</span>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs font-mono text-[#863221]">
-                      {m.route || '—'}
                     </td>
                     <td className="px-6 py-4 text-center text-xs font-semibold text-[#180200]">
                       {m.display_order ?? 0}

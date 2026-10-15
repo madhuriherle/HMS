@@ -164,6 +164,7 @@ def get_affiliation_magazine_setting(*, db: Session = Depends(deps.get_db), curr
     return _magazine_setting(db, AffiliationMagazineSetting, "affiliation_id", id, o, current_user.id)
 
 @router.put("/affiliations/{id}/magazine-setting")
+@approval_gate.gated("engagements", "UPDATE", "AffiliationMagazineSetting", "engagements.write")
 def put_affiliation_magazine_setting(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), id: int, data: schemas_engagements.MagazineSettingUpdate) -> Any:
     o = crud_engagements.affiliation.get(db, id)
     if not o: raise HTTPException(404, "Affiliation not found")
@@ -218,6 +219,7 @@ def get_associate_magazine_setting(*, db: Session = Depends(deps.get_db), curren
     return _magazine_setting(db, AssociateMagazineSetting, "associate_id", id, o, current_user.id)
 
 @router.put("/associates/{id}/magazine-setting")
+@approval_gate.gated("engagements", "UPDATE", "AssociateMagazineSetting", "engagements.write")
 def put_associate_magazine_setting(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), id: int, data: schemas_engagements.MagazineSettingUpdate) -> Any:
     o = db.query(Associate).filter(Associate.id == id, Associate.is_deleted == False).first()
     if not o: raise HTTPException(404, "Associate not found")
@@ -294,6 +296,7 @@ def get_press_magazine_setting(*, db: Session = Depends(deps.get_db), current_us
     return _magazine_setting(db, PressMediaMagazineSetting, "press_media_id", id, o, current_user.id)
 
 @router.put("/press-media/{id}/magazine-setting")
+@approval_gate.gated("engagements", "UPDATE", "PressMediaMagazineSetting", "engagements.write")
 def put_press_magazine_setting(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("engagements.write")), id: int, data: schemas_engagements.MagazineSettingUpdate) -> Any:
     o = db.query(PressMedia).filter(PressMedia.id == id, PressMedia.is_deleted == False).first()
     if not o: raise HTTPException(404, "Press/Media not found")

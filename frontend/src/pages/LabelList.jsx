@@ -579,54 +579,32 @@ export default function LabelList() {
             </div>
 
             {/* Labels Grid (2 columns Avery style) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2 print:gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 print:grid-cols-3 print:gap-0">
               {itemsToPrint.map((item) => {
                 const member = getMember(item.memberId);
-                const memType = membershipTypeFilter !== 'ALL' ? membershipTypes.find((mt) => String(mt.id) === String(membershipTypeFilter)) : null;
                 if (!member) return null;
 
                 return (
                   <div
                     key={item.id}
-                    className="printable-label-card rounded-lg border-2 border-dashed border-stone-400 bg-white p-4 shadow-sm relative flex flex-col justify-between"
-                    style={{ minHeight: '180px' }}
+                    className="printable-label-card border border-stone-300 bg-white px-3 py-2.5 relative"
+                    style={{ minHeight: '42.4mm' }}
                   >
-                    {/* Organization Header */}
-                    <div className="border-b border-stone-200 pb-1.5 mb-2 flex items-center justify-between">
-                      <div className="font-bold text-xs tracking-wider text-[#8C1801] uppercase">
-                        Havyaka MahaSabha
-                      </div>
-                      <span className="font-mono text-[10px] bg-stone-100 text-stone-700 px-1.5 py-0.5 rounded font-bold">
-                        {memType?.name || 'Member'}
-                      </span>
-                    </div>
-
                     {/* Recipient Details */}
-                    <div className="text-xs space-y-1 text-gray-900 flex-1">
-                      <div className="font-bold text-sm text-[#180200]">
-                        To: {member.fullName}
+                    <div className="text-[11px] leading-tight text-gray-900">
+                      <div className="font-mono text-[10px] text-gray-700 mb-1">
+                        {member.membershipNumber}
                       </div>
-                      <div className="text-[11px] text-gray-600 font-mono font-medium">
-                        ID: {member.membershipNumber}
+                      <div className="font-bold text-[12px] text-[#180200] mb-1">
+                        {member.fullName}
                       </div>
-                      <div className="text-xs text-gray-800 leading-snug pt-1">
+                      <div className="text-[11px] text-gray-800 leading-snug">
                         {member.addressLine}
                         <br />
                         {member.talukName}, {member.districtName}
                         <br />
                         {member.stateName} - <span className="font-bold font-mono">{member.postalCode}</span>
                       </div>
-                    </div>
-
-                    {/* Footer / Mobile */}
-                    <div className="border-t border-stone-200 pt-1.5 mt-2 flex items-center justify-between text-[11px] text-gray-600">
-                      <span className="flex items-center gap-1 font-mono">
-                        <Phone className="h-3 w-3 text-stone-400" />
-                        Ph: {member.mobile}
-                      </span>
-                      <span className="text-[10px] text-stone-400">
-                        HMS Dispatch
-                      </span>
                     </div>
                   </div>
                 );
