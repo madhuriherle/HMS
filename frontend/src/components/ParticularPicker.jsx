@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Search, X } from 'lucide-react';
 import Modal from './Modal';
 import ModalFooter from './ModalFooter';
@@ -11,10 +11,9 @@ export const lineKey = (particular, subType = '') =>
 
 /**
  * ParticularPicker:
- * Form button opens a spacious, horizontal-tabbed modal dialog.
- * Dynamic categories (Horizontal Tabs) + 3-column responsive tile grid of all items / sub-types ("members").
- * Instant 1-click selection: clicking any card immediately selects that Particular + SubType and closes the modal.
- * Real-time search across all particulars and sub-types.
+ * The form button opens one wide popup that shows every particular as a card with its sub types as buttons,
+ * all at once (no tabs, no dropdown to scroll). One click on a button picks that particular + sub type and
+ * closes the popup. The search box only dims what does not match; Enter picks the first match.
  */
 export default function ParticularPicker({
   particulars = [],
@@ -28,7 +27,6 @@ export default function ParticularPicker({
 }) {
   const takenKeys = useMemo(() => new Set(taken), [taken]);
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef(null);
 
@@ -38,78 +36,28 @@ export default function ParticularPicker({
     [particulars]
   );
 
-  // Flatten into selectable items: each sub-type or standalone parent particular
-  const allItems = useMemo(() => {
-    const items = [];
-    activeParticulars.forEach((p) => {
+  // One card per particular: its sub types as buttons, or a single button when it has none
+  const cards = useMemo(
+    () => activeParticulars.map((p) => {
       const subs = activeSubs(p);
-      if (subs.length > 0) {
-        subs.forEach((st) => {
-          items.push({
-            id: `${p.id || p.name}-${st.id || st.name}`,
-            title: st.name,
-            particular: p.name,
-            subType: st.name,
-            category: p.name,
-            key: lineKey(p.name, st.name),
-          });
-        });
-      } else {
-        items.push({
-          id: `${p.id || p.name}-root`,
-          title: p.name,
-          particular: p.name,
-          subType: '',
-          category: p.name,
-          key: lineKey(p.name, ''),
-        });
-      }
-    });
-    return items;
-  }, [activeParticulars]);
+      const buttons = subs.length
+        ? subs.map((st) => ({ id: `${p.id || p.name}-${st.id || st.name}`, title: st.name, particular: p.name, subType: st.name, key: lineKey(p.name, st.name) }))
+        : [{ id: `${p.id || p.name}-root`, title: p.name, particular: p.name, subType: '', key: lineKey(p.name, '') }];
+      return { name: p.name, hasSubs: subs.length > 0, buttons };
+    }),
+    [activeParticulars]
+  );
 
-  // Categories for Horizontal Tabs with dynamic item counts
-  const categories = useMemo(() => {
-    const list = [{ key: 'ALL', name: 'All', count: allItems.length }];
-    activeParticulars.forEach((p) => {
-      const count = allItems.filter((it) => it.particular === p.name).length;
-      if (count > 0) {
-        list.push({ key: p.name, name: p.name, count });
-      }
-    });
-    return list;
-  }, [activeParticulars, allItems]);
-
-  // Filter items based on activeTab and searchQuery
   const q = searchQuery.trim().toLowerCase();
-  const filteredItems = useMemo(() => {
-    return allItems.filter((item) => {
-      if (activeTab !== 'ALL' && item.particular !== activeTab) {
-        return false;
+  const matches = (card, btn) => !q || btn.title.toLowerCase().includes(q) || card.name.toLowerCase().includes(q);
+  const firstMatch = useMemo(() => {
+    for (const card of cards) {
+      for (const btn of card.buttons) {
+        if (!takenKeys.has(btn.key) && (!q || btn.title.toLowerCase().includes(q) || card.name.toLowerCase().includes(q))) return btn;
       }
-      if (q) {
-        const matchesTitle = item.title.toLowerCase().includes(q);
-        const matchesCat = item.category.toLowerCase().includes(q);
-        return matchesTitle || matchesCat;
-      }
-      return true;
-    });
-  }, [allItems, activeTab, q]);
-
-  // Group filtered items by category for structured display when "ALL" tab is selected
-  const groupedSections = useMemo(() => {
-    if (activeTab !== 'ALL' || q) {
-      return [{ category: activeTab === 'ALL' ? 'Search Results' : activeTab, items: filteredItems }];
     }
-    const groups = [];
-    activeParticulars.forEach((p) => {
-      const itemsInGroup = filteredItems.filter((it) => it.particular === p.name);
-      if (itemsInGroup.length > 0) {
-        groups.push({ category: p.name, items: itemsInGroup });
-      }
-    });
-    return groups;
-  }, [activeTab, q, filteredItems, activeParticulars]);
+    return null;
+  }, [cards, q, takenKeys]);
 
   const handlePick = (pickedParticular, pickedSubType = '') => {
     if (takenKeys.has(lineKey(pickedParticular, pickedSubType))) return;
@@ -121,12 +69,6 @@ export default function ParticularPicker({
   const handleOpenModal = () => {
     setOpen(true);
     setSearchQuery('');
-    // Auto-select the tab matching the current particular if available
-    if (particular && activeParticulars.some((p) => p.name === particular)) {
-      setActiveTab(particular);
-    } else {
-      setActiveTab('ALL');
-    }
     setTimeout(() => {
       searchInputRef.current?.focus();
     }, 50);
@@ -135,10 +77,7 @@ export default function ParticularPicker({
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      const firstEnabled = filteredItems.find((it) => !takenKeys.has(it.key));
-      if (firstEnabled) {
-        handlePick(firstEnabled.particular, firstEnabled.subType);
-      }
+      if (firstMatch) handlePick(firstMatch.particular, firstMatch.subType);
     }
   };
 
@@ -167,28 +106,23 @@ export default function ParticularPicker({
         <ChevronDown className="w-4 h-4 shrink-0 text-[#863221]" />
       </button>
 
-      {/* Horizontal Tabs Modal Picker */}
+      {/* Everything at once: a card per particular, its sub types as buttons */}
       {open && (
         <Modal
           isOpen
           onClose={() => setOpen(false)}
           title="Select Receipt Particular"
-          maxWidthClass="max-w-4xl"
+          maxWidthClass="max-w-6xl"
           footer={
             <ModalFooter
               kind="view"
               onCancel={() => setOpen(false)}
               cancelLabel="Close"
-              left={
-                <span className="text-xs text-[#863221] hidden sm:inline">
-                  Click any tile to select instantly and return to receipt form
-                </span>
-              }
+              left={<span className="text-xs text-[#863221] hidden sm:inline">Click a button to pick it</span>}
             />
           }
         >
           <div className="p-4 sm:p-5 space-y-4">
-            {/* Search Input */}
             <div className="relative">
               <Search className="w-4 h-4 text-[#863221] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
@@ -197,139 +131,59 @@ export default function ParticularPicker({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Search particular, sub-type, or keyword (press Enter to pick first)..."
-                className="w-full pl-10 pr-9 py-2.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/50 focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
+                placeholder="Type to find one (Enter picks the first match)"
+                className="w-full pl-10 pr-9 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/50 focus:outline-none focus:bg-white focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
               />
               {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#863221]/60 hover:text-[#180200] p-1"
-                >
+                <button type="button" onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#863221]/60 hover:text-[#180200] p-1">
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
 
-            {/* Horizontal Category Tabs Bar */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin border-b border-[#E8DFD8]">
-              {categories.map((cat) => {
-                const isActive = activeTab === cat.key;
-                return (
-                  <button
-                    key={cat.key}
-                    type="button"
-                    onClick={() => {
-                      setActiveTab(cat.key);
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
-                      isActive
-                        ? 'bg-[#510601] text-white shadow-sm'
-                        : 'bg-[#FAF7F2] text-[#863221] border border-[#E8DFD8] hover:bg-white hover:text-[#510601] hover:border-[#510601]'
-                    }`}
-                  >
-                    <span>{cat.name}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                        isActive ? 'bg-white/20 text-white' : 'bg-[#E8DFD8]/60 text-[#863221]'
-                      }`}
+            {cards.length === 0 ? (
+              <p className="py-10 text-center text-sm text-[#863221]">No active particulars.</p>
+            ) : (
+              <div className="max-h-[75vh] overflow-y-auto columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
+                {cards.map((card) => {
+                  const cardHasMatch = card.buttons.some((b) => matches(card, b));
+                  return (
+                    <div
+                      key={card.name}
+                      className={`mb-4 break-inside-avoid rounded-xl border border-[#E8DFD8] bg-white p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
                     >
-                      {cat.count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Tiles Grid Container */}
-            <div className="max-h-[50vh] overflow-y-auto pr-1 space-y-4">
-              {filteredItems.length === 0 ? (
-                <div className="py-12 text-center text-[#863221]">
-                  <p className="font-semibold text-sm text-[#180200]">No matching particulars found</p>
-                  <p className="text-xs mt-1">
-                    {searchQuery
-                      ? `No items match “${searchQuery}”. Try clearing the search or checking another tab.`
-                      : 'No active items available in this category.'}
-                  </p>
-                </div>
-              ) : (
-                groupedSections.map((group) => (
-                  <div key={group.category} className="space-y-2">
-                    {/* Section Header (when in ALL tab with multiple groups) */}
-                    {activeTab === 'ALL' && !q && (
-                      <div className="flex items-center justify-between border-b border-[#E8DFD8] pb-1 pt-1">
-                        <span className="text-[11px] font-bold text-[#510601] uppercase tracking-wider">
-                          {group.category}
-                        </span>
-                        <span className="text-[10px] font-mono text-[#863221] font-semibold">
-                          {group.items.length} {group.items.length === 1 ? 'item' : 'items'}
-                        </span>
+                      <p className="mb-2 border-b border-[#E8DFD8] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.name}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {card.buttons.map((btn) => {
+                          const isTaken = takenKeys.has(btn.key);
+                          const isSelected = particular === btn.particular && (subType || '') === btn.subType;
+                          const dim = q && !matches(card, btn);
+                          return (
+                            <button
+                              key={btn.id}
+                              type="button"
+                              disabled={isTaken}
+                              onClick={() => handlePick(btn.particular, btn.subType)}
+                              title={isTaken ? 'Already added on another line of this receipt' : `Select ${card.hasSubs ? `${card.name} › ` : ''}${btn.title}`}
+                              className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left text-xs font-semibold leading-snug transition-colors ${
+                                isTaken
+                                  ? 'cursor-not-allowed border-[#E8DFD8] bg-[#FAF7F2] text-[#863221]/50 line-through'
+                                  : isSelected
+                                  ? 'cursor-pointer border-[#510601] bg-[#510601] text-white'
+                                  : 'cursor-pointer border-[#E8DFD8] bg-[#FAF7F2] text-[#180200] hover:border-[#510601] hover:bg-white hover:text-[#510601]'
+                              } ${dim ? 'opacity-30' : ''}`}
+                            >
+                              {isSelected && <Check className="h-3 w-3 shrink-0" />}
+                              <span>{btn.title}</span>
+                            </button>
+                          );
+                        })}
                       </div>
-                    )}
-
-                    {/* 3-Column Tiles Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                      {group.items.map((item) => {
-                        const isTaken = takenKeys.has(item.key);
-                        const isSelected =
-                          particular === item.particular && (subType || '') === item.subType;
-
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            disabled={isTaken}
-                            onClick={() => handlePick(item.particular, item.subType)}
-                            title={
-                              isTaken
-                                ? 'Already added on another line of this receipt'
-                                : `Select ${item.title}`
-                            }
-                            className={`group relative flex flex-col justify-between p-3 rounded-xl border text-left transition-all cursor-pointer min-h-[72px] ${
-                              isTaken
-                                ? 'opacity-40 bg-[#FAF7F2] border-[#E8DFD8] cursor-not-allowed'
-                                : isSelected
-                                ? 'bg-[#FAF7F2] border-[#510601] ring-2 ring-[#510601]/20 shadow-sm'
-                                : 'bg-white border-[#E8DFD8] hover:border-[#510601] hover:bg-[#FAF7F2]/50 hover:shadow-sm'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2 w-full">
-                              <span
-                                className={`text-xs font-bold leading-snug line-clamp-2 ${
-                                  isSelected
-                                    ? 'text-[#510601]'
-                                    : isTaken
-                                    ? 'text-[#863221]'
-                                    : 'text-[#180200] group-hover:text-[#510601]'
-                                }`}
-                              >
-                                {item.title}
-                              </span>
-                              {isSelected && (
-                                <span className="w-4 h-4 rounded-full bg-[#510601] text-white flex items-center justify-center shrink-0">
-                                  <Check className="w-2.5 h-2.5" />
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="flex items-center justify-between gap-2 mt-2 pt-1 border-t border-[#E8DFD8]/60 w-full text-[10px]">
-                              <span className="text-[#863221] font-medium truncate">
-                                {item.category}
-                              </span>
-                              {isTaken && (
-                                <span className="font-semibold text-[#ED4636] shrink-0">
-                                  already added
-                                </span>
-                              )}
-                            </div>
-                          </button>
-                        );
-                      })}
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </Modal>
       )}
