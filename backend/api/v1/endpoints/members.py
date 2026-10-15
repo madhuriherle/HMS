@@ -46,6 +46,8 @@ def read_members(
     sort_by: Optional[str] = None,   # id | created_at | name | member_code | mobile | approval_status | member_status
     sort_dir: str = "desc",
     no_membership_type: bool = False,   # members who have not reached any type yet
+    receipt_assigned: Optional[bool] = None,   # True: has a receipt mapped; False: none yet
+    with_receipt: bool = False,         # carry each member's latest receipt and the with / without counts
     all_rows: bool = False,             # TEMPORARY: lifts the 200 cap for screens not yet moved to server paging
 ) -> Any:
     """Retrieve members with optional filters and search (offline + online). Newest first unless sort_by is given.
@@ -104,6 +106,21 @@ def read_members(
             Member.pincode_id.in_(db.query(PostalCode.id).filter(PostalCode.pincode.ilike(f"%{search}%"))),
         ))
 
+    summary = None
+    if with_receipt or receipt_assigned is not None:
+        from models.receipts import Receipt, ReceiptAllocation
+        mapped = db.query(ReceiptAllocation.member_id).join(Receipt, Receipt.id == ReceiptAllocation.receipt_id).filter(
+            ReceiptAllocation.is_deleted == False, ReceiptAllocation.member_id.isnot(None),  # noqa: E712
+            Receipt.is_deleted == False, Receipt.receipt_status != "CANCELLED",  # noqa: E712
+        )
+        if with_receipt:   # counts of the whole filtered set, before the receipt filter narrows it
+            with_n = query.filter(Member.id.in_(mapped)).count()
+            summary = {"with_receipt": with_n, "without_receipt": query.count() - with_n}
+        if receipt_assigned is True:
+            query = query.filter(Member.id.in_(mapped))
+        elif receipt_assigned is False:
+            query = query.filter(~Member.id.in_(mapped))
+
     from core.sorting import sort_query
     query = sort_query(
         query, sort_by=sort_by, sort_dir=sort_dir, tiebreak=Member.id,
@@ -113,7 +130,93 @@ def read_members(
     )
     result = paginate(query, page, limit)
     _attach_membership_types(db, result["data"])
+    if with_receipt:
+        _attach_latest_receipts(db, result["data"])
+        result["summary"] = summary
     return result
+
+
+@router.get("/label-list")
+def read_label_list(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    page: int = 1,
+    limit: int = 25,
+    search: Optional[str] = None,
+    membership_type_id: Optional[int] = None,
+    from_date: Optional[date] = None,     # last receipt on or after
+    to_date: Optional[date] = None,       # last receipt on or before
+) -> Any:
+    """The members who have paid (a receipt is mapped to them), each with the date of their latest receipt, newest
+    first. At most 200 per request (rule 10.6); the search and the filters run on every member."""
+    from core.pagination import LIST_PAGE_MAX, _to_plain
+    from models.masters import District, PostalCode
+    from models.receipts import Receipt, ReceiptAllocation
+    limit = max(1, min(limit, LIST_PAGE_MAX))
+    last = func.max(Receipt.receipt_date).label("last_receipt_date")
+    q = (
+        db.query(Member, last)
+        .join(ReceiptAllocation, ReceiptAllocation.member_id == Member.id)
+        .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
+        .filter(
+            Member.is_deleted == False,  # noqa: E712
+            ReceiptAllocation.is_deleted == False,  # noqa: E712
+            Receipt.is_deleted == False, Receipt.receipt_status != "CANCELLED",  # noqa: E712
+        )
+        .group_by(Member.id)
+    )
+    if membership_type_id:
+        q = q.filter(Member.id.in_(
+            db.query(MemberMembership.member_id).filter(
+                MemberMembership.membership_type_id == membership_type_id, MemberMembership.is_deleted == False,  # noqa: E712
+            )
+        ))
+    if search:
+        like = f"%{search}%"
+        q = q.filter(or_(
+            Member.first_name_en.ilike(like), Member.middle_name_en.ilike(like), Member.last_name_en.ilike(like),
+            Member.mobile.ilike(like), Member.member_code.ilike(like), Member.email.ilike(like),
+            Member.locality.ilike(like), Member.city.ilike(like),
+            Member.district_id.in_(db.query(District.id).filter(District.name_en.ilike(like))),
+            Member.pincode_id.in_(db.query(PostalCode.id).filter(PostalCode.pincode.ilike(like))),
+        ))
+    if from_date:
+        q = q.having(last >= from_date)
+    if to_date:
+        q = q.having(last <= to_date)
+    q = q.order_by(last.desc(), Member.id.desc())
+    result = paginate(q, page, limit, serializer=lambda row: {**_to_plain(row[0], set()), "last_receipt_date": row[1].isoformat() if row[1] else None})
+    _attach_membership_types(db, result["data"])
+    return result
+
+
+def _attach_latest_receipts(db: Session, rows: list) -> None:
+    """Each listed member carries the latest receipt mapped to them (None when there is none)."""
+    from models.receipts import Receipt, ReceiptAllocation
+    ids = [r.get("id") for r in rows if isinstance(r, dict) and r.get("id")]
+    latest = {}
+    if ids:
+        for alloc, receipt in (
+            db.query(ReceiptAllocation, Receipt)
+            .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
+            .filter(
+                ReceiptAllocation.member_id.in_(ids), ReceiptAllocation.is_deleted == False,  # noqa: E712
+                Receipt.is_deleted == False, Receipt.receipt_status != "CANCELLED",  # noqa: E712
+            )
+            .order_by(ReceiptAllocation.id.desc())
+            .all()
+        ):
+            if alloc.member_id not in latest:
+                latest[alloc.member_id] = {
+                    "id": receipt.id, "receipt_number": receipt.receipt_number,
+                    "receipt_date": receipt.receipt_date.isoformat() if receipt.receipt_date else None,
+                    "amount": float(receipt.net_amount), "payment_mode": receipt.payment_mode,
+                    "bank_account": receipt.bank_account, "transaction_reference": receipt.transaction_reference,
+                    "payment_status": receipt.payment_status, "receipt_status": receipt.receipt_status,
+                }
+    for r in rows:
+        if isinstance(r, dict):
+            r["receipt"] = latest.get(r.get("id"))
 
 
 def _attach_membership_types(db: Session, rows: list) -> None:

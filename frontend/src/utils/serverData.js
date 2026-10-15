@@ -1,7 +1,7 @@
 // Server-backed data for the whole panel. Nothing here is stored in the
 // browser: every function reads the API and returns the shape the pages use.
 import api from '../api';
-import { fetchMembers, fetchReceipts, unwrapList } from './apiAdapters';
+import { fetchMembers, fetchMemberPage, fetchReceipts, normalizeReceipt, unwrapList } from './apiAdapters';
 
 const rows = (res) => unwrapList(res?.data);
 const statusLabel = (flag) => (flag ? 'Active' : 'Inactive');
@@ -142,27 +142,19 @@ export const loadPaymentModeConfigs = async () => {
 export const loadMembers = (params) => fetchMembers(params);
 export const loadReceipts = (params) => fetchReceipts(params);
 
-// Members waiting for approval, each with whether a receipt has been mapped to
-// them (the server records that as a receipt allocation).
-export const loadUnapprovedMembers = async (sortParams = {}) => {
-  const [members, receipts] = await Promise.all([
-    fetchMembers({ approval_status: 'UNAPPROVED', ...sortParams }),
-    fetchReceipts(),
-  ]);
-  const receiptByMember = new Map();
-  receipts.forEach((r) => {
-    if (r.memberId != null && !receiptByMember.has(String(r.memberId))) {
-      receiptByMember.set(String(r.memberId), r);
-    }
-  });
-  return members.map((m) => {
-    const receipt = receiptByMember.get(String(m.id));
+// One page of the members waiting for approval (rule 10.6): each row carries the receipt mapped to it, if any,
+// and `summary` has the with / without receipt counts of the whole filtered set.
+export const loadUnapprovedPage = async (params = {}) => {
+  const page = await fetchMemberPage({ approval_status: 'UNAPPROVED', with_receipt: true, ...params });
+  const rows = page.rows.map((m) => {
+    const receipt = m.receipt ? normalizeReceipt(m.receipt) : null;
     return {
       ...m,
       receiptStatus: receipt ? 'Assigned' : 'Pending',
       assignedReceiptNumber: receipt ? receipt.receiptNumber : '',
-      receipt: receipt || null,
+      receipt,
       registrationDate: m.created_at ? String(m.created_at).slice(0, 10) : '',
     };
   });
+  return { ...page, rows };
 };

@@ -45,6 +45,7 @@ SUB_MODULE_AREAS = {
         ("members.list", "Membership List", [
             ("GET", r"^/members/?$", "not-unapproved"),
             ("GET", r"^/members/export-labels/?$"),
+            ("GET", r"^/members/label-list/?$"),
             ("GET", r"^/members/documents/\d+/file/?$"),
             ("GET", r"^/members/\d+(/(family|services|donations|profile(/[a-z]+)?|membership-credit|documents|service-optins))?/?$"),
             ("PUT|DELETE", r"^/members/\d+/?$"),

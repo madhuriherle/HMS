@@ -26,7 +26,9 @@ import {
   SlidersHorizontal,
   Download
 } from 'lucide-react';
-import { loadMembers, loadMembershipTypes, loadReceipts } from '../utils/serverData';
+import { loadMembershipTypes } from '../utils/serverData';
+import { fetchLabelPage } from '../utils/apiAdapters';
+import Pager from '../components/Pager';
 import { formatDate } from '../utils/dateUtils';
 import api from '../api';
 import { askForm } from '../utils/dialogs';
@@ -38,7 +40,11 @@ export default function LabelList() {
   // Synchronized stores
   // Label list = members that have a receipt mapped to them (paid members), all read from the server
   const [labelList, setLabelList] = useState([]);
-  const [members, setMembers] = useState([]);
+  const [members, setMembers] = useState([]); // the members of the page on screen
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
+  const [loadingPage, setLoadingPage] = useState(true);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [membershipTypes, setMembershipTypes] = useState([]);
 
   // Search & Filter
@@ -52,7 +58,7 @@ export default function LabelList() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
 
   // Print Preview Modal
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
@@ -65,72 +71,59 @@ export default function LabelList() {
     notify(message, type);
   };
 
-  const loadLabelData = async (typeId) => {
+  // what the server is asked for: the page, the search, the type and the last-receipt dates. They run on every paid
+  // member in the database; this screen only holds the page it shows (rule 10.6).
+  const labelParams = () => ({
+    ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+    ...(membershipTypeFilter !== 'ALL' ? { membership_type_id: membershipTypeFilter } : {}),
+    ...(fromDateFilter ? { from_date: fromDateFilter } : {}),
+    ...(toDateFilter ? { to_date: toDateFilter } : {}),
+  });
+  const requestSeq = useRef(0);
+  const loadLabelData = async () => {
+    const seq = (requestSeq.current += 1);
+    setLoadingPage(true);
     try {
-      const [mems, recs, types] = await Promise.all([
-        loadMembers({ limit: 5000, ...(typeId && typeId !== 'ALL' ? { membership_type_id: typeId } : {}) }),
-        loadReceipts({ limit: 5000 }),
-        loadMembershipTypes()
-      ]);
-      const lastReceiptDate = new Map();
-      recs.forEach((r) => {
-        if (r.memberId == null) return;
-        const prev = lastReceiptDate.get(r.memberId);
-        if (!prev || String(r.receiptDate) > prev) lastReceiptDate.set(r.memberId, String(r.receiptDate || ''));
-      });
-      setMembers(mems);
-      setMembershipTypes(types);
-      setLabelList(
-        [...lastReceiptDate.entries()].map(([memberId, addedDate]) => ({ id: memberId, memberId, addedDate }))
-      );
+      const result = await fetchLabelPage({ ...labelParams(), page: currentPage, limit: pageSize });
+      if (seq !== requestSeq.current) return;
+      setMembers(result.rows);
+      setTotal(result.total);
+      setPages(Math.max(1, result.pages));
+      setLabelList(result.rows.map((m) => ({ id: m.id, memberId: m.id, addedDate: m.last_receipt_date || '' })));
+      if (currentPage > Math.max(1, result.pages)) setCurrentPage(Math.max(1, result.pages));
     } catch (error) {
+      if (seq !== requestSeq.current) return;
       console.error('Failed to load label list.', error);
       showToast(error.response?.data?.detail || 'Failed to load the label list from the server.', 'error');
+    } finally {
+      if (seq === requestSeq.current) setLoadingPage(false);
     }
   };
 
-  // the membership-type filter is applied by the server
   useEffect(() => {
-    loadLabelData(membershipTypeFilter);
-  }, [membershipTypeFilter]);
+    loadMembershipTypes().then(setMembershipTypes).catch(() => {});
+  }, []);
+  const filterKey = [debouncedSearch, membershipTypeFilter, fromDateFilter, toDateFilter].join('|');
+  useEffect(() => {
+    loadLabelData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey, currentPage, pageSize]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterKey, pageSize]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  // Helper lookups
-  const getMember = (memberId) => members.find((m) => m.id === memberId);
+  // members ticked on any page stay printable
+  const selectedCache = useRef(new Map()); // id -> { item, member }
+  const getMember = (memberId) => members.find((m) => m.id === memberId) || selectedCache.current.get(memberId)?.member;
   const getMembershipType = (typeId) => membershipTypes.find((mt) => mt.id === typeId);
 
-  // Filtered list
-  const filteredList = useMemo(() => {
-    return labelList.filter((item) => {
-      const member = getMember(item.memberId);
-      if (!member) return false;
-
-      // Search
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const matchesName = String(member.fullName ?? '').toLowerCase().includes(q);
-        const matchesNo = String(member.membershipNumber ?? '').toLowerCase().includes(q);
-        const matchesPhone = String(member.mobile ?? '').includes(q);
-        const matchesCity = (member.talukName || '').toLowerCase().includes(q) || (member.districtName || '').toLowerCase().includes(q);
-
-        if (!matchesName && !matchesNo && !matchesPhone && !matchesCity) {
-          return false;
-        }
-      }
-
-      // Date added
-      if (fromDateFilter && item.addedDate < fromDateFilter) return false;
-      if (toDateFilter && item.addedDate > toDateFilter) return false;
-
-      return true;
-    });
-  }, [labelList, members, searchQuery, membershipTypeFilter, fromDateFilter, toDateFilter]);
-
-  // Paginated List
-  const totalPages = Math.ceil(filteredList.length / pageSize) || 1;
-  const paginatedList = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredList.slice(start, start + pageSize);
-  }, [filteredList, currentPage, pageSize]);
+  // the server already searched, filtered and paged them
+  const filteredList = labelList;
+  const paginatedList = labelList;
 
   // Selection handlers
   const isAllSelected = useMemo(() => {
@@ -138,27 +131,43 @@ export default function LabelList() {
     return paginatedList.every((item) => selectedIds.includes(item.id));
   }, [paginatedList, selectedIds]);
 
+  const remember = (item) => {
+    const member = members.find((m) => m.id === item.memberId);
+    if (member) selectedCache.current.set(item.id, { item, member });
+  };
+
   const handleToggleSelectAll = () => {
     if (isAllSelected) {
-      // Unselect only current page items
       const currentIds = paginatedList.map((i) => i.id);
       setSelectedIds((prev) => prev.filter((id) => !currentIds.includes(id)));
     } else {
-      // Select all current page items
+      paginatedList.forEach(remember);
       const currentIds = paginatedList.map((i) => i.id);
       setSelectedIds((prev) => Array.from(new Set([...prev, ...currentIds])));
     }
   };
 
   const handleToggleSelectItem = (id) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => {
+      if (prev.includes(id)) return prev.filter((item) => item !== id);
+      const item = labelList.find((i) => i.id === id);
+      if (item) remember(item);
+      return [...prev, id];
+    });
   };
 
-  const handleSelectAllAcrossAllPages = () => {
-    const allFilteredIds = filteredList.map((i) => i.id);
-    setSelectedIds(allFilteredIds);
+  // every member the filters match, read 200 at a time
+  const handleSelectAllAcrossAllPages = async () => {
+    const ids = [];
+    for (let n = 1; n <= 200; n += 1) {
+      const chunk = await fetchLabelPage({ ...labelParams(), page: n, limit: 200 });
+      chunk.rows.forEach((m) => {
+        selectedCache.current.set(m.id, { item: { id: m.id, memberId: m.id, addedDate: m.last_receipt_date || '' }, member: m });
+        ids.push(m.id);
+      });
+      if (n >= chunk.pages) break;
+    }
+    setSelectedIds(ids);
   };
 
   const handleClearSelection = () => {
@@ -168,8 +177,8 @@ export default function LabelList() {
 
   // Get items for printing
   const itemsToPrint = useMemo(() => {
-    return labelList.filter((item) => selectedIds.includes(item.id));
-  }, [labelList, selectedIds]);
+    return selectedIds.map((id) => selectedCache.current.get(id)?.item).filter(Boolean);
+  }, [selectedIds]);
 
   // Generate a label batch on the server (paid members only) and download its PDF
   const handleGenerateBatch = async () => {
@@ -310,7 +319,7 @@ export default function LabelList() {
             </div>
           </div>
           <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-[#180200]">{labelList.length}</span>
+            <span className="text-2xl font-bold text-[#180200]">{total}</span>
             <span className="text-xs text-gray-500">Ready to print</span>
           </div>
         </div>
@@ -327,7 +336,7 @@ export default function LabelList() {
           <div className="mt-2 flex items-baseline justify-between">
             <span className="text-2xl font-bold text-emerald-700">{selectedIds.length}</span>
             <span className="text-xs font-medium text-emerald-600">
-              {labelList.length ? `${Math.round((selectedIds.length / labelList.length) * 100)}% of queue` : '0%'}
+              {total ? `${Math.round((selectedIds.length / total) * 100)}% of queue` : '0%'}
             </span>
           </div>
         </div>
@@ -524,50 +533,12 @@ export default function LabelList() {
           </table>
         </div>
 
-        {/* Table Footer */}
-        <div className="flex flex-col items-center justify-between gap-3 border-t border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3 sm:flex-row text-xs text-[#863221]">
-          <div>
-            Showing <span className="font-semibold">{paginatedList.length}</span> of{' '}
-            <span className="font-semibold">{filteredList.length}</span> queued members
+        {/* Table Footer: the server pages the list */}
+        {total > 0 && (
+          <div className="border-t border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3">
+            <Pager page={currentPage} pages={pages} total={total} pageSize={pageSize} onPage={setCurrentPage} onPageSize={setPageSize} />
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Rows per page:</span>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setCurrentPage(1);
-              }}
-              className="rounded border border-stone-200 bg-white px-2 py-1 text-xs focus:outline-none"
-            >
-              <option value={5}>5</option>
-              <option value={10}>10</option>
-              <option value={20}>20</option>
-              <option value={50}>50</option>
-            </select>
-
-            <div className="ml-2 flex items-center space-x-1">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="rounded border border-stone-200 bg-white p-1 text-gray-600 hover:bg-stone-50 disabled:opacity-40"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="px-2 font-medium text-gray-800">
-                {currentPage} / {totalPages}
-              </span>
-              <button
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="rounded border border-stone-200 bg-white p-1 text-gray-600 hover:bg-stone-50 disabled:opacity-40"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* ========================================================= */}

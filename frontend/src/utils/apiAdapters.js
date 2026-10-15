@@ -265,6 +265,12 @@ export const fetchMembers = async (params = {}) => {
 // One page of the member list (at most 200 rows): the rows and the whole filtered set's total.
 export const fetchMemberPage = async (params = {}) => {
   const { data } = await api.get('/members/', { params: { limit: 25, ...params } });
+  return { rows: unwrapList(data).map(normalizeMember), total: data?.total ?? 0, pages: data?.pages ?? 1, summary: data?.summary || null };
+};
+
+// One page of the label list (members who have paid, latest receipt first); each row has last_receipt_date.
+export const fetchLabelPage = async (params = {}) => {
+  const { data } = await api.get('/members/label-list', { params: { limit: 25, ...params } });
   return { rows: unwrapList(data).map(normalizeMember), total: data?.total ?? 0, pages: data?.pages ?? 1 };
 };
 

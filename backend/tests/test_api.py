@@ -7112,3 +7112,32 @@ def test_member_list_pages_search_and_filters_run_on_every_member(client, admin_
     no_type = listing(limit=200, search="Pagey", no_membership_type=True)
     assert no_type["total"] >= 5
     assert listing(search="Pagey", is_active=False)["total"] == 0
+
+
+def test_unapproved_list_carries_receipts_and_label_list_pages(client, admin_headers):
+    H = admin_headers
+    paid = _create_member(client, H, "9699000001", "Zlabelpaid")
+    unpaid = _create_member(client, H, "9699000002", "Zlabelunpaid")
+    older = _make_receipt(client, H, gross_amount=500, net_amount=500, receipt_date="2026-01-05",
+                          items=[{"item_type": "MEMBERSHIP", "amount": 500}], allocations=[{"member_id": paid["id"], "allocated_amount": 500}])
+    newer = _make_receipt(client, H, gross_amount=700, net_amount=700, receipt_date="2026-03-09",
+                          items=[{"item_type": "MEMBERSHIP", "amount": 700}], allocations=[{"member_id": paid["id"], "allocated_amount": 700}])
+
+    # unapproved list: each member's latest receipt, and the with / without counts of the whole filtered set
+    lst = client.get("/api/v1/members/", headers=H, params={"approval_status": "UNAPPROVED", "search": "Zlabel", "with_receipt": True}).json()
+    by_id = {m["id"]: m for m in lst["data"]}
+    assert by_id[paid["id"]]["receipt"]["receipt_number"] == newer["receipt_number"]
+    assert by_id[unpaid["id"]]["receipt"] is None
+    assert lst["summary"] == {"with_receipt": 1, "without_receipt": 1}
+    only_paid = client.get("/api/v1/members/", headers=H, params={"approval_status": "UNAPPROVED", "search": "Zlabel", "receipt_assigned": True}).json()
+    assert [m["id"] for m in only_paid["data"]] == [paid["id"]]
+    only_unpaid = client.get("/api/v1/members/", headers=H, params={"approval_status": "UNAPPROVED", "search": "Zlabel", "receipt_assigned": False}).json()
+    assert [m["id"] for m in only_unpaid["data"]] == [unpaid["id"]]
+
+    # label list: only members who have paid, with the date of the latest receipt; search and dates run on all of them
+    labels = client.get("/api/v1/members/label-list", headers=H, params={"search": "Zlabel", "limit": 200}).json()
+    assert [m["id"] for m in labels["data"]] == [paid["id"]] and labels["data"][0]["last_receipt_date"] == "2026-03-09"
+    assert labels["limit"] == 200
+    assert client.get("/api/v1/members/label-list", headers=H, params={"search": "Zlabel", "from_date": "2026-04-01"}).json()["total"] == 0
+    assert client.get("/api/v1/members/label-list", headers=H, params={"search": "Zlabel", "to_date": "2026-03-31"}).json()["total"] == 1
+    assert client.get("/api/v1/members/label-list", headers=H, params={"limit": 5000}).json()["limit"] == 200

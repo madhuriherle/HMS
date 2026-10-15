@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import useSort from '../hooks/useSort';
+import Pager from '../components/Pager';
 import SortTh from '../components/SortTh';
 import { Link, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
@@ -45,7 +46,7 @@ import MemberApplicationDetails from '../components/MemberApplicationDetails';
 import { askReason } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import {
-  loadUnapprovedMembers,
+  loadUnapprovedPage,
   loadMembershipTypes,
   loadLocations
 } from '../utils/serverData';
@@ -85,19 +86,62 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   // ----------------------------------------------------
   // DATA STORES
   // ----------------------------------------------------
-  const [unapprovedMembers, setUnapprovedMembers] = useState([]);
+  const [unapprovedMembers, setUnapprovedMembers] = useState([]); // ONE page (at most 200), the rest stays on the server
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
+  const [counts, setCounts] = useState({ with_receipt: 0, without_receipt: 0 });
+  const [loadingPage, setLoadingPage] = useState(true);
   const [membershipTypes, setMembershipTypes] = useState([]);
   const [states, setStates] = useState([]);
   const [districts, setDistricts] = useState([]);
 
   const { sort, toggle: toggleSort, params: sortParams } = useSort();
-  const reloadData = async () => {
+  const requestSeq = useRef(0);
+  // what the server is asked for: the page, the search, the filters and the sort. They run on every applicant in the
+  // database; this screen only holds the page it shows (rule 10.6).
+  const loadPage = async () => {
+    const seq = (requestSeq.current += 1);
+    setLoadingPage(true);
+    try {
+      const params = { page: currentPage, limit: pageSize, ...sortParams };
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+      if (typeFilter !== 'ALL') {
+        const type = membershipTypes.find((mt) => mt.name.toLowerCase() === typeFilter.toLowerCase());
+        if (type) params.membership_type_id = type.id;
+      }
+      if (stateFilter !== 'ALL') {
+        const st = states.find((x) => x.name.toLowerCase() === stateFilter.toLowerCase());
+        if (st) params.state_id = st.id;
+      }
+      if (districtFilter !== 'ALL') {
+        const d = districts.find((x) => x.name.toLowerCase() === districtFilter.toLowerCase());
+        if (d) params.district_id = d.id;
+      }
+      if (receiptStatusFilter === 'Assigned') params.receipt_assigned = true;
+      if (receiptStatusFilter === 'Pending') params.receipt_assigned = false;
+      const result = await loadUnapprovedPage(params);
+      if (seq !== requestSeq.current) return; // a newer request is on its way
+      setUnapprovedMembers(result.rows);
+      setTotal(result.total);
+      setPages(Math.max(1, result.pages));
+      if (result.summary) setCounts(result.summary);
+      if (currentPage > Math.max(1, result.pages)) setCurrentPage(Math.max(1, result.pages));
+    } catch (error) {
+      if (seq !== requestSeq.current) return;
+      console.error('Failed to load unapproved members.', error);
+      showToast(error.response?.data?.detail || 'Failed to load unapproved members from the server.', 'error');
+    } finally {
+      if (seq === requestSeq.current) setLoadingPage(false);
+    }
+  };
+  const reloadData = loadPage; // after an action the same page is read again
+
+  const loadMasters = async () => {
     const fail = (what) => (error) => {
       console.error(`Failed to load ${what}.`, error);
       showToast(error.response?.data?.detail || `Failed to load ${what} from the server.`, 'error');
     };
     await Promise.all([
-      loadUnapprovedMembers(sortParams).then(setUnapprovedMembers).catch(fail('unapproved members')),
       loadMembershipTypes().then(setMembershipTypes).catch(fail('membership types')),
       loadLocations()
         .then((loc) => {
@@ -109,9 +153,9 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   };
 
   useEffect(() => {
-    reloadData();
+    loadMasters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sort.by, sort.dir]);
+  }, []);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState(null);
@@ -129,7 +173,23 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [receiptStatusFilter, setReceiptStatusFilter] = useState(assignedOnly ? 'Assigned' : 'ALL');
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
+
+  // the page is read again whenever the page, the search, a filter or the sort changes (default: newest first)
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const filterKey = [debouncedSearch, typeFilter, stateFilter, districtFilter, receiptStatusFilter, sort.by, sort.dir].join('|');
+  const mastersReady = membershipTypes.length > 0 || states.length > 0;
+  useEffect(() => {
+    loadPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey, currentPage, pageSize, mastersReady]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterKey, pageSize]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Row Selection
   const [selectionMode, setSelectionMode] = useState(false);
@@ -173,69 +233,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     return st ? districts.filter((d) => d.stateId === st.id) : districts;
   }, [districts, states, stateFilter]);
 
-  // ----------------------------------------------------
-  // FILTERING LOGIC
-  // ----------------------------------------------------
-  const filteredList = useMemo(() => {
-    return unapprovedMembers.filter((m) => {
-      // Search
-      if (searchQuery.trim()) {
-        const q = searchQuery.trim().toLowerCase();
-        const name = (m.fullName || m.name || '').toLowerCase();
-        const mob = (m.mobile || m.mobileNumber || '').toLowerCase();
-        const em = (m.email || '').toLowerCase();
-        const dist = (m.districtName || '').toLowerCase();
-        const id = String(m.id ?? '').toLowerCase();
-
-        if (
-          !name.includes(q) &&
-          !mob.includes(q) &&
-          !em.includes(q) &&
-          !dist.includes(q) &&
-          !id.includes(q)
-        ) {
-          return false;
-        }
-      }
-
-      // Membership Type Filter
-      if (typeFilter !== 'ALL') {
-        const mType = (m.membershipType || '').toLowerCase();
-        if (mType !== typeFilter.toLowerCase()) return false;
-      }
-
-      // State Filter
-      if (stateFilter !== 'ALL') {
-        if ((m.stateName || '').toLowerCase() !== stateFilter.toLowerCase()) return false;
-      }
-
-      // District Filter
-      if (districtFilter !== 'ALL') {
-        if ((m.districtName || '').toLowerCase() !== districtFilter.toLowerCase()) return false;
-      }
-
-      // Receipt Status Filter
-      if (receiptStatusFilter !== 'ALL') {
-        if ((m.receiptStatus || 'Pending') !== receiptStatusFilter) return false;
-      }
-
-      return true;
-    });
-  }, [
-    unapprovedMembers,
-    searchQuery,
-    typeFilter,
-    stateFilter,
-    districtFilter,
-    receiptStatusFilter
-  ]);
-
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredList.length / pageSize));
-  const paginatedList = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredList.slice(start, start + pageSize);
-  }, [filteredList, currentPage, pageSize]);
+  const filteredList = unapprovedMembers; // the server already searched, filtered, sorted and paged them
+  const paginatedList = unapprovedMembers;
 
   // Checkbox helpers
   const isAllPaginatedSelected = useMemo(() => {
@@ -243,12 +242,13 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     return paginatedList.every((m) => selectedIds.has(m.id));
   }, [paginatedList, selectedIds]);
 
+  const selectedCache = useRef(new Map()); // id -> applicant row, so a ticked applicant from another page still approves
   const handleToggleSelectAll = () => {
     const next = new Set(selectedIds);
     if (isAllPaginatedSelected) {
       paginatedList.forEach((m) => next.delete(m.id));
     } else {
-      paginatedList.forEach((m) => next.add(m.id));
+      paginatedList.forEach((m) => { next.add(m.id); selectedCache.current.set(m.id, m); });
     }
     setSelectedIds(next);
   };
@@ -259,6 +259,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
       next.delete(id);
     } else {
       next.add(id);
+      const row = unapprovedMembers.find((m) => m.id === id);
+      if (row) selectedCache.current.set(id, row);
     }
     setSelectedIds(next);
   };
@@ -436,7 +438,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
   // Bulk Approval for selected items in selection mode
   const handleBulkApprove = async () => {
-    const selectedMembers = unapprovedMembers.filter((m) => selectedIds.has(m.id));
+    const selectedMembers = [...selectedIds].map((id) => selectedCache.current.get(id)).filter(Boolean);
     if (selectedMembers.length === 0) return;
 
     const unassigned = selectedMembers.filter((m) => m.receiptStatus !== 'Assigned');
@@ -464,9 +466,9 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   };
 
   // Metric counts
-  const countTotal = unapprovedMembers.length;
-  const countPendingReceipt = unapprovedMembers.filter((m) => m.receiptStatus === 'Pending').length;
-  const countAssigned = unapprovedMembers.filter((m) => m.receiptStatus === 'Assigned').length;
+  const countTotal = counts.with_receipt + counts.without_receipt;
+  const countPendingReceipt = counts.without_receipt;
+  const countAssigned = counts.with_receipt;
 
   useSwalConfirm(
     validationBlockDialog,
@@ -788,62 +790,10 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           </table>
         </div>
 
-        {/* Pagination Section */}
-        {filteredList.length > 0 && (
-          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#863221]">
-            <div className="flex items-center gap-2">
-              <span>Showing</span>
-              <span className="font-bold text-[#180200]">
-                {Math.min((currentPage - 1) * pageSize + 1, filteredList.length)}
-              </span>
-              <span>to</span>
-              <span className="font-bold text-[#180200]">
-                {Math.min(currentPage * pageSize, filteredList.length)}
-              </span>
-              <span>of</span>
-              <span className="font-bold text-[#180200]">{filteredList.length}</span>
-              <span>unapproved applications</span>
-            </div>
-
-            <div className="flex items-center gap-4 self-end sm:self-auto">
-              <div className="flex items-center gap-1.5">
-                <span>Rows per page:</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="py-1 px-2 text-xs bg-white border border-[#E8DFD8] rounded focus:outline-none focus:border-[#510601]"
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="p-1.5 rounded-lg bg-white border border-[#E8DFD8] disabled:opacity-40 hover:bg-[#FAF7F2] transition-colors cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="px-2 font-bold text-[#180200]">
-                  {currentPage} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="p-1.5 rounded-lg bg-white border border-[#E8DFD8] disabled:opacity-40 hover:bg-[#FAF7F2] transition-colors cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+        {/* Pagination Section: the server pages the list */}
+        {total > 0 && (
+          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+            <Pager page={currentPage} pages={pages} total={total} pageSize={pageSize} onPage={setCurrentPage} onPageSize={setPageSize} />
           </div>
         )}
       </div>

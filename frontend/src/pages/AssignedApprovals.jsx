@@ -1,16 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ChevronLeft, ChevronRight, Check, Eye, Pencil } from 'lucide-react';
 import api from '../api';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
-import { loadUnapprovedMembers } from '../utils/serverData';
+import { loadUnapprovedPage } from '../utils/serverData';
+import Pager from '../components/Pager';
 import { confirmYesNo } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import { formatDate } from '../utils/dateUtils';
 import { formatMoney } from '../utils/money';
 
-const PAGE_SIZE = 25;
 const inr = formatMoney;
 
 // Final-approval queue: unapproved members whose receipt is already assigned.
@@ -20,54 +20,74 @@ export default function AssignedApprovals() {
   const { hasPermission } = useAuth();
   const canApprove = hasPermission('members.assigned.write');
 
-  const [members, setMembers] = useState([]);
+  const [members, setMembers] = useState([]); // ONE page (at most 200); the rest stays on the server
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selected, setSelected] = useState(new Set());
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
   const [busy, setBusy] = useState(false);
+  const selectedCache = useRef(new Map()); // id -> row, so a ticked applicant from another page still approves
+  const requestSeq = useRef(0);
 
+  // the members whose receipt is mapped, one page at a time; the search runs on all of them (rule 10.6)
   const load = async () => {
+    const seq = (requestSeq.current += 1);
     setLoading(true);
     try {
-      const all = await loadUnapprovedMembers();
-      setMembers(all.filter((m) => m.receiptStatus === 'Assigned'));
+      const result = await loadUnapprovedPage({
+        receipt_assigned: true, page, limit: pageSize,
+        ...(debouncedQuery.trim() ? { search: debouncedQuery.trim() } : {}),
+      });
+      if (seq !== requestSeq.current) return;
+      setMembers(result.rows);
+      setTotal(result.total);
+      setPages(Math.max(1, result.pages));
+      if (page > Math.max(1, result.pages)) setPage(Math.max(1, result.pages));
     } catch (error) {
+      if (seq !== requestSeq.current) return;
       notify(error.response?.data?.detail || 'Failed to load the list from the server.', 'error');
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, debouncedQuery]);
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedQuery, pageSize]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 350);
+    return () => clearTimeout(timer);
+  }, [query]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return members;
-    return members.filter((m) =>
-      [m.fullName, m.name, m.mobile, m.id, m.assignedReceiptNumber, m.membershipType]
-        .map((v) => String(v ?? '').toLowerCase())
-        .some((v) => v.includes(q))
-    );
-  }, [members, query]);
-
-  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const rows = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const rows = members; // the server already searched and paged them
   const allOnPage = rows.length > 0 && rows.every((m) => selected.has(m.id));
 
   const toggle = (id) =>
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
-      else next.add(id);
+      else {
+        next.add(id);
+        const row = members.find((m) => m.id === id);
+        if (row) selectedCache.current.set(id, row);
+      }
       return next;
     });
   const toggleAll = () =>
     setSelected((prev) => {
       const next = new Set(prev);
-      rows.forEach((m) => (allOnPage ? next.delete(m.id) : next.add(m.id)));
+      rows.forEach((m) => {
+        if (allOnPage) next.delete(m.id);
+        else { next.add(m.id); selectedCache.current.set(m.id, m); }
+      });
       return next;
     });
 
@@ -98,7 +118,7 @@ export default function AssignedApprovals() {
     await load();
   };
 
-  const chosen = members.filter((m) => selected.has(m.id));
+  const chosen = [...selected].map((id) => selectedCache.current.get(id)).filter(Boolean);
 
   return (
     <PermissionGate required="members.assigned.read">
@@ -111,10 +131,7 @@ export default function AssignedApprovals() {
               <input
                 type="text"
                 value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setPage(1);
-                }}
+                onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search name, mobile, receipt…"
                 className="w-full pl-9 pr-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
               />
@@ -223,22 +240,9 @@ export default function AssignedApprovals() {
             </table>
           </div>
 
-          {filtered.length > PAGE_SIZE && (
-            <div className="px-5 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8] flex items-center justify-between text-xs text-[#863221]">
-              <span>
-                Showing {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
-              </span>
-              <div className="flex items-center gap-2">
-                <span>
-                  Page {page} of {pages}
-                </span>
-                <button type="button" disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="p-1.5 rounded-md border border-[#E8DFD8] bg-white disabled:opacity-40 cursor-pointer">
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button type="button" disabled={page >= pages} onClick={() => setPage((p) => p + 1)} className="p-1.5 rounded-md border border-[#E8DFD8] bg-white disabled:opacity-40 cursor-pointer">
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+          {total > 0 && (
+            <div className="px-5 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8]">
+              <Pager page={page} pages={pages} total={total} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
             </div>
           )}
         </div>
