@@ -852,7 +852,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           isOpen
           onClose={() => setAssigningMember(null)}
           title={`Assign a receipt to ${assigningMember.fullName || assigningMember.name}`}
-          maxWidthClass="max-w-5xl"
+          maxWidthClass="max-w-[1400px]"
           footer={<ModalFooter kind="view" onCancel={() => setAssigningMember(null)} />}
         >
           <div className="p-5 space-y-4">
@@ -974,7 +974,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                 </table>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {assignPageRows.map((c) => {
                   const hinted = receiptMatchScore(c, assigningMember) > 0;
                   return (
