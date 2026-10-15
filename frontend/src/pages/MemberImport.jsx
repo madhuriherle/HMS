@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Upload,
@@ -12,12 +12,16 @@ import {
   RefreshCw,
   FileText,
   Check,
-  X
+  X,
+  History
 } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
+import { formatDateTime } from '../utils/dateUtils';
+import { confirmAction } from '../utils/actionConfirm';
+import { memberName } from '../utils/memberName';
 
 export default function MemberImport() {
   const navigate = useNavigate();
@@ -38,6 +42,44 @@ export default function MemberImport() {
   const [skippedCount, setSkippedCount] = useState(0);
   const [skippedList, setSkippedList] = useState([]);
   const [importCompleted, setImportCompleted] = useState(false);
+
+  // "Check file": the server judges every row exactly as the import would, but saves nothing
+  const [checking, setChecking] = useState(false);
+  const [checkResult, setCheckResult] = useState(null);
+
+  // Import history (right-side panel): who imported which file, when, and the result
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+  const [historyDetail, setHistoryDetail] = useState(null);
+
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const { data } = await api.get('/members/import-history', { params: { limit: 50 } });
+      setHistory(data.data || []);
+    } catch (err) {
+      setHistoryError(err.response?.data?.detail || 'Could not load the import history.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const openHistoryDetail = async (id) => {
+    try {
+      const { data } = await api.get(`/members/import-history/${id}`);
+      setHistoryDetail(data);
+    } catch (err) {
+      notify(err.response?.data?.detail || 'Could not load that import.', 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (historyOpen) loadHistory();
+    else setHistoryDetail(null);
+  }, [historyOpen]);
 
   // The template comes from the server (column headings only)
   const handleDownloadTemplate = async () => {
@@ -85,7 +127,7 @@ export default function MemberImport() {
 
       // Normalize key aliases
       const memNum = obj.membership_number || obj.membership_no || obj.member_no || obj.member_code || obj.no;
-      const firstName = obj.first_name_en || obj.first_name || obj.name || obj.full_name;
+      const firstName = obj.first_name_en || obj.first_name || obj.name || obj.full_name || obj.membership_name || obj.member_name;
 
       if (memNum && firstName) {
         rows.push({
@@ -94,8 +136,9 @@ export default function MemberImport() {
           middle_name_en: (obj.middle_name_en || '').trim() || null,
           last_name_en: (obj.last_name_en || obj.last_name || '').trim() || null,
           full_name_kn: (obj.full_name_kn || '').trim() || null,
-          mobile: (obj.mobile || obj.phone || '').trim() || null,
-          gender: (obj.gender || 'MALE').trim().toUpperCase(),
+          mobile: (obj.mobile || obj.phone || obj.mobile_number || '').trim() || null,
+          gotra: (obj.gotra || obj.gothra || '').trim() || null,
+          gender: (obj.gender || '').trim().toUpperCase() || null,
           date_of_birth: obj.date_of_birth || obj.dob || null,
           email: (obj.email || '').trim() || null,
           address_line1: (obj.address_line1 || obj.address || '').trim() || null,
@@ -143,11 +186,50 @@ export default function MemberImport() {
   };
 
   // Run the batch import
+  const handleCheckFile = async () => {
+    if (!parsedRows.length) return;
+    setChecking(true);
+    setCheckResult(null);
+    const BATCH = 300;
+    const seen = new Set(); // a number repeated later in the same file is skipped by the import, so it is here too
+    const rows = [];
+    const result = { total: parsedRows.length, wouldImport: 0, skipped: [], skippedCount: 0, warnings: [], warningCount: 0 };
+    for (const r of parsedRows) {
+      const key = String(r.membership_number || '').trim().toUpperCase();
+      if (key && seen.has(key)) {
+        result.skippedCount += 1;
+        if (result.skipped.length < 200) result.skipped.push({ membership_number: r.membership_number, reason: 'Already exists in database or earlier in this file' });
+        continue;
+      }
+      if (key) seen.add(key);
+      rows.push(r);
+    }
+    try {
+      for (let i = 0; i < rows.length; i += BATCH) {
+        const { data } = await api.post('/members/bulk-import/validate', { members: rows.slice(i, i + BATCH), skip_duplicates: skipDuplicates });
+        result.wouldImport += data.success_count || 0;
+        result.skippedCount += data.skipped_count || 0;
+        result.warningCount += data.warning_count || 0;
+        if (result.skipped.length < 200) result.skipped.push(...(data.skipped || []).slice(0, 200 - result.skipped.length));
+        if (result.warnings.length < 200) result.warnings.push(...(data.warnings || []).slice(0, 200 - result.warnings.length));
+      }
+      setCheckResult(result);
+    } catch (err) {
+      notify(err.response?.data?.detail || 'Could not check the file.', 'error');
+    } finally {
+      setChecking(false);
+    }
+  };
+
   const handleStartImport = async () => {
     if (!parsedRows || parsedRows.length === 0) {
       notify('Please select a file with valid member records.', 'error');
       return;
     }
+
+    // one confirmation for the whole file (not one per batch of 300)
+    const reason = await confirmAction('post', '/members/bulk-import');
+    if (!reason) return;
 
     setIsImporting(true);
     setProgressPercent(0);
@@ -162,6 +244,7 @@ export default function MemberImport() {
     const allSkipped = [];
 
     const totalRows = parsedRows.length;
+    const runId = (globalThis.crypto?.randomUUID?.() || `${Date.now()}${Math.random().toString(16).slice(2)}`).replace(/-/g, '').slice(0, 32);
 
     try {
       for (let i = 0; i < totalRows; i += BATCH_SIZE) {
@@ -169,8 +252,11 @@ export default function MemberImport() {
 
         const { data } = await api.post('/members/bulk-import', {
           members: batch,
-          skip_duplicates: skipDuplicates
-        });
+          skip_duplicates: skipDuplicates,
+          run_id: runId,
+          file_name: fileName,
+          total_rows: totalRows
+        }, { headers: { 'X-Action-Reason': reason } });
 
         totalSuccess += data.success_count || 0;
         totalSkipped += data.skipped_count || 0;
@@ -208,6 +294,7 @@ export default function MemberImport() {
     setSuccessCount(0);
     setSkippedCount(0);
     setSkippedList([]);
+    setCheckResult(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -221,6 +308,15 @@ export default function MemberImport() {
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              title="Import history"
+              aria-label="Import history"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-[#E8DFD8] text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] transition-colors cursor-pointer"
+            >
+              <History className="w-4 h-4" />
+            </button>
             <Link
               to="/dashboard/membership/list"
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] transition-colors"
@@ -309,6 +405,16 @@ export default function MemberImport() {
                     </button>
                     <button
                       type="button"
+                      onClick={handleCheckFile}
+                      disabled={checking}
+                      title="Shows what the import would do. Nothing is saved."
+                      className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold text-[#510601] rounded-xl border border-[#510601] hover:bg-[#510601]/5 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                      {checking ? 'Checking...' : 'Check file (nothing is saved)'}
+                    </button>
+                    <button
+                      type="button"
                       onClick={handleStartImport}
                       className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
                     >
@@ -316,6 +422,51 @@ export default function MemberImport() {
                       Import {parsedRows.length.toLocaleString()} Live Members
                     </button>
                   </div>
+                </div>
+              )}
+
+              {checkResult && parsedRows.length > 0 && !isImporting && (
+                <div className="p-4 rounded-2xl border border-[#E8DFD8] bg-[#FAF7F2] space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-bold text-[#180200] uppercase tracking-wider">Check result - nothing was saved</p>
+                    <button type="button" onClick={() => setCheckResult(null)} className="p-1 text-[#863221] hover:text-[#180200] cursor-pointer" aria-label="Close">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    {[
+                      ['Rows in file', checkResult.total],
+                      ['Would be imported', checkResult.wouldImport],
+                      ['Would be skipped', checkResult.skippedCount],
+                      ['Imported, please check', checkResult.warningCount],
+                    ].map(([k, v]) => (
+                      <div key={k} className="p-3 bg-white rounded-xl border border-[#E8DFD8]">
+                        <p className="text-[#863221] font-semibold uppercase text-[10px]">{k}</p>
+                        <p className="mt-0.5 text-base font-bold text-[#180200]">{Number(v).toLocaleString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {[
+                    ['Would be skipped', checkResult.skipped, checkResult.skippedCount, (r) => r.reason],
+                    ['Imported, please check', checkResult.warnings, checkResult.warningCount, (r) => r.warning],
+                  ].map(([title, list, count, text]) => (
+                    list.length > 0 && (
+                      <details key={title} className="bg-white rounded-xl border border-[#E8DFD8]">
+                        <summary className="px-3 py-2 text-xs font-bold text-[#180200] cursor-pointer">
+                          {title} (first {list.length}{count > list.length ? ` of ${Number(count).toLocaleString()}` : ''})
+                        </summary>
+                        <ul className="max-h-56 overflow-y-auto divide-y divide-[#E8DFD8] text-xs">
+                          {list.map((r, i) => (
+                            <li key={i} className="flex items-start justify-between gap-3 px-3 py-1.5">
+                              <span className="font-semibold text-[#180200] shrink-0">{r.membership_number || '-'}</span>
+                              <span className="text-[#863221] text-right">{text(r)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )
+                  ))}
+                  <p className="text-[11px] text-[#863221]">A mobile shared between two rows of this file is only flagged when the import runs.</p>
                 </div>
               )}
             </div>
@@ -473,7 +624,7 @@ export default function MemberImport() {
                         <td className="py-2 px-3 text-[#863221]/70">{i + 1}</td>
                         <td className="py-2 px-3 font-mono font-bold text-[#510601]">{r.membership_number}</td>
                         <td className="py-2 px-3 font-medium">
-                          {r.first_name_en} {r.last_name_en || ''}
+                          {memberName(r)}
                           {r.full_name_kn ? <span className="block text-[11px] text-[#863221]/70">{r.full_name_kn}</span> : null}
                         </td>
                         <td className="py-2 px-3 font-mono">{r.mobile || '—'}</td>
@@ -492,6 +643,121 @@ export default function MemberImport() {
             </div>
           )}
         </div>
+
+        {historyOpen && (
+          <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label="Import history">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setHistoryOpen(false)} />
+            <aside className="relative w-full max-w-md h-full bg-white shadow-2xl flex flex-col">
+              <div className="px-5 h-14 flex items-center justify-between border-b border-[#E8DFD8] bg-[#FAF7F2] shrink-0">
+                <h2 className="text-base font-bold text-[#180200]">{historyDetail ? 'Import details' : 'Import history'}</h2>
+                <div className="flex items-center gap-1">
+                  {!historyDetail && (
+                    <button type="button" onClick={loadHistory} title="Refresh" className="p-2 rounded-lg text-[#863221] hover:bg-white cursor-pointer">
+                      <RefreshCw className={`w-4 h-4 ${historyLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                  )}
+                  <button type="button" onClick={() => setHistoryOpen(false)} title="Close" className="p-2 rounded-lg text-[#863221] hover:bg-white cursor-pointer">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5">
+                {historyDetail ? (
+                  <div className="space-y-4">
+                    <button type="button" onClick={() => setHistoryDetail(null)} className="text-xs font-semibold text-[#510601] hover:underline cursor-pointer">
+                      &larr; All imports
+                    </button>
+                    <dl className="grid grid-cols-2 gap-3 text-xs">
+                      {[
+                        ['File', historyDetail.file_name || '-'],
+                        ['Imported by', historyDetail.imported_by],
+                        ['Started', formatDateTime(historyDetail.imported_at, '-', false)],
+                        ['Finished', formatDateTime(historyDetail.finished_at, '-', false)],
+                        ['Rows in file', Number(historyDetail.total_rows).toLocaleString()],
+                        ['Rows processed', Number(historyDetail.processed_rows).toLocaleString()],
+                        ['Imported', Number(historyDetail.success_count).toLocaleString()],
+                        ['Skipped', Number(historyDetail.skipped_count).toLocaleString()],
+                        ['Imported with a note', Number(historyDetail.warning_count || 0).toLocaleString()],
+                        ['Existing numbers', historyDetail.skip_duplicates ? 'Skipped' : 'Stopped the import'],
+                        ['Status', historyDetail.status === 'COMPLETED' ? 'Completed' : 'Stopped before the end'],
+                      ].map(([k, v]) => (
+                        <div key={k} className="p-3 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8] min-w-0">
+                          <dt className="text-[#863221] font-semibold uppercase text-[10px]">{k}</dt>
+                          <dd className="mt-0.5 font-bold text-[#180200] break-words">{v}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                    <div>
+                      <h3 className="text-xs font-bold text-[#180200] uppercase tracking-wider mb-2">
+                        Skipped rows{historyDetail.skipped_count > (historyDetail.skipped || []).length ? ` (first ${(historyDetail.skipped || []).length} of ${Number(historyDetail.skipped_count).toLocaleString()})` : ''}
+                      </h3>
+                      {(historyDetail.skipped || []).length === 0 ? (
+                        <p className="text-xs text-[#863221]">Nothing was skipped.</p>
+                      ) : (
+                        <ul className="divide-y divide-[#E8DFD8] border border-[#E8DFD8] rounded-xl text-xs">
+                          {historyDetail.skipped.map((r, i) => (
+                            <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
+                              <span className="font-semibold text-[#180200]">{r.membership_number || '-'}</span>
+                              <span className="text-[#863221] text-right">{r.reason}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold text-[#180200] uppercase tracking-wider mb-2">
+                        Imported, please check{(historyDetail.warning_count || 0) > (historyDetail.warnings || []).length ? ` (first ${(historyDetail.warnings || []).length} of ${Number(historyDetail.warning_count).toLocaleString()})` : ''}
+                      </h3>
+                      {(historyDetail.warnings || []).length === 0 ? (
+                        <p className="text-xs text-[#863221]">Nothing to check.</p>
+                      ) : (
+                        <ul className="divide-y divide-[#E8DFD8] border border-[#E8DFD8] rounded-xl text-xs">
+                          {historyDetail.warnings.map((r, i) => (
+                            <li key={i} className="flex items-start justify-between gap-3 px-3 py-2">
+                              <span className="font-semibold text-[#180200] shrink-0">{r.membership_number}</span>
+                              <span className="text-[#863221] text-right">{r.warning}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                ) : historyError ? (
+                  <p className="text-sm font-semibold text-red-700">{historyError}</p>
+                ) : historyLoading && history.length === 0 ? (
+                  <p className="text-sm text-[#863221]">Loading...</p>
+                ) : history.length === 0 ? (
+                  <p className="text-sm text-[#863221]">No imports have been run yet.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {history.map((h) => (
+                      <li key={h.id}>
+                        <button type="button" onClick={() => openHistoryDetail(h.id)}
+                          className="w-full text-left p-3.5 rounded-xl border border-[#E8DFD8] hover:border-[#510601] hover:bg-[#FAF7F2] transition-colors cursor-pointer">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-bold text-[#180200] break-all">{h.file_name || 'Imported file'}</p>
+                            <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${h.status === 'COMPLETED' ? 'bg-[#3D705C]/10 text-[#3D705C]' : 'bg-[#FFC107]/20 text-[#863221]'}`}>
+                              {h.status === 'COMPLETED' ? 'Completed' : 'Stopped'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-[#863221] mt-1">
+                            {h.imported_by} &middot; {formatDateTime(h.imported_at, '-', false)}
+                          </p>
+                          <p className="text-xs text-[#180200] mt-1.5">
+                            <span className="font-bold">{Number(h.success_count).toLocaleString()}</span> imported &middot;{' '}
+                            <span className="font-bold">{Number(h.skipped_count).toLocaleString()}</span> skipped of{' '}
+                            {Number(h.total_rows).toLocaleString()}
+                          </p>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </aside>
+          </div>
+        )}
       </div>
     </PermissionGate>
   );

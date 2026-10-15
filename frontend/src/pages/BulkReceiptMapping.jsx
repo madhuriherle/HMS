@@ -27,6 +27,7 @@ import { formatMoney } from '../utils/money';
 
 
 import ModalFooter from '../components/ModalFooter';
+import { memberName } from '../utils/memberName';
 export default function BulkReceiptMapping() {
   const { hasPermission } = useAuth();
   const canWrite = hasPermission('receipts.bulk_mapping.write');
@@ -236,7 +237,7 @@ export default function BulkReceiptMapping() {
         ]
       });
 
-      notify(`Receipt ${activeReceiptForManual.receipt_number} mapped to ${member.name || member.first_name_en}!`, 'success');
+      notify(`Receipt ${activeReceiptForManual.receipt_number} mapped to ${member.name || memberName(member)}!`, 'success');
       setManualModalOpen(false);
       await fetchCandidates();
     } catch (err) {
@@ -692,7 +693,7 @@ export default function BulkReceiptMapping() {
                   >
                     <div>
                       <h4 className="text-xs font-bold text-[#180200]">
-                        {m.name || m.first_name_en} {m.last_name_en || ''}
+                        {m.name || memberName(m)}
                       </h4>
                       <p className="text-[11px] text-[#863221]">
                         No: <span className="font-mono font-semibold">{m.membership_number || m.member_code || '—'}</span>

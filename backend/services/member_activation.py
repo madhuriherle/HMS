@@ -61,7 +61,7 @@ def activate_member(db: Session, member: Member, *, activated_by: int) -> Member
     task queue)."""
     gaps = approval_gaps(member)
     if gaps:
-        name = " ".join(p for p in (member.first_name_en, member.last_name_en) if p) or f"Member {member.id}"
+        name = member.display_name or f"Member {member.id}"
         raise HTTPException(400, f"Cannot approve {name}: missing {', '.join(gaps)}")
     now = datetime.now(timezone.utc)
     old_status = member.approval_status

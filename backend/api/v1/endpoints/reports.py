@@ -56,7 +56,7 @@ KANNADA_HEADERS = {
 
 
 def _member_name(m: Member) -> str:
-    return " ".join(p for p in (m.first_name_en, m.last_name_en) if p)
+    return m.display_name
 
 
 def _member_geo_rows(

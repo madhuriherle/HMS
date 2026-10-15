@@ -139,7 +139,7 @@ def global_search(
             .filter(
                 Member.is_deleted == False,  # noqa: E712
                 or_(
-                    Member.first_name_en.ilike(like), Member.last_name_en.ilike(like), Member.full_name_kn.ilike(like),
+                    Member.full_name_en.ilike(like), Member.first_name_en.ilike(like), Member.last_name_en.ilike(like), Member.full_name_kn.ilike(like),
                     Member.member_code.ilike(like), Member.mobile.like(f"%{''.join(ch for ch in text if ch.isdigit()) or '#'}%"),
                     Member.id.in_(by_number),
                 ),
@@ -149,7 +149,7 @@ def global_search(
             .all()
         )
         members = [
-            {"id": m.id, "name": " ".join(x for x in (m.first_name_en, m.last_name_en) if x),
+            {"id": m.id, "name": m.display_name,
              "member_code": m.member_code, "mobile": m.mobile, "approval_status": m.approval_status}
             for m in rows
         ]

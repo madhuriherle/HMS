@@ -258,6 +258,6 @@ def read_member_timeline(
 
     return {
         "member_id": member_id,
-        "member_name": " ".join(p for p in (member.first_name_en, member.last_name_en) if p),
+        "member_name": member.display_name,
         **page_data,
     }

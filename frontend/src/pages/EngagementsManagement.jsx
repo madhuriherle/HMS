@@ -36,6 +36,7 @@ import PageActions, { PageActionsSlot } from '../components/PageActions';
 import { formatDate } from '../utils/dateUtils';
 import { notify } from '../utils/notify';
 import Swal from 'sweetalert2';
+import { memberName } from '../utils/memberName';
 
 export default function EngagementsManagement() {
   const { hasPermission } = useAuth();
@@ -1596,7 +1597,7 @@ function CommitteeView({ canWrite, canDelete }) {
   };
 
   const handleSelectHmsMember = (m) => {
-    const fullName = `${m.first_name_en || ''} ${m.last_name_en || ''}`.trim() || m.full_name_kn || 'Member';
+    const fullName = memberName(m) || m.full_name_kn || 'Member';
     const code = m.membership_number || m.member_code || '';
     setMemberForm((prev) => ({
       ...prev,
@@ -2034,7 +2035,7 @@ function CommitteeView({ canWrite, canDelete }) {
                       {hmsSearchResults.length > 0 && (
                         <div className="border border-[#E8DFD8] rounded-lg bg-white max-h-40 overflow-y-auto divide-y divide-[#E8DFD8]">
                           {hmsSearchResults.map((m) => {
-                            const name = `${m.first_name_en || ''} ${m.last_name_en || ''}`.trim() || m.full_name_kn;
+                            const name = memberName(m) || m.full_name_kn;
                             const code = m.membership_number || m.member_code;
                             return (
                               <button

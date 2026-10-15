@@ -1,4 +1,5 @@
 import api from '../api';
+import { memberName } from './memberName';
 
 const titleCase = (value) => {
   if (!value) return '';
@@ -11,10 +12,7 @@ const titleCase = (value) => {
 const firstDefined = (...values) => values.find((value) => value !== undefined && value !== null && value !== '');
 
 const fullNameFromMember = (member) => {
-  const name = [member.first_name_en, member.middle_name_en, member.last_name_en]
-    .filter(Boolean)
-    .join(' ')
-    .trim();
+  const name = memberName(member);
   return name || member.full_name_kn || member.name || '';
 };
 
@@ -113,6 +111,7 @@ export const normalizeMember = (member) => {
 export const memberToApiPayload = (formData, { isUpdate = false } = {}) => {
   const parts = formData.name.trim().split(/\s+/);
   return {
+    full_name_en: formData.name.trim().split(/\s+/).join(' '),
     first_name_en: parts[0] || formData.name.trim(),
     middle_name_en: parts.length > 2 ? parts.slice(1, -1).join(' ') : null,
     last_name_en: parts.length > 1 ? parts[parts.length - 1] : null,

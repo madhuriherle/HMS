@@ -501,7 +501,7 @@ def _resolve_committee_names(db: Session, members: list) -> list:
             "hms_member_id": link_by_committee.get(m.id),
             "hms_member_code": hms.member_code if hms else None,
             "hms_member_name": (
-                " ".join(p for p in (hms.first_name_en, hms.last_name_en) if p)
+                hms.display_name
                 if hms else None
             ),
         })

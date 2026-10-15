@@ -54,6 +54,7 @@ import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/use
 import { formatMoney } from '../utils/money';
 
 import ModalFooter from '../components/ModalFooter';
+import { memberName } from '../utils/memberName';
 // ----------------------------------------------------
 // Server member -> the shape this screen draws
 // ----------------------------------------------------
@@ -76,7 +77,7 @@ const toEntryMember = (m, loc) => {
   const nameOf = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '';
   const pin = loc.postalCodes.find((p) => String(p.id) === String(m.pincode_id));
   const reg = m.registration_payment || {};
-  const fullName = [m.name_title, m.first_name_en, m.middle_name_en, m.last_name_en].filter(Boolean).join(' ');
+  const fullName = memberName(m, true);
   const approved = String(m.approval_status).toUpperCase() === 'APPROVED';
   const districtName = nameOf(loc.districts, m.district_id);
   const stateName = nameOf(loc.states, m.state_id);

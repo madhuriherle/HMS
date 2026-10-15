@@ -258,3 +258,127 @@ def test_bulk_mapping_ignores_the_mobile_number(client, admin_headers):
     cands = client.get("/api/v1/receipts/unassigned-candidates", headers=admin_headers, params={"search": tag}).json()
     found = [c for c in cands["candidates"] if c["receipt_id"] == rid][0]
     assert found["match_type"] == "NONE" and found["matched_member"] is None
+
+
+def test_bulk_import_history_records_who_imported_what(client, admin_headers):
+    rows = [{"membership_number": "HIST9001", "first_name_en": "Hist One"}, {"membership_number": "HIST9002", "first_name_en": "Hist Two"}]
+    base = {"skip_duplicates": True, "run_id": "histrun-1", "file_name": "members.csv", "total_rows": 3}
+    assert client.post("/api/v1/members/bulk-import", headers=admin_headers, json={**base, "members": rows}).status_code == 200
+    # second batch of the same file: one new, one already there
+    again = [{"membership_number": "HIST9002", "first_name_en": "Hist Two"}, {"membership_number": "HIST9003", "first_name_en": "Hist Three"}]
+    assert client.post("/api/v1/members/bulk-import", headers=admin_headers, json={**base, "members": again[:1]}).status_code == 200
+    listing = client.get("/api/v1/members/import-history", headers=admin_headers).json()["data"]
+    run = next(r for r in listing if r["file_name"] == "members.csv")
+    assert run["success_count"] == 2 and run["skipped_count"] == 1 and run["processed_rows"] == 3
+    assert run["status"] == "COMPLETED" and run["imported_by"] != "-"
+    detail = client.get(f"/api/v1/members/import-history/{run['id']}", headers=admin_headers).json()
+    assert detail["skipped"][0]["membership_number"] == "HIST9002"
+    assert client.get("/api/v1/members/import-history").status_code in (401, 403)
+
+
+def test_bulk_import_rules_for_duplicates_mobiles_and_names(client, admin_headers):
+    def row(num, name, mobile=None, mtype=None):
+        return {"membership_number": num, "first_name_en": name, "mobile": mobile, "membership_type": mtype}
+
+    batch = [
+        row("RUL001", "  SUJATA   BHAT, ", "+91 98452 49580"),         # spaces / comma / +91 cleaned
+        row("RUL002", "FAMILY MEMBER", "9845249580"),                   # same mobile as RUL001: allowed, flagged
+        row("RUL003", "SUJATA BHAT", "98452-49580"),                    # same name + mobile: possible duplicate person
+        row("RUL001", "AGAIN", None),                                   # same number twice in one file: skipped
+        row("RUL004", "LANDLINE", "080-23612047"),                      # landline: mobile left blank
+        row("RUL005", "FOREIGN", "61432716266"),                        # not a mobile: left blank
+        row("", "NO NUMBER", None),                                     # no number: skipped
+        row("RUL006", "   ", None),                                     # no name: skipped
+        row("RUL007", "NO MOBILE", None),                               # blank mobile is fine
+        row("RUL008", "ODD TYPE", None, "No Such Type"),                # unknown type: default used, flagged
+    ]
+    # validate first: nothing is saved
+    dry = client.post("/api/v1/members/bulk-import/validate", headers=admin_headers, json={"members": batch}).json()
+    assert dry["dry_run"] is True and dry["success_count"] == 7
+    assert client.get("/api/v1/members/", headers=admin_headers, params={"search": "RUL001"}).json()["data"] == []
+
+    res = client.post("/api/v1/members/bulk-import", headers=admin_headers, json={"members": batch, "run_id": "rules-run", "file_name": "rules.csv", "total_rows": 10}).json()
+    assert res["success_count"] == 7 and res["skipped_count"] == 3
+    reasons = {s["membership_number"] or "-": s["reason"] for s in res["skipped"]}
+    assert "earlier in this file" in reasons["RUL001"] and reasons["-"] == "Missing membership number" and reasons["RUL006"] == "Missing name"
+    warn = {}
+    for w in res["warnings"]:
+        warn.setdefault(w["membership_number"], []).append(w["warning"])
+    assert any("shared with" in w for w in warn["RUL002"])
+    assert any("possible duplicate person" in w for w in warn["RUL003"])
+    assert any("landline" in w for w in warn["RUL004"]) and any("not a valid mobile" in w for w in warn["RUL005"])
+    assert any("not found" in w for w in warn["RUL008"]) and "RUL007" not in warn
+    got = {m["member_code"]: m for m in client.get("/api/v1/members/", headers=admin_headers, params={"search": "RUL", "limit": 50}).json()["data"]}
+    assert got["RUL001"]["mobile"] == "9845249580" and (got["RUL001"]["first_name_en"], got["RUL001"]["last_name_en"]) == ("SUJATA", "BHAT")
+    assert got["RUL004"]["mobile"] is None and got["RUL005"]["mobile"] is None
+    # running the same file again creates nothing new
+    again = client.post("/api/v1/members/bulk-import", headers=admin_headers, json={"members": batch}).json()
+    assert again["success_count"] == 0
+
+
+def test_bulk_import_maps_gotra_spellings_to_the_master(client, admin_headers):
+    from models.masters import Gotra
+    from db.session import SessionLocal
+    db = SessionLocal()
+    try:
+        if not db.query(Gotra).filter(Gotra.name_en == "Vasista", Gotra.is_deleted == False).first():  # noqa: E712
+            db.add(Gotra(name_en="Vasista", status=True))
+            db.commit()
+        master_id = db.query(Gotra).filter(Gotra.name_en == "Vasista", Gotra.is_deleted == False).first().id  # noqa: E712
+    finally:
+        db.close()
+    rows = [{"membership_number": f"GOT00{i}", "first_name_en": f"Gotra {i}", "gotra": g}
+            for i, g in enumerate(["VASHISHTA", "vasistha", "GENERAL", "", "Zzyzx"], start=1)]
+    res = client.post("/api/v1/members/bulk-import", headers=admin_headers, json={"members": rows}).json()
+    assert res["success_count"] == 5
+    assert [w["membership_number"] for w in res["warnings"] if "Gotra" in w["warning"]] == ["GOT005"]
+    got = {m["member_code"]: m for m in client.get("/api/v1/members/", headers=admin_headers, params={"search": "GOT00", "limit": 20}).json()["data"]}
+    assert got["GOT001"]["gotra_id"] == master_id and got["GOT002"]["gotra_id"] == master_id
+    assert got["GOT001"]["gotra_text"] == "Vasista"
+    assert got["GOT003"]["gotra_id"] is None and got["GOT003"]["gotra_text"] is None and got["GOT004"]["gotra_text"] is None
+    assert got["GOT005"]["gotra_id"] is None and got["GOT005"]["gotra_text"] == "Zzyzx"
+
+
+def test_bulk_import_splits_a_full_name_like_the_register_screen(client, admin_headers):
+    rows = [{"membership_number": "NAM001", "first_name_en": "B.SEETHA  KESHAV BHAT"},
+            {"membership_number": "NAM002", "first_name_en": "T.S.GOPALKRISHNA"},
+            {"membership_number": "NAM003", "first_name_en": "Given Name", "last_name_en": "Family Name"}]
+    assert client.post("/api/v1/members/bulk-import", headers=admin_headers, json={"members": rows}).json()["success_count"] == 3
+    got = {m["member_code"]: m for m in client.get("/api/v1/members/", headers=admin_headers, params={"search": "NAM00", "limit": 10}).json()["data"]}
+    assert (got["NAM001"]["first_name_en"], got["NAM001"]["middle_name_en"], got["NAM001"]["last_name_en"]) == ("B.SEETHA", "KESHAV", "BHAT")
+    assert (got["NAM002"]["first_name_en"], got["NAM002"]["last_name_en"]) == ("T.S.GOPALKRISHNA", None)
+    assert (got["NAM003"]["first_name_en"], got["NAM003"]["last_name_en"]) == ("Given Name", "Family Name")
+
+
+def test_member_keeps_the_full_name_and_the_parts_together(client, admin_headers):
+    rows = [{"membership_number": "FUL001", "first_name_en": "ZQX.SEETHA  KESHAV BHAT"}]
+    assert client.post("/api/v1/members/bulk-import", headers=admin_headers, json={"members": rows}).json()["success_count"] == 1
+    m = client.get("/api/v1/members/", headers=admin_headers, params={"search": "ZQX.SEETHA KESHAV"}).json()["data"]
+    assert [x["member_code"] for x in m] == ["FUL001"] and m[0]["full_name_en"] == "ZQX.SEETHA KESHAV BHAT"
+    # editing the parts rebuilds the full name; editing the full name re-splits the parts
+    mid = m[0]["id"]
+    assert client.put(f"/api/v1/members/{mid}", headers=admin_headers, json={"last_name_en": "HEGDE"}).status_code in (200, 202)
+    got = client.get(f"/api/v1/members/{mid}", headers=admin_headers).json()
+    assert got["full_name_en"] == "ZQX.SEETHA KESHAV HEGDE"
+    assert client.put(f"/api/v1/members/{mid}", headers=admin_headers, json={"full_name_en": "Ravi Kumar Rao"}).status_code in (200, 202)
+    got = client.get(f"/api/v1/members/{mid}", headers=admin_headers).json()
+    assert (got["first_name_en"], got["middle_name_en"], got["last_name_en"]) == ("Ravi", "Kumar", "Rao")
+
+
+def test_gotra_aliases_reach_the_real_gotra():
+    from api.v1.endpoints.members import _GOTRA_ALIAS_KEYS, _gotra_key
+    for alias, real in (("VSISHTA", "Vasista"), ("JAMADGNI", "Jamadagni"), ("KASHYPA", "Kashyapa"),
+                        ("VISHVAMITRA", "Vishwamitra"), ("GUTHAMA", "Goutama"), ("MOUNBHARGHAVA", "Mouna Bharghava")):
+        assert _GOTRA_ALIAS_KEYS.get(_gotra_key(alias), _gotra_key(alias)) == _gotra_key(real), alias
+    # a gotra that is not a misspelling is never forced onto another one
+    assert _gotra_key("BHARGAVA") not in {_gotra_key(g) for g in ("Vasista", "Vishwamitra", "Kashyapa", "Aangiras", "Goutama", "Jamadagni", "Bharadwaja", "Mouna Bharghava")}
+
+
+def test_bulk_import_never_guesses_a_gender(client, admin_headers):
+    rows = [{"membership_number": f"GEN00{i}", "first_name_en": f"Gender {i}", "gender": g}
+            for i, g in enumerate([None, "", "f", "Female", "Other?"], start=1)]
+    res = client.post("/api/v1/members/bulk-import", headers=admin_headers, json={"members": rows}).json()
+    assert res["success_count"] == 5
+    assert [w["membership_number"] for w in res["warnings"] if "Gender" in w["warning"]] == ["GEN005"]
+    got = {m["member_code"]: m["gender"] for m in client.get("/api/v1/members/", headers=admin_headers, params={"search": "GEN00", "limit": 20}).json()["data"]}
+    assert got == {"GEN001": None, "GEN002": None, "GEN003": "FEMALE", "GEN004": "FEMALE", "GEN005": None}

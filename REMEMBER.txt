@@ -647,5 +647,21 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
       <PageActionsSlot /> in the page heading row (components/PageActions.jsx). Row buttons and buttons
       inside popups stay where they are.
 
+15.22 THE MEMBER NAME IS STORED AS TYPED (members.full_name_en, migration 0082). The Register Member screen has ONE
+      Full Name box; first / middle / last stay in step with it (first word, words in between, last word) and are
+      filled automatically on save. Show a name with Member.display_name (backend) or memberName(m) (frontend); never
+      join first + last by hand. Search and sorting use the full name.
+15.23 BULK MEMBER IMPORT (Member Import page; POST /members/bulk-import, /bulk-import/validate = dry run, GET
+      /members/import-history). Template columns: membership_number, member_name, gotra, mobile, gender, ... Amount,
+      receipt number and receipt date are NOT imported (receipts are linked later in Bulk Receipt Mapping).
+      Rules: a repeated or existing membership number is skipped with a reason; a shared mobile is allowed and only
+      flagged; mobiles are cleaned (+91, spaces, dashes) and a landline / foreign number is left blank with a note;
+      blank gender stays blank; gotra is matched to the Gotra master whatever the spelling (aliases in
+      _GOTRA_ALIASES), "GENERAL" = none, an unknown one is kept as text with a note; each file is one line in the
+      import history (who, when, counts, skipped and flagged rows). The screen asks for confirmation once per file.
+15.24 RANKS ARE NEVER SHOWN. Super Admin is rank 0 (god mode, hidden from everyone else), Admin is rank 1. No screen or
+      error message names a rank number, a rank gate to a role, or "a higher rank" (rule 13.6). The Modules page
+      keeps its Rank gate field (rank-0 users only).
+
 ================================================================================
 

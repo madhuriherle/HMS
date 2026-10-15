@@ -34,7 +34,8 @@ VALID_SERVICE_OPTIN_SOURCES = {"ADMIN", "MOBILE_APP", "WEBSITE"}
 
 
 class MemberBase(BaseModel):
-    first_name_en: str
+    full_name_en: Optional[str] = None  # the name as typed; first / middle / last are filled from it when not given
+    first_name_en: str = ""
     middle_name_en: Optional[str] = None
     last_name_en: Optional[str] = None
     full_name_kn: Optional[str] = None
@@ -159,6 +160,12 @@ class MemberBase(BaseModel):
         return v
 
 
+    @model_validator(mode="after")
+    def _a_name_is_required(self):
+        if not (str(self.first_name_en or "").strip() or str(self.full_name_en or "").strip()):
+            raise ValueError("Full name is required")
+        return self
+
 class MemberCreate(MemberBase):
     pass
 
@@ -169,6 +176,7 @@ class MemberUpdate(BaseModel):
     approve/activate endpoints)."""
     # the member's current membership type (changed on the membership record, not on the member row)
     membership_type_id: Optional[int] = None
+    full_name_en: Optional[str] = None
     first_name_en: Optional[str] = None
     middle_name_en: Optional[str] = None
     last_name_en: Optional[str] = None

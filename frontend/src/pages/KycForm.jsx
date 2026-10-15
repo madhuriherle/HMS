@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ShieldCheck, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import api from '../api';
 import { apiErrorMessage } from '../utils/apiError';
+import { memberName } from '../utils/memberName';
 
 // ── Member KYC update — public, token-authenticated (no sign-in) ──────────────
 // The admin sends a KYC request from the member profile; the member opens the
@@ -142,7 +143,7 @@ export default function KycForm() {
             <div className="rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] p-3">
               <span className="block text-xs text-[#863221]">Updating details for</span>
               <span className="block text-sm font-bold text-[#180200]">
-                {[state.member.first_name_en, state.member.last_name_en].filter(Boolean).join(' ')}
+                {memberName(state.member)}
               </span>
             </div>
 

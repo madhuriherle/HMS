@@ -536,6 +536,7 @@ def seed_menu_pages(db) -> int:
 GOTRA_VALUES = [
     "Vasista", "Vishwamitra", "Kashyapa", "Aangiras",
     "Goutama", "Jamadagni", "Bharadwaja", "Mouna Bharghava",
+    "Bhargava", "Atri", "Koushika", "Haritasa",
 ]
 
 QUALIFICATION_VALUES = [

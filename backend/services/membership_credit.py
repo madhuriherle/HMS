@@ -249,7 +249,7 @@ def flag_for_review(db: Session, member_ids, reason: str) -> int:
         if total + Decimal("0.005") >= _d(price.amount):
             continue
         member = db.get(Member, mid)
-        who = " ".join(x for x in (member.name_title, member.first_name_en, member.last_name_en) if x) if member else f"Member {mid}"
+        who = " ".join(x for x in (member.name_title, member.display_name) if x) if member else f"Member {mid}"
         flagged += 1 if notify_approvers(
             db, "Membership type needs review",
             f"{who}: credit is now {total} but their type costs {_d(price.amount)} ({reason}). The type was not lowered; review it.",

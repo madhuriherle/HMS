@@ -38,7 +38,7 @@ VALID_MEMBER_FILTERS = {
 def _member_variables(m: Member) -> dict:
     """Standard {{placeholders}} resolved from a member row."""
     return {
-        "name": " ".join(p for p in (m.first_name_en, m.last_name_en) if p),
+        "name": m.display_name,
         "full_name_kn": m.full_name_kn or "",
         "member_code": m.member_code or "",
         "mobile": m.mobile or "",

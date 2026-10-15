@@ -91,9 +91,8 @@ def lookup_pincode(pin: str, current_user: User = Depends(deps.get_current_user)
 IMPORT_TEMPLATES = {
     "members": (
         "members_import_template.csv",
-        ["membership_number", "first_name_en", "last_name_en", "middle_name_en", "full_name_kn", "mobile", "gender",
-         "date_of_birth", "email", "address_line1", "address_line2", "locality", "city", "pincode",
-         "membership_type", "remarks"],
+        ["membership_number", "member_name", "gotra", "mobile", "gender", "date_of_birth", "email", "address_line1",
+         "address_line2", "locality", "city", "pincode", "membership_type", "remarks"],
     ),
     "postal-codes": (
         "location_postal_codes_template.csv",

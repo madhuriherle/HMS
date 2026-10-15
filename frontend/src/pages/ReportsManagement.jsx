@@ -40,6 +40,7 @@ import DateInput from '../components/DateInput';
 import { formatDate } from '../utils/dateUtils';
 import { notify } from '../utils/notify';
 import { loadLocations, loadMembershipTypes } from '../utils/serverData';
+import { memberName } from '../utils/memberName';
 
 const TABS = [
   { key: 'summary', label: 'Summary', icon: BarChart3 },
@@ -719,7 +720,7 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
                 ) : (
                   paginatedRows.map((r, i) => (
                     <tr key={i} className="hover:bg-stone-50">
-                      <td className="py-3 px-4 font-semibold text-stone-800">{r.name || [r.first_name_en, r.last_name_en].filter(Boolean).join(' ') || '—'}</td>
+                      <td className="py-3 px-4 font-semibold text-stone-800">{r.name || memberName(r) || '—'}</td>
                       <td className="py-3 px-4 text-stone-600">{r.mobile || '—'}</td>
                       <td className="py-3 px-4 text-stone-600">{r.district_name || '—'}</td>
                       <td className="py-3 px-4 text-stone-600">{r.taluk_name || '—'}</td>

@@ -113,7 +113,7 @@ def read_event_detail(
     member_names = {}
     if member_ids:
         for m in db.query(Member).filter(Member.id.in_(member_ids)).all():
-            member_names[m.id] = " ".join(p for p in (m.first_name_en, m.last_name_en) if p)
+            member_names[m.id] = m.display_name
 
     links = db.query(EventMemberLink).filter(
         EventMemberLink.event_id == id, EventMemberLink.is_deleted == False
@@ -267,7 +267,7 @@ def read_participants(
     member_names = {}
     if member_ids:
         for m in db.query(Member).filter(Member.id.in_(member_ids)).all():
-            member_names[m.id] = " ".join(p for p in (m.first_name_en, m.last_name_en) if p)
+            member_names[m.id] = m.display_name
 
     return {
         "total": len(rows),

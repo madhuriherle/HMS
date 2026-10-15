@@ -441,7 +441,7 @@ def repeat_returns(
         "data": [
             {
                 "subscription_id": sub.id, "member_id": mem.id, "member_code": mem.member_code,
-                "name": " ".join(p for p in (mem.first_name_en, mem.last_name_en) if p),
+                "name": mem.display_name,
                 "mobile": mem.mobile, "delivery_status": sub.delivery_status,
                 "returns_in_period": n, "last_returned_issue": last_issue,
             }
@@ -1004,9 +1004,7 @@ def _label_names(db: Session, items) -> dict:
 
     if "MEMBER" in wanted:
         for m in db.query(Member).filter(Member.id.in_(wanted["MEMBER"])).all():
-            names[("MEMBER", m.id)] = " ".join(
-                p for p in (m.first_name_en, m.last_name_en) if p
-            )
+            names[("MEMBER", m.id)] = m.display_name
     if "AFFILIATION" in wanted:
         for a in db.query(Affiliation).filter(Affiliation.id.in_(wanted["AFFILIATION"])).all():
             names[("AFFILIATION", a.id)] = a.group_name
@@ -1223,8 +1221,7 @@ def read_unsubscribed_paid_members(
     results = []
     for member, total_allocated in paid_members_query.all():
         if member.id not in active_member_ids:
-            name_parts = [p for p in (member.first_name_en, member.last_name_en) if p]
-            full_name = " ".join(name_parts) or member.full_name_kn or f"Member {member.id}"
+            full_name = member.display_name or member.full_name_kn or f"Member {member.id}"
             results.append(
                 schemas_magazines.UnsubscribedPaidMember(
                     member_id=member.id,
@@ -1288,13 +1285,14 @@ def read_all_recipients(
         if search:
             s = f"%{search}%"
             q = q.filter(
+                (Member.full_name_en.ilike(s)) |
                 (Member.first_name_en.ilike(s)) |
                 (Member.last_name_en.ilike(s)) |
                 (Member.member_code.ilike(s)) |
                 (Member.mobile.ilike(s))
             )
         for sub, m in q.all():
-            name = " ".join(p for p in (m.first_name_en, m.last_name_en) if p) or m.full_name_kn or f"Member {m.id}"
+            name = m.display_name or m.full_name_kn or f"Member {m.id}"
             recipients.append(
                 schemas_magazines.MagazineRecipientItem(
                     recipient_type="MEMBER",

@@ -1,4 +1,4 @@
-from sqlalchemy import String, BigInteger, Boolean, DateTime, Date, Numeric, Text, ForeignKey, JSON, Index, text
+from sqlalchemy import String, BigInteger, Boolean, DateTime, Date, Numeric, Text, ForeignKey, JSON, Index, text, event, inspect as sa_inspect
 from sqlalchemy.orm import Mapped, mapped_column, synonym
 from models.base import Base, AuditMixin
 
@@ -18,6 +18,13 @@ class Member(AuditMixin, Base):
     # the old name still works in code as an alias.
     membership_number: Mapped[str] = mapped_column(String(30), nullable=True)
     member_code = synonym("membership_number")
+
+    @property
+    def display_name(self) -> str:
+        """The name as typed (full_name_en); older rows without it fall back to first / middle / last."""
+        return self.full_name_en or " ".join(p.strip() for p in (self.first_name_en, self.middle_name_en, self.last_name_en) if p and p.strip())
+    # The name as the office types it (one Full Name box). first / middle / last below are kept in step with it.
+    full_name_en: Mapped[str] = mapped_column(String(250), nullable=True, index=True)
     first_name_en: Mapped[str] = mapped_column(String(100), nullable=False)
     middle_name_en: Mapped[str] = mapped_column(String(100), nullable=True)
     last_name_en: Mapped[str] = mapped_column(String(100), nullable=True)
@@ -278,3 +285,39 @@ class MemberImportRun(AuditMixin, Base):
     skipped: Mapped[list] = mapped_column(JSON, nullable=True)  # the first rows that were left out, with the reason
     warning_count: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     warnings: Mapped[list] = mapped_column(JSON, nullable=True)  # rows imported with something to look at, e.g. a shared mobile
+
+
+def split_full_name(full: str) -> tuple:
+    """(first, middle, last) the way the Register Member screen splits a Full Name: first word, the words in
+    between, last word. One word is only a first name."""
+    parts = " ".join(str(full or "").split()).split(" ")
+    parts = [p for p in parts if p]
+    if not parts:
+        return "", None, None
+    return parts[0], (" ".join(parts[1:-1]) or None), (parts[-1] if len(parts) > 1 else None)
+
+
+def join_name_parts(first, middle, last) -> str:
+    return " ".join(p.strip() for p in (first, middle, last) if p and str(p).strip())
+
+
+def _sync_member_names(mapper, connection, member, *, inserting: bool) -> None:
+    """Whichever side was set wins: a typed Full Name fills first / middle / last (when those were not given), and
+    edited parts rebuild the Full Name. Both are always saved together."""
+    state = sa_inspect(member)
+    full = " ".join(str(member.full_name_en or "").split())
+    if inserting:
+        split_from_full = bool(full) and not member.first_name_en
+    else:
+        full_changed = state.attrs.full_name_en.history.has_changes()
+        parts_changed = any(state.attrs[k].history.has_changes() for k in ("first_name_en", "middle_name_en", "last_name_en"))
+        split_from_full = bool(full) and full_changed and not parts_changed
+    if split_from_full:
+        member.full_name_en = full
+        member.first_name_en, member.middle_name_en, member.last_name_en = split_full_name(full)
+    else:
+        member.full_name_en = join_name_parts(member.first_name_en, member.middle_name_en, member.last_name_en) or None
+
+
+event.listen(Member, "before_insert", lambda m, c, t: _sync_member_names(m, c, t, inserting=True))
+event.listen(Member, "before_update", lambda m, c, t: _sync_member_names(m, c, t, inserting=False))

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import api from '../api';
 import CountryCodeSelect from '../components/CountryCodeSelect';
-import { askReason } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import { apiErrorMessage } from '../utils/apiError';
 import { formatDate, formatDateTime } from '../utils/dateUtils';
@@ -95,18 +94,12 @@ export default function MyProfile() {
   const save = async (ev) => {
     ev.preventDefault();
     if (!validate()) return;
-    const reason = await askReason({
-      title: 'Update your profile?',
-      text: 'You will be signed out and asked to log in again. Why are you changing it?',
-      confirmText: 'Update',
-    });
-    if (!reason) return;
     setSaving(true);
     try {
       await api.put('/auth/me', {
         name: form.name.trim(), username: form.username.trim(), email: form.email.trim() || null,
         mobile: form.mobile || null, mobile_country_code: form.mobile_country_code,
-      }, { params: { reason } });
+      });
       notify('Profile updated. Please log in again.');
       endSession(navigate);
     } catch (e) {
@@ -196,7 +189,8 @@ export default function MyProfile() {
             <input id="p-status" className={inputCls} value={me.status ? 'Active' : 'Inactive'} disabled />
           </Field>
         </div>
-        <div className="px-6 h-14 flex items-center justify-end border-t border-[#E8DFD8] bg-[#FAF7F2]">
+        <div className="px-6 h-14 flex items-center justify-end gap-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+          <span className="text-xs text-[#863221] hidden sm:inline">You will be signed out after updating.</span>
           <button type="submit" disabled={!dirty || saving} className={buttonCls}>{saving ? 'Updating...' : 'Update'}</button>
         </div>
       </form>
@@ -227,7 +221,8 @@ export default function MyProfile() {
                   value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} />
               </Field>
             </div>
-            <div className="px-6 h-14 flex items-center justify-end border-t border-[#E8DFD8] bg-[#FAF7F2]">
+            <div className="px-6 h-14 flex items-center justify-end gap-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+              <span className="text-xs text-[#863221] hidden sm:inline">You will be signed out after updating.</span>
               <button type="submit" disabled={pwSaving} className={buttonCls}>{pwSaving ? 'Updating...' : 'Update'}</button>
             </div>
           </form>

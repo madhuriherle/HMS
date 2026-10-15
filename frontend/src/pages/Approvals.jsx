@@ -52,7 +52,22 @@ const kindBadge = (kind) => {
 const formatValue = (val) => {
   if (val === null || val === undefined || val === '') return '—';
   if (typeof val === 'boolean') return val ? 'Active / Yes' : 'Inactive / No';
-  if (typeof val === 'object') return JSON.stringify(val);
+  if (Array.isArray(val)) {
+    if (val.length === 0) return 'None';
+    return val
+      .map((item, index) => {
+        const label = val.length > 1 ? `${index + 1}. ` : '';
+        return `${label}${formatValue(item)}`;
+      })
+      .join('  •  ');
+  }
+  if (typeof val === 'object') {
+    const entries = Object.entries(val).filter(([key]) => !key.startsWith('_'));
+    if (entries.length === 0) return 'None';
+    return entries
+      .map(([key, value]) => `${humanizeKey(key)}: ${formatValue(value)}`)
+      .join('  •  ');
+  }
   return String(val);
 };
 
@@ -779,8 +794,8 @@ export default function Approvals() {
                               <div
                                 className={
                                   row.changed
-                                    ? 'font-mono text-rose-800 line-through opacity-85'
-                                    : 'text-[#863221]/70'
+                                    ? 'font-mono text-rose-800 line-through opacity-85 whitespace-normal break-words leading-5'
+                                    : 'text-[#863221]/70 whitespace-normal break-words leading-5'
                                 }
                               >
                                 {row.previous}
@@ -790,8 +805,8 @@ export default function Approvals() {
                               <div
                                 className={
                                   row.changed
-                                    ? 'font-mono font-semibold text-emerald-800'
-                                    : 'text-[#180200]/70'
+                                    ? 'font-mono font-semibold text-emerald-800 whitespace-normal break-words leading-5'
+                                    : 'text-[#180200]/70 whitespace-normal break-words leading-5'
                                 }
                               >
                                 {row.proposed}

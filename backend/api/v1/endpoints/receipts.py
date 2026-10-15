@@ -205,6 +205,7 @@ def read_receipts(
             .filter(
                 ReceiptAllocation.is_deleted == False,
                 or_(
+                    Member.full_name_en.ilike(like),
                     Member.first_name_en.ilike(like),
                     Member.last_name_en.ilike(like),
                     Member.full_name_kn.ilike(like),
@@ -393,6 +394,7 @@ def read_receipt_tracking(
             .filter(
                 ReceiptAllocation.is_deleted == False,
                 or_(
+                    Member.full_name_en.ilike(like),
                     Member.first_name_en.ilike(like),
                     Member.last_name_en.ilike(like),
                     Member.full_name_kn.ilike(like),
@@ -474,7 +476,7 @@ def read_receipt_tracking(
         links = by_receipt.get(r.id, [])
         first_member, first_membership, first_associate = (links[0] if links else (None, None, None))
         member_name = (
-            " ".join(p for p in (first_member.first_name_en, first_member.last_name_en) if p)
+            first_member.display_name
             if first_member else None
         )
         data.append({
@@ -705,7 +707,7 @@ def _member_card(db: Session, member: Member, today: date) -> dict:
     return {
         "id": member.id,
         "kind": "member" if member.approval_status == "APPROVED" else "applicant",
-        "name": " ".join(p for p in (member.name_title, member.first_name_en, member.middle_name_en, member.last_name_en) if p),
+        "name": " ".join(p for p in (member.name_title, member.display_name) if p),
         "member_code": mem_code,
         "membership_number": mem_code,
         "registration_number": str(member.id),
@@ -946,7 +948,7 @@ def read_allocations(
     names, associate_names = {}, {}
     if member_ids:
         for m in db.query(Member).filter(Member.id.in_(member_ids)).all():
-            names[m.id] = " ".join(p for p in (m.first_name_en, m.last_name_en) if p)
+            names[m.id] = m.display_name
     if associate_ids:
         for a in db.query(Associate).filter(Associate.id.in_(associate_ids)).all():
             associate_names[a.id] = a.name
@@ -1063,7 +1065,7 @@ def get_unassigned_candidates(
             "matched_member": None,
         }
         if matched_m:
-            full_name = f"{matched_m.first_name_en} {matched_m.last_name_en or ''}".strip()
+            full_name = matched_m.display_name
             item["matched_member"] = {
                 "id": matched_m.id,
                 "name": full_name or matched_m.full_name_kn or f"Member {matched_m.id}",
@@ -1362,7 +1364,7 @@ def read_receipt_allocations(
     names, associate_names = {}, {}
     if member_ids:
         for m in db.query(Member).filter(Member.id.in_(member_ids)).all():
-            names[m.id] = " ".join(p for p in (m.first_name_en, m.last_name_en) if p)
+            names[m.id] = m.display_name
     if associate_ids:
         for a in db.query(Associate).filter(Associate.id.in_(associate_ids)).all():
             associate_names[a.id] = a.name

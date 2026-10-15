@@ -6645,7 +6645,7 @@ def test_member_list_carries_the_membership_type_name(client, admin_headers):
 
 def test_import_templates_have_headings_only(client, admin_headers):
     r = client.get("/api/v1/meta/import-template/members", headers=admin_headers)
-    assert r.status_code == 200 and r.text.startswith("membership_number,first_name_en")
+    assert r.status_code == 200 and r.text.startswith("membership_number,member_name,gotra,mobile")
     assert r.text.strip().count("\n") == 0  # one heading line, no made-up person
     p = client.get("/api/v1/meta/import-template/postal-codes", headers=admin_headers)
     assert p.status_code == 200 and p.text.strip() == "pin_code,post_office_name,taluk_name,district_name,state_name"

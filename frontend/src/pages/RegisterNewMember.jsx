@@ -42,6 +42,7 @@ import SearchableFormSelect from '../components/SearchableFormSelect';
 import useAuth from '../hooks/useAuth';
 import useRules, { hasDigits } from '../hooks/useRules';
 import { formatMoney } from '../utils/money';
+import { memberName } from '../utils/memberName';
 
 const DEFAULT_CATEGORY = 'Only Havyaka Mahasabha Membership';
 
@@ -284,7 +285,7 @@ export default function RegisterNewMember() {
         const approved = String(m.approval_status).toUpperCase() === 'APPROVED';
         setTargetMember({
           id: m.id,
-          fullName: [m.name_title, m.first_name_en, m.middle_name_en, m.last_name_en].filter(Boolean).join(' '),
+          fullName: memberName(m, true),
           registrationNumber: String(m.id),
           membershipNumber: m.membership_number || m.member_code || membership?.membership_number || '',
           approvalStatus: approved ? 'Approved' : 'Unapproved',
@@ -298,7 +299,7 @@ export default function RegisterNewMember() {
           membershipType: type ? type.name : '',
           photoUrl,
           nameTitle: m.name_title || (gender === 'Female' ? 'MS.' : 'SRI.'),
-          name: [m.first_name_en, m.middle_name_en, m.last_name_en].filter(Boolean).join(' '),
+          name: memberName(m),
           nameKn: m.full_name_kn || '',
           fatherHusbandName: m.father_name || m.father_husband_name || '',
           fatherName: m.father_name || m.father_husband_name || '',
@@ -865,6 +866,7 @@ export default function RegisterNewMember() {
     ) || locations.postalCodes.find((p) => p.postalCode === formData.postalCode);
     return {
       name_title: formData.nameTitle || null,
+      full_name_en: formData.name.trim().split(/\s+/).join(' '),
       first_name_en: parts[0],
       middle_name_en: parts.length > 2 ? parts.slice(1, -1).join(' ') : null,
       last_name_en: parts.length > 1 ? parts[parts.length - 1] : null,

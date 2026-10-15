@@ -41,8 +41,8 @@ ENTITIES = {
     e.key: e
     for e in (
         Entity("member", "Member", Member,
-               lambda r: _join(r.first_name_en, r.middle_name_en, r.last_name_en) or (r.member_code or f"Member {r.id}"),
-               (Member.first_name_en, Member.last_name_en, Member.member_code)),
+               lambda r: r.display_name or (r.member_code or f"Member {r.id}"),
+               (Member.full_name_en, Member.first_name_en, Member.last_name_en, Member.member_code)),
         Entity("receipt", "Receipt", Receipt,
                lambda r: _join(f"Receipt {r.receipt_number}", "-", r.payer_name) if r.payer_name else f"Receipt {r.receipt_number}",
                (Receipt.receipt_number, Receipt.payer_name)),

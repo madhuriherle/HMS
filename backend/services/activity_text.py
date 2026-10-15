@@ -80,7 +80,7 @@ def name_hint(obj: Any) -> Optional[str]:
     """Something that tells a person which record this is (a name, receipt number, code...)."""
     first = getattr(obj, "first_name_en", None)
     if first:
-        return " ".join(p for p in (first, getattr(obj, "last_name_en", None)) if p)
+        return getattr(obj, "display_name", None) or " ".join(p for p in (first, getattr(obj, "last_name_en", None)) if p)
     for attr in ("receipt_number", "name_en", "name", "title", "template_name", "username", "payment_mode", "code"):
         value = getattr(obj, attr, None)
         if value:

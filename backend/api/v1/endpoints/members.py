@@ -93,6 +93,7 @@ def read_members(
     if search:
         from models.masters import District, PostalCode  # the list also shows the place: search it too
         query = query.filter(or_(
+            Member.full_name_en.ilike(f"%{search}%"),
             Member.first_name_en.ilike(f"%{search}%"),
             Member.last_name_en.ilike(f"%{search}%"),
             Member.full_name_kn.ilike(f"%{search}%"),
@@ -124,7 +125,7 @@ def read_members(
     from core.sorting import sort_query
     query = sort_query(
         query, sort_by=sort_by, sort_dir=sort_dir, tiebreak=Member.id,
-        allowed={"id": Member.id, "created_at": Member.created_at, "name": Member.first_name_en, "member_code": Member.member_code,
+        allowed={"id": Member.id, "created_at": Member.created_at, "name": Member.full_name_en, "member_code": Member.member_code,
                  "mobile": Member.mobile, "approval_status": Member.approval_status, "member_status": Member.member_status},
         newest_first=(Member.created_at.desc(),),
     )
@@ -555,7 +556,7 @@ def export_labels(
         textobject = c.beginText()
         textobject.setTextOrigin(x, y + label_height - 25)
         textobject.setFont("Helvetica-Bold", 10)
-        name = f"{member.first_name_en or ''} {member.last_name_en or ''}".strip()
+        name = member.display_name
         textobject.textLine(name or "Unknown Member")
         
         textobject.setFont("Helvetica", 9)
@@ -611,7 +612,7 @@ def duplicate_check(
         district = db.query(District.name_en).filter(District.id == m.district_id).scalar() if m.district_id else None
         return {
             "id": m.id,
-            "name": " ".join(x for x in (m.name_title, m.first_name_en, m.middle_name_en, m.last_name_en) if x),
+            "name": " ".join(x for x in (m.name_title, m.display_name) if x),
             "member_code": m.member_code,
             "membership_number": m.membership_number,
             "mobile": m.mobile,
@@ -676,7 +677,7 @@ def lookup_member(
             MemberMembership.member_id == m.id,
             MemberMembership.is_deleted == False,
         ).order_by(MemberMembership.id.desc()).first()
-        full_name = " ".join(p for p in (m.name_title, m.first_name_en, m.middle_name_en, m.last_name_en) if p)
+        full_name = " ".join(p for p in (m.name_title, m.display_name) if p)
         matches.append({
             "id": m.id,
             "name": full_name or m.full_name_kn or f"Member {m.id}",
@@ -713,7 +714,7 @@ def _import_run_row(run: MemberImportRun, names: dict, detail: bool = False) -> 
 @router.get("/import-history")
 def member_import_history(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_any_permission("members.register.write", "members.write")),
+    current_user: User = Depends(deps.require_any_permission("members.import.read", "members.import.write", "members.register.write", "members.write")),
     page: int = 1, limit: int = 20,
 ) -> Any:
     """Every bulk member import, newest first: who ran it, when, which file and the result."""
@@ -728,7 +729,7 @@ def member_import_history(
 @router.get("/import-history/{run_id}")
 def member_import_history_detail(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_any_permission("members.register.write", "members.write")),
+    current_user: User = Depends(deps.require_any_permission("members.import.read", "members.import.write", "members.register.write", "members.write")),
     run_id: int,
 ) -> Any:
     run = db.query(MemberImportRun).filter(MemberImportRun.id == run_id, MemberImportRun.is_deleted == False).first()  # noqa: E712
@@ -764,7 +765,7 @@ def read_member_family(
     family_chain = []
     
     def _format_name(m):
-        return m.full_name_kn or f"{m.first_name_en} {m.last_name_en or ''}".strip()
+        return m.full_name_kn or m.display_name
         
     if member.member_code:
         linked = db.query(Member).filter(
@@ -1077,7 +1078,7 @@ def _member_master_details(db: Session, member: Member) -> dict:
             referred = {
                 "id": ref.id,
                 "member_code": ref.member_code,
-                "name": ref.full_name_kn or f"{ref.first_name_en} {ref.last_name_en or ''}".strip(),
+                "name": ref.full_name_kn or ref.display_name,
             }
 
     result = {}
@@ -1137,7 +1138,7 @@ def _queue_activation_notification(
         return
 
     variables = {
-        "name": " ".join(p for p in (member.first_name_en, member.last_name_en) if p),
+        "name": member.display_name,
         "full_name_kn": member.full_name_kn or "",
         "member_code": member.member_code or "",
         "mobile": member.mobile or "",
@@ -2742,6 +2743,21 @@ def _gotra_key(raw: Optional[str]) -> str:
     return k[:-1] if k.endswith("A") else k
 
 
+# Misspellings seen in the legacy register that the spelling key alone cannot reach -> the gotra they mean.
+_GOTRA_ALIASES = {
+    "Vasista": ["VSISHTA", "VASISAHTA", "VASHITA", "VASJHISTHA", "VASHIATHA", "VSISTATA"],
+    "Vishwamitra": ["VISHVAMITRA", "VISHWMITRA", "VISHWAMITHA", "VISHWMATRA", "VISEAMITRA", "VISHAWAMITRA", "VISHEMITRA",
+                    "VISHWAMAITHRA", "VISMAMITRA", "VISHWAMTHRA", "VISHVAMITHRA"],
+    "Kashyapa": ["KASHYPA", "KAISHIPA", "KASHIPA", "KAHYAPA", "KASAHYAPA", "KASHAPA"],
+    "Jamadagni": ["JAMADGNI", "JAMDAGNI", "JAMADGI", "JAMADGHNI", "GAMADAGNI"],
+    "Goutama": ["GUTHAMA", "GOUTHMA"],
+    "Bharadwaja": ["BAHRADWA", "JBHARADWAJ"],
+    "Mouna Bharghava": ["MOUNBHARGHAVA"],
+    "Haritasa": ["HARITHSA"],
+}
+_GOTRA_ALIAS_KEYS = {_gotra_key(alias): _gotra_key(real) for real, aliases in _GOTRA_ALIASES.items() for alias in aliases}
+
+
 def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImportPayload", *, dry_run: bool = False) -> dict:
     """Shared by the real import and the validate-only check. Every row is judged on its own: a bad row is
     skipped (or its bad field left blank) and the rest carry on."""
@@ -2771,12 +2787,12 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
     batch_mobiles = {m for m in (_clean_import_mobile(i.mobile)[0] for i in payload.members) if m}
     holders: dict = {}
     if batch_mobiles:
-        for mobile, code, first, last in (
-            db.query(Member.mobile, Member.member_code, Member.first_name_en, Member.last_name_en)
+        for mobile, code, first, middle, last in (
+            db.query(Member.mobile, Member.member_code, Member.first_name_en, Member.middle_name_en, Member.last_name_en)
             .filter(Member.mobile.in_(batch_mobiles), Member.is_deleted == False)  # noqa: E712
             .all()
         ):
-            holders.setdefault(mobile, []).append((code, f"{first or ''} {last or ''}".strip().upper()))
+            holders.setdefault(mobile, []).append((code, " ".join(x for x in (first, middle, last) if x).upper()))
 
     # the Gotra master, looked up by the spelling-proof key
     from models.masters import Gotra
@@ -2806,6 +2822,11 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
 
         first_name = _clean_import_name(item.first_name_en)
         last_name = _clean_import_name(item.last_name_en) or None
+        middle_name = _clean_import_name(item.middle_name_en) or None
+        if first_name and not last_name and not middle_name and " " in first_name:
+            # one Full Name in the file: split exactly as the Register Member screen does (first word, middle words, last word)
+            parts = first_name.split(" ")
+            first_name, middle_name, last_name = parts[0], (" ".join(parts[1:-1]) or None), parts[-1]
         if not first_name:
             skipped.append({"membership_number": num, "reason": "Missing name"})
             continue
@@ -2819,7 +2840,7 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
         if mobile_warning:
             row_warnings.append(mobile_warning)
         if mobile and mobile in holders:
-            same_name = [c for c, n in holders[mobile] if n == f"{first_name} {last_name or ''}".strip().upper()]
+            same_name = [c for c, n in holders[mobile] if n == " ".join(x for x in (first_name, middle_name, last_name) if x).upper()]
             if same_name:
                 row_warnings.append(f"Same name and mobile as member {same_name[0]}: possible duplicate person, please check")
             else:
@@ -2829,7 +2850,8 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
         gotra_id, gotra_text = None, None
         raw_gotra = _clean_import_name(item.gotra)
         if raw_gotra.upper() not in _NO_GOTRA:
-            master = gotras.get(_gotra_key(raw_gotra))
+            gkey = _gotra_key(raw_gotra)
+            master = gotras.get(_GOTRA_ALIAS_KEYS.get(gkey, gkey))
             if master:
                 gotra_id, gotra_text = master.id, master.name_en
             else:
@@ -2853,13 +2875,17 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
                 db.flush()
             mt_id = fallback.id
 
-        gen = (item.gender or "MALE").strip().upper()
+        # gender is never guessed: blank stays blank, M / F are understood, anything else is left blank with a note
+        gen = {"M": "MALE", "F": "FEMALE", "O": "OTHER"}.get((item.gender or "").strip().upper(), (item.gender or "").strip().upper())
         if gen not in ("MALE", "FEMALE", "OTHER"):
-            gen = "MALE"
+            if gen:
+                row_warnings.append(f"Gender '{item.gender}' is not recognised, so it was left blank")
+            gen = None
 
         member = Member(
+            full_name_en=" ".join(x for x in (first_name, middle_name, last_name) if x),
             first_name_en=first_name,
-            middle_name_en=_clean_import_name(item.middle_name_en) or None,
+            middle_name_en=middle_name,
             last_name_en=last_name,
             full_name_kn=item.full_name_kn.strip() if item.full_name_kn else None,
             gender=gen,
@@ -2895,7 +2921,7 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
         db.add(mm)
         existing_nums.add(num.upper())
         if mobile:  # later rows of the same file see this member as a holder too
-            holders.setdefault(mobile, []).append((num, f"{first_name} {last_name or ''}".strip().upper()))
+            holders.setdefault(mobile, []).append((num, " ".join(x for x in (first_name, middle_name, last_name) if x).upper()))
         for w in row_warnings:
             warnings.append({"membership_number": num, "warning": w})
         created_count += 1
@@ -2921,7 +2947,7 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
 def validate_bulk_import(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_any_permission("members.register.write", "members.write")),
+    current_user: User = Depends(deps.require_any_permission("members.import.write", "members.register.write", "members.write")),
     payload: "BulkMemberImportPayload",
 ) -> Any:
     """Check a batch exactly as the import would judge it, without saving anything: what would be imported,
@@ -2933,7 +2959,7 @@ def validate_bulk_import(
 def bulk_import_members(
     *,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_any_permission("members.register.write", "members.write")),
+    current_user: User = Depends(deps.require_any_permission("members.import.write", "members.register.write", "members.write")),
     payload: "BulkMemberImportPayload",
 ) -> Any:
     """Import a batch of existing/live members with their permanent membership numbers."""
@@ -2945,7 +2971,7 @@ async def bulk_import_members_file(
     file: UploadFile = File(...),
     skip_duplicates: bool = True,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_any_permission("members.register.write", "members.write")),
+    current_user: User = Depends(deps.require_any_permission("members.import.write", "members.register.write", "members.write")),
 ) -> Any:
     """Upload a CSV or Excel file containing live/legacy members to import in bulk."""
     import io
@@ -3001,11 +3027,7 @@ async def bulk_import_members_file(
             continue
 
         last_name = norm.get("last_name_en") or norm.get("last_name")
-        first_name_str = str(first_name).strip()
-        if not last_name and " " in first_name_str:
-            parts = first_name_str.split(" ", 1)
-            first_name_str = parts[0]
-            last_name = parts[1]
+        first_name_str = str(first_name).strip()  # a full name is split into first / last name by the import itself
 
         dob = norm.get("date_of_birth") or norm.get("dob")
         dob_parsed = None

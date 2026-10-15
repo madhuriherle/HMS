@@ -10,6 +10,7 @@ import { formatDate, formatDateTime } from '../utils/dateUtils';
 import { apiErrorMessage } from '../utils/apiError';
 import { notify } from '../utils/notify';
 import { formatMoney } from '../utils/money';
+import { memberName } from '../utils/memberName';
 
 const inr = formatMoney;
 
@@ -1205,7 +1206,7 @@ export default function MemberProfile() {
   }, [summary?.photo_path]);
 
   const s = summary;
-  const fullName = s ? [s.name_title, s.first_name_en, s.middle_name_en, s.last_name_en].filter(Boolean).join(' ') : '';
+  const fullName = s ? memberName(s, true) : '';
 
   return (
     <PermissionGate required="members.list.read">
