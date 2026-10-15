@@ -876,6 +876,20 @@ def report_summary(
         .group_by(Member.registration_source)
         .all()
     )
+    from models.masters import District
+
+    top_districts = [
+        {"name": name, "count": c}
+        for name, c in (
+            db.query(District.name_en, func.count(Member.id))
+            .join(Member, Member.district_id == District.id)
+            .filter(Member.is_deleted == False)  # noqa: E712
+            .group_by(District.id, District.name_en)
+            .order_by(func.count(Member.id).desc())
+            .limit(5)
+            .all()
+        )
+    ]
 
     receipts = db.query(Receipt).filter(Receipt.is_deleted == False)
     receipt_count = receipts.count()
@@ -926,6 +940,7 @@ def report_summary(
             "by_approval_status": members_by_approval,
             "by_gender": members_by_gender,
             "by_registration_source": members_by_source,
+            "top_districts": top_districts,
         },
         "receipts": {
             "count": receipt_count,

@@ -344,6 +344,9 @@ RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
 12.15 EVERY ROW ACTION SHOWS AN ICON AND ITS NAME (Edit, Delete, Remove, Resume, Pause ...), never an icon alone.
      Only pagination arrows and a popup's close X stay icon-only. The Magazine, Engagements, Events,
      Notifications and Reports pages follow it; older pages are changed when they are next touched.
+12.16 THE PANEL FONT IS NUNITO (rounded, friendly), loaded in index.html and set in tailwind.config.js and
+     index.css. Inter is only the fallback. Numbers and codes use the same font (font-mono is mapped to it
+     with equal-width digits); do not bring back a typewriter-style monospace font.
 
 --------------------------------------------------------------------------------
 RULE 13: PERMISSIONS AND ACCESS

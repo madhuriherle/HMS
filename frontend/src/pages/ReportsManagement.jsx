@@ -4,6 +4,10 @@ import PageActions, { PageActionsSlot } from '../components/PageActions';
 import {
   BarChart3,
   Users,
+  UserCheck,
+  UserX,
+  Award,
+  ArrowRight,
   Receipt,
   BookOpen,
   History,
@@ -219,211 +223,126 @@ function SummaryTab({ onNavigate, onDownload }) {
   const rec = summary?.receipts || {};
   const mag = summary?.magazines || {};
   const mtypes = summary?.memberships?.by_type || [];
+  const approved = mem.by_approval_status?.APPROVED || 0;
+  const pending = mem.by_approval_status?.UNAPPROVED || 0;
+  const male = mem.by_gender?.MALE || mem.by_gender?.Male || 0;
+  const female = mem.by_gender?.FEMALE || mem.by_gender?.Female || 0;
+  const otherGender = Math.max(0, (mem.total || 0) - male - female);
+  const share = (n, of) => (of > 0 ? Math.min(100, (n / of) * 100) : 0);
+
+  // a clickable headline card: icon tile, big number, a line of detail and an arrow
+  const Kpi = ({ to, label, icon: Icon, tone, value, detail, linkLabel }) => (
+    <button
+      type="button"
+      onClick={() => onNavigate(to)}
+      className="text-left bg-white p-5 rounded-2xl border border-[#E8DFD8] shadow-sm hover:border-[#510601]/40 hover:shadow-md transition-all group flex flex-col justify-between gap-3 cursor-pointer"
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-[#863221] uppercase tracking-wider">{label}</span>
+        <span className={`p-2 rounded-xl ${tone}`}><Icon className="w-4 h-4" /></span>
+      </div>
+      <div>
+        <strong className="text-2xl font-bold text-[#180200] block tabular-nums">{value}</strong>
+        <span className="text-xs text-[#863221] block mt-0.5">{detail}</span>
+      </div>
+      <span className="text-xs font-semibold text-[#510601] inline-flex items-center gap-1">
+        {linkLabel}
+        <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+      </span>
+    </button>
+  );
+
+  // a labelled bar: the name, the number, and how much of the whole it is
+  const Bar = ({ label, count, of, color }) => (
+    <div>
+      <div className="flex justify-between text-xs font-semibold mb-1">
+        <span className="text-[#180200] truncate pr-2">{label}</span>
+        <span className="text-[#510601] tabular-nums">{count.toLocaleString()}</span>
+      </div>
+      <div className="w-full bg-[#FAF7F2] h-2 rounded-full overflow-hidden border border-[#E8DFD8]">
+        <div className={`${color} h-full rounded-full`} style={{ width: `${share(count, of)}%` }} />
+      </div>
+    </div>
+  );
+
+  const Section = ({ icon: Icon, title, to, linkLabel, children }) => (
+    <div className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-sm">
+      <div className="flex items-center justify-between pb-3 border-b border-[#E8DFD8]">
+        <div className="flex items-center gap-2">
+          <Icon className="w-4 h-4 text-[#510601]" />
+          <h3 className="font-bold text-[#180200] text-sm">{title}</h3>
+        </div>
+        {to && (
+          <button type="button" onClick={() => onNavigate(to)} className="text-xs font-semibold text-[#510601] hover:underline cursor-pointer">
+            {linkLabel}
+          </button>
+        )}
+      </div>
+      <div className="mt-4 space-y-3">{children}</div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
-      {/* Quick Action Banner */}
-      <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-sm font-bold text-[#180200]">Executive Overview</h2>
-          <span className="text-xs text-stone-600">
-            Real-time counts across membership, financial receipts, and magazine logistics.
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={loadSummary}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-stone-50 cursor-pointer shadow-sm transition-colors"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh</span>
-          </button>
-          <button
-            onClick={() => onDownload('/reports/members', { export: 'csv' }, `members-summary-${new Date().toISOString().slice(0, 10)}.csv`)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#510601] rounded-lg hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Download All Members CSV</span>
-          </button>
-        </div>
+      <PageActions>
+        <button
+          type="button"
+          onClick={loadSummary}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-stone-50 cursor-pointer shadow-sm transition-colors"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          <span>Refresh</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onDownload('/reports/members', { export: 'csv' }, `members-summary-${new Date().toISOString().slice(0, 10)}.csv`)}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-[#510601] rounded-lg hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>Download All Members CSV</span>
+        </button>
+      </PageActions>
+
+      {/* Headline cards: each one opens its report */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Kpi to="members" label="Approved Members" icon={UserCheck} tone="bg-emerald-50 text-emerald-800"
+          value={approved.toLocaleString()} detail={`${(mem.total || 0).toLocaleString()} registered in all`} linkLabel="View members" />
+        <Kpi to="members" label="Pending Approval" icon={UserX} tone="bg-amber-50 text-amber-700"
+          value={pending.toLocaleString()} detail={`${mem.by_approval_status?.REJECTED || 0} rejected`} linkLabel="View unapproved" />
+        <Kpi to="receipts" label="Collections" icon={CreditCard} tone="bg-emerald-50 text-emerald-800"
+          value={`₹${(rec.total_amount || 0).toLocaleString('en-IN')}`} detail={`${(rec.count || 0).toLocaleString()} receipts`} linkLabel="View receipts" />
+        <Kpi to="magazines" label="Magazine Circulation" icon={BookOpen} tone="bg-[#510601]/10 text-[#510601]"
+          value={(mag.subscriptions_by_status?.ACTIVE || 0).toLocaleString()}
+          detail={`${mag.active_pauses || 0} paused · ${mag.returns_total || 0} returned`} linkLabel="View circulation" />
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Members */}
-        <div className="bg-white border border-[#E8DFD8] rounded-xl p-5 shadow-sm space-y-3">
-          <div className="flex items-center justify-between text-stone-500">
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-600">Total Members</span>
-            <Users className="w-5 h-5 text-[#8C1801]" />
-          </div>
-          <div>
-            <div className="text-3xl font-extrabold text-[#180200]">
-              {(mem.total || 0).toLocaleString()}
-            </div>
-            <div className="mt-2 text-xs text-stone-500 space-y-1">
-              <div className="flex justify-between">
-                <span>Approved:</span>
-                <strong className="text-emerald-700">{mem.by_approval_status?.APPROVED || 0}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Pending Approval:</span>
-                <strong className="text-amber-700">{mem.by_approval_status?.UNAPPROVED || 0}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Rejected:</span>
-                <strong className="text-stone-600">{mem.by_approval_status?.REJECTED || 0}</strong>
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => onNavigate('members')}
-            className="w-full text-center text-xs font-semibold text-[#8C1801] hover:text-[#510601] pt-2 border-t border-stone-100 cursor-pointer block"
-          >
-            View Members Report &rarr;
-          </button>
-        </div>
+      {/* Breakdowns */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Section icon={Award} title="Membership Types" to="members" linkLabel="View details">
+          {mtypes.length === 0 ? (
+            <p className="text-xs text-stone-400">No membership type data recorded.</p>
+          ) : (
+            mtypes.map((t) => (
+              <Bar key={t.membership_type} label={t.membership_type} count={t.member_count} of={mem.total || 0} color="bg-[#8C1801]" />
+            ))
+          )}
+        </Section>
 
-        {/* Collections & Financials */}
-        <div className="bg-white border border-[#E8DFD8] rounded-xl p-5 shadow-sm space-y-3">
-          <div className="flex items-center justify-between text-stone-500">
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-600">Collections</span>
-            <CreditCard className="w-5 h-5 text-emerald-700" />
-          </div>
-          <div>
-            <div className="text-3xl font-extrabold text-[#180200]">
-              ₹{(rec.total_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </div>
-            <div className="mt-2 text-xs text-stone-500 space-y-1">
-              <div className="flex justify-between">
-                <span>Total Receipts:</span>
-                <strong className="text-stone-800">{rec.count || 0}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Allocated:</span>
-                <strong className="text-emerald-700">₹{(rec.allocated_amount || 0).toLocaleString('en-IN')}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Unallocated Balance:</span>
-                <strong className="text-stone-600">₹{((rec.total_amount || 0) - (rec.allocated_amount || 0)).toLocaleString('en-IN')}</strong>
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => onNavigate('receipts')}
-            className="w-full text-center text-xs font-semibold text-[#8C1801] hover:text-[#510601] pt-2 border-t border-stone-100 cursor-pointer block"
-          >
-            View Financials Report &rarr;
-          </button>
-        </div>
+        <Section icon={Users} title="Gender" to="members" linkLabel="View details">
+          <Bar label="Male" count={male} of={mem.total || 0} color="bg-sky-700" />
+          <Bar label="Female" count={female} of={mem.total || 0} color="bg-emerald-700" />
+          <Bar label="Other / not given" count={otherGender} of={mem.total || 0} color="bg-stone-400" />
+        </Section>
 
-        {/* Magazine Subscriptions */}
-        <div className="bg-white border border-[#E8DFD8] rounded-xl p-5 shadow-sm space-y-3">
-          <div className="flex items-center justify-between text-stone-500">
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-600">Magazine Circulation</span>
-            <BookOpen className="w-5 h-5 text-[#510601]" />
-          </div>
-          <div>
-            <div className="text-3xl font-extrabold text-[#180200]">
-              {(mag.subscriptions_by_status?.ACTIVE || 0).toLocaleString()}
-            </div>
-            <div className="mt-2 text-xs text-stone-500 space-y-1">
-              <div className="flex justify-between">
-                <span>Active Delivery:</span>
-                <strong className="text-emerald-700">{mag.subscriptions_by_status?.ACTIVE || 0}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Temporary Pauses:</span>
-                <strong className="text-amber-700">{mag.active_pauses || 0}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Returns / Undelivered:</span>
-                <strong className="text-rose-700">{mag.returns_total || 0}</strong>
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => onNavigate('magazines')}
-            className="w-full text-center text-xs font-semibold text-[#8C1801] hover:text-[#510601] pt-2 border-t border-stone-100 cursor-pointer block"
-          >
-            View Circulation Report &rarr;
-          </button>
-        </div>
-
-        {/* Gender Demographics */}
-        <div className="bg-white border border-[#E8DFD8] rounded-xl p-5 shadow-sm space-y-3">
-          <div className="flex items-center justify-between text-stone-500">
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-600">Demographics</span>
-            <TrendingUp className="w-5 h-5 text-blue-700" />
-          </div>
-          <div>
-            <div className="text-3xl font-extrabold text-[#180200]">
-              {(mem.by_gender?.MALE || mem.by_gender?.Male || 0) + (mem.by_gender?.FEMALE || mem.by_gender?.Female || 0)}
-            </div>
-            <div className="mt-2 text-xs text-stone-500 space-y-1">
-              <div className="flex justify-between">
-                <span>Male Members:</span>
-                <strong>{mem.by_gender?.MALE || mem.by_gender?.Male || 0}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Female Members:</span>
-                <strong>{mem.by_gender?.FEMALE || mem.by_gender?.Female || 0}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span>Unspecified:</span>
-                <strong>{mem.by_gender?.UNSPECIFIED || 0}</strong>
-              </div>
-            </div>
-          </div>
-          <button
-            onClick={() => onNavigate('members')}
-            className="w-full text-center text-xs font-semibold text-[#8C1801] hover:text-[#510601] pt-2 border-t border-stone-100 cursor-pointer block"
-          >
-            View Demographic Breakdown &rarr;
-          </button>
-        </div>
-      </div>
-
-      {/* Membership Type Breakdown Table */}
-      <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-[#E8DFD8] flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-bold text-[#180200]">Membership by Category</h2>
-            <span className="text-xs text-stone-500">Breakdown of members across configured membership types</span>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-600 font-bold">
-                <th className="py-3 px-4">Membership Type</th>
-                <th className="py-3 px-4">Kannada Name</th>
-                <th className="py-3 px-4 text-right">Member Count</th>
-                <th className="py-3 px-4 text-right">Share of Total</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E8DFD8]">
-              {mtypes.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="py-8 text-center text-stone-400">
-                    No membership type data recorded.
-                  </td>
-                </tr>
-              ) : (
-                mtypes.map((t, idx) => {
-                  const pct = mem.total ? ((t.member_count / mem.total) * 100).toFixed(1) : '0.0';
-                  return (
-                    <tr key={idx} className="hover:bg-stone-50">
-                      <td className="py-3 px-4 font-semibold text-stone-800">{t.membership_type}</td>
-                      <td className="py-3 px-4 text-stone-600">{t.type_name_kn || '—'}</td>
-                      <td className="py-3 px-4 text-right font-bold text-stone-800">{t.member_count.toLocaleString()}</td>
-                      <td className="py-3 px-4 text-right text-stone-600">{pct}%</td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        <Section icon={MapPin} title="Top Districts" to="members" linkLabel="View details">
+          {(mem.top_districts || []).length === 0 ? (
+            <p className="text-xs text-stone-400">No district data recorded.</p>
+          ) : (
+            (mem.top_districts || []).map((d) => (
+              <Bar key={d.name} label={d.name} count={d.count} of={mem.total || 0} color="bg-[#510601]" />
+            ))
+          )}
+        </Section>
       </div>
     </div>
   );

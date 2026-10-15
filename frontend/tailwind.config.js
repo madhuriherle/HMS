@@ -46,8 +46,10 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '"Segoe UI"', 'Roboto', 'sans-serif'],
-        serif: ['Inter', 'system-ui', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        sans: ['Nunito', 'Inter', 'system-ui', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        serif: ['Nunito', 'Inter', 'system-ui', '"Segoe UI"', 'Roboto', 'sans-serif'],
+        // numbers and codes use the same friendly face (the old typewriter look is gone); digits stay aligned
+        mono: ['Nunito', 'Inter', 'system-ui', '"Segoe UI"', 'Roboto', 'sans-serif'],
         kannada: ["'Anek Kannada'", "'Noto Sans Kannada'", "'Tunga'", 'sans-serif'],
         kannadaSerif: ["'Noto Serif Kannada'", "'Tiro Kannada'", 'serif'],
       },

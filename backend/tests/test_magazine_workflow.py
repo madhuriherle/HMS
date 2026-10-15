@@ -364,3 +364,11 @@ def test_the_delivery_history_lists_each_issue(client, admin_headers):
     assert [i["issue_month_year"] for i in got] == sorted((i["issue_month_year"] for i in got), reverse=True)
     prof = client.get(f"{API}/members/{mid}/profile/magazine", headers=h).json()
     assert {i["issue_month_year"] for i in prof["issues"]} >= {f"{year}-03", f"{year}-04", f"{year}-05"}
+
+
+def test_the_summary_lists_the_top_districts(client, admin_headers):
+    body = client.get(f"{API}/reports/summary", headers=admin_headers).json()
+    top = body["members"]["top_districts"]
+    assert isinstance(top, list) and len(top) <= 5
+    assert all({"name", "count"} <= set(row) for row in top)
+    assert [r["count"] for r in top] == sorted((r["count"] for r in top), reverse=True)

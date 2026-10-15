@@ -107,7 +107,7 @@
   select,
   textarea,
   optgroup {
-    font-family: Inter, system-ui, "Segoe UI", Roboto, sans-serif;
+    font-family: Nunito, Inter, system-ui, "Segoe UI", Roboto, sans-serif;
   }
 
   *,
@@ -319,3 +319,6 @@
 @media (prefers-reduced-motion: reduce) {
   .hms-nf-bob, .hms-nf-spin, .hms-nf-shadow, .hms-nf-four, .hms-nf-dot { animation: none !important; }
 }
+
+/* numbers and codes use the body font, with equal-width digits so columns still line up */
+.font-mono { font-variant-numeric: tabular-nums; }
