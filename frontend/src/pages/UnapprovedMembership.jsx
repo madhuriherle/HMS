@@ -24,6 +24,8 @@ import {
   Clock,
   FileText,
   Link as LinkIcon,
+  Link2,
+  Loader2,
   ChevronRight,
   ChevronLeft,
   ShieldAlert,
@@ -48,6 +50,28 @@ import useSwalConfirm from '../hooks/useSwalConfirm';
 import { formatMoney } from '../utils/money';
 
 import ModalFooter from '../components/ModalFooter';
+// ----------------------------------------------------
+// A receipt carries no member link of its own: one entered before the member existed only holds what
+// the clerk wrote on it — the payer name, the mobile, and the number typed into the Membership No.
+// box (often the applicant's own id, since an applicant has no membership number yet). These helpers
+// only rank and label such receipts; mapping always stays a human click.
+// ----------------------------------------------------
+const digitsOnly = (value) => String(value ?? '').replace(/\D/g, '');
+const flatText = (value) => String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const receiptMatchScore = (candidate, member) => {
+  if (!candidate || !member) return 0;
+  let score = 0;
+  const memberMobile = digitsOnly(member.mobile || member.mobileNumber);
+  if (memberMobile && digitsOnly(candidate.payer_mobile) === memberMobile) score += 4;
+  if (flatText(candidate.payer_membership_no) === String(member.id)) score += 3;
+  const memberNumber = flatText(member.membershipNumber);
+  if (memberNumber && flatText(candidate.payer_membership_no) === memberNumber) score += 3;
+  const memberName = flatText(member.fullName || member.name);
+  if (memberName && flatText(candidate.payer_name) === memberName) score += 2;
+  return score;
+};
+
 // assignedOnly: the final-approval queue (members whose receipt is already assigned)
 export default function UnapprovedMembership({ assignedOnly = false }) {
   const navigate = useNavigate();
@@ -115,6 +139,17 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
   // 3. Receipt Validation Block Alert Modal
   const [validationBlockDialog, setValidationBlockDialog] = useState(null); // Member object blocked
+
+  // 4. Assign Receipt Modal: map a receipt entered earlier to this applicant
+  const [assigningMember, setAssigningMember] = useState(null); // the applicant being mapped
+  const [assignCandidates, setAssignCandidates] = useState([]); // receipts still waiting for a member
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignError, setAssignError] = useState('');
+  const [assignSearch, setAssignSearch] = useState('');
+  const [mappingReceiptId, setMappingReceiptId] = useState(null);
+  // the API behind Map enforces receipts.write; the sibling Bulk Mapping screen uses the page privilege,
+  // so either one is enough to press it
+  const canMapReceipts = hasPermission('receipts.bulk_mapping.write') || hasPermission('receipts.write');
 
   // Districts for dropdown filter
   const filterDistricts = useMemo(() => {
@@ -230,6 +265,79 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   };
 
   // ----------------------------------------------------
+  // ASSIGN A RECEIPT THAT WAS ENTERED EARLIER
+  // The receipt is often entered before the member exists (a walk-in payer with a typed number), so the
+  // money sits in the register with no member. "Assign Receipt" therefore lists every receipt still
+  // waiting for a member and maps the picked one to this applicant, instead of opening the entry form
+  // again (which would book a second receipt for money that is already recorded).
+  // ----------------------------------------------------
+  const loadAssignCandidates = async () => {
+    setAssignLoading(true);
+    setAssignError('');
+    try {
+      const { data } = await api.get('/receipts/unassigned-candidates', { params: { limit: 500 } });
+      setAssignCandidates(data?.candidates || []);
+    } catch (error) {
+      setAssignCandidates([]);
+      setAssignError(
+        error.response?.status === 403
+          ? 'You need the Receipts read privilege to see the receipts waiting for a member.'
+          : error.response?.data?.detail || 'Could not load the receipts waiting for a member.'
+      );
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const openAssignReceipt = (member) => {
+    setAssigningMember(member);
+    setAssignSearch('');
+    loadAssignCandidates();
+  };
+
+  const handleMapReceipt = async (candidate) => {
+    if (!assigningMember) return;
+    const who = assigningMember.fullName || assigningMember.name;
+    setMappingReceiptId(candidate.receipt_id);
+    try {
+      const { data } = await api.post('/receipts/bulk-allocate', {
+        allocations: [
+          {
+            receipt_id: candidate.receipt_id,
+            member_id: assigningMember.id,
+            allocated_amount: candidate.net_amount,
+          },
+        ],
+      });
+      if (data?.failed_count) {
+        showToast(data.failed?.[0]?.reason || 'That receipt could not be mapped.', 'error');
+      } else {
+        showToast(`Receipt ${candidate.receipt_number} mapped to ${who}. Approval is no longer blocked.`, 'success');
+        setAssigningMember(null);
+      }
+      await reloadData();
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Error mapping the receipt', 'error');
+    } finally {
+      setMappingReceiptId(null);
+    }
+  };
+
+  // Every parked receipt, filtered by what the clerk types and ranked: one that carries this applicant's
+  // mobile / id / name comes first and is labelled, but none is ever mapped without a click.
+  const assignRows = useMemo(() => {
+    const q = assignSearch.trim().toLowerCase();
+    const matching = q
+      ? assignCandidates.filter((c) =>
+          [c.receipt_number, c.payer_name, c.payer_membership_no, c.payer_mobile, String(c.net_amount ?? '')].some(
+            (value) => String(value ?? '').toLowerCase().includes(q)
+          )
+        )
+      : assignCandidates;
+    return [...matching].sort((a, b) => receiptMatchScore(b, assigningMember) - receiptMatchScore(a, assigningMember));
+  }, [assignCandidates, assignSearch, assigningMember]);
+
+  // ----------------------------------------------------
   // APPROVAL TRIGGER & VALIDATION
   // ----------------------------------------------------
   const handleInitiateApprove = (member) => {
@@ -333,7 +441,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
       text: `${d.fullName} cannot be approved until an official receipt is assigned (receipt status: ${d.receiptStatus || 'Pending'}).`,
       confirmText: 'Assign a receipt',
     }),
-    () => goToReceiptEntry(validationBlockDialog)
+    () => openAssignReceipt(validationBlockDialog)
   );
 
   useSwalConfirm(
@@ -569,9 +677,13 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           {/* 1. Assign to Receipt Action */}
                           <button
                             type="button"
-                            onClick={() => navigate('/dashboard/receipts/entry', { state: { selectedMember: m } })}
+                            onClick={() => openAssignReceipt(m)}
                             className="btn-act"
-                            title={isAssigned ? `Receipt ${m.assignedReceiptNumber} assigned. Click to view or create another receipt.` : 'Open Receipt Entry and assign receipt to this applicant'}
+                            title={
+                              isAssigned
+                                ? `Receipt ${m.assignedReceiptNumber} is already mapped. Click to map another receipt entered earlier.`
+                                : 'List the receipts already entered and map one to this applicant'
+                            }
                           >
                             <FileText className="w-3.5 h-3.5 shrink-0" />
                             <span>{isAssigned ? 'Receipt' : 'Assign Receipt'}</span>
@@ -700,6 +812,203 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           </div>
         )}
       </div>
+
+      {/* ---------------------------------------------------- */}
+      {/* ASSIGN A RECEIPT: map a receipt that was entered BEFORE this member existed */}
+      {/* ---------------------------------------------------- */}
+      {assigningMember && (
+        <Modal
+          isOpen
+          onClose={() => setAssigningMember(null)}
+          title={`Assign a receipt to ${assigningMember.fullName || assigningMember.name}`}
+          maxWidthClass="max-w-4xl"
+          footer={<ModalFooter kind="view" onCancel={() => setAssigningMember(null)} />}
+        >
+          <div className="p-5 space-y-4">
+            {/* Who the money will be mapped to */}
+            <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold">
+                  {(assigningMember.fullName || assigningMember.name || 'U').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-[#180200]">
+                    {assigningMember.fullName || assigningMember.name}
+                  </div>
+                  <div className="text-[11px] text-[#863221] font-mono mt-0.5">
+                    ID: {assigningMember.id}
+                    {assigningMember.mobile ? ` · ${assigningMember.mobile}` : ''}
+                    {assigningMember.membershipType ? ` · ${assigningMember.membershipType}` : ''}
+                  </div>
+                </div>
+              </div>
+              <span className={`chip ${assigningMember.receiptStatus === 'Assigned' ? 'chip-on' : 'chip-warn'}`}>
+                {assigningMember.receiptStatus === 'Assigned'
+                  ? `Receipt ${assigningMember.assignedReceiptNumber} mapped`
+                  : 'No receipt mapped yet'}
+              </span>
+            </div>
+
+            <p className="text-[11px] text-[#863221] leading-relaxed">
+              A receipt entered before this member existed carries no member link, so it waits here with the number
+              that was typed on it. Pick the receipt for this payment and map it — the receipt is never entered again.
+            </p>
+
+            {/* Filter + refresh */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative flex-1 min-w-[220px]">
+                <Search className="w-4 h-4 text-[#863221] absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={assignSearch}
+                  onChange={(e) => setAssignSearch(e.target.value)}
+                  placeholder="Filter by receipt no., payer name, number on the receipt, mobile or amount"
+                  disabled={!!assignError}
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601] disabled:bg-[#FAF7F2]"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={loadAssignCandidates}
+                className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#863221] hover:text-[#510601] text-xs font-bold rounded-xl transition-all cursor-pointer"
+                title="Reload the receipts waiting for a member"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${assignLoading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {/* The receipts waiting for a member */}
+            <div className="border border-[#E8DFD8] rounded-xl overflow-hidden">
+              <div className="max-h-[42vh] overflow-y-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-[#FAF7F2] text-[#863221] font-bold uppercase tracking-wider text-[11px] sticky top-0 z-10">
+                    <tr>
+                      <th className="py-2.5 px-3">Receipt No.</th>
+                      <th className="py-2.5 px-3">Date</th>
+                      <th className="py-2.5 px-3 text-right">Amount</th>
+                      <th className="py-2.5 px-3">Payer</th>
+                      <th className="py-2.5 px-3">No. on Receipt</th>
+                      <th className="py-2.5 px-3 text-right">Map</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E8DFD8]">
+                    {assignLoading ? (
+                      <tr>
+                        <td colSpan={6} className="py-10 text-center text-[#863221]">
+                          Loading receipts…
+                        </td>
+                      </tr>
+                    ) : assignError ? (
+                      <tr>
+                        <td colSpan={6} className="py-10 px-6 text-center text-[#863221]">
+                          {assignError}
+                        </td>
+                      </tr>
+                    ) : assignRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-10 px-6 text-center">
+                          <CheckCircle2 className="w-7 h-7 text-[#3D705C]/50 mx-auto mb-1.5" />
+                          <p className="font-semibold text-sm text-[#180200]">
+                            {assignCandidates.length === 0
+                              ? 'No receipt is waiting for a member'
+                              : 'No receipt matches that filter'}
+                          </p>
+                          <p className="text-xs text-[#863221] mt-1">
+                            {assignCandidates.length === 0
+                              ? 'Every entered receipt is already mapped. Use “Enter a new receipt” below if this payment has not been recorded at all.'
+                              : 'Clear the filter to see every receipt waiting to be mapped.'}
+                          </p>
+                        </td>
+                      </tr>
+                    ) : (
+                      assignRows.map((c) => {
+                        const hinted = receiptMatchScore(c, assigningMember) > 0;
+                        return (
+                          <tr key={c.receipt_id} className="bg-white hover:bg-[#FAF7F2] transition-colors">
+                            <td className="py-2.5 px-3 align-top">
+                              <div className="font-mono font-bold text-[#510601]">{c.receipt_number}</div>
+                              {hinted && (
+                                <span
+                                  className="chip chip-on mt-1"
+                                  title="Written with this applicant's mobile, id or name — check it before mapping."
+                                >
+                                  possible match
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 align-top text-[#180200] whitespace-nowrap">
+                              {formatDate(c.receipt_date)}
+                            </td>
+                            <td className="py-2.5 px-3 align-top text-right font-bold text-[#180200] whitespace-nowrap">
+                              {formatMoney(c.net_amount)}
+                            </td>
+                            <td className="py-2.5 px-3 align-top text-[#180200]">
+                              {c.payer_name || '—'}
+                              {c.payer_mobile ? (
+                                <div className="text-[10px] font-mono text-[#863221]">{c.payer_mobile}</div>
+                              ) : null}
+                            </td>
+                            <td className="py-2.5 px-3 align-top font-mono text-[#863221]">
+                              {c.payer_membership_no || '—'}
+                            </td>
+                            <td className="py-2.5 px-3 align-top text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleMapReceipt(c)}
+                                disabled={!canMapReceipts || mappingReceiptId === c.receipt_id}
+                                className={`btn-act btn-act-ok ${canMapReceipts ? '' : 'opacity-40 cursor-not-allowed'}`}
+                                title={
+                                  canMapReceipts
+                                    ? `Map receipt ${c.receipt_number} to ${assigningMember.fullName || assigningMember.name}`
+                                    : 'Requires the receipts write privilege'
+                                }
+                              >
+                                {mappingReceiptId === c.receipt_id ? (
+                                  <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
+                                ) : (
+                                  <Link2 className="w-3.5 h-3.5 shrink-0" />
+                                )}
+                                <span>Map</span>
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Fallback: the payment was never entered at all */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border border-dashed border-[#E8DFD8] bg-[#FAF7F2] rounded-xl p-3.5">
+              <div className="flex items-start gap-2.5">
+                <FileText className="w-4 h-4 text-[#863221] mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-xs font-bold text-[#180200]">Receipt not entered yet?</div>
+                  <p className="text-[11px] text-[#863221] mt-0.5">
+                    Only if this payment was never written in the register — the receipt is created and mapped to{' '}
+                    {assigningMember.fullName || assigningMember.name} in one go.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const applicant = assigningMember;
+                  setAssigningMember(null);
+                  goToReceiptEntry(applicant);
+                }}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#863221] hover:text-[#510601] text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0"
+              >
+                <ArrowRight className="w-3.5 h-3.5" />
+                <span>Enter a new receipt</span>
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* View Application is rendered on dedicated full-screen page /dashboard/membership/profile/:id */}
       {false && viewingMember && (

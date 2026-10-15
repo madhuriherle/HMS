@@ -123,6 +123,116 @@ def test_modules_seeded_and_gated(client, admin_headers):
     assert "/dashboard/receipts/bulk-mapping" in routes
 
 
+def test_parked_receipt_is_mapped_to_a_member_created_after_it(client, admin_headers):
+    """Receipt first, member later: the parked receipt is mapped by hand from the Unapproved list.
+
+    This is the walk-in flow — a receipt is entered for someone who is not a member yet, with the number
+    they were given typed onto it. The member is registered afterwards, so the money is still waiting.
+    It cannot match on the number (a registered member has no membership number until approval, see
+    test_bulk_mapping_ignores_the_mobile_number), so the Unapproved screen lists every parked receipt
+    and maps the picked one to the applicant's id instead of opening the entry form again.
+    """
+    import uuid
+
+    typed_number = "2315-" + uuid.uuid4().hex[:6].upper()
+    payer_mobile = "9" + str(uuid.uuid4().int)[:9]
+
+    # 1. The receipt is entered first, for a payer who is not a member yet
+    receipt_res = client.post(
+        "/api/v1/receipts/",
+        headers=admin_headers,
+        json={
+            "receipt_date": str(date.today()),
+            "receipt_type": "MEMBERSHIP",
+            "payer_name": "Walk In Payer",
+            "payment_mode": "CASH",
+            "gross_amount": 1500,
+            "net_amount": 1500,
+            "payer_membership_no": typed_number,
+            "payer_mobile": payer_mobile,
+            "items": [{"item_type": "MEMBERSHIP", "amount": 1500, "detail": "Membership Fee"}],
+        },
+    )
+    assert receipt_res.status_code in (200, 201), receipt_res.text
+    receipt_id = receipt_res.json()["id"]
+    assert receipt_res.json()["receipt_status"] == "UNASSIGNED"
+
+    # 2. The member is registered afterwards: an id, but no membership number until approval
+    member_res = client.post(
+        "/api/v1/members/",
+        headers=admin_headers,
+        json={
+            "first_name_en": "Later",
+            "last_name_en": "Registrant",
+            "mobile": "9" + str(uuid.uuid4().int)[:9],
+            "gender": "Male",
+        },
+    )
+    assert member_res.status_code in (200, 201), member_res.text
+    member = member_res.json()
+    member_id = member["id"]
+    assert member.get("approval_status") == "UNAPPROVED"
+    assert not member.get("member_code"), "a membership number is minted only at approval"
+
+    # 3. The applicant is on the Unapproved list — the screen whose Assign button must offer the receipt
+    listing = client.get(
+        "/api/v1/members/",
+        headers=admin_headers,
+        params={"approval_status": "UNAPPROVED", "limit": 1000},
+    )
+    assert listing.status_code == 200, listing.text
+    assert member_id in {m["id"] for m in listing.json()["data"]}
+
+    # 4. The receipt entered earlier is still parked and offered, with no automatic match on the number
+    cand_res = client.get(
+        "/api/v1/receipts/unassigned-candidates",
+        headers=admin_headers,
+        params={"limit": 500},
+    )
+    assert cand_res.status_code == 200, cand_res.text
+    parked = [c for c in cand_res.json()["candidates"] if c["receipt_id"] == receipt_id]
+    assert parked, "a receipt entered before registration must still be listed for mapping"
+    assert parked[0]["match_type"] == "NONE" and parked[0]["matched_member"] is None
+    assert parked[0]["payer_membership_no"] == typed_number
+    assert parked[0]["net_amount"] == 1500
+
+    # 5. Mapping the picked receipt to this applicant (what the Assign modal's Map button sends)
+    alloc_res = client.post(
+        "/api/v1/receipts/bulk-allocate",
+        headers=admin_headers,
+        json={
+            "allocations": [
+                {
+                    "receipt_id": receipt_id,
+                    "member_id": member_id,
+                    "allocated_amount": parked[0]["net_amount"],
+                }
+            ]
+        },
+    )
+    assert alloc_res.status_code == 200, alloc_res.text
+    assert alloc_res.json()["allocated_count"] == 1
+    assert alloc_res.json()["failed_count"] == 0
+
+    # 6. The register now links the money to the member, which is what flips the list row to Assigned
+    track = client.get(
+        "/api/v1/receipts/tracking",
+        headers=admin_headers,
+        params={"receipt_id": receipt_id, "limit": 1},
+    ).json()
+    row = track["data"][0]
+    assert row["receipt_status"] == "ASSIGNED"
+    assert row["member_id"] == member_id
+
+    # 7. It is no longer offered for mapping
+    after = client.get(
+        "/api/v1/receipts/unassigned-candidates",
+        headers=admin_headers,
+        params={"limit": 500},
+    ).json()
+    assert receipt_id not in {c["receipt_id"] for c in after["candidates"]}
+
+
 def test_bulk_mapping_ignores_the_mobile_number(client, admin_headers):
     """A receipt is matched on the membership number only: a member with the same mobile is not a match."""
     import uuid
