@@ -81,6 +81,7 @@ export default function RegisterNewMember() {
   // ----------------------------------------------------
   // MASTER DATA (all from the server)
   // ----------------------------------------------------
+  const [sharedOpen, setSharedOpen] = useState(false);
   const [membershipTypes, setMembershipTypes] = useState([]);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [], postalCodes: [] });
   const [gothras, setGothras] = useState([]);
@@ -1050,14 +1051,14 @@ export default function RegisterNewMember() {
             {/* Form Body */}
             <form onSubmit={handleSaveMember}>
               <div className="px-6 sm:px-8 py-6 space-y-6">
-                <fieldset disabled={isViewMode} className="space-y-6 disabled:opacity-95">
+                <fieldset disabled={isViewMode} className="space-y-4 disabled:opacity-95">
                   <div className="pb-2 border-b border-[#E8DFD8]"><h3 className="text-sm font-bold text-[#8C1801] uppercase tracking-wider">Personal Details</h3></div>
 
                   {/* Photo upload + Basic Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                   {/* Left: Passport Size Photo Upload */}
-                  <div className="md:col-span-3 flex flex-col items-center justify-center p-1">
-                    <div className="w-32 sm:w-36 h-40 sm:h-44 border-2 border-dashed border-[#DFD5CC] bg-[#FAF7F2] flex flex-col items-center justify-center relative overflow-hidden rounded-lg shadow-2xs hover:border-[#8C1801]/50 transition-colors">
+                  <div className="md:col-span-2 flex flex-col items-center justify-start">
+                    <div className="w-24 h-28 border-2 border-dashed border-[#DFD5CC] bg-[#FAF7F2] flex flex-col items-center justify-center relative overflow-hidden rounded-lg shadow-2xs hover:border-[#8C1801]/50 transition-colors">
                       {formData.photoUrl ? (
                         <img
                           src={formData.photoUrl}
@@ -1074,7 +1075,7 @@ export default function RegisterNewMember() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="mt-2.5 py-1.5 px-4 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-md text-center shadow-xs transition-colors cursor-pointer inline-flex items-center justify-center"
+                      className="mt-2 py-1 px-3 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-md text-center shadow-xs transition-colors cursor-pointer inline-flex items-center justify-center"
                     >
                       Select Image
                     </button>
@@ -1088,7 +1089,7 @@ export default function RegisterNewMember() {
                   </div>
 
                   {/* Right: Member Name, DOB, Age in single line, Mobile, Relationship, WhatsApp, Father Name */}
-                  <div className="md:col-span-9 space-y-5">
+                  <div className="md:col-span-10 space-y-4">
                     {/* Row 1: Name (Title + Full Name), DOB, and Age in a SINGLE LINE */}
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-x-4 gap-y-5 items-start">
                       {/* Member Name */}
@@ -1182,32 +1183,30 @@ export default function RegisterNewMember() {
                         {formErrors.mobile && (
                           <p className="text-[11px] text-red-600 mt-1">{formErrors.mobile}</p>
                         )}
-                        {/* Shared family mobile notice (Non-blocking) */}
+                        {/* Shared family mobile: one small line listing who already uses it (never blocks) */}
                         {dupInfo.same_mobile.length > 0 && (
-                          <div className="mt-1.5 p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] font-medium text-amber-900 space-y-1">
-                            <div className="font-semibold text-amber-800 flex items-center gap-1">
-                              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-700" />
-                              <span>Shared Mobile ({dupInfo.same_mobile.length} existing member{dupInfo.same_mobile.length > 1 ? 's' : ''}):</span>
-                            </div>
-                            <div className="space-y-0.5 pl-3">
-                              {dupInfo.same_mobile.map((d) => (
-                                <div key={d.id} className="flex items-center justify-between gap-2">
-                                  <span>
-                                    &bull; {d.name} {d.membership_number || d.member_code ? `(${d.membership_number || d.member_code})` : ''}
-                                  </span>
-                                  <a
-                                    href={`/dashboard/membership/profile/${d.id}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="underline text-[#510601] font-semibold text-[10px]"
-                                  >
-                                    View
-                                  </a>
-                                </div>
-                              ))}
-                            </div>
-                            <p className="text-[10px] text-amber-700 italic">Family members can share mobile numbers. Registration is not blocked.</p>
-                          </div>
+                          <p className="mt-1.5 text-[11px] leading-snug text-stone-600">
+                            <span className="font-semibold text-[#863221]">Also used by: </span>
+                            {(sharedOpen ? dupInfo.same_mobile : dupInfo.same_mobile.slice(0, 3)).map((d, i) => (
+                              <span key={d.id}>
+                                {i > 0 && ', '}
+                                <a
+                                  href={`/dashboard/membership/profile/${d.id}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="font-semibold text-[#510601] hover:underline"
+                                >
+                                  {d.name}
+                                </a>
+                                {(d.membership_number || d.member_code) ? ` (${d.membership_number || d.member_code})` : ''}
+                              </span>
+                            ))}
+                            {!sharedOpen && dupInfo.same_mobile.length > 3 && (
+                              <button type="button" onClick={() => setSharedOpen(true)} className="ml-1 font-semibold text-[#510601] hover:underline cursor-pointer">
+                                +{dupInfo.same_mobile.length - 3} more
+                              </button>
+                            )}
+                          </p>
                         )}
                       </div>
 
@@ -1309,7 +1308,7 @@ export default function RegisterNewMember() {
                 </div>
 
                 {/* Community & identity: four across */}
-                <div className="pt-5 border-t border-[#DFD5CC] space-y-4">
+                <div className="pt-4 border-t border-[#DFD5CC] space-y-3">
                   <div className="pb-2 border-b border-[#E8DFD8]"><h3 className="text-sm font-bold text-[#8C1801] uppercase tracking-wider">Community & Identity</h3></div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                   {/* Gothra */}
@@ -1412,7 +1411,7 @@ export default function RegisterNewMember() {
                 </div>
 
                 {/* Address & work */}
-                <div className="pt-5 border-t border-[#DFD5CC] space-y-4">
+                <div className="pt-4 border-t border-[#DFD5CC] space-y-3">
                   <div className="pb-2 border-b border-[#E8DFD8]"><h3 className="text-sm font-bold text-[#8C1801] uppercase tracking-wider">Address & Work</h3></div>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                   {/* Communication Address */}
