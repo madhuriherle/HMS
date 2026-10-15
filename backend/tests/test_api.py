@@ -6857,3 +6857,41 @@ def test_losing_credit_never_lowers_the_type_but_asks_for_a_review(client, admin
         flagged = [n for n in db.query(AppNotification).all()
                    if (n.data or {}).get("kind") == "MEMBERSHIP_CREDIT_REVIEW" and (n.data or {}).get("member_id") == mid]
     assert flagged, "approvers were not told to review the type"
+
+
+def test_rank_gate_is_super_admin_only(client, admin_headers):
+    """Rank 0 (Super Admin) alone passes the rank gates: Modules, Settings, Data Cleanup; an Admin (rank 1)
+    does not, cannot see Super Admin users or roles, and cannot mint a rank-0 role."""
+    roles = {r["code"]: r for r in client.get("/api/v1/users/roles", headers=admin_headers, params={"limit": 200}).json()["data"]}
+    assert roles["SUPERADMIN"]["rank_level"] == 0 and roles["ADMIN"]["rank_level"] == 1
+
+    # an Admin-level (rank 1) account that may read and write roles and users, so the only thing keeping it out is rank
+    _, _, adm = _staff_with_role(
+        client, admin_headers, "gate_admin_user", "Gate Admin Role", "GATE_ADMIN_ROLE",
+        permission_grants=[("roles.read", False), ("roles.write", False), ("users.management.read", False), ("users.management.write", False)],
+        rank_level=1,
+    )
+
+    # the Super Admin passes every gate
+    for path in ("/api/v1/users/modules", "/api/v1/system/error-logs", "/api/v1/system/cleanup"):
+        assert client.get(path, headers=admin_headers).status_code == 200, path
+    # an Admin passes none of them
+    for path in ("/api/v1/users/modules", "/api/v1/system/error-logs", "/api/v1/system/cleanup"):
+        assert client.get(path, headers=adm).status_code == 403, path
+
+    # the sidebar: Modules and Settings are Super Admin's alone
+    def codes(nodes):
+        out = set()
+        for n in nodes:
+            out.add(n["code"]); out |= codes(n.get("submodules", []))
+        return out
+    full = codes(client.get("/api/v1/users/modules/menu", headers=admin_headers).json())
+    mine = codes(client.get("/api/v1/users/modules/menu", headers=adm).json())
+    assert {"users.modules", "system"} & full
+    assert not ({"users.modules", "system", "system.cleanup"} & mine)
+
+    # an Admin cannot see rank 0: not in the role list, not reachable, no new rank-0 role
+    listed = {r["code"] for r in client.get("/api/v1/users/roles", headers=adm, params={"limit": 200}).json()["data"]}
+    assert "SUPERADMIN" not in listed
+    assert client.get(f"/api/v1/users/roles/{roles['SUPERADMIN']['id']}", headers=adm).status_code in (403, 404)
+    assert client.post("/api/v1/users/roles", headers=adm, json={"name": "Zero", "code": "ZERO_RANK", "rank_level": 0}).status_code in (400, 403)
