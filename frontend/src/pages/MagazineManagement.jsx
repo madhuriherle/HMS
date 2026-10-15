@@ -166,12 +166,13 @@ const TH = ({ children, className = '' }) => (
 // ── page ─────────────────────────────────────────────────────
 export default function MagazineManagement() {
   const { hasPermission } = useAuth();
-  const canWrite = hasPermission('magazines.write');
-  const canDelete = hasPermission('magazines.delete');
 
-  // the sidebar picks the section; each one is its own page
+  // the sidebar picks the section; each one is its own page with its own privileges
   const { pathname } = useLocation();
   const tab = pathname.includes('/labels-delivery') ? 'labels-delivery' : 'subscriptions';
+  const area = tab === 'labels-delivery' ? 'magazines.labels_delivery' : 'magazines.subscribers';
+  const canWrite = hasPermission(`${area}.write`);
+  const canDelete = hasPermission(`${area}.delete`);
   const sectionTitle = { subscriptions: 'Subscriptions', 'labels-delivery': 'Labels & Delivery' }[tab];
   const [members, setMembers] = useState([]);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [] });
@@ -225,7 +226,7 @@ export default function MagazineManagement() {
   }, [loadSubscriptions, loadUnsubscribed]);
 
   return (
-    <PermissionGate required="magazines.read" title="Access Restricted" message="You need the Magazine privilege to open this page.">
+    <PermissionGate required={`${area}.read`} title="Access Restricted" message="You need the privilege for this Magazine page to open it.">
       <div className="space-y-6 pb-12">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">{sectionTitle}</h1>

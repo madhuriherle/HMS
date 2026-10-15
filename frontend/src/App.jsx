@@ -77,7 +77,7 @@ function App() {
           
           {/* Membership Module Routes */}
           <Route path="membership/list" element={<MembershipList />} />
-          <Route path="membership/import" element={<PermissionGate required={['members.register.write', 'members.write']} title="Access Restricted" message="You need permission to register or import members."><MemberImport /></PermissionGate>} />
+          <Route path="membership/import" element={<PermissionGate required={['members.import.read', 'members.import.write']} title="Access Restricted" message="You need permission to register or import members."><MemberImport /></PermissionGate>} />
           <Route path="membership/unapproved" element={<UnapprovedMembership />} />
           <Route path="membership/assigned" element={<AssignedApprovals />} />
           <Route path="membership/register" element={<RegisterNewMember />} />
@@ -169,16 +169,16 @@ function App() {
 
           {/* Reports Module Routes */}
           <Route path="reports" element={<Navigate to="/dashboard/reports/summary" replace />} />
-          <Route path="reports/summary" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
-          <Route path="reports/members" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
-          <Route path="reports/receipts" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
-          <Route path="reports/magazines" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
-          <Route path="reports/saved" element={<PermissionGate required="reports.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
+          <Route path="reports/summary" element={<PermissionGate required="reports.summary_report.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
+          <Route path="reports/members" element={<PermissionGate required="reports.members_report.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
+          <Route path="reports/receipts" element={<PermissionGate required="reports.receipts_report.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
+          <Route path="reports/magazines" element={<PermissionGate required="reports.magazines_report.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
+          <Route path="reports/saved" element={<PermissionGate required="reports.saved_report.read" title="Access Restricted" message="You need the Reports privilege to view this page."><ReportsManagement /></PermissionGate>} />
         
           {/* Notifications Module Routes */}
           <Route path="notifications" element={<Navigate to="/dashboard/notifications/campaigns" replace />} />
-          <Route path="notifications/campaigns" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
-          <Route path="notifications/templates" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
+          <Route path="notifications/campaigns" element={<PermissionGate required="notifications.campaigns.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
+          <Route path="notifications/templates" element={<PermissionGate required="notifications.message_templates.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
           <Route path="notifications/quick-send" element={<Navigate to="/dashboard/notifications/campaigns" replace />} />
           <Route path="notifications/inbox" element={<PermissionGate required="notifications.read" title="Access Restricted" message="You need the Notifications privilege to view this page."><NotificationsManagement /></PermissionGate>} />
         </Route>

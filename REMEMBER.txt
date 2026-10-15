@@ -481,6 +481,14 @@ RULE 13: PERMISSIONS AND ACCESS
       shown a page only when it holds that page's own Read. When a page gets its own privilege
       later, a migration gives it to the roles that used the page before, so nobody loses it;
       it is never added to a role built on purpose without it (see 13.16).
+13.17 PAGES THAT USED TO SHARE A PRIVILEGE NOW OWN ONE (migration 0081): Magazine Subscriptions and Labels & Delivery
+      (magazines.subscribers / magazines.labels_delivery), the five Reports pages (reports.summary_report,
+      members_report, receipts_report, magazines_report, saved_report: read only, Saved also write / delete),
+      the three Notifications pages (notifications.campaigns / message_templates / inbox), Member Import
+      (members.import read / write) and Assigned for Approval (members.assigned read / write). Which API call
+      belongs to which page is decided by its path in db/seed_defaults.py (SUB_MODULE_AREAS); reference lists a page
+      reads from another page are listed in SHARED_READS (read only). A new page follows the same four steps:
+      its area rule, its menu row asking for its own Read, its screen gate, and a migration for existing roles.
 13.16 THE RECEPTIONIST ROLE (front desk, rank 5, code RECEPTIONIST) holds exactly four
       privileges: receipts.entry.read / write and receipts.tracking.read / write. No delete, no
       approvals, no Bulk Receipt Mapping, no Masters, no Membership pages. Its menu shows only

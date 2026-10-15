@@ -44,8 +44,6 @@ const PURPOSES = [
 
 export default function NotificationsManagement() {
   const { hasPermission } = useAuth();
-  const canWrite = hasPermission('notifications.write');
-  const canDelete = hasPermission('notifications.delete');
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -58,6 +56,11 @@ export default function NotificationsManagement() {
     if (p.includes('/campaigns')) return 'campaigns';
     return searchParams.get('tab') || 'campaigns';
   }, [location.pathname, searchParams]);
+
+  // each section has its own privileges
+  const area = { campaigns: 'notifications.campaigns', templates: 'notifications.message_templates', inbox: 'notifications.inbox' }[activeTab] || 'notifications.campaigns';
+  const canWrite = hasPermission(`${area}.write`);
+  const canDelete = hasPermission(`${area}.delete`);
 
   const setTab = (t) => {
     navigate(`/dashboard/notifications/${t}`);

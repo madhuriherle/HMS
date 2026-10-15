@@ -212,7 +212,7 @@ export default function MemberImport() {
   };
 
   return (
-    <PermissionGate required={['members.register.write', 'members.write']} title="Access Restricted" message="You need permission to register or import members.">
+    <PermissionGate required={['members.import.read', 'members.import.write']} title="Access Restricted" message="You need the Member Import privilege to open this page.">
       <div className="space-y-6">
         {/* Breadcrumb Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">

@@ -57,9 +57,42 @@ SUB_MODULE_AREAS = {
         ]),
         ("members.register", "Register New Member", [
             ("POST", r"^/members/?$"),
-            ("POST", r"^/members/bulk-import(-file)?/?$"),
             ("POST", r"^/members/\d+/(memberships|photo)/?$"),
         ]),
+        ("members.import", "Member Import", [
+            ("POST", r"^/members/bulk-import(/validate|-file)?/?$"),
+            ("GET", r"^/members/import-history(/\d+)?/?$"),
+        ]),
+        # the final-approval queue: the same member reads and the same approve call as Unapproved Members
+        ("members.assigned", "Assigned for Approval", [
+            ("GET", r"^/members/?$", "unapproved"),
+            ("GET", r"^/members/documents/\d+/file/?$"),
+            ("GET", r"^/members/\d+(/(family|services|donations|profile(/[a-z]+)?|membership-credit|documents|service-optins))?/?$"),
+            ("PUT|POST", r"^/members/\d+/(approve|request-activation)/?$"),
+        ]),
+    ],
+    "magazines": [
+        ("magazines.subscribers", "Magazine Subscriptions", [
+            "/magazines/subscriptions", "/magazines/pauses", "/magazines/returns", "/magazines/members",
+            "/magazines/unsubscribed-paid-members", "/magazines/backfill-subscriptions",
+        ]),
+        ("magazines.labels_delivery", "Magazine Labels & Delivery", [
+            "/magazines/label-batches", "/magazines/delivery-batches", "/magazines/generate-labels", "/magazines/all-recipients",
+        ]),
+    ],
+    "reports": [
+        ("reports.summary_report", "Summary Report", ["/reports/summary"]),
+        ("reports.members_report", "Members Report", ["/reports/members", "/reports/unapproved-members", "/reports/labels"]),
+        ("reports.receipts_report", "Receipts & Finance Report", ["/reports/receipts"]),
+        ("reports.magazines_report", "Magazine & Logistics Report", ["/reports/magazine-returns"]),
+        ("reports.saved_report", "Saved & Audit Logs", ["/reports/saved", "/reports/export-logs"]),
+    ],
+    "notifications": [
+        ("notifications.campaigns", "Send Messages", [
+            "/notifications/campaigns", "/notifications/send-individual", "/notifications/send-bulk", "/notifications/expiry-reminders",
+        ]),
+        ("notifications.message_templates", "Message Templates", ["/notifications/templates"]),
+        ("notifications.inbox", "System Inbox", ["/notifications/inbox", "/notifications/devices"]),
     ],
     "receipts": [
         ("receipts.entry", "Receipt Entry", [
@@ -103,17 +136,24 @@ SUB_MODULE_AREAS = {
 SHARED_READS = [
     # reference lists the screens fill their dropdowns and filters from
     (r"^/masters/(states|districts|taluks|postal-codes)(/.*)?$",
-     ["receipts.entry.read", "receipts.tracking.read", "members.list.read", "members.unapproved.read",
-      "members.register.write", "reports.read", "notifications.read"]),
+     ["receipts.entry.read", "receipts.tracking.read", "members.list.read", "members.unapproved.read", "members.assigned.read",
+      "members.register.write", "reports.read", "notifications.read",
+      "reports.members_report.read", "reports.receipts_report.read", "reports.magazines_report.read",
+      "magazines.subscribers.read", "magazines.labels_delivery.read", "notifications.campaigns.read"]),
     (r"^/masters/membership-types(/.*)?$",
-     ["receipts.entry.read", "receipts.tracking.read", "members.list.read", "members.unapproved.read",
-      "members.register.write", "reports.read", "notifications.read"]),
+     ["receipts.entry.read", "receipts.tracking.read", "members.list.read", "members.unapproved.read", "members.assigned.read",
+      "members.register.write", "reports.read", "notifications.read",
+      "reports.members_report.read", "reports.receipts_report.read", "reports.magazines_report.read",
+      "magazines.subscribers.read", "notifications.campaigns.read"]),
     (r"^/masters/(gotras|qualifications|native-places)(/.*)?$",
-     ["members.list.read", "members.unapproved.read", "members.register.write"]),
+     ["members.list.read", "members.unapproved.read", "members.assigned.read", "members.register.write", "reports.members_report.read"]),
     (r"^/masters/(particulars|payment-modes|banks)(/.*)?$",
-     ["receipts.entry.read", "receipts.tracking.read", "members.register.write", "reports.read"]),
+     ["receipts.entry.read", "receipts.tracking.read", "members.register.write", "reports.read", "reports.receipts_report.read"]),
+    # the message templates a campaign picks from
+    (r"^/notifications/templates(/.*)?$", ["notifications.campaigns.read"]),
     # the member picker and member checks used by the receipt screens and the registration form
-    (r"^/members/?$", ["receipts.entry.read", "receipts.tracking.read", "receipts.bulk_mapping.read", "events.write", "engagements.write", "notifications.write"]),
+    (r"^/members/?$", ["receipts.entry.read", "receipts.tracking.read", "receipts.bulk_mapping.read", "events.write", "engagements.write", "notifications.write",
+                       "notifications.campaigns.write", "magazines.subscribers.read", "magazines.labels_delivery.read"]),
     (r"^/members/lookup/?$", ["receipts.entry.read", "members.register.write"]),
     (r"^/members/duplicate-check/?$", ["members.register.write"]),
     (r"^/members/\d+(/profile(/[a-z]+)?)?/?$", ["receipts.entry.read", "members.register.write"]),
@@ -123,6 +163,14 @@ SHARED_READS = [
 ]
 
 AREA_ACTIONS = {
+    # report pages only read (and export); the saved-report page can also save and delete
+    "reports.summary_report": ("read",),
+    "reports.members_report": ("read",),
+    "reports.receipts_report": ("read",),
+    "reports.magazines_report": ("read",),
+    "notifications.inbox": ("read", "write"),
+    "members.import": ("read", "write"),
+    "members.assigned": ("read", "write"),
     "members.unapproved": ("read", "write"),
     "members.register": ("write",),
     "receipts.entry": ("read", "write"),
@@ -310,9 +358,9 @@ MENU_PAGE_CATALOG = [
     ("members.list", "Membership List", "members", "/dashboard/membership/list", "list", 1, "members.list.read", None),
     ("members.unapproved", "Unapproved Members", "members", "/dashboard/membership/unapproved", "user-check", 2, "members.unapproved.read", None),
     ("members.register", "Register New Member", "members", "/dashboard/membership/register", "user-plus", 3, "members.register.write", None),
-    ("members.import", "Member Import", "members", "/dashboard/membership/import", "upload", 4, "members.register.write", None),
+    ("members.import", "Member Import", "members", "/dashboard/membership/import", "upload", 4, "members.import.read", None),
     # Final-approval queue: unapproved members who already have a receipt assigned (same privilege as Unapproved Members).
-    ("members.assigned", "Assigned for Approval", "approvals", "/dashboard/membership/assigned", "check-circle", 2, "members.unapproved.read", None),
+    ("members.assigned", "Assigned for Approval", "approvals", "/dashboard/membership/assigned", "check-circle", 2, "members.assigned.read", None),
     ("receipts.entry", "Receipt Entry", "receipts", "/dashboard/receipts/entry", "file-plus", 1, "receipts.entry.read", None),
     ("receipts.tracking", "Receipt Tracking", "receipts", "/dashboard/receipts/tracking", "search", 2, "receipts.tracking.read", None),
     ("receipts.bulk_mapping", "Bulk Receipt Mapping", "receipts", "/dashboard/receipts/bulk-mapping", "link", 3, "receipts.bulk_mapping.read", None),
@@ -322,7 +370,7 @@ MENU_PAGE_CATALOG = [
     ("masters.particulars", "Particulars Master", "masters", "/dashboard/master/receipt-type", "list-checks", 3, "masters.particulars.read", None),
     ("system.hub", "System Settings", "system", "/dashboard/settings", "settings", 0, "system.read", None),
     ("system.number_formats", "Number Formats", "system.hub", "/dashboard/system/number-formats", "list-checks", 2, "system.number_formats.read", None),
-    ("masters.organisation", "Organisation Settings", "system.hub", "/dashboard/master/organisation-settings", "building", 1, "system.read", None),
+    ("masters.organisation", "Organisation Settings", "system.hub", "/dashboard/master/organisation-settings", "building", 1, "masters.organisation.read", None),
     ("masters.payment_modes", "Payment Mode Setup", "masters", "/dashboard/master/payment-modes", "credit-card", 5, "masters.payment_modes.read", None),
     # Personal Masters screen is switched off for now (also switched off in migration 0025):
     # ("masters.personal", "Personal Masters", "masters", "/dashboard/master/personal-masters", "list-checks", 7, "masters.read", None),
@@ -330,22 +378,22 @@ MENU_PAGE_CATALOG = [
     ("approvals.requests", "Approval Requests", "approvals", "/dashboard/approvals", "check-circle", 1, "approvals.read", None),
     # Magazine, Reports and Notifications: one sidebar page per section (no tab rows). Each page opens with the
     # module's own privilege (magazines.read / reports.read / notifications.read).
-    ("magazines.subscribers", "Subscriptions", "magazines", "/dashboard/magazine/subscriptions", "book-open", 1, "magazines.read", None),
-    ("magazines.labels_delivery", "Labels & Delivery", "magazines", "/dashboard/magazine/labels-delivery", "printer", 2, "magazines.read", None),
+    ("magazines.subscribers", "Subscriptions", "magazines", "/dashboard/magazine/subscriptions", "book-open", 1, "magazines.subscribers.read", None),
+    ("magazines.labels_delivery", "Labels & Delivery", "magazines", "/dashboard/magazine/labels-delivery", "printer", 2, "magazines.labels_delivery.read", None),
     # PR & Communications group: Events first, then the registries (the "events" module stays as the privilege owner but is no longer a group)
     ("events.management", "Events", "engagements", "/dashboard/events", "calendar", 1, "events.read", None),
     ("engagements.affiliations", "Affiliations", "engagements", "/dashboard/engagements/affiliations", "users", 2, "engagements.affiliations.read", None),
     ("engagements.associates", "Associates", "engagements", "/dashboard/engagements/associates", "user-check", 3, "engagements.associates.read", None),
     ("engagements.press_media", "Press & Media", "engagements", "/dashboard/engagements/press-media", "newspaper", 4, "engagements.press_media.read", None),
     ("engagements.committee", "Managing Committee", "engagements", "/dashboard/engagements/committee", "shield", 5, "engagements.committee.read", None),
-    ("reports.summary_report", "Summary", "reports", "/dashboard/reports/summary", "bar-chart", 1, "reports.read", None),
-    ("reports.members_report", "Members", "reports", "/dashboard/reports/members", "users", 2, "reports.read", None),
-    ("reports.receipts_report", "Receipts & Finance", "reports", "/dashboard/reports/receipts", "receipt", 3, "reports.read", None),
-    ("reports.magazines_report", "Magazine & Logistics", "reports", "/dashboard/reports/magazines", "book-open", 4, "reports.read", None),
-    ("reports.saved_report", "Saved & Audit Logs", "reports", "/dashboard/reports/saved", "history", 5, "reports.read", None),
-    ("notifications.campaigns", "Send Messages", "notifications", "/dashboard/notifications/campaigns", "send", 1, "notifications.read", None),
-    ("notifications.message_templates", "Templates", "notifications", "/dashboard/notifications/templates", "message-square", 2, "notifications.read", None),
-    ("notifications.inbox", "System Inbox", "notifications", "/dashboard/notifications/inbox", "inbox", 3, "notifications.read", None),
+    ("reports.summary_report", "Summary", "reports", "/dashboard/reports/summary", "bar-chart", 1, "reports.summary_report.read", None),
+    ("reports.members_report", "Members", "reports", "/dashboard/reports/members", "users", 2, "reports.members_report.read", None),
+    ("reports.receipts_report", "Receipts & Finance", "reports", "/dashboard/reports/receipts", "receipt", 3, "reports.receipts_report.read", None),
+    ("reports.magazines_report", "Magazine & Logistics", "reports", "/dashboard/reports/magazines", "book-open", 4, "reports.magazines_report.read", None),
+    ("reports.saved_report", "Saved & Audit Logs", "reports", "/dashboard/reports/saved", "history", 5, "reports.saved_report.read", None),
+    ("notifications.campaigns", "Send Messages", "notifications", "/dashboard/notifications/campaigns", "send", 1, "notifications.campaigns.read", None),
+    ("notifications.message_templates", "Templates", "notifications", "/dashboard/notifications/templates", "message-square", 2, "notifications.message_templates.read", None),
+    ("notifications.inbox", "System Inbox", "notifications", "/dashboard/notifications/inbox", "inbox", 3, "notifications.inbox.read", None),
 ]
 
 # Older rows were seeded with API-style routes; point them at the real pages,
@@ -396,6 +444,19 @@ MENU_ORDER_FIXES = {
 MENU_PERMISSION_FIXES = {
     "system.number_formats": ("system.read", "system.number_formats.read"),
     "masters.organisation": ("system.read", "masters.organisation.read"),
+    # the pages that used to share their module's privilege (magazines.read, reports.read, ...) each get their own
+    "magazines.subscribers": ("magazines.read", "magazines.subscribers.read"),
+    "magazines.labels_delivery": ("magazines.read", "magazines.labels_delivery.read"),
+    "reports.summary_report": ("reports.read", "reports.summary_report.read"),
+    "reports.members_report": ("reports.read", "reports.members_report.read"),
+    "reports.receipts_report": ("reports.read", "reports.receipts_report.read"),
+    "reports.magazines_report": ("reports.read", "reports.magazines_report.read"),
+    "reports.saved_report": ("reports.read", "reports.saved_report.read"),
+    "notifications.campaigns": ("notifications.read", "notifications.campaigns.read"),
+    "notifications.message_templates": ("notifications.read", "notifications.message_templates.read"),
+    "notifications.inbox": ("notifications.read", "notifications.inbox.read"),
+    "members.import": ("members.register.write", "members.import.read"),
+    "members.assigned": ("members.unapproved.read", "members.assigned.read"),
     # each Engagements page opens with its own privilege (nobody held them yet, so no role loses access)
     "engagements.affiliations": (None, "engagements.affiliations.read"),
     "engagements.associates": (None, "engagements.associates.read"),

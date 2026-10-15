@@ -52,7 +52,7 @@ def test_health(client):
 
 
 def test_permission_catalog_seeded(client, admin_headers):
-    response = client.get("/api/v1/users/permissions", headers=admin_headers)
+    response = client.get("/api/v1/users/permissions", headers=admin_headers, params={"limit": 1000})
     assert response.status_code == 200, response.text
     body = response.json()
     assert {"total", "page", "limit", "pages", "data"} <= set(body)
@@ -6994,3 +6994,54 @@ def test_lists_show_the_newest_first_and_can_be_sorted(client, admin_headers):
         ok = client.get(path, headers=H, params={"sort_dir": "asc"})
         assert ok.status_code == 200, (path, ok.text)
         assert client.get(path, headers=H, params={"sort_by": "bogus"}).status_code == 400, path
+
+
+def test_every_page_of_magazine_reports_and_notifications_has_its_own_privilege(client, admin_headers):
+    """A role holding one page's privilege opens that page's data and nothing of its neighbours."""
+    H = admin_headers
+
+    def role_with(username, code, *grants):
+        _, _, headers = _staff_with_role(client, H, username, f"Page {username}", code.upper(), permission_grants=[(g, False) for g in grants])
+        return headers
+
+    # Reports: five pages, five privileges
+    only_members = role_with("pg_rep_members", "pg_rep_members", "reports.members_report.read")
+    assert client.get("/api/v1/reports/members", headers=only_members).status_code == 200
+    assert client.get("/api/v1/reports/receipts", headers=only_members).status_code == 403
+    assert client.get("/api/v1/reports/summary", headers=only_members).status_code == 403
+    assert client.get("/api/v1/reports/saved", headers=only_members).status_code == 403
+    only_receipts = role_with("pg_rep_receipts", "pg_rep_receipts", "reports.receipts_report.read")
+    assert client.get("/api/v1/reports/receipts", headers=only_receipts).status_code == 200
+    assert client.get("/api/v1/reports/members", headers=only_receipts).status_code == 403
+    only_saved = role_with("pg_rep_saved", "pg_rep_saved", "reports.saved_report.read")
+    assert client.get("/api/v1/reports/saved", headers=only_saved).status_code == 200
+    assert client.get("/api/v1/reports/magazine-returns", headers=only_saved).status_code == 403
+    # reading a saved report is not saving one
+    assert client.post("/api/v1/reports/saved", headers=only_saved, json={"name": "x", "report_key": "members"}).status_code == 403
+
+    # Magazine: Subscriptions and Labels & Delivery are separate
+    subs = role_with("pg_mag_subs", "pg_mag_subs", "magazines.subscribers.read")
+    assert client.get("/api/v1/magazines/subscriptions", headers=subs).status_code == 200
+    assert client.get("/api/v1/magazines/label-batches", headers=subs).status_code == 403
+    labels = role_with("pg_mag_labels", "pg_mag_labels", "magazines.labels_delivery.read")
+    assert client.get("/api/v1/magazines/label-batches", headers=labels).status_code == 200
+    assert client.get("/api/v1/magazines/delivery-batches", headers=labels).status_code == 200
+    assert client.get("/api/v1/magazines/subscriptions", headers=labels).status_code == 403
+    assert client.post("/api/v1/magazines/generate-labels", headers=subs, params={"issue_month_year": "2031-01"}).status_code == 403
+
+    # Notifications: campaigns, templates, inbox
+    templates = role_with("pg_not_tpl", "pg_not_tpl", "notifications.message_templates.read")
+    assert client.get("/api/v1/notifications/templates", headers=templates).status_code == 200
+    assert client.get("/api/v1/notifications/campaigns", headers=templates).status_code == 403
+    campaigns = role_with("pg_not_camp", "pg_not_camp", "notifications.campaigns.read")
+    assert client.get("/api/v1/notifications/campaigns", headers=campaigns).status_code == 200
+    assert client.get("/api/v1/notifications/templates", headers=campaigns).status_code == 200   # the list a campaign picks from
+    assert client.post("/api/v1/notifications/templates", headers=campaigns, json={"template_name": "t", "channel": "SMS", "body": "x"}).status_code == 403
+
+    # the sidebar rows ask for those same privileges
+    from db.seed_defaults import MENU_PAGE_CATALOG
+    asked = {m[0]: m[6] for m in MENU_PAGE_CATALOG}
+    for page in ("magazines.subscribers", "magazines.labels_delivery", "reports.summary_report", "reports.members_report",
+                 "reports.receipts_report", "reports.magazines_report", "reports.saved_report", "notifications.campaigns",
+                 "notifications.message_templates", "notifications.inbox", "members.import", "members.assigned", "masters.organisation"):
+        assert asked[page] == f"{page}.read", page

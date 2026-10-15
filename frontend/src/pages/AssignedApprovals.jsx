@@ -18,7 +18,7 @@ const inr = formatMoney;
 export default function AssignedApprovals() {
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-  const canApprove = hasPermission('members.unapproved.write');
+  const canApprove = hasPermission('members.assigned.write');
 
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +101,7 @@ export default function AssignedApprovals() {
   const chosen = members.filter((m) => selected.has(m.id));
 
   return (
-    <PermissionGate required="members.unapproved.read">
+    <PermissionGate required="members.assigned.read">
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Assigned for Approval</h1>

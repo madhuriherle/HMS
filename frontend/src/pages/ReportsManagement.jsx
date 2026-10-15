@@ -64,8 +64,7 @@ const MEMBER_COLUMNS = [
 
 export default function ReportsManagement() {
   const { hasPermission } = useAuth();
-  const canExport = hasPermission('reports.read');
-  const canSave = hasPermission('reports.write');
+  const canSave = hasPermission('reports.saved_report.write');
 
   const location = useLocation();
   const navigate = useNavigate();
