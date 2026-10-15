@@ -323,8 +323,11 @@ def seed_modules(db) -> int:
     from models.users import Module
 
     rows = {m.code: m for m in db.query(Module).filter(Module.is_deleted == False).all()}  # noqa: E712
+    deleted_codes = {c for (c,) in db.query(Module.code).filter(Module.is_deleted == True).all()}  # noqa: E712 - unique code: never insert it again
     created = 0
     for code, name, _parent, route, icon, order, min_rank in MODULE_CATALOG:
+        if code not in rows and code in deleted_codes:
+            continue
         if code in rows:
             m = rows[code]
             if m.route is None and route:
@@ -487,9 +490,10 @@ def seed_menu_pages(db) -> int:
     from models.users import Module
 
     rows = {m.code: m for m in db.query(Module).filter(Module.is_deleted == False).all()}  # noqa: E712
+    deleted_codes = {c for (c,) in db.query(Module.code).filter(Module.is_deleted == True).all()}  # noqa: E712 - unique code: never insert it again
     created = 0
     for code, name, parent, route, icon, order, perm, min_rank in MENU_PAGE_CATALOG:
-        if code in rows:
+        if code in rows or code in deleted_codes:
             continue
         parent_row = next((rows[c] for c in (parent or '').split('|') if c in rows), None) if parent else None
         if parent and not parent_row:
@@ -572,10 +576,8 @@ def seed_permissions(db) -> int:
     """
     from models.users import Permission, Module
 
-    existing = {
-        p.code
-        for p in db.query(Permission).filter(Permission.is_deleted == False).all()  # noqa: E712
-    }
+    # a code that exists but was deleted on purpose (the code column is unique) is left deleted, never re-inserted
+    existing = {p.code for p in db.query(Permission).all()}
     modules_by_code = {
         m.code: m for m in db.query(Module).filter(Module.is_deleted == False).all()  # noqa: E712
     }

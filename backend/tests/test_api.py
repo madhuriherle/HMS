@@ -7141,3 +7141,23 @@ def test_unapproved_list_carries_receipts_and_label_list_pages(client, admin_hea
     assert client.get("/api/v1/members/label-list", headers=H, params={"search": "Zlabel", "from_date": "2026-04-01"}).json()["total"] == 0
     assert client.get("/api/v1/members/label-list", headers=H, params={"search": "Zlabel", "to_date": "2026-03-31"}).json()["total"] == 1
     assert client.get("/api/v1/members/label-list", headers=H, params={"limit": 5000}).json()["limit"] == 200
+
+
+def test_seeding_privileges_leaves_a_deleted_privilege_deleted(client, admin_headers):
+    """A privilege someone deleted keeps its code (the column is unique): seeding must not try to insert it again
+    (that crashed migration 0081 on UAT, where system.read had been deleted)."""
+    from db.seed_defaults import seed_permissions
+    from db.session import SessionLocal
+    from models.users import Permission
+
+    with SessionLocal() as db:
+        row = db.query(Permission).filter(Permission.code == "system.write").first()
+        assert row is not None
+        row.is_deleted = True
+        db.commit()
+        try:
+            assert seed_permissions(db) == 0          # nothing new, and no duplicate-key error
+            assert db.query(Permission).filter(Permission.code == "system.write").count() == 1
+        finally:
+            row.is_deleted = False
+            db.commit()
