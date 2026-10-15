@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import useSort from '../hooks/useSort';
+import SortTh from '../components/SortTh';
 import { Link, useNavigate } from 'react-router-dom';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
@@ -169,13 +171,14 @@ export default function ReceiptTracking() {
   const [particularOptions, setParticularOptions] = useState([]);
   const [paymentModeOptions, setPaymentModeOptions] = useState([]);
 
+  const { sort, toggle: toggleSort, params: sortParams } = useSort();
   const reloadData = async () => {
     const fail = (what) => (error) => {
       console.error(`Failed to load ${what}.`, error);
       showToast(error.response?.data?.detail || `Failed to load ${what} from the server.`, 'error');
     };
     await Promise.all([
-      fetchReceipts().then(setReceipts).catch(fail('receipts')),
+      fetchReceipts(sortParams).then(setReceipts).catch(fail('receipts')),
       loadParticulars()
         .then((all) => setParticularOptions(all.filter((p) => p.status === 'Active').map((p) => p.name)))
         .catch(fail('particulars')),
@@ -188,7 +191,8 @@ export default function ReceiptTracking() {
   // Synchronize on mount
   useEffect(() => {
     reloadData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sort.by, sort.dir]);
 
   // ----------------------------------------------------
   // FILTERING LOGIC
@@ -645,13 +649,13 @@ export default function ReceiptTracking() {
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
-                <th className="py-3.5 px-4 whitespace-nowrap">Receipt No.</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Date</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Name</th>
+                <SortTh label="Receipt No." field="receipt_number" sort={sort} onSort={toggleSort} className="py-3.5 px-4 whitespace-nowrap" />
+                <SortTh label="Date" field="receipt_date" sort={sort} onSort={toggleSort} className="py-3.5 px-4 whitespace-nowrap" />
+                <SortTh label="Name" field="payer_name" sort={sort} onSort={toggleSort} className="py-3.5 px-4 whitespace-nowrap" />
                 <th className="py-3.5 px-4 whitespace-nowrap">Particulars</th>
-                <th className="py-3.5 px-4 text-right whitespace-nowrap">Amount</th>
+                <SortTh label="Amount" field="amount" sort={sort} onSort={toggleSort} className="py-3.5 px-4 text-right whitespace-nowrap" />
                 <th className="py-3.5 px-4 whitespace-nowrap">Mode</th>
-                <th className="py-3.5 px-4 whitespace-nowrap">Status</th>
+                <SortTh label="Status" field="payment_status" sort={sort} onSort={toggleSort} className="py-3.5 px-4 whitespace-nowrap" />
                 <th className="py-3.5 px-4 text-right whitespace-nowrap min-w-[170px]">Actions</th>
               </tr>
             </thead>

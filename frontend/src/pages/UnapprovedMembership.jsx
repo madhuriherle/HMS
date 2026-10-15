@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import useSort from '../hooks/useSort';
+import SortTh from '../components/SortTh';
 import { Link, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
@@ -88,13 +90,14 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [states, setStates] = useState([]);
   const [districts, setDistricts] = useState([]);
 
+  const { sort, toggle: toggleSort, params: sortParams } = useSort();
   const reloadData = async () => {
     const fail = (what) => (error) => {
       console.error(`Failed to load ${what}.`, error);
       showToast(error.response?.data?.detail || `Failed to load ${what} from the server.`, 'error');
     };
     await Promise.all([
-      loadUnapprovedMembers().then(setUnapprovedMembers).catch(fail('unapproved members')),
+      loadUnapprovedMembers(sortParams).then(setUnapprovedMembers).catch(fail('unapproved members')),
       loadMembershipTypes().then(setMembershipTypes).catch(fail('membership types')),
       loadLocations()
         .then((loc) => {
@@ -107,7 +110,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
   useEffect(() => {
     reloadData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sort.by, sort.dir]);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState(null);
@@ -630,8 +634,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                     />
                   </th>
                 )}
-                <th className="py-3 px-4">Applicant</th>
-                <th className="py-3 px-4">Contact</th>
+                <SortTh label="Applicant" field="name" sort={sort} onSort={toggleSort} className="py-3 px-4" />
+                <SortTh label="Contact" field="mobile" sort={sort} onSort={toggleSort} className="py-3 px-4" />
                 <th className="py-3 px-4">Type</th>
                 <th className="py-3 px-4 text-center">Receipt</th>
                 <th className="py-3 px-4 text-right min-w-[220px]">Actions</th>

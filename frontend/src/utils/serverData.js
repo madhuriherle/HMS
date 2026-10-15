@@ -144,9 +144,9 @@ export const loadReceipts = (params) => fetchReceipts(params);
 
 // Members waiting for approval, each with whether a receipt has been mapped to
 // them (the server records that as a receipt allocation).
-export const loadUnapprovedMembers = async () => {
+export const loadUnapprovedMembers = async (sortParams = {}) => {
   const [members, receipts] = await Promise.all([
-    fetchMembers({ approval_status: 'UNAPPROVED' }),
+    fetchMembers({ approval_status: 'UNAPPROVED', ...sortParams }),
     fetchReceipts(),
   ]);
   const receiptByMember = new Map();

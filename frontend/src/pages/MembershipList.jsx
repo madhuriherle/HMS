@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import useSort from '../hooks/useSort';
+import SortTh from '../components/SortTh';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
@@ -82,9 +84,10 @@ export default function MembershipList() {
   const [postalCodes, setPostalCodes] = useState([]);
   const [gothras, setGothras] = useState([]);
 
+  const { sort, toggle: toggleSort, params: sortParams } = useSort();
   const loadMembers = async () => {
     try {
-      setMembers(await fetchMembers({ approval_status: 'APPROVED' }));
+      setMembers(await fetchMembers({ approval_status: 'APPROVED', ...sortParams }));
     } catch (error) {
       console.error('Failed to load members.', error);
       showToast(error.response?.data?.detail || 'Failed to load members from the server.', 'error');
@@ -114,9 +117,14 @@ export default function MembershipList() {
 
   // Everything is read from the server on mount
   useEffect(() => {
-    loadMembers();
     loadMasters();
   }, []);
+
+  // the member list is read again from the server whenever the sort changes (the default is newest first)
+  useEffect(() => {
+    loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sort.by, sort.dir]);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState(null);
@@ -839,11 +847,11 @@ export default function MembershipList() {
                     title="Select All on page"
                   />
                 </th>}
-                <th className="py-3 px-4">Member No.</th>
-                <th className="py-3 px-4">Name</th>
-                <th className="py-3 px-4">Contact</th>
+                <SortTh label="Member No." field="member_code" sort={sort} onSort={toggleSort} className="py-3 px-4" />
+                <SortTh label="Name" field="name" sort={sort} onSort={toggleSort} className="py-3 px-4" />
+                <SortTh label="Contact" field="mobile" sort={sort} onSort={toggleSort} className="py-3 px-4" />
                 <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4 text-center">Status</th>
+                <SortTh label="Status" field="member_status" sort={sort} onSort={toggleSort} className="py-3 px-4 text-center" />
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>

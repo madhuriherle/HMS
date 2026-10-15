@@ -1,4 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import useSort from '../hooks/useSort';
+import SortTh from '../components/SortTh';
 import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
@@ -63,19 +65,24 @@ export default function UserManagement() {
   const [allPrivileges, setAllPrivileges] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const { sort, toggle: toggleSort, params: sortParams } = useSort();
+  const firstLoad = useRef(true);
+  const readUsers = async () => {
+    const usersResponse = await api.get('/users/', { params: { limit: 500, ...sortParams } });
+    const rawUserRows = Array.isArray(usersResponse.data)
+      ? usersResponse.data
+      : (usersResponse.data?.data || usersResponse.data?.items || []);
+    return rawUserRows.filter(
+      (u) => u.user_type !== 'MEMBER' && !u.member_id && u.role_name !== 'Member'
+    );
+  };
+
   // --- Fetch API Data on Mount ---
   useEffect(() => {
     const fetchMasterData = async () => {
       try {
         setLoading(true);
-        const usersResponse = await api.get('/users/', { params: { limit: 500 } });
-        const rawUserRows = Array.isArray(usersResponse.data)
-          ? usersResponse.data
-          : (usersResponse.data?.data || usersResponse.data?.items || []);
-        const userRows = rawUserRows.filter(
-          (u) => u.user_type !== 'MEMBER' && !u.member_id && u.role_name !== 'Member'
-        );
-        setUsers(userRows);
+        setUsers(await readUsers());
 
         const rolesResponse = await api.get('/users/roles', { params: { limit: 500, assignable: true } });
         const rawRoleRows = Array.isArray(rolesResponse.data)
@@ -92,7 +99,15 @@ export default function UserManagement() {
       }
     };
     fetchMasterData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // the users are read again when the sort changes (the default is newest first)
+  useEffect(() => {
+    if (firstLoad.current) { firstLoad.current = false; return; }
+    readUsers().then(setUsers).catch((error) => showToast(error.response?.data?.detail || 'Could not load the users.', 'error'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sort.by, sort.dir]);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -611,11 +626,11 @@ export default function UserManagement() {
           <table className="w-full text-left border-collapse min-w-[840px]">
             <thead>
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-semibold text-[#863221] uppercase tracking-wider">
-                <th className="px-6 py-3.5">User</th>
+                <SortTh label="User" field="name" sort={sort} onSort={toggleSort} className="px-6 py-3.5" />
                 <th className="px-6 py-3.5">Email</th>
                 <th className="px-6 py-3.5">Mobile</th>
                 <th className="px-6 py-3.5">Role</th>
-                <th className="px-6 py-3.5">Status</th>
+                <SortTh label="Status" field="status" sort={sort} onSort={toggleSort} className="px-6 py-3.5" />
                 <th className="px-6 py-3.5">Last Seen</th>
                 <th className="px-6 py-3.5 text-right">Actions</th>
               </tr>
