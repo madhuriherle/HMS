@@ -186,6 +186,7 @@ export default function RegisterNewMember() {
     state: '',
     nativePlace: '',
     appliedOnBehalfOf: 'Self',
+    behalfOtherText: '',
     qualification: '',
     employment: '',
     magazineNeeded: 'YES',
@@ -336,7 +337,8 @@ export default function RegisterNewMember() {
           district: nameOf(locations.districts, m.district_id),
           state: nameOf(locations.states, m.state_id),
           nativePlace: m.native_place_text || '',
-          appliedOnBehalfOf: m.applied_on_behalf_of || 'Self',
+          appliedOnBehalfOf: !m.applied_on_behalf_of ? 'Self' : BEHALF_OPTIONS.includes(m.applied_on_behalf_of) ? m.applied_on_behalf_of : 'Others',
+          behalfOtherText: m.applied_on_behalf_of && !BEHALF_OPTIONS.includes(m.applied_on_behalf_of) ? m.applied_on_behalf_of : '',
           qualification: m.qualification_text || '',
           employment: m.occupation || '',
           magazineNeeded: m.magazine_needed === false ? 'NO' : 'YES',
@@ -906,7 +908,7 @@ export default function RegisterNewMember() {
       district_id: pinRow?.districtId || null,
       taluk_id: pinRow?.talukId || null,
       pincode_id: pinRow?.id || null,
-      applied_on_behalf_of: formData.appliedOnBehalfOf || null,
+      applied_on_behalf_of: formData.appliedOnBehalfOf === 'Others' ? (formData.behalfOtherText || '').trim() || 'Others' : formData.appliedOnBehalfOf || null,
       magazine_needed: formData.magazineNeeded === 'YES',
       magazine_kind: formData.magazineNeeded === 'YES' ? formData.magazineKind || 'PHYSICAL' : null,
       magazine_delivery_address: formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' && formData.magazineDeliveryChoice === 'DIFFERENT' ? (formData.magazineDeliveryAddress || '').trim() || null : null,
@@ -1090,7 +1092,7 @@ export default function RegisterNewMember() {
                     {/* Row 1: Name (Title + Full Name), DOB, and Age in a SINGLE LINE */}
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-x-4 gap-y-5 items-start">
                       {/* Member Name */}
-                      <div className="sm:col-span-6">
+                      <div className="sm:col-span-7">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           New Member Name: <span className="text-red-600">*</span>
                         </label>
@@ -1129,7 +1131,7 @@ export default function RegisterNewMember() {
                       </div>
 
                       {/* Date of Birth */}
-                      <div className="sm:col-span-4">
+                      <div className="sm:col-span-5">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           Date of Birth: <span className="text-red-600">*</span>
                         </label>
@@ -1146,18 +1148,6 @@ export default function RegisterNewMember() {
                         {formErrors.birthDate && (
                           <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.birthDate}</p>
                         )}
-                      </div>
-
-                      {/* Age */}
-                      <div className="sm:col-span-2">
-                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">Age:</label>
-                        <input
-                          type="text"
-                          readOnly
-                          value={formData.age}
-                          placeholder="Age"
-                          className="w-full px-2.5 py-2 bg-[#F5EFEB] border border-[#DFD5CC] rounded-lg text-xs sm:text-sm font-bold text-[#510601] text-center placeholder:text-[#9E8B7F] placeholder:font-normal focus:outline-none cursor-default shadow-2xs transition-all"
-                        />
                       </div>
                     </div>
 
@@ -1240,6 +1230,16 @@ export default function RegisterNewMember() {
                             </option>
                           ))}
                         </select>
+                        {formData.appliedOnBehalfOf === 'Others' && (
+                          <input
+                            type="text"
+                            maxLength={30}
+                            placeholder="Specify the relation"
+                            value={formData.behalfOtherText}
+                            onChange={(e) => setFormData({ ...formData, behalfOtherText: e.target.value })}
+                            className="mt-2 w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                          />
+                        )}
                       </div>
 
                       {/* WhatsApp Number */}
@@ -1286,33 +1286,9 @@ export default function RegisterNewMember() {
                       </div>
                     </div>
 
-                    {/* Row 3: Father's Name */}
+                    {/* Kannada name (hidden for now) */}
+                    {SHOW_KANNADA_FIELDS && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5 items-start">
-                      <div>
-                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
-                          Father's Name:
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="Father's Full Name"
-                          value={formData.fatherName || formData.fatherHusbandName}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setFormData({ ...formData, fatherName: val, fatherHusbandName: val });
-                            if (formErrors.fatherName || formErrors.fatherHusbandName)
-                              setFormErrors({ ...formErrors, fatherName: '', fatherHusbandName: '' });
-                          }}
-                          className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
-                            (formErrors.fatherName || formErrors.fatherHusbandName) ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
-                          }`}
-                        />
-                        {(formErrors.fatherName || formErrors.fatherHusbandName) && (
-                          <p className="text-[11px] text-red-600 mt-1">
-                            {formErrors.fatherName || formErrors.fatherHusbandName}
-                          </p>
-                        )}
-                      </div>
-
                       {SHOW_KANNADA_FIELDS && (
                         <div>
                           <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
@@ -1328,6 +1304,7 @@ export default function RegisterNewMember() {
                         </div>
                       )}
                     </div>
+                    )}
                   </div>
                 </div>
 
@@ -1734,16 +1711,16 @@ export default function RegisterNewMember() {
                             {formData.magazineDeliveryChoice !== 'DIFFERENT' ? (
                               <div className="p-3 bg-[#FAF7F2] rounded-lg border border-[#DFD5CC] text-xs text-stone-700">
                                 <div className="text-[11px] font-bold text-[#510601] uppercase mb-1">Current Delivery Address:</div>
-                                {formData.address ? (
+                                {(formData.address || formData.locality || formData.postalCode) ? (
                                   <div>
-                                    <div className="font-medium text-[#180200]">{formData.address}</div>
-                                    <div className="text-[11px] text-stone-600">
+                                    {formData.address && <div className="font-medium text-[#180200] whitespace-pre-line">{formData.address}</div>}
+                                    <div className="text-xs text-stone-700">
                                       {[formData.locality, formData.taluk, formData.district, formData.state].filter(Boolean).join(', ')}
                                       {formData.postalCode ? ` - ${formData.postalCode}` : ''}
                                     </div>
                                   </div>
                                 ) : (
-                                  <div className="text-stone-400 italic">No communication address entered above yet. Please fill the communication address above.</div>
+                                  <div className="text-stone-400 italic">Not entered yet. It shows here as you type the communication address above.</div>
                                 )}
                               </div>
                             ) : (
