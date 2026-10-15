@@ -853,9 +853,10 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           onClose={() => setAssigningMember(null)}
           title={`Assign a receipt to ${assigningMember.fullName || assigningMember.name}`}
           maxWidthClass="max-w-[1400px]"
+          heightClass="h-[90vh]"
           footer={<ModalFooter kind="view" onCancel={() => setAssigningMember(null)} />}
         >
-          <div className="p-5 space-y-4">
+          <div className="p-5 flex flex-col gap-4 flex-1 min-h-0">
             {/* Who the money will be mapped to */}
             <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
@@ -914,7 +915,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
               </button>
             </div>
 
-            {/* The receipts waiting for a member */}
+            {/* The receipts waiting for a member: the only part that scrolls */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
             {assignLoading ? (
               <div className="py-12 text-center text-sm text-[#863221]">Loading receipts…</div>
             ) : assignError ? (
@@ -1008,6 +1010,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                 })}
               </div>
             )}
+
+            </div>
 
             {/* Pages */}
             {assignRows.length > 0 && !assignLoading && !assignError && (
