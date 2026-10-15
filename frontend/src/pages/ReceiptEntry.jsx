@@ -1760,6 +1760,29 @@ export default function ReceiptEntry() {
                       className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
                     />
                   </div>
+                  {/* what the typing found: a short note in the free half of this row */}
+                  {(typedNumber || typedName || typedMobile) && (
+                    <div className="self-end rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] px-3 py-2 text-xs min-h-[38px] flex items-center">
+                      {filteredRightMembers.length === 0 ? (
+                        <span className="text-[#863221]">No member matches. This will be saved as a non-member receipt.</span>
+                      ) : filteredRightMembers.length === 1 ? (
+                        (() => {
+                          const m = filteredRightMembers[0];
+                          return (
+                            <div className="flex w-full items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="truncate font-bold text-[#180200]">{m.fullName || m.name} <span className="font-mono font-semibold text-[#510601]">{m.membershipNumber || ''}</span></p>
+                                <p className="truncate text-[11px] text-[#863221]">{[m.membershipType, m.districtName || m.district, m.mobile].filter(Boolean).join(' · ')}</p>
+                              </div>
+                              <button type="button" onClick={() => handleAssignFromMembership(m)} className="shrink-0 rounded-lg border border-[#510601]/30 px-2.5 py-1 text-[11px] font-semibold text-[#510601] hover:bg-[#510601] hover:text-white cursor-pointer">Assign</button>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <span className="text-[#863221]"><b className="text-[#180200]">{filteredRightMembers.length}</b> members match. Pick one from the Membership List.</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Row 4: Particulars (with sub-type), Amount & Multi-Line Items */}
