@@ -79,19 +79,22 @@ const lineLabel = (i) => {
   return sub && sub.toLowerCase() !== String(i.particular || '').trim().toLowerCase() ? sub : (i.particular || '');
 };
 
-// Receipt Type cell: the main thing picked (the sub type), "+N" for more lines, and a hover card listing every line
+// the full name of a line: "Particular › sub type" (just the particular when there is no sub type)
+const fullLabel = (i) => (lineLabel(i) !== i.particular ? `${i.particular} › ${lineLabel(i)}` : i.particular || '');
+
+// Receipt Type cell: "Particular › sub type" (wraps when narrow), "+N" for more lines, and a hover card listing every line
 function TypeCell({ receipt }) {
   const [tip, setTip] = useState(null);
   const items = receipt.items || [];
   const first = items[0];
-  const label = first ? lineLabel(first) : receipt.particulars || 'Membership';
+  const label = first ? fullLabel(first) : receipt.particulars || 'Membership';
   const more = items.length - 1;
   const show = (e) => {
     const r = e.currentTarget.getBoundingClientRect();
     setTip({ left: Math.min(r.left, window.innerWidth - 340), top: r.bottom + 6 });
   };
   return (
-    <div className="inline-block" onMouseEnter={show} onMouseLeave={() => setTip(null)}>
+    <div className="max-w-[220px] whitespace-normal break-words leading-snug" onMouseEnter={show} onMouseLeave={() => setTip(null)}>
       <span className="cursor-default">{label}</span>
       {more > 0 && (
         <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-bold text-[#863221]">
@@ -105,8 +108,7 @@ function TypeCell({ receipt }) {
             {items.map((i, idx) => (
               <li key={idx} className="flex items-start justify-between gap-3 py-1.5 text-xs">
                 <span className="min-w-0">
-                  <span className="block font-semibold text-[#180200]">{lineLabel(i)}</span>
-                  {lineLabel(i) !== i.particular && <span className="block text-[11px] font-normal text-[#863221]">{i.particular}</span>}
+                  <span className="block font-semibold text-[#180200]">{fullLabel(i)}</span>
                 </span>
                 <span className="shrink-0 font-mono font-bold text-[#510601]">{formatMoney(i.amount)}</span>
               </li>
@@ -878,10 +880,7 @@ export default function ReceiptTracking() {
                     <span className="text-[10px] uppercase font-bold text-[#863221]">Receipt Type</span>
                     {viewingReceipt.items?.[0] ? (
                       <>
-                        <p className="font-bold text-[#510601] mt-0.5">{lineLabel(viewingReceipt.items[0])}</p>
-                        {lineLabel(viewingReceipt.items[0]) !== viewingReceipt.items[0].particular && (
-                          <p className="text-[11px] text-[#863221]">{viewingReceipt.items[0].particular}</p>
-                        )}
+                        <p className="font-bold text-[#510601] mt-0.5">{fullLabel(viewingReceipt.items[0])}</p>
                       </>
                     ) : (
                       <p className="font-bold text-[#510601] mt-0.5">{viewingReceipt.particulars || 'Membership'}</p>
