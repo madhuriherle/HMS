@@ -1,7 +1,7 @@
 from typing import Any, Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from api import deps
 from models.users import User
 from models.activity import UserActivityLog, MemberActivityLog
@@ -39,6 +39,9 @@ def read_user_activity(
     from datetime import datetime, time
 
     q = db.query(UserActivityLog).filter(UserActivityLog.is_deleted == False)
+    hidden = deps.stronger_user_ids(db, current_user)   # accounts above you never show up in a log
+    if hidden:
+        q = q.filter(or_(UserActivityLog.user_id.is_(None), UserActivityLog.user_id.notin_(hidden)))
 
     if user_id:
         q = q.filter(UserActivityLog.user_id == user_id)
@@ -123,6 +126,9 @@ def read_activity_stats(
     from datetime import datetime, time
 
     q = db.query(UserActivityLog).filter(UserActivityLog.is_deleted == False)
+    hidden = deps.stronger_user_ids(db, current_user)
+    if hidden:
+        q = q.filter(or_(UserActivityLog.user_id.is_(None), UserActivityLog.user_id.notin_(hidden)))
     if user_id:
         q = q.filter(UserActivityLog.user_id == user_id)
     if from_date:
@@ -164,6 +170,9 @@ def read_user_activity_summary(
         UserActivityLog.action,
         func.count(UserActivityLog.id).label("count"),
     ).filter(UserActivityLog.is_deleted == False)
+    hidden = deps.stronger_user_ids(db, current_user)
+    if hidden:
+        q = q.filter(or_(UserActivityLog.user_id.is_(None), UserActivityLog.user_id.notin_(hidden)))
     if user_id:
         q = q.filter(UserActivityLog.user_id == user_id)
     rows = q.group_by(UserActivityLog.user_id, UserActivityLog.action).all()
@@ -230,8 +239,13 @@ def read_member_timeline(
     # Rows written before descriptions existed get theirs worked out from what they recorded.
     from services import activity_text
 
+    hidden = deps.stronger_user_ids(db, current_user)
     for row in page_data["data"]:
-        row["acted_by_name"] = names.get(row.get("user_id"))
+        if row.get("user_id") in hidden:   # an account above you: shown as the system, never by name
+            row["user_id"] = None
+            row["acted_by_name"] = "System"
+        else:
+            row["acted_by_name"] = names.get(row.get("user_id"))
         d = row.get("details") or {}
         if not d.get("description"):
             table = d.get("entity_type")

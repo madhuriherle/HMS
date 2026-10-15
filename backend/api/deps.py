@@ -72,6 +72,22 @@ def user_rank(db: Session, user: User) -> int:
     return role.rank_level if role else 99
 
 
+def stronger_user_ids(db: Session, user: User) -> set:
+    """Ids of the accounts ranked strictly above this user. They are never shown to this user, not even by
+    name in a log: the Super Admin (rank 0) must not be visible to anyone else."""
+    from models.users import Role
+    mine = user_rank(db, user)
+    if mine <= 0:
+        return set()
+    rows = (
+        db.query(User.id)
+        .join(Role, Role.id == User.role_id)
+        .filter(Role.rank_level < mine)
+        .all()
+    )
+    return {r[0] for r in rows}
+
+
 def is_all_access(db: Session, user: User) -> bool:
     role = get_user_role(db, user)
     return bool(role and role.status and role.is_all_access)

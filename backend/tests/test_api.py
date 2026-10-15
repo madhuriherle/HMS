@@ -2049,16 +2049,18 @@ def test_rank_hierarchy_rules(client, admin_headers):
                      json={"name": "Sub", "username": "sub_user", "password": "Subuser@123", "role_id": sub.json()["id"]})
     assert ok.status_code == 200, ok.text
     assert client.post("/api/v1/users/", headers=mgr,
-                       json={"name": "Up", "username": "up_user", "password": "Upuser@1234", "role_id": _role_id(client, admin_headers, "ADMIN")}).status_code == 403
+                       json={"name": "Up", "username": "up_user", "password": "Upuser@1234", "role_id": _role_id(client, admin_headers, "ADMIN")}).status_code == 400  # same answer as an unknown role
     users = {u["username"] for u in client.get("/api/v1/users/", headers=mgr, params={"limit": 200}).json()["data"]}
     # only your own rank and weaker are listed: a stronger rank (the Super Admin) is neither listed nor reachable
     assert "sub_user" in users and "admin" not in users and "rank3_mgr" not in users  # your own account is on My Profile, not in this list
-    assert client.get("/api/v1/users/1", headers=mgr).status_code == 403
-    assert client.put("/api/v1/users/1", headers=mgr, json={"name": "Hacked"}).status_code == 403
-    assert client.delete("/api/v1/users/1", headers=mgr).status_code == 403
+    # a stronger account answers exactly like one that does not exist
+    assert client.get("/api/v1/users/1", headers=mgr).status_code == 404
+    assert client.put("/api/v1/users/1", headers=mgr, json={"name": "Hacked"}).status_code == 404
+    assert client.delete("/api/v1/users/1", headers=mgr).status_code == 404
+    assert client.get("/api/v1/users/99999999", headers=mgr).status_code == 404
     # a role stronger than your own can never be handed out; your own rank can
     assert client.put(f"/api/v1/users/{ok.json()['id']}", headers=mgr,
-                      json={"role_id": _role_id(client, admin_headers, "ADMIN")}).status_code == 403
+                      json={"role_id": _role_id(client, admin_headers, "ADMIN")}).status_code == 400
     # cannot change own role
     assert client.put(f"/api/v1/users/{mgr_uid}", headers=mgr, json={"role_id": sub.json()["id"]}).status_code in (400, 401, 403)
 
@@ -6582,7 +6584,7 @@ def test_equal_rank_users_can_manage_each_other_with_safeguards(client, admin_he
     assert client.delete(f"/api/v1/users/{peer.json()['id']}", headers=mgr).status_code == 200
     # never your own account, never someone stronger
     assert client.delete(f"/api/v1/users/{mgr_uid}", headers=mgr).status_code == 400
-    assert client.delete("/api/v1/users/1", headers=mgr).status_code == 403
+    assert client.delete("/api/v1/users/1", headers=mgr).status_code == 404
 
     # a Super Admin may create another Super Admin and manage them; a lower rank never can
     sa = _role_id(client, admin_headers, "SUPERADMIN")
@@ -6591,7 +6593,7 @@ def test_equal_rank_users_can_manage_each_other_with_safeguards(client, admin_he
     assert boss2.status_code == 200, boss2.text
     assert client.put(f"/api/v1/users/{boss2.json()['id']}", headers=admin_headers, json={"name": "Boss Two"}).status_code == 200
     assert client.post("/api/v1/users/", headers=mgr,
-                       json={"name": "Boss3", "username": "boss_three", "password": "Bossthree@123", "role_id": sa}).status_code == 403
+                       json={"name": "Boss3", "username": "boss_three", "password": "Bossthree@123", "role_id": sa}).status_code == 400
     assert client.delete(f"/api/v1/users/{boss2.json()['id']}", headers=admin_headers).status_code == 200
 
     # the last active holder of a top-two rank role cannot be deleted or deactivated
@@ -6895,3 +6897,32 @@ def test_rank_gate_is_super_admin_only(client, admin_headers):
     assert "SUPERADMIN" not in listed
     assert client.get(f"/api/v1/users/roles/{roles['SUPERADMIN']['id']}", headers=adm).status_code in (403, 404)
     assert client.post("/api/v1/users/roles", headers=adm, json={"name": "Zero", "code": "ZERO_RANK", "rank_level": 0}).status_code in (400, 403)
+
+
+def test_nothing_reveals_that_someone_sits_above_the_admin(client, admin_headers):
+    """The Super Admin must stay invisible to an Admin: unknown and stronger accounts answer the same way, and the
+    activity logs never show the Super Admin's actions."""
+    _, _, adm = _staff_with_role(
+        client, admin_headers, "hidden_check_admin", "Hidden Check Role", "HIDDEN_CHECK_ROLE",
+        permission_grants=[("users.management.read", False), ("users.management.write", False), ("activity.read", False)],
+        rank_level=1,
+    )
+    me = client.get("/api/v1/auth/me", headers=admin_headers).json()
+    sa_id = me.get("id") or me.get("user", {}).get("id")
+    assert sa_id
+
+    # a stronger account and one that does not exist give the same answer, with the same words
+    gone = client.get("/api/v1/users/99999999", headers=adm)
+    above = client.get(f"/api/v1/users/{sa_id}", headers=adm)
+    assert gone.status_code == above.status_code == 404 and gone.json() == above.json()
+    sa_role = _role_id(client, admin_headers, "SUPERADMIN")
+    unknown_role = client.post("/api/v1/users/", headers=adm, json={"name": "X", "username": "zz_x1", "password": "Zzpass@1234", "role_id": 99999999})
+    stronger_role = client.post("/api/v1/users/", headers=adm, json={"name": "X", "username": "zz_x2", "password": "Zzpass@1234", "role_id": sa_role})
+    assert unknown_role.status_code == stronger_role.status_code == 400 and unknown_role.json() == stronger_role.json()
+
+    # the Super Admin's own actions (the log in just now) are in the log for the Super Admin, never for the Admin
+    mine = client.get("/api/v1/activity/users", headers=admin_headers, params={"limit": 200, "show_navigation": True}).json()["data"]
+    assert any(r.get("user_id") == sa_id for r in mine)
+    seen = client.get("/api/v1/activity/users", headers=adm, params={"limit": 200, "show_navigation": True}).json()["data"]
+    assert not any(r.get("user_id") == sa_id for r in seen)
+    assert str(sa_id) not in client.get("/api/v1/activity/users/summary", headers=adm).json()["data"]

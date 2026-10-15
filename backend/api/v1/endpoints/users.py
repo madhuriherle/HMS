@@ -109,7 +109,7 @@ def create_user(
     if not role:
         raise HTTPException(400, "Invalid role_id")
     if not can_manage_rank(deps.user_rank(db, current_user), role.rank_level):
-        raise HTTPException(403, "You cannot give this role")
+        raise HTTPException(400, "Invalid role_id")  # same answer as a role that does not exist
     _check_password(user_in.password)
     data = user_in.model_dump()
     data["password_hash"] = get_password_hash(data.pop("password"))
@@ -836,7 +836,7 @@ def _visible_user(db: Session, me: User, user: Optional[User]) -> User:
         return user
     target = deps.get_user_role(db, user)
     if not can_manage_rank(deps.user_rank(db, me), target.rank_level if target else 99):
-        raise HTTPException(403, "Unauthorized to access a user with a higher rank")
+        raise HTTPException(404, "User not found")  # same answer as a user that does not exist
     return user
 
 
@@ -886,7 +886,7 @@ def update_user(*, db: Session = Depends(deps.get_db), current_user: User = Depe
         if not new_role:
             raise HTTPException(400, "Invalid role_id")
         if not can_manage_rank(deps.user_rank(db, current_user), new_role.rank_level):
-            raise HTTPException(403, "Cannot assign a rank higher than yours")
+            raise HTTPException(400, "Invalid role_id")  # same answer as a role that does not exist
         _protect_user(db, current_user, user, "change the role of")
         data["user_type"] = _user_type_for(new_role)
         changed = True
