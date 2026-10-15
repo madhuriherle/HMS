@@ -62,6 +62,8 @@ def read_users(
     search: Optional[str] = None,
     status: Optional[bool] = None,
     role_id: Optional[int] = None,
+    sort_by: Optional[str] = None,   # id | created_at | name | username | status
+    sort_dir: str = "desc",
 ) -> Any:
     """Staff accounts whose role is the same rank as yours or weaker (members are not users). A stronger rank is
     never listed or opened: a rank 1 Admin does not see the Super Admin (rank 0); rank 0 sees everyone else. Your own account is
@@ -85,7 +87,11 @@ def read_users(
         q = q.filter(User.status == status)
     if role_id is not None:
         q = q.filter(User.role_id == role_id)
-    page_data = paginate(q.order_by(User.id.desc()), page, limit, exclude={"password_hash", "security_stamp"})
+    from core.sorting import sort_query
+    q = sort_query(q, sort_by=sort_by, sort_dir=sort_dir, tiebreak=User.id,
+                   allowed={"id": User.id, "created_at": User.created_at, "name": User.name, "username": User.username, "status": User.status},
+                   newest_first=(User.created_at.desc(),))
+    page_data = paginate(q, page, limit, exclude={"password_hash", "security_stamp"})
     roles = {r.id: r for r in db.query(Role).filter(Role.id.in_({u["role_id"] for u in page_data["data"] if u.get("role_id")} or {0})).all()}
     for u in page_data["data"]:
         r = roles.get(u.get("role_id"))

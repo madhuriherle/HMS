@@ -62,6 +62,17 @@ def _allocated_member_ids(db: Session, receipt_id: int) -> list:
     ]
 
 
+def _sort_receipts(q, sort_by, sort_dir):
+    """Newest receipt (entry order) first, or the column the caller asked for."""
+    from core.sorting import sort_query
+    return sort_query(
+        q, sort_by=sort_by, sort_dir=sort_dir, tiebreak=Receipt.id,
+        allowed={"id": Receipt.id, "receipt_date": Receipt.receipt_date, "receipt_number": Receipt.receipt_number,
+                 "amount": Receipt.net_amount, "payer_name": Receipt.payer_name, "payment_status": Receipt.payment_status},
+        newest_first=(Receipt.id.desc(),),
+    )
+
+
 def _validate_lines(db: Session, items, net: float) -> None:
     """Multi-line receipts: every line must reference a real particular and the lines must add up to
     the receipt's net amount. (A single legacy line without a particular id is not cross-checked.)"""
@@ -161,6 +172,8 @@ def read_receipts(
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
     search: Optional[str] = None,
+    sort_by: Optional[str] = None,   # id | receipt_date | receipt_number | amount | payer_name | payment_status
+    sort_dir: str = "desc",
 ) -> Any:
     """Receipt entries with filters; source=ONLINE|OFFLINE, member_id narrows
     to receipts mapped to that member. ``search`` matches payer name,
@@ -208,7 +221,7 @@ def read_receipts(
             Receipt.cheque_number.ilike(like),
             Receipt.id.in_(payee_receipt_ids),
         ))
-    return paginate(q.order_by(Receipt.id.desc()), page, limit)
+    return paginate(_sort_receipts(q, sort_by, sort_dir), page, limit)
 
 
 @router.post("/", response_model=Union[schemas_receipts.Receipt, PendingApproval], status_code=201)
@@ -287,6 +300,8 @@ def read_receipt_tracking(
     search: Optional[str] = None,
     receipt_id: Optional[int] = None,  # one receipt (the edit screen loads it this way)
     export: Optional[str] = None,  # "csv" or "excel"
+    sort_by: Optional[str] = None,   # id | receipt_date | receipt_number | amount | payer_name | payment_status
+    sort_dir: str = "desc",
 ) -> Any:
     """Receipt register for the Receipt Tracking screen.
 
@@ -362,9 +377,7 @@ def read_receipt_tracking(
     total = db.query(func.count(Receipt.id)).filter(*filters).scalar()
 
     rows = (
-        db.query(Receipt)
-        .filter(*filters)
-        .order_by(Receipt.id.desc())
+        _sort_receipts(db.query(Receipt).filter(*filters), sort_by, sort_dir)
         .offset((page - 1) * limit)
         .limit(limit)
         .all()

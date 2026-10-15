@@ -27,11 +27,17 @@ def read_affiliations(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
     magazine_enabled: Optional[bool] = None,
-    page: int = 1, limit: int = 20
+    page: int = 1, limit: int = 20,
+    sort_by: Optional[str] = None,   # id | created_at | group_name
+    sort_dir: str = "desc",
 ) -> Any:
+    from core.sorting import sort_query
     q = db.query(Affiliation).filter(Affiliation.is_deleted == False)
     if magazine_enabled is not None:
         q = q.filter(Affiliation.magazine_enabled == magazine_enabled)
+    q = sort_query(q, sort_by=sort_by, sort_dir=sort_dir, tiebreak=Affiliation.id,
+                   allowed={"id": Affiliation.id, "created_at": Affiliation.created_at, "group_name": Affiliation.group_name},
+                   newest_first=(Affiliation.created_at.desc(),))
     return paginate(q, page, limit)
 
 @router.post("/affiliations", response_model=Union[schemas_engagements.Affiliation, PendingApproval], status_code=201)
@@ -170,7 +176,9 @@ def read_associates(
     current_user: User = Depends(deps.get_current_user),
     magazine_enabled: Optional[bool] = None,
     search: Optional[str] = None,
-    page: int = 1, limit: int = 20
+    page: int = 1, limit: int = 20,
+    sort_by: Optional[str] = None,   # id | created_at | name | organization
+    sort_dir: str = "desc",
 ) -> Any:
     q = db.query(Associate).filter(Associate.is_deleted == False)
     if magazine_enabled is not None:
@@ -185,7 +193,11 @@ def read_associates(
             Associate.mobile.ilike(like),
             Associate.email.ilike(like),
         ))
-    return paginate(q.order_by(Associate.id.desc()), page, limit)
+    from core.sorting import sort_query
+    q = sort_query(q, sort_by=sort_by, sort_dir=sort_dir, tiebreak=Associate.id,
+                   allowed={"id": Associate.id, "created_at": Associate.created_at, "name": Associate.name, "organization": Associate.organization},
+                   newest_first=(Associate.created_at.desc(),))
+    return paginate(q, page, limit)
 
 @router.post("/associates", response_model=Union[schemas_engagements.Associate, PendingApproval], status_code=201)
 @approval_gate.gated("engagements", "CREATE", "Associate", "engagements.write")
@@ -241,7 +253,9 @@ def read_press_media(
     current_user: User = Depends(deps.get_current_user),
     magazine_enabled: Optional[bool] = None,
     search: Optional[str] = None,
-    page: int = 1, limit: int = 20
+    page: int = 1, limit: int = 20,
+    sort_by: Optional[str] = None,   # id | created_at | organization_name | reporter_name
+    sort_dir: str = "desc",
 ) -> Any:
     q = db.query(PressMedia).filter(PressMedia.is_deleted == False)
     if magazine_enabled is not None:
@@ -254,7 +268,12 @@ def read_press_media(
             PressMedia.mobile.ilike(like),
             PressMedia.email.ilike(like),
         ))
-    return paginate(q.order_by(PressMedia.id.desc()), page, limit)
+    from core.sorting import sort_query
+    q = sort_query(q, sort_by=sort_by, sort_dir=sort_dir, tiebreak=PressMedia.id,
+                   allowed={"id": PressMedia.id, "created_at": PressMedia.created_at, "organization_name": PressMedia.organization_name,
+                            "reporter_name": PressMedia.reporter_name},
+                   newest_first=(PressMedia.created_at.desc(),))
+    return paginate(q, page, limit)
 
 @router.post("/press-media", response_model=Union[schemas_engagements.PressMedia, PendingApproval], status_code=201)
 @approval_gate.gated("engagements", "CREATE", "PressMedia", "engagements.write")

@@ -38,7 +38,10 @@ def read_events(
     search: Optional[str] = None,
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
+    sort_by: Optional[str] = None,   # event_date | title | created_at | id
+    sort_dir: str = "desc",
 ) -> Any:
+    from core.sorting import sort_query
     q = db.query(Event).filter(Event.is_deleted == False)
     if upcoming_only:
         q = q.filter(Event.event_date >= date.today())
@@ -47,7 +50,10 @@ def read_events(
         q = q.filter(or_(Event.title.ilike(like), Event.location.ilike(like)))
     if from_date: q = q.filter(Event.event_date >= from_date)
     if to_date: q = q.filter(Event.event_date <= to_date)
-    return paginate(q.order_by(Event.event_date.desc()), page, limit)
+    q = sort_query(q, sort_by=sort_by, sort_dir=sort_dir, tiebreak=Event.id,
+                   allowed={"event_date": Event.event_date, "title": Event.title, "created_at": Event.created_at, "id": Event.id},
+                   newest_first=(Event.event_date.desc(),))
+    return paginate(q, page, limit)
 
 
 @router.get("/upcoming")

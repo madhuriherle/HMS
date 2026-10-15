@@ -976,7 +976,7 @@ def read_saved_reports(
     q = db.query(SavedReport).filter(SavedReport.is_deleted == False)
     if report_key:
         q = q.filter(SavedReport.report_key == report_key)
-    return paginate(q, page, limit)
+    return paginate(q.order_by(SavedReport.id.desc()), page, limit)
 
 @router.get("/saved/{id}", response_model=schemas_reports.SavedReport)
 def read_saved_report(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user), id: int) -> Any:

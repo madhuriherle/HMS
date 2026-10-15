@@ -234,6 +234,13 @@ RULE 10: MASTERS AND SCREENS
      "card inside card" clutter. Registration amount and receipt date on a new
      registration are read-only (the amount follows the chosen membership type).
 
+10.5 LISTS SHOW THE NEWEST FIRST (masters excepted, they keep their own order). A list endpoint
+     with no sort given returns the newest record first (events: the latest event date first).
+     The main lists also take sort_by and sort_dir (asc | desc): members, receipts and
+     receipts/tracking, users, associates, press-media, affiliations, events and magazine
+     subscriptions. sort_by must be one of the list's own column names (anything else is a 400),
+     and ties fall back to the newest id. The helper is core/sorting.py (sort_query).
+
 --------------------------------------------------------------------------------
 RULE 11: HOW WE WORK (ALL AGENTS)
 --------------------------------------------------------------------------------

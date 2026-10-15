@@ -50,11 +50,18 @@ def read_subscriptions(
     page: int = 1, limit: int = 20,
     member_id: Optional[int] = None,
     delivery_status: Optional[str] = None,
+    sort_by: Optional[str] = None,   # id | created_at | delivery_status
+    sort_dir: str = "desc",
 ) -> Any:
+    from core.sorting import sort_query
     q = db.query(MagazineSubscription).filter(MagazineSubscription.is_deleted == False)
     if member_id: q = q.filter(MagazineSubscription.member_id == member_id)
     if delivery_status: q = q.filter(MagazineSubscription.delivery_status == delivery_status)
-    return paginate(q.order_by(MagazineSubscription.id.desc()), page, limit)
+    q = sort_query(q, sort_by=sort_by, sort_dir=sort_dir, tiebreak=MagazineSubscription.id,
+                   allowed={"id": MagazineSubscription.id, "created_at": MagazineSubscription.created_at,
+                            "delivery_status": MagazineSubscription.delivery_status},
+                   newest_first=(MagazineSubscription.id.desc(),))
+    return paginate(q, page, limit)
 
 
 @router.get("/subscriptions/{sub_id}", response_model=schemas_magazines.MagazineSubscription)

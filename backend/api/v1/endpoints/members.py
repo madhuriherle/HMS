@@ -12,7 +12,7 @@ from schemas import members as schemas_members
 from schemas.common import PendingApproval
 from api import deps
 from models.masters import ServiceType
-from models.members import Member, MemberApprovalHistory, MemberMembership, MemberServiceOptin
+from models.members import Member, MemberApprovalHistory, MemberImportRun, MemberMembership, MemberServiceOptin
 from models.users import User
 from core.config import settings
 from core.pagination import paginate
@@ -43,8 +43,10 @@ def read_members(
     registration_source: Optional[str] = None,
     include_deleted: bool = False,
     search: Optional[str] = None,
+    sort_by: Optional[str] = None,   # id | created_at | name | member_code | mobile | approval_status | member_status
+    sort_dir: str = "desc",
 ) -> Any:
-    """Retrieve members with optional filters and search (offline + online)."""
+    """Retrieve members with optional filters and search (offline + online). Newest first unless sort_by is given."""
     query = db.query(Member).filter(Member.is_deleted == False)
     if include_deleted:
         query = db.query(Member)
@@ -85,6 +87,13 @@ def read_members(
             Member.email.ilike(f"%{search}%"),
         ))
 
+    from core.sorting import sort_query
+    query = sort_query(
+        query, sort_by=sort_by, sort_dir=sort_dir, tiebreak=Member.id,
+        allowed={"id": Member.id, "created_at": Member.created_at, "name": Member.first_name_en, "member_code": Member.member_code,
+                 "mobile": Member.mobile, "approval_status": Member.approval_status, "member_status": Member.member_status},
+        newest_first=(Member.created_at.desc(),),
+    )
     result = paginate(query, page, limit)
     _attach_membership_types(db, result["data"])
     return result
@@ -565,6 +574,48 @@ def lookup_member(
         "matches": matches,
         "member": matches[0] if matches else None,
     }
+
+
+def _import_run_row(run: MemberImportRun, names: dict, detail: bool = False) -> dict:
+    out = {
+        "id": run.id, "file_name": run.file_name, "total_rows": run.total_rows, "processed_rows": run.processed_rows,
+        "success_count": run.success_count, "skipped_count": run.skipped_count, "warning_count": run.warning_count,
+        "skip_duplicates": run.skip_duplicates,
+        "imported_by": names.get(run.created_by) or "-", "imported_at": run.created_at, "finished_at": run.updated_at or run.created_at,
+        "status": "COMPLETED" if run.processed_rows >= run.total_rows else "INCOMPLETE",
+    }
+    if detail:
+        out["skipped"] = run.skipped or []
+        out["warnings"] = run.warnings or []
+    return out
+
+
+@router.get("/import-history")
+def member_import_history(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_any_permission("members.register.write", "members.write")),
+    page: int = 1, limit: int = 20,
+) -> Any:
+    """Every bulk member import, newest first: who ran it, when, which file and the result."""
+    q = db.query(MemberImportRun).filter(MemberImportRun.is_deleted == False).order_by(MemberImportRun.id.desc())  # noqa: E712
+    data = paginate(q, page, limit, serializer=lambda r: r)
+    ids = {r.created_by for r in data["data"] if r.created_by}
+    names = {u.id: (u.name or u.username) for u in db.query(User).filter(User.id.in_(ids or {0})).all()}
+    data["data"] = [_import_run_row(r, names) for r in data["data"]]
+    return data
+
+
+@router.get("/import-history/{run_id}")
+def member_import_history_detail(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_any_permission("members.register.write", "members.write")),
+    run_id: int,
+) -> Any:
+    run = db.query(MemberImportRun).filter(MemberImportRun.id == run_id, MemberImportRun.is_deleted == False).first()  # noqa: E712
+    if not run:
+        raise HTTPException(404, "Import not found")
+    u = db.query(User).filter(User.id == run.created_by).first() if run.created_by else None
+    return _import_run_row(run, {u.id: (u.name or u.username)} if u else {}, detail=True)
 
 
 @router.get("/{id}", response_model=schemas_members.Member)
@@ -2502,6 +2553,7 @@ class BulkMemberImportRow(pydantic.BaseModel):
     address_line2: Optional[str] = None
     locality: Optional[str] = None
     city: Optional[str] = None
+    gotra: Optional[str] = None
     pincode: Optional[str] = None
     membership_type: Optional[str] = None
     remarks: Optional[str] = None
@@ -2509,22 +2561,76 @@ class BulkMemberImportRow(pydantic.BaseModel):
 class BulkMemberImportPayload(pydantic.BaseModel):
     members: List[BulkMemberImportRow]
     skip_duplicates: bool = True
+    # the screen sends a file in batches: these tie the batches to one line in the import history
+    run_id: Optional[str] = pydantic.Field(default=None, max_length=40)
+    file_name: Optional[str] = pydantic.Field(default=None, max_length=255)
+    total_rows: Optional[int] = None
 
 
-@router.post("/bulk-import")
-def bulk_import_members(
-    *,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_any_permission("members.register.write", "members.write")),
-    payload: BulkMemberImportPayload,
-) -> Any:
-    """Import a batch of existing/live members with their permanent membership numbers."""
+def _record_import_run(db: Session, user: User, *, run_id: Optional[str], file_name: Optional[str], total_rows: Optional[int],
+                       batch_rows: int, created: int, skipped: list, skip_duplicates: bool, warnings: Optional[list] = None) -> None:
+    """Add one batch to its run in the import history (the run is created by the first batch)."""
+    import uuid
+    run_id = (run_id or uuid.uuid4().hex)[:40]
+    run = db.query(MemberImportRun).filter(MemberImportRun.run_id == run_id).first()
+    if not run:
+        run = MemberImportRun(run_id=run_id, file_name=file_name, total_rows=total_rows or batch_rows, processed_rows=0,
+                              success_count=0, skipped_count=0, skip_duplicates=skip_duplicates, skipped=[], warnings=[],
+                              warning_count=0, created_by=user.id)
+        db.add(run)
+    elif run.created_by != user.id:
+        return  # someone else's run id: never add to it
+    run.processed_rows += batch_rows
+    run.success_count += created
+    run.skipped_count += len(skipped)
+    run.skipped = ((run.skipped or []) + skipped)[:200]
+    run.warning_count = (run.warning_count or 0) + len(warnings or [])
+    run.warnings = ((run.warnings or []) + (warnings or []))[:200]
+
+
+def _clean_import_name(raw: Optional[str]) -> str:
+    """Collapse runs of spaces and drop stray punctuation at the ends (a trailing comma or backtick)."""
+    name = re.sub(r"\s+", " ", str(raw or "")).strip()
+    name = name.replace("`", "").replace("\u2019", "'")
+    return name.strip(" ,;:-_/\\").strip()
+
+
+def _clean_import_mobile(raw: Optional[str]) -> tuple:
+    """(mobile, warning). A 10-digit Indian mobile is kept; +91 / 91 / spaces / dashes are dropped. A landline
+    (starts with 0 / an STD code), a foreign number or any other length is left blank, with a warning."""
+    text = str(raw or "").strip()
+    if not text:
+        return None, None
+    digits = re.sub(r"\D", "", text)
+    if len(digits) == 12 and digits.startswith("91"):
+        digits = digits[2:]
+    if len(digits) == 10 and digits[0] in "6789":
+        return digits, None
+    if digits.startswith("0") or "-" in text:
+        return None, f"'{text}' looks like a landline, so the mobile was left blank"
+    return None, f"'{text}' is not a valid mobile number, so it was left blank"
+
+
+_NO_GOTRA = {"", "GENERAL", "NA", "N/A", "NONE", "NIL", "UNKNOWN", "-", "--"}
+
+
+def _gotra_key(raw: Optional[str]) -> str:
+    """One key for the many spellings of a gotra (VASISHTA, VASHISHTA, VASISTA... / VISHWAMITRA, VISHWAMITHRA... /
+    GOWTAMA, GOUTHAMA...): letters only, AU as OU, W as U, no H, doubled letters once, E as I, no final A."""
+    k = re.sub(r"[^A-Z]", "", str(raw or "").upper()).replace("AU", "OU").replace("W", "U").replace("H", "")
+    k = re.sub(r"(.)\1+", r"\1", k).replace("E", "I")
+    return k[:-1] if k.endswith("A") else k
+
+
+def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImportPayload", *, dry_run: bool = False) -> dict:
+    """Shared by the real import and the validate-only check. Every row is judged on its own: a bad row is
+    skipped (or its bad field left blank) and the rest carry on."""
     from models.masters import MembershipType
-    from models.members import Member, MemberMembership
 
     # Cache active membership types
-    m_types = db.query(MembershipType).filter(MembershipType.is_deleted == False).all()
+    m_types = db.query(MembershipType).filter(MembershipType.is_deleted == False).all()  # noqa: E712
     default_m_type_id = m_types[0].id if m_types else None
+    default_m_type_name = m_types[0].name_en if m_types else "Life Member"
     type_lookup = {mt.name_en.strip().upper(): mt.id for mt in m_types}
     type_lookup.update({mt.code.strip().upper(): mt.id for mt in m_types if mt.code})
 
@@ -2532,7 +2638,7 @@ def bulk_import_members(
     existing_nums = set(
         num.strip().upper()
         for (num,) in db.query(MemberMembership.membership_number)
-        .filter(MemberMembership.is_deleted == False, MemberMembership.membership_number != None)  # noqa: E711
+        .filter(MemberMembership.is_deleted == False, MemberMembership.membership_number != None)  # noqa: E711, E712
         .all()
     )
     # the number is also the member's member_code, which must stay unique
@@ -2541,8 +2647,26 @@ def bulk_import_members(
         for (c,) in db.query(Member.member_code).filter(Member.member_code != None).all()  # noqa: E711
     }
 
+    # members already holding a mobile that appears in this batch (one query for the whole batch)
+    batch_mobiles = {m for m in (_clean_import_mobile(i.mobile)[0] for i in payload.members) if m}
+    holders: dict = {}
+    if batch_mobiles:
+        for mobile, code, first, last in (
+            db.query(Member.mobile, Member.member_code, Member.first_name_en, Member.last_name_en)
+            .filter(Member.mobile.in_(batch_mobiles), Member.is_deleted == False)  # noqa: E712
+            .all()
+        ):
+            holders.setdefault(mobile, []).append((code, f"{first or ''} {last or ''}".strip().upper()))
+
+    # the Gotra master, looked up by the spelling-proof key
+    from models.masters import Gotra
+    gotras = {}
+    for g in db.query(Gotra).filter(Gotra.is_deleted == False, Gotra.status == True).all():  # noqa: E712
+        gotras.setdefault(_gotra_key(g.name_en), g)
+
     created_count = 0
     skipped = []
+    warnings = []
     now = datetime.now(timezone.utc)
 
     for item in payload.members:
@@ -2550,12 +2674,47 @@ def bulk_import_members(
         if not num:
             skipped.append({"membership_number": "", "reason": "Missing membership number"})
             continue
+        if len(num) > 30:
+            skipped.append({"membership_number": num[:30], "reason": "Membership number is longer than 30 characters"})
+            continue
         if num.upper() in existing_nums:
             if payload.skip_duplicates:
-                skipped.append({"membership_number": num, "reason": "Already exists in database"})
+                skipped.append({"membership_number": num, "reason": "Already exists in database or earlier in this file"})
                 continue
             else:
                 raise HTTPException(409, f"Duplicate membership number '{num}'")
+
+        first_name = _clean_import_name(item.first_name_en)
+        last_name = _clean_import_name(item.last_name_en) or None
+        if not first_name:
+            skipped.append({"membership_number": num, "reason": "Missing name"})
+            continue
+        if len(first_name) > 100 or (last_name and len(last_name) > 100):
+            skipped.append({"membership_number": num, "reason": "Name is longer than 100 characters"})
+            continue
+        row_warnings = []
+
+        # mobile: cleaned; a family may share one number, so a shared mobile is allowed and only flagged
+        mobile, mobile_warning = _clean_import_mobile(item.mobile)
+        if mobile_warning:
+            row_warnings.append(mobile_warning)
+        if mobile and mobile in holders:
+            same_name = [c for c, n in holders[mobile] if n == f"{first_name} {last_name or ''}".strip().upper()]
+            if same_name:
+                row_warnings.append(f"Same name and mobile as member {same_name[0]}: possible duplicate person, please check")
+            else:
+                row_warnings.append(f"Mobile is shared with {len(holders[mobile])} other member(s)")
+
+        # gotra: matched to the master whatever the spelling; "GENERAL" / blank means none; an unknown one is kept as text
+        gotra_id, gotra_text = None, None
+        raw_gotra = _clean_import_name(item.gotra)
+        if raw_gotra.upper() not in _NO_GOTRA:
+            master = gotras.get(_gotra_key(raw_gotra))
+            if master:
+                gotra_id, gotra_text = master.id, master.name_en
+            else:
+                gotra_text = raw_gotra[:100]
+                row_warnings.append(f"Gotra '{raw_gotra}' is not in the Gotra master, kept as text")
 
         # Resolve membership type
         mt_id = default_m_type_id
@@ -2563,6 +2722,8 @@ def bulk_import_members(
             mt_key = str(item.membership_type).strip().upper()
             if mt_key in type_lookup:
                 mt_id = type_lookup[mt_key]
+            else:
+                row_warnings.append(f"Membership type '{item.membership_type}' not found, used '{default_m_type_name}'")
 
         if not mt_id:
             fallback = db.query(MembershipType).first()
@@ -2577,13 +2738,15 @@ def bulk_import_members(
             gen = "MALE"
 
         member = Member(
-            first_name_en=item.first_name_en.strip(),
-            middle_name_en=item.middle_name_en.strip() if item.middle_name_en else None,
-            last_name_en=item.last_name_en.strip() if item.last_name_en else None,
+            first_name_en=first_name,
+            middle_name_en=_clean_import_name(item.middle_name_en) or None,
+            last_name_en=last_name,
             full_name_kn=item.full_name_kn.strip() if item.full_name_kn else None,
             gender=gen,
             date_of_birth=item.date_of_birth,
-            mobile=item.mobile.strip() if item.mobile else None,
+            mobile=mobile,
+            gotra_id=gotra_id,
+            gotra_text=gotra_text,
             email=item.email.strip() if item.email else None,
             address_line1=item.address_line1.strip() if item.address_line1 else None,
             address_line2=item.address_line2.strip() if item.address_line2 else None,
@@ -2611,14 +2774,50 @@ def bulk_import_members(
         )
         db.add(mm)
         existing_nums.add(num.upper())
+        if mobile:  # later rows of the same file see this member as a holder too
+            holders.setdefault(mobile, []).append((num, f"{first_name} {last_name or ''}".strip().upper()))
+        for w in row_warnings:
+            warnings.append({"membership_number": num, "warning": w})
         created_count += 1
 
-    db.commit()
+    if dry_run:
+        db.rollback()
+    else:
+        _record_import_run(db, current_user, run_id=payload.run_id, file_name=payload.file_name, total_rows=payload.total_rows,
+                           batch_rows=len(payload.members), created=created_count, skipped=skipped,
+                           skip_duplicates=payload.skip_duplicates, warnings=warnings)
+        db.commit()
     return {
         "success_count": created_count,
         "skipped_count": len(skipped),
         "skipped": skipped[:100],
+        "warning_count": len(warnings),
+        "warnings": warnings[:100],
+        "dry_run": dry_run,
     }
+
+
+@router.post("/bulk-import/validate")
+def validate_bulk_import(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_any_permission("members.register.write", "members.write")),
+    payload: "BulkMemberImportPayload",
+) -> Any:
+    """Check a batch exactly as the import would judge it, without saving anything: what would be imported,
+    skipped (and why) and flagged. Nothing is written and nothing is recorded in the import history."""
+    return _run_bulk_import(db, current_user, payload, dry_run=True)
+
+
+@router.post("/bulk-import")
+def bulk_import_members(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_any_permission("members.register.write", "members.write")),
+    payload: "BulkMemberImportPayload",
+) -> Any:
+    """Import a batch of existing/live members with their permanent membership numbers."""
+    return _run_bulk_import(db, current_user, payload)
 
 
 @router.post("/bulk-import-file")
@@ -2676,6 +2875,7 @@ async def bulk_import_members_file(
             or norm.get("name")
             or norm.get("full_name")
             or norm.get("member_name")
+            or norm.get("membership_name")
         )
         if not first_name:
             continue
@@ -2711,6 +2911,7 @@ async def bulk_import_members_file(
                 last_name_en=str(last_name).strip() if last_name else None,
                 full_name_kn=str(norm.get("full_name_kn") or "").strip() or None,
                 mobile=str(norm.get("mobile") or norm.get("phone") or norm.get("mobile_number") or "").strip() or None,
+                gotra=str(norm.get("gotra") or norm.get("gothra") or "").strip() or None,
                 gender=str(norm.get("gender") or "").strip() or None,
                 date_of_birth=dob_parsed,
                 email=str(norm.get("email") or "").strip() or None,
@@ -2727,5 +2928,5 @@ async def bulk_import_members_file(
     if not parsed_members:
         raise HTTPException(400, "Could not identify required columns (Membership No, Name) in the file.")
 
-    payload = BulkMemberImportPayload(members=parsed_members, skip_duplicates=skip_duplicates)
+    payload = BulkMemberImportPayload(members=parsed_members, skip_duplicates=skip_duplicates, file_name=(file.filename or "")[:255], total_rows=len(parsed_members))
     return bulk_import_members(db=db, current_user=current_user, payload=payload)

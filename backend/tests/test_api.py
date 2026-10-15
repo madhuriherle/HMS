@@ -6958,3 +6958,39 @@ def test_recycle_bin_hides_accounts_above_the_viewer(client, admin_headers):
         # restoring or purging it as the weaker viewer answers like an item that is not there
         out = recycle_bin.restore(db, viewer_admin.id, [{"entity": "user", "id": boss_id}], viewer=viewer_admin)
         assert out["restored"] == 0 and out["failed"][0]["error"].startswith("Not in the recycle bin")
+
+
+def test_lists_show_the_newest_first_and_can_be_sorted(client, admin_headers):
+    H = admin_headers
+    first = _create_member(client, H, "9677000001", "SortAAA")
+    second = _create_member(client, H, "9677000002", "SortZZZ")
+
+    # members: newest first by default
+    ids = [m["id"] for m in client.get("/api/v1/members/", headers=H, params={"limit": 200}).json()["data"]]
+    assert ids.index(second["id"]) < ids.index(first["id"])
+    # the caller can ask for another order
+    asc = [m["id"] for m in client.get("/api/v1/members/", headers=H, params={"limit": 200, "sort_by": "id", "sort_dir": "asc"}).json()["data"]]
+    assert asc.index(first["id"]) < asc.index(second["id"])
+    by_name = [m["first_name_en"] for m in client.get("/api/v1/members/", headers=H, params={"limit": 200, "sort_by": "name", "sort_dir": "asc"}).json()["data"]]
+    assert by_name == sorted(by_name, key=lambda v: (v is None, v))  # database order of names
+    assert client.get("/api/v1/members/", headers=H, params={"sort_by": "password_hash"}).status_code == 400
+    assert client.get("/api/v1/members/", headers=H, params={"sort_dir": "sideways"}).status_code == 400
+
+    # receipts (list and tracking): newest first, sortable by amount
+    r1 = _make_receipt(client, H, gross_amount=111, net_amount=111, items=[{"item_type": "MEMBERSHIP", "amount": 111}])
+    r2 = _make_receipt(client, H, gross_amount=999, net_amount=999, items=[{"item_type": "MEMBERSHIP", "amount": 999}])
+    for path in ("/api/v1/receipts/", "/api/v1/receipts/tracking"):
+        rows = [r["id"] for r in client.get(path, headers=H, params={"limit": 500}).json()["data"]]
+        assert rows.index(r2["id"]) < rows.index(r1["id"]), path
+        by_amount = client.get(path, headers=H, params={"limit": 500, "sort_by": "amount", "sort_dir": "asc"}).json()["data"]
+        amounts = [float(r["amount"] if "amount" in r else r["net_amount"]) for r in by_amount]
+        assert amounts == sorted(amounts), path
+
+    # users and the engagements lists accept the same two parameters
+    assert client.get("/api/v1/users/", headers=H, params={"sort_by": "name", "sort_dir": "asc"}).status_code == 200
+    assert client.get("/api/v1/users/", headers=H, params={"sort_by": "bogus"}).status_code == 400
+    for path in ("/api/v1/engagements/associates", "/api/v1/engagements/press-media", "/api/v1/engagements/affiliations",
+                 "/api/v1/events/", "/api/v1/magazines/subscriptions"):
+        ok = client.get(path, headers=H, params={"sort_dir": "asc"})
+        assert ok.status_code == 200, (path, ok.text)
+        assert client.get(path, headers=H, params={"sort_by": "bogus"}).status_code == 400, path

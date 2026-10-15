@@ -54,7 +54,7 @@ def read_attachments(
     q = db.query(FileAttachment)
     if entity_type:
         q = q.filter(FileAttachment.entity_type == entity_type)
-    return paginate(q, page, limit)
+    return paginate(q.order_by(FileAttachment.id.desc()), page, limit)
 
 @router.get("/error-logs")
 def read_error_logs(
