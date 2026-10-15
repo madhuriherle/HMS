@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
+import DateInput from '../components/DateInput';
 import {
   UserCheck,
   User,
@@ -32,7 +33,9 @@ import {
   Sparkles,
   ArrowRight,
   XCircle,
-  CheckSquare
+  CheckSquare,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import api from '../api';
 import { formatDate } from '../utils/dateUtils';
@@ -146,6 +149,14 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignError, setAssignError] = useState('');
   const [assignSearch, setAssignSearch] = useState('');
+  const [assignFrom, setAssignFrom] = useState('');
+  const [assignTo, setAssignTo] = useState('');
+  const [assignMin, setAssignMin] = useState('');
+  const [assignMax, setAssignMax] = useState('');
+  const [assignMatchOnly, setAssignMatchOnly] = useState(false);
+  const [assignPage, setAssignPage] = useState(1);
+  const [assignPageSize, setAssignPageSize] = useState(10);
+  const [assignView, setAssignView] = useState('table'); // table | cards
   const [mappingReceiptId, setMappingReceiptId] = useState(null);
   // the API behind Map enforces receipts.write; the sibling Bulk Mapping screen uses the page privilege,
   // so either one is enough to press it
@@ -292,6 +303,12 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const openAssignReceipt = (member) => {
     setAssigningMember(member);
     setAssignSearch('');
+    setAssignFrom('');
+    setAssignTo('');
+    setAssignMin('');
+    setAssignMax('');
+    setAssignMatchOnly(false);
+    setAssignPage(1);
     loadAssignCandidates();
   };
 
@@ -327,15 +344,29 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   // mobile / id / name comes first and is labelled, but none is ever mapped without a click.
   const assignRows = useMemo(() => {
     const q = assignSearch.trim().toLowerCase();
-    const matching = q
-      ? assignCandidates.filter((c) =>
-          [c.receipt_number, c.payer_name, c.payer_membership_no, c.payer_mobile, String(c.net_amount ?? '')].some(
-            (value) => String(value ?? '').toLowerCase().includes(q)
-          )
-        )
-      : assignCandidates;
+    const min = assignMin === '' ? null : Number(assignMin);
+    const max = assignMax === '' ? null : Number(assignMax);
+    const matching = assignCandidates.filter((c) => {
+      if (q && ![c.receipt_number, c.payer_name, c.payer_membership_no, c.payer_mobile, String(c.net_amount ?? '')].some(
+        (value) => String(value ?? '').toLowerCase().includes(q)
+      )) return false;
+      const day = String(c.receipt_date || '').slice(0, 10);
+      if (assignFrom && day < assignFrom) return false;
+      if (assignTo && day > assignTo) return false;
+      if (min !== null && Number(c.net_amount) < min) return false;
+      if (max !== null && Number(c.net_amount) > max) return false;
+      if (assignMatchOnly && receiptMatchScore(c, assigningMember) <= 0) return false;
+      return true;
+    });
     return [...matching].sort((a, b) => receiptMatchScore(b, assigningMember) - receiptMatchScore(a, assigningMember));
-  }, [assignCandidates, assignSearch, assigningMember]);
+  }, [assignCandidates, assignSearch, assignFrom, assignTo, assignMin, assignMax, assignMatchOnly, assigningMember]);
+
+  const assignTotalPages = Math.max(1, Math.ceil(assignRows.length / assignPageSize));
+  const assignPageRows = useMemo(
+    () => assignRows.slice((assignPage - 1) * assignPageSize, assignPage * assignPageSize),
+    [assignRows, assignPage, assignPageSize]
+  );
+  useEffect(() => { setAssignPage(1); }, [assignSearch, assignFrom, assignTo, assignMin, assignMax, assignMatchOnly, assignPageSize]);
 
   // ----------------------------------------------------
   // APPROVAL TRIGGER & VALIDATION
@@ -821,68 +852,84 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           isOpen
           onClose={() => setAssigningMember(null)}
           title={`Assign a receipt to ${assigningMember.fullName || assigningMember.name}`}
-          maxWidthClass="max-w-4xl"
+          maxWidthClass="max-w-5xl"
           footer={<ModalFooter kind="view" onCancel={() => setAssigningMember(null)} />}
         >
           <div className="p-5 space-y-4">
             {/* Who the money will be mapped to */}
-            <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold">
-                  {(assigningMember.fullName || assigningMember.name || 'U').charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div className="text-sm font-bold text-[#180200]">
-                    {assigningMember.fullName || assigningMember.name}
-                  </div>
-                  <div className="text-[11px] text-[#863221] font-mono mt-0.5">
-                    ID: {assigningMember.id}
-                    {assigningMember.mobile ? ` · ${assigningMember.mobile}` : ''}
-                    {assigningMember.membershipType ? ` · ${assigningMember.membershipType}` : ''}
-                  </div>
+            <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-[#180200]">{assigningMember.fullName || assigningMember.name}</div>
+                <div className="text-[11px] text-[#863221] font-mono mt-0.5">
+                  ID {assigningMember.id}
+                  {assigningMember.mobile ? ` · ${assigningMember.mobile}` : ''}
+                  {assigningMember.membershipType ? ` · ${assigningMember.membershipType}` : ''}
                 </div>
               </div>
               <span className={`chip ${assigningMember.receiptStatus === 'Assigned' ? 'chip-on' : 'chip-warn'}`}>
-                {assigningMember.receiptStatus === 'Assigned'
-                  ? `Receipt ${assigningMember.assignedReceiptNumber} mapped`
-                  : 'No receipt mapped yet'}
+                {assigningMember.receiptStatus === 'Assigned' ? `Receipt ${assigningMember.assignedReceiptNumber}` : 'No receipt yet'}
               </span>
             </div>
 
-            <p className="text-[11px] text-[#863221] leading-relaxed">
-              A receipt entered before this member existed carries no member link, so it waits here with the number
-              that was typed on it. Pick the receipt for this payment and map it — the receipt is never entered again.
-            </p>
-
-            {/* Filter + refresh */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Search and filters */}
+            <div className="flex flex-wrap items-end gap-2">
               <div className="relative flex-1 min-w-[220px]">
                 <Search className="w-4 h-4 text-[#863221] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={assignSearch}
                   onChange={(e) => setAssignSearch(e.target.value)}
-                  placeholder="Filter by receipt no., payer name, number on the receipt, mobile or amount"
+                  placeholder="Receipt no., payer, mobile or amount"
                   disabled={!!assignError}
                   className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601] disabled:bg-[#FAF7F2]"
                 />
               </div>
-              <button
-                type="button"
-                onClick={loadAssignCandidates}
-                className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#863221] hover:text-[#510601] text-xs font-bold rounded-xl transition-all cursor-pointer"
-                title="Reload the receipts waiting for a member"
-              >
+              <div className="w-[130px]">
+                <DateInput value={assignFrom} onChange={(e) => setAssignFrom(e.target.value)} placeholder="From date"
+                  className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]" />
+              </div>
+              <div className="w-[130px]">
+                <DateInput value={assignTo} onChange={(e) => setAssignTo(e.target.value)} placeholder="To date"
+                  className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]" />
+              </div>
+              <input type="number" min="0" value={assignMin} onChange={(e) => setAssignMin(e.target.value)} placeholder="Min ₹"
+                className="w-[90px] px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]" />
+              <input type="number" min="0" value={assignMax} onChange={(e) => setAssignMax(e.target.value)} placeholder="Max ₹"
+                className="w-[90px] px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]" />
+              <div className="inline-flex rounded-xl border border-[#E8DFD8] bg-white p-0.5 text-xs font-bold">
+                <button type="button" onClick={() => setAssignMatchOnly(false)}
+                  className={`px-3 py-1.5 rounded-lg cursor-pointer ${!assignMatchOnly ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}>All</button>
+                <button type="button" onClick={() => setAssignMatchOnly(true)}
+                  className={`px-3 py-1.5 rounded-lg cursor-pointer ${assignMatchOnly ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}>Likely matches</button>
+              </div>
+              <div className="inline-flex rounded-xl border border-[#E8DFD8] bg-white p-0.5">
+                <button type="button" title="Table" onClick={() => setAssignView('table')}
+                  className={`p-1.5 rounded-lg cursor-pointer ${assignView === 'table' ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}><List className="w-4 h-4" /></button>
+                <button type="button" title="Cards" onClick={() => setAssignView('cards')}
+                  className={`p-1.5 rounded-lg cursor-pointer ${assignView === 'cards' ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}><LayoutGrid className="w-4 h-4" /></button>
+              </div>
+              <button type="button" onClick={loadAssignCandidates} title="Reload"
+                className="p-2 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#863221] hover:text-[#510601] rounded-xl cursor-pointer">
                 <RefreshCw className={`w-3.5 h-3.5 ${assignLoading ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
               </button>
             </div>
 
             {/* The receipts waiting for a member */}
-            <div className="border border-[#E8DFD8] rounded-xl overflow-hidden">
-              <div className="max-h-[42vh] overflow-y-auto">
+            {assignLoading ? (
+              <div className="py-12 text-center text-sm text-[#863221]">Loading receipts…</div>
+            ) : assignError ? (
+              <div className="py-12 px-6 text-center text-sm text-[#863221]">{assignError}</div>
+            ) : assignRows.length === 0 ? (
+              <div className="py-12 text-center">
+                <CheckCircle2 className="w-7 h-7 text-[#3D705C]/50 mx-auto mb-1.5" />
+                <p className="font-semibold text-sm text-[#180200]">
+                  {assignCandidates.length === 0 ? 'No receipt is waiting for a member' : 'No receipt matches these filters'}
+                </p>
+              </div>
+            ) : assignView === 'table' ? (
+              <div className="border border-[#E8DFD8] rounded-xl overflow-hidden">
                 <table className="w-full text-left border-collapse text-xs">
-                  <thead className="bg-[#FAF7F2] text-[#863221] font-bold uppercase tracking-wider text-[11px] sticky top-0 z-10">
+                  <thead className="bg-[#FAF7F2] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                     <tr>
                       <th className="py-2.5 px-3">Receipt No.</th>
                       <th className="py-2.5 px-3">Date</th>
@@ -893,106 +940,111 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E8DFD8]">
-                    {assignLoading ? (
-                      <tr>
-                        <td colSpan={6} className="py-10 text-center text-[#863221]">
-                          Loading receipts…
-                        </td>
-                      </tr>
-                    ) : assignError ? (
-                      <tr>
-                        <td colSpan={6} className="py-10 px-6 text-center text-[#863221]">
-                          {assignError}
-                        </td>
-                      </tr>
-                    ) : assignRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-10 px-6 text-center">
-                          <CheckCircle2 className="w-7 h-7 text-[#3D705C]/50 mx-auto mb-1.5" />
-                          <p className="font-semibold text-sm text-[#180200]">
-                            {assignCandidates.length === 0
-                              ? 'No receipt is waiting for a member'
-                              : 'No receipt matches that filter'}
-                          </p>
-                          <p className="text-xs text-[#863221] mt-1">
-                            {assignCandidates.length === 0
-                              ? 'Every entered receipt is already mapped. Use “Enter a new receipt” below if this payment has not been recorded at all.'
-                              : 'Clear the filter to see every receipt waiting to be mapped.'}
-                          </p>
-                        </td>
-                      </tr>
-                    ) : (
-                      assignRows.map((c) => {
-                        const hinted = receiptMatchScore(c, assigningMember) > 0;
-                        return (
-                          <tr key={c.receipt_id} className="bg-white hover:bg-[#FAF7F2] transition-colors">
-                            <td className="py-2.5 px-3 align-top">
-                              <div className="font-mono font-bold text-[#510601]">{c.receipt_number}</div>
-                              {hinted && (
-                                <span
-                                  className="chip chip-on mt-1"
-                                  title="Written with this applicant's mobile, id or name — check it before mapping."
-                                >
-                                  possible match
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-2.5 px-3 align-top text-[#180200] whitespace-nowrap">
-                              {formatDate(c.receipt_date)}
-                            </td>
-                            <td className="py-2.5 px-3 align-top text-right font-bold text-[#180200] whitespace-nowrap">
-                              {formatMoney(c.net_amount)}
-                            </td>
-                            <td className="py-2.5 px-3 align-top text-[#180200]">
-                              {c.payer_name || '—'}
-                              {c.payer_mobile ? (
-                                <div className="text-[10px] font-mono text-[#863221]">{c.payer_mobile}</div>
-                              ) : null}
-                            </td>
-                            <td className="py-2.5 px-3 align-top font-mono text-[#863221]">
-                              {c.payer_membership_no || '—'}
-                            </td>
-                            <td className="py-2.5 px-3 align-top text-right">
-                              <button
-                                type="button"
-                                onClick={() => handleMapReceipt(c)}
-                                disabled={!canMapReceipts || mappingReceiptId === c.receipt_id}
-                                className={`btn-act btn-act-ok ${canMapReceipts ? '' : 'opacity-40 cursor-not-allowed'}`}
-                                title={
-                                  canMapReceipts
-                                    ? `Map receipt ${c.receipt_number} to ${assigningMember.fullName || assigningMember.name}`
-                                    : 'Requires the receipts write privilege'
-                                }
-                              >
-                                {mappingReceiptId === c.receipt_id ? (
-                                  <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />
-                                ) : (
-                                  <Link2 className="w-3.5 h-3.5 shrink-0" />
-                                )}
-                                <span>Map</span>
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
+                    {assignPageRows.map((c) => {
+                      const hinted = receiptMatchScore(c, assigningMember) > 0;
+                      return (
+                        <tr key={c.receipt_id} className="bg-white hover:bg-[#FAF7F2] transition-colors">
+                          <td className="py-2.5 px-3 align-top">
+                            <div className="font-mono font-bold text-[#510601]">{c.receipt_number}</div>
+                            {hinted && <span className="chip chip-on mt-1">likely match</span>}
+                          </td>
+                          <td className="py-2.5 px-3 align-top text-[#180200] whitespace-nowrap">{formatDate(c.receipt_date)}</td>
+                          <td className="py-2.5 px-3 align-top text-right font-bold text-[#180200] whitespace-nowrap">{formatMoney(c.net_amount)}</td>
+                          <td className="py-2.5 px-3 align-top text-[#180200]">
+                            {c.payer_name || '—'}
+                            {c.payer_mobile ? <div className="text-[10px] font-mono text-[#863221]">{c.payer_mobile}</div> : null}
+                          </td>
+                          <td className="py-2.5 px-3 align-top font-mono text-[#863221]">{c.payer_membership_no || '—'}</td>
+                          <td className="py-2.5 px-3 align-top text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleMapReceipt(c)}
+                              disabled={!canMapReceipts || mappingReceiptId === c.receipt_id}
+                              className={`btn-act btn-act-ok ${canMapReceipts ? '' : 'opacity-40 cursor-not-allowed'}`}
+                              title={canMapReceipts ? `Map receipt ${c.receipt_number}` : 'Requires the receipts write privilege'}
+                            >
+                              {mappingReceiptId === c.receipt_id ? <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" /> : <Link2 className="w-3.5 h-3.5 shrink-0" />}
+                              <span>Map</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {assignPageRows.map((c) => {
+                  const hinted = receiptMatchScore(c, assigningMember) > 0;
+                  return (
+                    <div key={c.receipt_id} className={`rounded-xl border p-3 bg-white ${hinted ? 'border-[#3D705C]/50' : 'border-[#E8DFD8]'}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="font-mono font-bold text-sm text-[#510601]">{c.receipt_number}</div>
+                          <div className="text-[11px] text-[#863221]">{formatDate(c.receipt_date)}</div>
+                        </div>
+                        <div className="text-right font-bold text-sm text-[#180200]">{formatMoney(c.net_amount)}</div>
+                      </div>
+                      <div className="mt-2 text-xs text-[#180200]">
+                        {c.payer_name || '—'}
+                        {c.payer_mobile ? <span className="ml-2 font-mono text-[11px] text-[#863221]">{c.payer_mobile}</span> : null}
+                      </div>
+                      {c.payer_membership_no ? <div className="text-[11px] font-mono text-[#863221]">No. {c.payer_membership_no}</div> : null}
+                      <div className="mt-2 flex items-center justify-between">
+                        {hinted ? <span className="chip chip-on">likely match</span> : <span />}
+                        <button
+                          type="button"
+                          onClick={() => handleMapReceipt(c)}
+                          disabled={!canMapReceipts || mappingReceiptId === c.receipt_id}
+                          className={`btn-act btn-act-ok ${canMapReceipts ? '' : 'opacity-40 cursor-not-allowed'}`}
+                        >
+                          {mappingReceiptId === c.receipt_id ? <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" /> : <Link2 className="w-3.5 h-3.5 shrink-0" />}
+                          <span>Map</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-            {/* Fallback: the payment was never entered at all */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border border-dashed border-[#E8DFD8] bg-[#FAF7F2] rounded-xl p-3.5">
-              <div className="flex items-start gap-2.5">
-                <FileText className="w-4 h-4 text-[#863221] mt-0.5 shrink-0" />
-                <div>
-                  <div className="text-xs font-bold text-[#180200]">Receipt not entered yet?</div>
-                  <p className="text-[11px] text-[#863221] mt-0.5">
-                    Only if this payment was never written in the register — the receipt is created and mapped to{' '}
-                    {assigningMember.fullName || assigningMember.name} in one go.
-                  </p>
+            {/* Pages */}
+            {assignRows.length > 0 && !assignLoading && !assignError && (
+              <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#863221]">
+                <span>
+                  Showing {(assignPage - 1) * assignPageSize + 1}–{Math.min(assignPage * assignPageSize, assignRows.length)} of {assignRows.length}
+                </span>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5">
+                    <span>Rows</span>
+                    <select value={assignPageSize} onChange={(e) => setAssignPageSize(Number(e.target.value))}
+                      className="px-2 py-1 bg-white border border-[#E8DFD8] rounded-lg text-xs cursor-pointer">
+                      {[10, 25, 50].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button type="button" disabled={assignPage <= 1} onClick={() => setAssignPage((p) => p - 1)}
+                      className="px-2 py-1 rounded-lg border border-[#E8DFD8] bg-white disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed">‹</button>
+                    {Array.from({ length: assignTotalPages }, (_, i) => i + 1)
+                      .filter((n) => n === 1 || n === assignTotalPages || Math.abs(n - assignPage) <= 1)
+                      .map((n, i, arr) => (
+                        <React.Fragment key={n}>
+                          {i > 0 && n - arr[i - 1] > 1 && <span className="px-1">…</span>}
+                          <button type="button" onClick={() => setAssignPage(n)}
+                            className={`min-w-[28px] px-2 py-1 rounded-lg border cursor-pointer ${n === assignPage ? 'bg-[#510601] text-white border-[#510601]' : 'bg-white border-[#E8DFD8]'}`}>{n}</button>
+                        </React.Fragment>
+                      ))}
+                    <button type="button" disabled={assignPage >= assignTotalPages} onClick={() => setAssignPage((p) => p + 1)}
+                      className="px-2 py-1 rounded-lg border border-[#E8DFD8] bg-white disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed">›</button>
+                  </div>
                 </div>
               </div>
+            )}
+
+            {/* Not entered at all */}
+            <div className="flex items-center justify-between gap-3 border-t border-[#E8DFD8] pt-3">
+              <span className="text-xs font-semibold text-[#180200]">Receipt not entered yet?</span>
               <button
                 type="button"
                 onClick={() => {
