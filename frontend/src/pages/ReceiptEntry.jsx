@@ -1726,7 +1726,7 @@ export default function ReceiptEntry() {
                   </div>
                 </div>
 
-                {/* Row 3: Membership No, PAN */}
+                {/* Row 3: Membership No */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Membership No */}
                   <div>
@@ -1742,28 +1742,6 @@ export default function ReceiptEntry() {
                       className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
                     />
                     <MemberLookupCard lookup={numberLookup} onUse={handleUseLookedUpMember} />
-                  </div>
-
-                  {/* PAN */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#180200] mb-1">
-                      PAN <span className="font-normal text-[#863221]/70">(optional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="panNo"
-                      value={formData.panNo}
-                      onChange={handleInputChange}
-                      maxLength={10}
-
-                      className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono uppercase text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
-                    />
-                    {formErrors.panNo && (
-                      <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3 shrink-0" />
-                        {formErrors.panNo}
-                      </p>
-                    )}
                   </div>
                 </div>
 
@@ -2014,19 +1992,28 @@ export default function ReceiptEntry() {
                   </div>
                 </div>
 
-                {/* Row 6: Payment Details & Payment Received Details */}
+                {/* Row 6: PAN & Payment Received Details */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* PAN */}
                   <div>
                     <label className="block text-xs font-bold text-[#180200] mb-1">
-                      Payment Details
+                      PAN <span className="font-normal text-[#863221]/70">(optional)</span>
                     </label>
                     <input
                       type="text"
-                      name="bankAccount"
-                      value={formData.bankAccount}
+                      name="panNo"
+                      value={formData.panNo}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
+                      maxLength={10}
+
+                      className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono uppercase text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
                     />
+                    {formErrors.panNo && (
+                      <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0" />
+                        {formErrors.panNo}
+                      </p>
+                    )}
                   </div>
 
                   <div>
