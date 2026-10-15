@@ -236,6 +236,7 @@ export default function ReceiptEntry() {
 
   // Search and pagination state for Right-Side Membership List Table
   const [rightSearchQuery, setRightSearchQuery] = useState('');
+  const [typingOrder, setTypingOrder] = useState([]); // the three look-up boxes, most recently typed last
   const [rightSearchOpen, setRightSearchOpen] = useState(false);
   const [rightPage, setRightPage] = useState(1);
   const [rightPageSize, setRightPageSize] = useState(10);
@@ -779,6 +780,9 @@ export default function ReceiptEntry() {
   // Handle Generic Form Inputs
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'name' || name === 'mobile' || name === 'membershipNo') {
+      setTypingOrder((prev) => [...prev.filter((k) => k !== name), name]);
+    }
 
     if (name === 'amount') {
       const cleaned = value.replace(/\D/g, '');
@@ -1237,9 +1241,15 @@ export default function ReceiptEntry() {
   // ----------------------------------------------------
   // what is typed in the Payee Name, Mobile and Membership No. boxes narrows the list, as you type
   const typingFree = entrySource === 'normal';
-  const typedNumber = typingFree ? String(formData.membershipNo || '').trim().toLowerCase() : '';
-  const typedName = typingFree && String(formData.name || '').trim().length >= 2 ? String(formData.name).trim().toLowerCase() : '';
-  const typedMobile = typingFree && String(formData.mobile || '').length >= 3 ? String(formData.mobile) : '';
+  // only the box typed in last (that still has enough typed) filters the list; the others are ignored for it
+  const numberText = String(formData.membershipNo || '').trim().toLowerCase();
+  const nameText = String(formData.name || '').trim().toLowerCase();
+  const mobileText = String(formData.mobile || '');
+  const usable = { membershipNo: numberText.length >= 1, name: nameText.length >= 2, mobile: mobileText.length >= 3 };
+  const activeBox = typingFree ? [...typingOrder].reverse().find((k) => usable[k]) : undefined;
+  const typedNumber = activeBox === 'membershipNo' ? numberText : '';
+  const typedName = activeBox === 'name' ? nameText : '';
+  const typedMobile = activeBox === 'mobile' ? mobileText : '';
   const filteredRightMembers = useMemo(() => {
     let base = registeredMembers;
     if (typedNumber) {
