@@ -1005,9 +1005,9 @@ export default function RegisterNewMember() {
   return (
     <PermissionGate required={isViewMode ? 'members.list.read' : isEditMode ? 'members.list.write' : 'members.register.write'}>
     <div className="max-w-[1440px] mx-auto space-y-6">
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+      <div className="space-y-6">
         {/* Left Column: Member Registration Form */}
-        <div className="xl:col-span-8 space-y-6">
+        <div className="space-y-6">
           <div className="w-full bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden">
             {/* Clean Form Header */}
             <div className="px-6 sm:px-8 py-5 border-b border-[#E8DFD8] bg-[#FAF7F2]/40">
@@ -1049,8 +1049,10 @@ export default function RegisterNewMember() {
             <form onSubmit={handleSaveMember}>
               <div className="px-6 sm:px-8 py-6 space-y-6">
                 <fieldset disabled={isViewMode} className="space-y-6 disabled:opacity-95">
+                  <div className="pb-2 border-b border-[#E8DFD8]"><h3 className="text-sm font-bold text-[#8C1801] uppercase tracking-wider">Personal Details</h3></div>
+
                   {/* Photo upload + Basic Details */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
                   {/* Left: Passport Size Photo Upload */}
                   <div className="md:col-span-3 flex flex-col items-center justify-center p-1">
                     <div className="w-32 sm:w-36 h-40 sm:h-44 border-2 border-dashed border-[#DFD5CC] bg-[#FAF7F2] flex flex-col items-center justify-center relative overflow-hidden rounded-lg shadow-2xs hover:border-[#8C1801]/50 transition-colors">
@@ -1084,9 +1086,9 @@ export default function RegisterNewMember() {
                   </div>
 
                   {/* Right: Member Name, DOB, Age in single line, Mobile, Relationship, WhatsApp, Father Name */}
-                  <div className="md:col-span-9 space-y-4">
+                  <div className="md:col-span-9 space-y-5">
                     {/* Row 1: Name (Title + Full Name), DOB, and Age in a SINGLE LINE */}
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-x-4 gap-y-5 items-start">
                       {/* Member Name */}
                       <div className="sm:col-span-6">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
@@ -1160,7 +1162,7 @@ export default function RegisterNewMember() {
                     </div>
 
                     {/* Row 2: Mobile Number & Relationship & WhatsApp */}
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-x-4 gap-y-5 items-start">
                       {/* Mobile Number */}
                       <div className="sm:col-span-5">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
@@ -1285,7 +1287,7 @@ export default function RegisterNewMember() {
                     </div>
 
                     {/* Row 3: Father's Name */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5 items-start">
                       <div>
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           Father's Name:
@@ -1329,8 +1331,10 @@ export default function RegisterNewMember() {
                   </div>
                 </div>
 
-                {/* Compact 4-Column Grid: Gothra, Gender, Blood Group, Aadhar Number */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-3 border-t border-[#DFD5CC]">
+                {/* Community & identity: four across */}
+                <div className="pt-5 border-t border-[#DFD5CC] space-y-4">
+                  <div className="pb-2 border-b border-[#E8DFD8]"><h3 className="text-sm font-bold text-[#8C1801] uppercase tracking-wider">Community & Identity</h3></div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                   {/* Gothra */}
                   <div>
                     <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
@@ -1427,13 +1431,20 @@ export default function RegisterNewMember() {
                     )}
                   </div>
 
+                </div>
+                </div>
+
+                {/* Address & work */}
+                <div className="pt-5 border-t border-[#DFD5CC] space-y-4">
+                  <div className="pb-2 border-b border-[#E8DFD8]"><h3 className="text-sm font-bold text-[#8C1801] uppercase tracking-wider">Address & Work</h3></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                   {/* Communication Address */}
-                  <div>
+                  <div className="col-span-full">
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
                       Communication Address: <span className="text-red-600">*</span>
                     </label>
                     <textarea
-                      rows={2}
+                      rows={3}
                       value={formData.address}
                       onChange={(e) => {
                         setFormData({ ...formData, address: e.target.value });
@@ -1604,8 +1615,11 @@ export default function RegisterNewMember() {
                     />
                   </div>
 
-                  {/* Consolidated Havyaka Magazine Subscription Block */}
-                  <div className="md:col-span-2 bg-[#FAF7F2] p-4 sm:p-5 rounded-xl border border-[#DFD5CC] space-y-4">
+                </div>
+                </div>
+
+                {/* Magazine subscription */}
+                  <div className="bg-[#FAF7F2] p-5 sm:p-6 rounded-xl border border-[#DFD5CC] space-y-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <h3 className="text-sm font-bold text-[#510601] flex items-center gap-2">
@@ -1687,7 +1701,8 @@ export default function RegisterNewMember() {
 
                         {/* Delivery Destination (when physical copy is required) */}
                         {formData.magazineKind !== 'EMAIL' && (
-                          <div className="pt-2 space-y-2.5">
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pt-2">
+                          <div className="space-y-2.5">
                             <label className="block text-xs font-bold text-[#510601] uppercase tracking-wider">
                               Postal Delivery Address:
                             </label>
@@ -1744,11 +1759,93 @@ export default function RegisterNewMember() {
                               </div>
                             )}
                           </div>
+            <div className="bg-white rounded-xl border border-[#E8DFD8] p-5">
+              {/* Card Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-[#E8DFD8]">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-[#510601] text-white rounded-lg shadow-xs">
+                    <Printer className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-[#180200]">Postal Label Preview</h2>
+                    <p className="text-[11px] text-stone-500">Live dispatch print simulation</p>
+                  </div>
+                </div>
+                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
+                  isLabelReady
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>
+                  {isLabelReady ? 'Ready for Dispatch' : 'Awaiting Details'}
+                </span>
+              </div>
+
+              {/* Printable Dispatch Sticker Preview Card */}
+              <div className="mt-4 p-4 rounded-xl border-2 border-dashed border-[#8C1801]/40 bg-[#FAF7F2] relative flex flex-col justify-between shadow-2xs min-h-[200px]">
+                {/* Organization Header Bar */}
+                <div className="border-b border-[#DFD5CC] pb-2 mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-[11px] tracking-wider text-[#8C1801] uppercase">
+                      Havyaka MahaSabha
+                    </span>
+                  </div>
+                  <span className="font-mono text-[9px] font-bold bg-white text-[#510601] px-2 py-0.5 rounded border border-[#DFD5CC]">
+                    BOOK-POST / STICKER
+                  </span>
+                </div>
+
+                {/* Recipient Details */}
+                <div className="text-xs space-y-1 text-[#180200] flex-1">
+                  <div className="font-bold text-sm tracking-tight text-[#180200]">
+                    To: {formData.nameTitle} {formData.name?.trim() ? formData.name.trim().toUpperCase() : 'MEMBER FULL NAME'}
+                  </div>
+
+                  {/* Care of Father / Spouse */}
+                  {(formData.isMarried === 'YES' && formData.spouseName?.trim()) ? (
+                    <div className="text-[11px] text-[#863221] font-medium">
+                      C/o Spouse: {formData.spouseName.trim()}
+                    </div>
+                  ) : (formData.fatherName?.trim() || formData.fatherHusbandName?.trim()) ? (
+                    <div className="text-[11px] text-[#863221] font-medium">
+                      C/o Father: {(formData.fatherName || formData.fatherHusbandName).trim()}
+                    </div>
+                  ) : null}
+
+                  {/* Address Lines */}
+                  <div className="text-xs text-stone-800 leading-snug pt-1 whitespace-pre-line font-medium">
+                    {previewAddress.line ? previewAddress.line : <span className="italic text-stone-400">Door No., Street / Cross, Locality...</span>}
+                  </div>
+                  <div className="text-xs text-stone-700">
+                    {(previewAddress.locality || previewAddress.taluk || previewAddress.district) ? (
+                      <span>
+                        {[previewAddress.locality, previewAddress.taluk, previewAddress.district].filter(Boolean).join(', ')}
+                      </span>
+                    ) : (
+                      <span className="italic text-stone-400">Post Office / Taluk, District</span>
+                    )}
+                  </div>
+                  <div className="text-xs font-semibold text-stone-900">
+                    {previewAddress.state} — <span className="font-bold font-mono text-[#510601] text-sm">{previewAddress.pin || 'PIN CODE'}</span>
+                  </div>
+                </div>
+
+                {/* Footer Bar */}
+                <div className="border-t border-[#DFD5CC] pt-2 mt-3 flex items-center justify-between text-[11px] text-stone-600">
+                  <span className="flex items-center gap-1 font-mono font-bold text-[#510601]">
+                    <Phone className="h-3 w-3 text-[#8C1801]" />
+                    {formData.mobile ? `${formData.mobileCountryCode} ${formData.mobile}` : '+91 XXXXX XXXXX'}
+                  </span>
+                  <span className="text-[10px] font-mono text-stone-500 font-bold">
+                    {formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' ? 'MAGAZINE DISPATCH' : 'GENERAL POST'}
+                  </span>
+                </div>
+              </div>
+            </div>
+                          </div>
                         )}
                       </div>
                     )}
                   </div>
-                </div>
 
                 {/* ═══════════════════════════════════════════════════════ */}
                 {/* Section: Family & Relationship Details */}
@@ -2129,113 +2226,6 @@ export default function RegisterNewMember() {
             </div>
           </div>
 
-          {/* Right Column: Sticky Live Postal Label Preview */}
-          <div className="xl:col-span-4 sticky top-6 space-y-4">
-            <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden p-5">
-              {/* Card Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-[#E8DFD8]">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-[#510601] text-white rounded-lg shadow-xs">
-                    <Printer className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold text-[#180200]">Postal Label Preview</h2>
-                    <p className="text-[11px] text-stone-500">Live dispatch print simulation</p>
-                  </div>
-                </div>
-                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
-                  isLabelReady
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-amber-50 text-amber-700 border-amber-200'
-                }`}>
-                  {isLabelReady ? 'Ready for Dispatch' : 'Awaiting Details'}
-                </span>
-              </div>
-
-              {/* Printable Dispatch Sticker Preview Card */}
-              <div className="mt-4 p-4 rounded-xl border-2 border-dashed border-[#8C1801]/40 bg-[#FAF7F2] relative flex flex-col justify-between shadow-2xs min-h-[220px]">
-                {/* Organization Header Bar */}
-                <div className="border-b border-[#DFD5CC] pb-2 mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-[11px] tracking-wider text-[#8C1801] uppercase">
-                      Havyaka MahaSabha
-                    </span>
-                  </div>
-                  <span className="font-mono text-[9px] font-bold bg-white text-[#510601] px-2 py-0.5 rounded border border-[#DFD5CC]">
-                    BOOK-POST / STICKER
-                  </span>
-                </div>
-
-                {/* Recipient Details */}
-                <div className="text-xs space-y-1 text-[#180200] flex-1">
-                  <div className="font-bold text-sm tracking-tight text-[#180200]">
-                    To: {formData.nameTitle} {formData.name?.trim() ? formData.name.trim().toUpperCase() : 'MEMBER FULL NAME'}
-                  </div>
-
-                  {/* Care of Father / Spouse */}
-                  {(formData.isMarried === 'YES' && formData.spouseName?.trim()) ? (
-                    <div className="text-[11px] text-[#863221] font-medium">
-                      C/o Spouse: {formData.spouseName.trim()}
-                    </div>
-                  ) : (formData.fatherName?.trim() || formData.fatherHusbandName?.trim()) ? (
-                    <div className="text-[11px] text-[#863221] font-medium">
-                      C/o Father: {(formData.fatherName || formData.fatherHusbandName).trim()}
-                    </div>
-                  ) : null}
-
-                  {/* Address Lines */}
-                  <div className="text-xs text-stone-800 leading-snug pt-1 whitespace-pre-line font-medium">
-                    {previewAddress.line ? previewAddress.line : <span className="italic text-stone-400">Door No., Street / Cross, Locality...</span>}
-                  </div>
-                  <div className="text-xs text-stone-700">
-                    {(previewAddress.locality || previewAddress.taluk || previewAddress.district) ? (
-                      <span>
-                        {[previewAddress.locality, previewAddress.taluk, previewAddress.district].filter(Boolean).join(', ')}
-                      </span>
-                    ) : (
-                      <span className="italic text-stone-400">Post Office / Taluk, District</span>
-                    )}
-                  </div>
-                  <div className="text-xs font-semibold text-stone-900">
-                    {previewAddress.state} — <span className="font-bold font-mono text-[#510601] text-sm">{previewAddress.pin || 'PIN CODE'}</span>
-                  </div>
-                </div>
-
-                {/* Footer Bar */}
-                <div className="border-t border-[#DFD5CC] pt-2 mt-3 flex items-center justify-between text-[11px] text-stone-600">
-                  <span className="flex items-center gap-1 font-mono font-bold text-[#510601]">
-                    <Phone className="h-3 w-3 text-[#8C1801]" />
-                    {formData.mobile ? `${formData.mobileCountryCode} ${formData.mobile}` : '+91 XXXXX XXXXX'}
-                  </span>
-                  <span className="text-[10px] font-mono text-stone-500 font-bold">
-                    {formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' ? 'MAGAZINE DISPATCH' : 'GENERAL POST'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Informational Guidance */}
-              <div className="mt-4 p-3 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8] text-[11px] text-[#863221] space-y-1.5">
-                <div className="font-bold text-[#510601] flex items-center gap-1">
-                  <span>Standard Postal Sticker Sheet (100mm x 50mm)</span>
-                </div>
-                <p className="text-stone-600 leading-relaxed">
-                  This preview updates in real-time as you type, reflecting how member address details appear on printed envelope stickers and magazine dispatch labels.
-                </p>
-                {formData.magazineNeeded === 'YES' && (
-                  <div className="pt-1 text-[11px] text-emerald-800 font-semibold flex items-center gap-1">
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>
-                      {formData.magazineKind === 'PHYSICAL'
-                        ? 'Physical copy dispatch enabled.'
-                        : formData.magazineKind === 'BOTH'
-                        ? 'Physical dispatch + website access enabled.'
-                        : 'E-copy (hosted online on website).'}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </PermissionGate>
