@@ -208,7 +208,7 @@
   .printable-label-card {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    border: 1px dashed #777 !important;
+    border: 1px solid #bbb !important;
     background: #ffffff !important;
     box-shadow: none !important;
   }

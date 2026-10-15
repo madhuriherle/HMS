@@ -1439,7 +1439,7 @@ export default function MembershipList() {
                   Print-Oriented Address Label Preview
                 </h3>
                 <p className="text-xs text-[#863221]">
-                  {selectedMembersForLabels.length} address label{selectedMembersForLabels.length !== 1 ? 's' : ''} ready for dispatch printing. Fixed physical aspect ratio.
+                  {selectedMembersForLabels.length} address label{selectedMembersForLabels.length !== 1 ? 's' : ''} ready for printing.
                 </p>
               </div>
             </div>
@@ -1458,58 +1458,28 @@ export default function MembershipList() {
             <div className="mb-4 flex items-center gap-2.5 bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs text-amber-900 print:hidden no-print">
               <AlertCircle className="w-4 h-4 shrink-0 text-amber-700" />
               <span>
-                Physical 2-column sticker sheet format (3.5" x 2.25" / ~89mm x 57mm). Optimized for standard A4 / label printers without overflowing.
+                A4 sticker sheet, 3 columns x 7 rows: membership number, name and address on each label.
               </span>
             </div>
 
-            {/* Labels Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2 print:gap-4">
+            {/* Labels Grid: 3 across, no gaps (the sheet's own stickers) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 print:grid-cols-3 print:gap-0">
               {selectedMembersForLabels.map((m) => (
                 <div
                   key={m.id}
-                  className="printable-label-card bg-white rounded-xl border-2 border-dashed border-stone-300 p-4 shadow-sm relative flex flex-col justify-between"
-                  style={{
-                    minHeight: '190px',
-                    maxWidth: '380px',
-                    margin: '0 auto',
-                    width: '100%'
-                  }}
+                  className="printable-label-card border border-stone-300 bg-white px-3 py-2.5 relative"
+                  style={{ minHeight: '42.4mm' }}
                 >
-                  {/* Organization Top Banner */}
-                  <div className="border-b border-[#E8DFD8] pb-1.5 mb-2 flex items-center justify-between">
-                    <span className="font-bold text-[10px] tracking-wider text-[#510601] uppercase">
-                      Akhila Havyaka Mahasabha
-                    </span>
-                    <span className="font-mono text-[10px] font-bold bg-[#FAF7F2] text-[#510601] px-1.5 py-0.5 rounded border border-[#E8DFD8]">
-                      {m.membershipNumber ? `${m.membershipNumber}` : '—'}
-                    </span>
-                  </div>
-
-                  {/* Recipient Details */}
-                  <div className="space-y-1 text-xs">
-                    <div className="font-bold text-sm text-[#180200] leading-snug">
-                      To: {m.fullName || m.name}
+                  <div className="text-[11px] leading-tight text-gray-900">
+                    <div className="font-mono text-[10px] text-gray-700 mb-1">{m.membershipNumber || ''}</div>
+                    <div className="font-bold text-[12px] text-[#180200] mb-1">{m.fullName || m.name}</div>
+                    <div className="text-[11px] text-gray-800 leading-snug">
+                      {m.addressLine || m.address || ''}
+                      <br />
+                      {[m.talukName || m.post, m.districtName].filter(Boolean).join(', ')}
+                      <br />
+                      {m.stateName}{m.stateName ? ' - ' : ''}<span className="font-bold font-mono">{m.postalCode || ''}</span>
                     </div>
-                    <div className="text-[#180200] leading-tight line-clamp-2">
-                      {m.addressLine || m.address || '—'}
-                    </div>
-                    <div className="text-[#863221] text-[11px] font-medium leading-tight">
-                      {m.talukName || m.post ? `${m.talukName || m.post}, ` : ''}
-                      {m.districtName || ''}{m.stateName ? `, ${m.stateName}` : ''}
-                    </div>
-                    <div className="font-mono font-bold text-xs text-[#510601] pt-0.5">
-                      PIN: {m.postalCode || '—'}
-                    </div>
-                  </div>
-
-                  {/* Label Footer */}
-                  <div className="border-t border-[#E8DFD8] pt-1.5 mt-2 flex items-center justify-between text-[10px] text-[#863221]">
-                    <span className="font-mono">
-                      Mob: {m.mobile || m.mobileNumber || '—'}
-                    </span>
-                    <span className="px-1.5 py-0.5 bg-[#FAF7F2] text-[#510601] font-semibold rounded border border-[#E8DFD8]">
-                      {m.membershipType || '—'}
-                    </span>
                   </div>
                 </div>
               ))}

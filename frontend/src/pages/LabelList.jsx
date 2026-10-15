@@ -574,11 +574,11 @@ export default function LabelList() {
             <div className="mb-4 flex items-center gap-2.5 rounded-lg bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200 print:hidden no-print">
               <AlertCircle className="h-4 w-4 shrink-0 text-amber-700" />
               <span>
-                Clean, high-contrast label formatting suitable for standard sheet sticker printing (2 columns).
+                A4 sticker sheet, 3 columns x 7 rows: membership number, name and address on each label.
               </span>
             </div>
 
-            {/* Labels Grid (2 columns Avery style) */}
+            {/* Labels Grid: 3 across, no gaps */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-0 print:grid-cols-3 print:gap-0">
               {itemsToPrint.map((item) => {
                 const member = getMember(item.memberId);
