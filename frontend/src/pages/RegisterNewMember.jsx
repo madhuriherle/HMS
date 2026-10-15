@@ -1751,7 +1751,7 @@ export default function RegisterNewMember() {
                   </div>
                   <div>
                     <h2 className="text-sm font-bold text-[#180200]">Postal Label Preview</h2>
-                    <p className="text-[11px] text-stone-500">Live dispatch print simulation</p>
+                    <p className="text-[11px] text-stone-500">As it prints on the sticker</p>
                   </div>
                 </div>
                 <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
@@ -1763,64 +1763,25 @@ export default function RegisterNewMember() {
                 </span>
               </div>
 
-              {/* Printable Dispatch Sticker Preview Card */}
-              <div className="mt-4 p-4 rounded-xl border-2 border-dashed border-[#8C1801]/40 bg-[#FAF7F2] relative flex flex-col justify-between shadow-2xs min-h-[200px]">
-                {/* Organization Header Bar */}
-                <div className="border-b border-[#DFD5CC] pb-2 mb-2 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-[11px] tracking-wider text-[#8C1801] uppercase">
-                      Havyaka MahaSabha
-                    </span>
-                  </div>
-                  <span className="font-mono text-[9px] font-bold bg-white text-[#510601] px-2 py-0.5 rounded border border-[#DFD5CC]">
-                    BOOK-POST / STICKER
-                  </span>
+              {/* The sticker as it prints: membership number, name in bold, address (the sticker sheet's own format) */}
+              <div
+                className="mt-4 rounded-md border border-stone-300 bg-white px-5 py-4 min-h-[170px] text-black"
+                style={{ fontFamily: '"Times New Roman", Times, serif' }}
+              >
+                <div className="text-[13px] leading-tight">
+                  {targetMember?.membershipNumber && targetMember.membershipNumber !== 'Not Assigned'
+                    ? targetMember.membershipNumber
+                    : <span className="italic text-stone-400">Membership no. is given on approval</span>}
                 </div>
-
-                {/* Recipient Details */}
-                <div className="text-xs space-y-1 text-[#180200] flex-1">
-                  <div className="font-bold text-sm tracking-tight text-[#180200]">
-                    To: {formData.nameTitle} {formData.name?.trim() ? formData.name.trim().toUpperCase() : 'MEMBER FULL NAME'}
-                  </div>
-
-                  {/* Care of Father / Spouse */}
-                  {(formData.isMarried === 'YES' && formData.spouseName?.trim()) ? (
-                    <div className="text-[11px] text-[#863221] font-medium">
-                      C/o Spouse: {formData.spouseName.trim()}
-                    </div>
-                  ) : (formData.fatherName?.trim() || formData.fatherHusbandName?.trim()) ? (
-                    <div className="text-[11px] text-[#863221] font-medium">
-                      C/o Father: {(formData.fatherName || formData.fatherHusbandName).trim()}
-                    </div>
-                  ) : null}
-
-                  {/* Address Lines */}
-                  <div className="text-xs text-stone-800 leading-snug pt-1 whitespace-pre-line font-medium">
-                    {previewAddress.line ? previewAddress.line : <span className="italic text-stone-400">Door No., Street / Cross, Locality...</span>}
-                  </div>
-                  <div className="text-xs text-stone-700">
-                    {(previewAddress.locality || previewAddress.taluk || previewAddress.district) ? (
-                      <span>
-                        {[previewAddress.locality, previewAddress.taluk, previewAddress.district].filter(Boolean).join(', ')}
-                      </span>
-                    ) : (
-                      <span className="italic text-stone-400">Post Office / Taluk, District</span>
-                    )}
-                  </div>
-                  <div className="text-xs font-semibold text-stone-900">
-                    {previewAddress.state} — <span className="font-bold font-mono text-[#510601] text-sm">{previewAddress.pin || 'PIN CODE'}</span>
-                  </div>
+                <div className="mt-1 font-bold text-[14px] uppercase leading-tight">
+                  {[formData.nameTitle, formData.name?.trim()].filter(Boolean).join(' ') || <span className="font-normal normal-case italic text-stone-400">Name</span>}
                 </div>
-
-                {/* Footer Bar */}
-                <div className="border-t border-[#DFD5CC] pt-2 mt-3 flex items-center justify-between text-[11px] text-stone-600">
-                  <span className="flex items-center gap-1 font-mono font-bold text-[#510601]">
-                    <Phone className="h-3 w-3 text-[#8C1801]" />
-                    {formData.mobile ? `${formData.mobileCountryCode} ${formData.mobile}` : '+91 XXXXX XXXXX'}
-                  </span>
-                  <span className="text-[10px] font-mono text-stone-500 font-bold">
-                    {formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' ? 'MAGAZINE DISPATCH' : 'GENERAL POST'}
-                  </span>
+                <div className="mt-1 text-[14px] leading-snug whitespace-pre-line">
+                  {previewAddress.line || <span className="italic text-stone-400">Door no., street / cross, locality</span>}
+                  <br />
+                  {[previewAddress.locality, previewAddress.taluk, previewAddress.district].filter(Boolean).join(', ') || <span className="italic text-stone-400">Post office / taluk, district</span>}
+                  <br />
+                  {previewAddress.state || ''}{previewAddress.state ? ' - ' : ''}<span className="font-semibold">{previewAddress.pin || <span className="italic font-normal text-stone-400">Pin code</span>}</span>
                 </div>
               </div>
             </div>

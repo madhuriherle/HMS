@@ -113,6 +113,7 @@ export default function ParticularPicker({
           onClose={() => setOpen(false)}
           title="Select Receipt Particular"
           maxWidthClass="max-w-6xl"
+          heightClass="h-[85vh]"
           footer={
             <ModalFooter
               kind="view"
@@ -122,7 +123,7 @@ export default function ParticularPicker({
             />
           }
         >
-          <div className="p-4 sm:p-5 space-y-4">
+          <div className="p-4 sm:p-5 space-y-4 flex flex-col flex-1 min-h-0">
             <div className="relative">
               <Search className="w-4 h-4 text-[#863221] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
@@ -144,7 +145,7 @@ export default function ParticularPicker({
             {cards.length === 0 ? (
               <p className="py-10 text-center text-sm text-[#863221]">No active particulars.</p>
             ) : (
-              <div className="max-h-[75vh] overflow-y-auto columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
+              <div className="flex-1 min-h-0 overflow-y-auto columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
                 {cards.map((card) => {
                   const cardHasMatch = card.buttons.some((b) => matches(card, b));
                   return (
