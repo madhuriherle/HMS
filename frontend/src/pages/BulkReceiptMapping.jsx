@@ -49,7 +49,7 @@ export default function BulkReceiptMapping() {
 
   // Selection for batch actions
   const [selectedReceiptIds, setSelectedReceiptIds] = useState(new Set());
-  const [selectionMode, setSelectionMode] = useState(false); // checkboxes show only after the Select button is pressed
+  const selectionMode = true; // the checkboxes are always showing (matched receipts only)
   const [isAllocating, setIsAllocating] = useState(false);
 
   // Manual Member Selection Modal for unmatched receipts
@@ -290,72 +290,6 @@ export default function BulkReceiptMapping() {
             <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Bulk Receipt Auto-Mapping</h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectionMode((on) => !on);
-                setSelectedReceiptIds(new Set());
-              }}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border cursor-pointer transition-colors ${
-                selectionMode ? 'text-white bg-[#510601] border-[#510601]' : 'text-[#863221] bg-white border-[#E8DFD8] hover:bg-[#FAF7F2]'
-              }`}
-              title="Select receipts to map one by one"
-            >
-              <CheckSquare className="w-4 h-4" />
-              {selectionMode ? 'Done' : 'Select'}
-            </button>
-            <Link
-              to="/dashboard/receipts/tracking"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] transition-colors"
-            >
-              Receipt Tracking
-            </Link>
-            <Link
-              to="/dashboard/membership/import"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl border border-[#510601] text-[#510601] hover:bg-[#510601]/5 transition-colors"
-            >
-              Import Members
-            </Link>
-          </div>
-        </div>
-
-        {/* 3 KPI Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-2xl p-4">
-            <span className="block text-[11px] font-bold uppercase tracking-wider text-[#863221]">
-              Unassigned Receipts
-            </span>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="text-2xl font-bold text-[#180200] font-mono">{totalUnassigned.toLocaleString()}</span>
-              
-            </div>
-            <p className="text-[10px] text-[#863221]/70 mt-1">Receipts waiting to be linked to members</p>
-          </div>
-
-          <div className="bg-[#3D705C]/5 border border-[#3D705C]/30 rounded-2xl p-4">
-            <span className="block text-[11px] font-bold uppercase tracking-wider text-[#3D705C]">
-              Ready for Auto-Mapping (Matched)
-            </span>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="text-2xl font-bold text-[#3D705C] font-mono">{totalMatched.toLocaleString()}</span>
-              
-            </div>
-            <p className="text-[10px] text-[#3D705C]/80 mt-1">Member number matches imported register</p>
-          </div>
-
-          <div className="bg-white border border-[#E8DFD8] rounded-2xl p-4">
-            <span className="block text-[11px] font-bold uppercase tracking-wider text-[#863221]">
-              Unmatched Receipts
-            </span>
-            <div className="flex items-baseline justify-between mt-1">
-              <span className="text-2xl font-bold text-[#180200] font-mono">
-                {Math.max(0, totalUnassigned - totalMatched).toLocaleString()}
-              </span>
-
-            </div>
-            <p className="text-[10px] text-[#863221]/70 mt-1">Can be mapped manually via member picker</p>
-          </div>
         </div>
 
         {/* Action Bar: Filters + 1-Click Bulk Action Button */}
@@ -420,7 +354,7 @@ export default function BulkReceiptMapping() {
                     type="button"
                     disabled={isAllocating}
                     onClick={handleBulkAutoMapAll}
-                    title={"Auto-map all matched receipts"}
+                    title={"Link every receipt whose membership number matches a member"}
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#3D705C] hover:bg-[#2d5445] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     {isAllocating ? (
@@ -428,7 +362,7 @@ export default function BulkReceiptMapping() {
                     ) : (
                       <Sparkles className="w-4 h-4 text-emerald-200" />
                     )}
-                    ⚡ Auto-Map All {totalMatched} Matched Receipts
+                    Map all matched ({totalMatched})
                   </button>
                 )
               )}
@@ -449,25 +383,7 @@ export default function BulkReceiptMapping() {
           {/* Selection Helper Strip */}
           {candidates.length > 0 && (
             <div className="flex items-center justify-between text-xs text-[#863221] pt-1 border-t border-[#E8DFD8]/60">
-              <div className="flex items-center gap-3">
-                {selectionMode && (<>
-                <button
-                  type="button"
-                  onClick={handleSelectAllMatched}
-                  className="hover:underline font-semibold text-[#3D705C] cursor-pointer"
-                >
-                  Select all matched rows
-                </button>
-                <span>·</span>
-                <button
-                  type="button"
-                  onClick={handleClearSelection}
-                  className="hover:underline cursor-pointer"
-                >
-                  Clear selection
-                </button>
-                </>)}
-              </div>
+              <div />
 
               <span>
                 Showing <b>{candidates.length}</b> of <b>{total}</b> receipts
@@ -502,15 +418,21 @@ export default function BulkReceiptMapping() {
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#180200] font-bold">
                   <tr>
-                    {selectionMode && <th className="py-3 px-3 w-10 text-center">
-                      <span className="sr-only">Select</span>
-                    </th>}
-                    <th className="py-3 px-3">Receipt Details</th>
-                    <th className="py-3 px-3">Entered Member No</th>
-                    <th className="py-3 px-3">Payer on Receipt</th>
+                    <th className="py-3 px-3 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        aria-label="Select every matched receipt on this page"
+                        title="Select every matched receipt on this page"
+                        checked={candidates.some((c) => c.matched_member) && candidates.filter((c) => c.matched_member).every((c) => selectedReceiptIds.has(c.receipt_id))}
+                        disabled={!candidates.some((c) => c.matched_member)}
+                        onChange={(e) => (e.target.checked ? handleSelectAllMatched() : handleClearSelection())}
+                        className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] disabled:opacity-30 cursor-pointer"
+                      />
+                    </th>
+                    <th className="py-3 px-3">Receipt</th>
+                    <th className="py-3 px-3">Payer</th>
                     <th className="py-3 px-3">Amount</th>
-                    <th className="py-3 px-3">Matched Live Member</th>
-                    <th className="py-3 px-3 text-center">Status</th>
+                    <th className="py-3 px-3">Member</th>
                     <th className="py-3 px-3 text-right">Action</th>
                   </tr>
                 </thead>
@@ -547,20 +469,12 @@ export default function BulkReceiptMapping() {
                           </span>
                         </td>
 
-                        {/* Entered Member No */}
-                        <td className="py-3 px-3">
-                          {cand.payer_membership_no ? (
-                            <span className="px-2.5 py-1 rounded-lg bg-[#FAF7F2] border border-[#E8DFD8] font-mono font-bold text-xs text-[#180200] inline-block">
-                              {cand.payer_membership_no}
-                            </span>
-                          ) : (
-                            <span className="text-[11px] text-[#863221]/50 italic">None typed</span>
-                          )}
-                        </td>
-
                         {/* Payer on Receipt */}
                         <td className="py-3 px-3">
                           <span className="font-semibold text-[#180200] block">{cand.payer_name || '—'}</span>
+                          <span className="text-[11px] text-[#863221] font-mono block">
+                            No: {cand.payer_membership_no || 'none typed'}
+                          </span>
                           {cand.payer_mobile && (
                             <span className="text-[11px] text-[#863221] font-mono block">
                               📞 {cand.payer_mobile}
@@ -593,20 +507,6 @@ export default function BulkReceiptMapping() {
                           ) : (
                             <span className="text-[11px] text-[#863221]/60 italic">
                               No matching member found
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Status Badge */}
-                        <td className="py-3 px-3 text-center">
-                          {cand.match_type === 'EXACT_NUMBER' ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#3D705C]/15 text-[#3D705C] border border-[#3D705C]/30">
-                              <Check className="w-3 h-3" />
-                              Exact Match
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-300">
-                              Unmatched
                             </span>
                           )}
                         </td>

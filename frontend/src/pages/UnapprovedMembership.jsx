@@ -192,7 +192,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   }, [searchQuery]);
 
   // Row Selection
-  const [selectionMode, setSelectionMode] = useState(false);
+  const selectionMode = true; // the checkboxes are always showing
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   // ----------------------------------------------------
@@ -237,18 +237,20 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const paginatedList = unapprovedMembers;
 
   // Checkbox helpers
+  // only an applicant whose receipt is assigned can be approved, so only those can be ticked
+  const approvableList = useMemo(() => paginatedList.filter((m) => m.receiptStatus === 'Assigned'), [paginatedList]);
   const isAllPaginatedSelected = useMemo(() => {
-    if (paginatedList.length === 0) return false;
-    return paginatedList.every((m) => selectedIds.has(m.id));
-  }, [paginatedList, selectedIds]);
+    if (approvableList.length === 0) return false;
+    return approvableList.every((m) => selectedIds.has(m.id));
+  }, [approvableList, selectedIds]);
 
   const selectedCache = useRef(new Map()); // id -> applicant row, so a ticked applicant from another page still approves
   const handleToggleSelectAll = () => {
     const next = new Set(selectedIds);
     if (isAllPaginatedSelected) {
-      paginatedList.forEach((m) => next.delete(m.id));
+      approvableList.forEach((m) => next.delete(m.id));
     } else {
-      paginatedList.forEach((m) => { next.add(m.id); selectedCache.current.set(m.id, m); });
+      approvableList.forEach((m) => { next.add(m.id); selectedCache.current.set(m.id, m); });
     }
     setSelectedIds(next);
   };
@@ -467,7 +469,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     }
     showToast(`Successfully approved ${approvedCount} member(s)!`, 'success');
     setSelectedIds(new Set());
-    setSelectionMode(false);
     await reloadData();
   };
 
@@ -520,17 +521,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
         }
         onResetFilters={handleClearFilters}
         rightSlot={
-          !selectionMode ? (
-            <button
-              type="button"
-              onClick={() => setSelectionMode(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#863221] hover:text-[#510601] text-xs sm:text-sm font-bold rounded-xl transition-all shadow-2xs cursor-pointer shrink-0"
-              title="Select multiple applications"
-            >
-              <CheckSquare className="w-4 h-4" />
-              <span>Select</span>
-            </button>
-          ) : (
+          (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-bold text-[#510601] bg-[#FAF7F2] px-2.5 py-1.5 rounded-lg border border-[#E8DFD8]">
                 {selectedIds.size} selected
@@ -548,18 +539,17 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                   </button>
                 )
               )}
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectionMode(false);
-                  setSelectedIds(new Set());
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 bg-white border border-[#E8DFD8] text-[#863221] hover:text-[#180200] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                title="Cancel selection mode"
-              >
-                <X className="w-3.5 h-3.5" />
-                <span>Cancel</span>
-              </button>
+              {selectedIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(new Set())}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-white border border-[#E8DFD8] text-[#863221] hover:text-[#180200] text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                  title="Untick everything"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Clear</span>
+                </button>
+              )}
             </div>
           )
         }
@@ -636,9 +626,10 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                     <input
                       type="checkbox"
                       checked={isAllPaginatedSelected}
+                      disabled={approvableList.length === 0}
                       onChange={handleToggleSelectAll}
-                      className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer accent-[#510601]"
-                      title="Select All on page"
+                      className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer accent-[#510601] disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Select every applicant on this page whose receipt is assigned"
                     />
                   </th>
                 )}
@@ -673,14 +664,16 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                       className={`transition-colors ${isSelected ? 'bg-[#FAF7F2]' : 'bg-white hover:bg-[#FAF7F2]'
                         }`}
                     >
-                      {/* Checkbox (only in selection mode) */}
+                      {/* Checkbox */}
                       {selectionMode && (
                         <td className="py-3.5 px-4 text-center">
                           <input
                             type="checkbox"
                             checked={isSelected}
+                            disabled={!isAssigned}
+                            title={isAssigned ? undefined : 'Assign a receipt first, then this applicant can be approved'}
                             onChange={() => handleToggleSelectRow(m.id)}
-                            className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer accent-[#510601]"
+                            className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer accent-[#510601] disabled:opacity-30 disabled:cursor-not-allowed"
                           />
                         </td>
                       )}
