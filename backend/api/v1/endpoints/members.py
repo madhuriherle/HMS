@@ -120,7 +120,7 @@ def _attach_membership_types(db: Session, rows: list) -> None:
                 r["member_code"] = mem_no
 
 
-MAGAZINE_KINDS = {"PHYSICAL", "EMAIL", "BOTH"}
+MAGAZINE_KINDS = {"PHYSICAL", "EMAIL"}
 
 
 def _magazine_choice(data: dict, *, needed, own_email=None) -> None:
@@ -133,7 +133,7 @@ def _magazine_choice(data: dict, *, needed, own_email=None) -> None:
         return
     kind = kind or "PHYSICAL"
     data["magazine_kind"] = kind
-    if kind in ("EMAIL", "BOTH"):
+    if kind == "EMAIL":
         data["magazine_email"] = (data.get("magazine_email") or own_email or "").strip() or None
     else:
         data["magazine_email"] = None

@@ -342,7 +342,7 @@ export default function RegisterNewMember() {
           magazineNeeded: m.magazine_needed === false ? 'NO' : 'YES',
           magazineDeliveryChoice: m.magazine_delivery_address ? 'DIFFERENT' : 'COMMUNICATION',
           magazineDeliveryAddress: m.magazine_delivery_address || '',
-          magazineKind: m.magazine_kind || 'PHYSICAL',
+          magazineKind: m.magazine_kind === 'EMAIL' ? 'EMAIL' : 'PHYSICAL',
           magazineEmail: m.magazine_email || '',
           referredMembershipNo: m.referred_by_number || '',
           referredMembershipName: m.referred_by_name || '',
@@ -1668,11 +1668,10 @@ export default function RegisterNewMember() {
                           <label className="block text-xs font-bold text-[#510601] uppercase tracking-wider mb-2">
                             Select Magazine Edition:
                           </label>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {[
                               ['PHYSICAL', 'Physical Copy', 'Posted monthly to postal address'],
-                              ['EMAIL', 'E-Magazine', 'Read online on website (No email needed)'],
-                              ['BOTH', 'Both Editions', 'Physical copy posted + Website access']
+                              ['EMAIL', 'E-Magazine', 'Read online on website (No email needed)']
                             ].map(([code, title, desc]) => (
                               <label
                                 key={code}

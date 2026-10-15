@@ -638,7 +638,7 @@ function MagazineTab({ id }) {
               {d.magazine_kind && (
                 <Field
                   label="Magazine type"
-                  value={{ PHYSICAL: 'Physical copy', EMAIL: 'E-copy', BOTH: 'Physical copy and e-copy' }[d.magazine_kind] || d.magazine_kind}
+                  value={{ PHYSICAL: 'Physical copy', EMAIL: 'E-copy' }[d.magazine_kind] || d.magazine_kind}
                 />
               )}
               {d.magazine_email && <Field label="E-copy email" value={d.magazine_email} />}
