@@ -293,6 +293,20 @@ RULE 11: HOW WE WORK (ALL AGENTS)
      through the app's own API (audit log), not by editing tables, and say what was changed.
 11.14 UAT AND PROD RUN THE SAME COMMIT. After any prod update the live web bundle name and the
      alembic version must be identical on both; check both and report them.
+11.15 SHARED WORKING TREE: other agents edit the same files at the same time. Commit only the files
+     you changed, never `git add -A`, and never add a file another agent has unsaved edits in:
+     build the HEAD version plus only your lines (git hash-object -w, git update-index --add
+     --cacheinfo) instead. A migration chains after the real head; if the previous one is another
+     agent's and not committed, commit that file with yours so HEAD stays one chain. Before a deploy
+     export HEAD (git archive HEAD backend frontend REMEMBER.txt), run the tests and the build on that
+     export: what is committed must work alone.
+11.16 DEPLOY CHECKS: build the web files from HEAD, not from the working tree. In Git Bash set
+     MSYS_NO_PATHCONV=1 for `vite build --base=/` (otherwise the base becomes C:/Program Files/Git/
+     and every page loads a blank screen with "Expected a JavaScript module"). Use the IP that the
+     site's own name resolves to (nslookup), never an old VPS_HOST. After a deploy fetch the page's
+     /assets files and confirm each answers 200 with the right content type. A prod web-only update is
+     built from prod's own commit plus only the asked files: first rebuild prod's CURRENT bundle and
+     match its file name, then apply the change.
 
 --------------------------------------------------------------------------------
 RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
@@ -373,6 +387,26 @@ RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
      font-bold uppercase tracking-wider text-[11px]"> (add "sticky top-0 z-10" when it must stay in view),
      cells py-3 px-4, table text-xs. Reports, Magazine, Events, Engagements and Notifications follow it;
      older pages with another header style are changed when next touched.
+12.18 A LIST WITH SORTING USES THE SERVER: the column heading is <SortTh> with the useSort hook
+     (components/SortTh.jsx, hooks/useSort.js); a click sorts asc, then desc, then back to the
+     default (newest first, rule 10.5). The page asks the list API again with sort_by / sort_dir; it
+     does not sort in the browser. Only columns the API allows are clickable.
+12.19 THE PARTICULAR PICKER shows everything at once: one wide popup (max-w-6xl) with a card per
+     particular and its sub types as buttons, one click picks and closes, items already on the receipt are
+     greyed, and the search box only dims. No tabs, no scrolling dropdown. A particular with no sub types
+     is one button with no heading above it. Anywhere a receipt line is named it reads
+     "Particular > sub type" (wraps when narrow); a receipt with several lines shows the first and "+N",
+     and a hover card lists every line with its amount.
+12.20 ASSIGN RECEIPT POPUP (Unapproved Membership): no explanatory paragraphs. The applicant strip, the
+     search + date range + amount range + Likely matches filters, a Table / Cards switch, pages
+     (10 / 25 / 50 with 1 2 ... N), and the "Receipt not entered yet?" line. A steady tall size (90% of the
+     screen, heightClass on Modal), width up to max-w-6xl, only the list scrolls. Likely match = the
+     receipt's mobile (4 points), the number typed on it equals the applicant's id or membership number
+     (3 each) or the payer name is the same (2); it is a hint, nothing is mapped without a click.
+12.21 RECEIPT ENTRY LOOK-UP: Payee Name (2+ letters), Mobile (3+ digits) and Membership No. each filter the
+     Membership List on the right; only the box typed in LAST decides the list, the others are ignored for
+     it. A short note beside Membership No. says what was found (one match with Assign, several with a
+     count, none = a non-member receipt). Only Assign links a member; typing never does.
 
 --------------------------------------------------------------------------------
 RULE 13: PERMISSIONS AND ACCESS
@@ -438,8 +472,8 @@ RULE 13: PERMISSIONS AND ACCESS
 
 13.10 WHO YOU CAN SEE IN USER MANAGEMENT: only users whose role is your own rank or weaker.
       A stronger rank is never listed and never opened (a rank 2 Admin does not see the
-      Super Admin). Opening, editing or deleting a stronger user is refused by the server
-      too (403). A rank 1 user sees everyone else. Your OWN account is not listed: you cannot
+      Super Admin). Opening, editing or deleting a stronger user answers 404 "User not found",
+      exactly like a user that does not exist (see 13.18). A rank 0 user sees everyone else. Your OWN account is not listed: you cannot
       change your own role or privileges, and My Profile edits your details.
 13.11 ROLE DATA IN THE SCREENS: GET /users/roles returns each role with permission_codes
      (the privilege codes it holds) and is_all_access. A full-access role holds no
@@ -481,6 +515,11 @@ RULE 13: PERMISSIONS AND ACCESS
       shown a page only when it holds that page's own Read. When a page gets its own privilege
       later, a migration gives it to the roles that used the page before, so nobody loses it;
       it is never added to a role built on purpose without it (see 13.16).
+13.16 THE RECEPTIONIST ROLE (front desk, rank 4 since migration 0079, code RECEPTIONIST) holds exactly four
+      privileges: receipts.entry.read / write and receipts.tracking.read / write. No delete, no
+      approvals, no Bulk Receipt Mapping, no Masters, no Membership pages. Its menu shows only
+      Receipt Entry and Receipt Tracking. It exists on UAT and prod. Migrations that hand out
+      a new privilege must skip it (see NOT_CARRIED in alembic 20261014_0061).
 13.17 PAGES THAT USED TO SHARE A PRIVILEGE NOW OWN ONE (migration 0081): Magazine Subscriptions and Labels & Delivery
       (magazines.subscribers / magazines.labels_delivery), the five Reports pages (reports.summary_report,
       members_report, receipts_report, magazines_report, saved_report: read only, Saved also write / delete),
@@ -489,11 +528,14 @@ RULE 13: PERMISSIONS AND ACCESS
       belongs to which page is decided by its path in db/seed_defaults.py (SUB_MODULE_AREAS); reference lists a page
       reads from another page are listed in SHARED_READS (read only). A new page follows the same four steps:
       its area rule, its menu row asking for its own Read, its screen gate, and a migration for existing roles.
-13.16 THE RECEPTIONIST ROLE (front desk, rank 5, code RECEPTIONIST) holds exactly four
-      privileges: receipts.entry.read / write and receipts.tracking.read / write. No delete, no
-      approvals, no Bulk Receipt Mapping, no Masters, no Membership pages. Its menu shows only
-      Receipt Entry and Receipt Tracking. It exists on UAT and prod. Migrations that hand out
-      a new privilege must skip it (see NOT_CARRIED in alembic 20261014_0061).
+13.18 NOTHING MAY REVEAL THAT SOMEONE SITS ABOVE THE ADMIN (the Super Admin stays invisible):
+      - a user or role above you answers 404 / "Invalid role_id", the same words as one that does not
+        exist (never 403, "higher rank" or "Super Admin" in a message);
+      - the activity logs (list, counters, per-user summary), a member's timeline and the Recycle Bin leave
+        out or rename accounts above you ("System"), including what they deleted;
+      - no screen shows a rank number, a rank gate or the words "Super Admin" to anyone but a Super Admin
+        (the Modules page, which only rank 0 opens, may show its rank gate);
+      - helper: deps.stronger_user_ids(db, user). A new list, log or lookup that names users must use it.
 
 --------------------------------------------------------------------------------
 RULE 14: SETTINGS AND ADMIN TOOLS
