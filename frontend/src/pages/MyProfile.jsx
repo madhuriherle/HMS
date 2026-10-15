@@ -144,7 +144,7 @@ export default function MyProfile() {
 
   const pwErr = errors.pw || {};
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className="space-y-5">
       <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">My Profile</h1>
 
       <div className="bg-white rounded-2xl border border-[#E8DFD8] p-5 flex flex-wrap items-center gap-4">
@@ -163,6 +163,8 @@ export default function MyProfile() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 items-start">
+      <div className="xl:col-span-2 space-y-5">
       <form onSubmit={save} className="bg-white rounded-2xl border border-[#E8DFD8] overflow-hidden">
         <div className="px-6 h-14 flex items-center border-b border-[#E8DFD8] bg-[#FAF7F2]">
           <h2 className="text-base font-bold text-[#180200]">Profile Information</h2>
@@ -235,6 +237,8 @@ export default function MyProfile() {
         )}
       </div>
 
+      </div>
+
       <div className="bg-white rounded-2xl border border-[#E8DFD8] overflow-hidden">
         <div className="px-6 h-14 flex items-center border-b border-[#E8DFD8] bg-[#FAF7F2]">
           <h2 className="text-base font-bold text-[#180200]">My Access</h2>
@@ -259,6 +263,7 @@ export default function MyProfile() {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
