@@ -852,7 +852,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           isOpen
           onClose={() => setAssigningMember(null)}
           title={`Assign a receipt to ${assigningMember.fullName || assigningMember.name}`}
-          maxWidthClass="max-w-[1400px]"
+          maxWidthClass="max-w-6xl"
           heightClass="h-[90vh]"
           footer={<ModalFooter kind="view" onCancel={() => setAssigningMember(null)} />}
         >
