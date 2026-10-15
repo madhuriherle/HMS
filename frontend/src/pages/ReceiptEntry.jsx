@@ -32,7 +32,6 @@ import {
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import PermissionGate from '../components/PermissionGate';
-import MemberLookupCard from '../components/MemberLookupCard';
 import DateInput from '../components/DateInput';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
@@ -977,7 +976,7 @@ export default function ReceiptEntry() {
       const answered = numberLookup.status === 'done' && numberLookup.number === typed;
       // An unknown number is fine: the receipt is saved unassigned and mapped to a member later.
       if (answered && numberLookup.exact && numberLookup.matches.length > 0) {
-        errors.membershipNo = `This number belongs to ${numberLookup.matches[0].name}. Click "Use this member" to link the receipt, or clear the box.`;
+        errors.membershipNo = `This number belongs to ${numberLookup.matches[0].name}. Click Assign on that member in the Membership List, or clear the box.`;
       }
     }
 
@@ -1236,10 +1235,18 @@ export default function ReceiptEntry() {
   // ----------------------------------------------------
   // RIGHT-SIDE MEMBERSHIP LIST FILTER & PAGINATION
   // ----------------------------------------------------
+  // what is typed in the Membership No. box also narrows the list, as you type
+  const typedNumber = entrySource === 'normal' ? String(formData.membershipNo || '').trim().toLowerCase() : '';
   const filteredRightMembers = useMemo(() => {
-    if (!rightSearchQuery.trim()) return registeredMembers;
+    let base = registeredMembers;
+    if (typedNumber) {
+      base = base.filter((m) =>
+        String(m.membershipNumber || '').toLowerCase().includes(typedNumber) ||
+        String(m.registrationNumber || '').toLowerCase().includes(typedNumber));
+    }
+    if (!rightSearchQuery.trim()) return base;
     const q = rightSearchQuery.toLowerCase().trim();
-    return registeredMembers.filter((m) => {
+    return base.filter((m) => {
       const memNo = String(m.membershipNumber || '').toLowerCase();
       const regNo = String(m.registrationNumber || m.id || '').toLowerCase();
       const name = String(m.fullName || m.name || '').toLowerCase();
@@ -1256,7 +1263,9 @@ export default function ReceiptEntry() {
         location.includes(q)
       );
     });
-  }, [registeredMembers, rightSearchQuery]);
+  }, [registeredMembers, rightSearchQuery, typedNumber]);
+
+  useEffect(() => { setRightPage(1); }, [typedNumber]);
 
   const totalRightMembers = filteredRightMembers.length;
   const totalRightPages = Math.max(1, Math.ceil(totalRightMembers / rightPageSize));
@@ -1741,7 +1750,6 @@ export default function ReceiptEntry() {
 
                       className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
                     />
-                    <MemberLookupCard lookup={numberLookup} onUse={handleUseLookedUpMember} />
                   </div>
                 </div>
 
