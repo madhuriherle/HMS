@@ -1235,14 +1235,23 @@ export default function ReceiptEntry() {
   // ----------------------------------------------------
   // RIGHT-SIDE MEMBERSHIP LIST FILTER & PAGINATION
   // ----------------------------------------------------
-  // what is typed in the Membership No. box also narrows the list, as you type
-  const typedNumber = entrySource === 'normal' ? String(formData.membershipNo || '').trim().toLowerCase() : '';
+  // what is typed in the Payee Name, Mobile and Membership No. boxes narrows the list, as you type
+  const typingFree = entrySource === 'normal';
+  const typedNumber = typingFree ? String(formData.membershipNo || '').trim().toLowerCase() : '';
+  const typedName = typingFree && String(formData.name || '').trim().length >= 2 ? String(formData.name).trim().toLowerCase() : '';
+  const typedMobile = typingFree && String(formData.mobile || '').length >= 3 ? String(formData.mobile) : '';
   const filteredRightMembers = useMemo(() => {
     let base = registeredMembers;
     if (typedNumber) {
       base = base.filter((m) =>
         String(m.membershipNumber || '').toLowerCase().includes(typedNumber) ||
         String(m.registrationNumber || '').toLowerCase().includes(typedNumber));
+    }
+    if (typedName) {
+      base = base.filter((m) => String(m.fullName || m.name || '').toLowerCase().includes(typedName));
+    }
+    if (typedMobile) {
+      base = base.filter((m) => String(m.contactNumber || m.mobile || m.mobileNumber || m.phone || '').replace(/\D/g, '').includes(typedMobile));
     }
     if (!rightSearchQuery.trim()) return base;
     const q = rightSearchQuery.toLowerCase().trim();
@@ -1263,9 +1272,9 @@ export default function ReceiptEntry() {
         location.includes(q)
       );
     });
-  }, [registeredMembers, rightSearchQuery, typedNumber]);
+  }, [registeredMembers, rightSearchQuery, typedNumber, typedName, typedMobile]);
 
-  useEffect(() => { setRightPage(1); }, [typedNumber]);
+  useEffect(() => { setRightPage(1); }, [typedNumber, typedName, typedMobile]);
 
   const totalRightMembers = filteredRightMembers.length;
   const totalRightPages = Math.max(1, Math.ceil(totalRightMembers / rightPageSize));
@@ -2417,7 +2426,7 @@ export default function ReceiptEntry() {
                     </div>
                     <p className="font-semibold text-sm text-[#180200]">No members found</p>
                     <p className="text-xs text-[#863221] mt-0.5">
-                      {rightSearchQuery ? 'Try adjusting your search criteria.' : 'No members registered yet in the Membership List.'}
+                      {rightSearchQuery ? 'Try adjusting your search criteria.' : (typedNumber || typedName || typedMobile) ? 'No member matches what is typed. You can still save this as a non-member receipt.' : 'No members registered yet in the Membership List.'}
                     </p>
                   </div>
                 ) : (
