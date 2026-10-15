@@ -1,7 +1,7 @@
 // Server-backed data for the whole panel. Nothing here is stored in the
 // browser: every function reads the API and returns the shape the pages use.
 import api from '../api';
-import { fetchMembers, fetchMemberPage, fetchReceipts, normalizeReceipt, unwrapList } from './apiAdapters';
+import { fetchMemberPage, normalizeReceipt, unwrapList } from './apiAdapters';
 
 const rows = (res) => unwrapList(res?.data);
 const statusLabel = (flag) => (flag ? 'Active' : 'Inactive');
@@ -139,9 +139,6 @@ export const loadPaymentModeConfigs = async () => {
 };
 
 // ── Members, receipts, renewals ──────────────────────────────────────────
-export const loadMembers = (params) => fetchMembers(params);
-export const loadReceipts = (params) => fetchReceipts(params);
-
 // One page of the members waiting for approval (rule 10.6): each row carries the receipt mapped to it, if any,
 // and `summary` has the with / without receipt counts of the whole filtered set.
 export const loadUnapprovedPage = async (params = {}) => {

@@ -308,7 +308,6 @@ def read_receipt_tracking(
     fy: Optional[str] = None,           # financial year "2025-26" (1 Apr - 31 Mar)
     mode: Optional[str] = None,         # payment mode as shown: "Cash", or the bank/account name
     member_ids: Optional[str] = None,   # comma separated member ids (their receipts), at most 200
-    all_rows: bool = False,             # TEMPORARY: lifts the 200 cap for screens not yet moved to server paging
 ) -> Any:
     """Receipt register for the Receipt Tracking screen.
 
@@ -328,7 +327,7 @@ def read_receipt_tracking(
     filters = [Receipt.is_deleted == False]  # noqa: E712
     from core.pagination import LIST_PAGE_MAX
     page = max(1, page)
-    limit = max(1, limit) if all_rows or export else max(1, min(limit, LIST_PAGE_MAX))
+    limit = max(1, limit) if export else max(1, min(limit, LIST_PAGE_MAX))
     if receipt_id:
         filters.append(Receipt.id == receipt_id)
     if receipt_status:

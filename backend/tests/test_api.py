@@ -4558,8 +4558,8 @@ def test_page_size_clamped(client, admin_headers):
     response = client.get("/api/v1/members/", headers=admin_headers, params={"limit": 100000})
     assert response.status_code == 200, response.text
     assert response.json()["limit"] == LIST_PAGE_MAX
-    # the screens not yet moved to server paging use the temporary switch, still capped by the hard maximum
-    response = client.get("/api/v1/members/", headers=admin_headers, params={"limit": 100000, "all_rows": True})
+    # other lists (the masters, which are reference data) keep the hard maximum
+    response = client.get("/api/v1/masters/states", headers=admin_headers, params={"limit": 100000})
     assert response.json()["limit"] == MAX_PAGE_SIZE
 
 
@@ -7080,8 +7080,6 @@ def test_receipt_tracking_pages_filters_and_counts_run_on_the_whole_register(cli
                                       f"{str((date.today().year if date.today().month >= 4 else date.today().year - 1) + 1)[-2:]}")["total"] == 3
     assert tracking(search="Zorro", fy="1999-00")["total"] == 0
     assert client.get("/api/v1/receipts/tracking", headers=H, params={"fy": "nope"}).status_code == 400
-    # the legacy switch for screens not moved yet still lifts the cap
-    assert tracking(limit=5000, all_rows=True)["limit"] == 5000
 
     options = client.get("/api/v1/receipts/tracking-options", headers=H).json()
     assert options["financial_years"] and "Cash" in options["payment_modes"] and "Upi" in options["payment_modes"]
@@ -7097,9 +7095,8 @@ def test_member_list_pages_search_and_filters_run_on_every_member(client, admin_
         assert r.status_code == 200, r.text
         return r.json()
 
-    # never more than 200 in one request; the screens still on the old way ask for all_rows
+    # never more than 200 in one request
     assert listing(limit=5000)["limit"] == 200
-    assert listing(limit=5000, all_rows=True)["limit"] == 5000
     # a page is a slice; the total and the search cover every member
     first = listing(limit=2, search="Pagey")
     assert first["total"] >= 5 and len(first["data"]) == 2 and first["pages"] >= 3

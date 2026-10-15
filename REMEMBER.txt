@@ -249,11 +249,13 @@ RULE 10: MASTERS AND SCREENS
      extra download. The sort is the server's too (rule 12.18). Use components/Pager.jsx for the controls and
      wait ~350 ms after typing before asking. An export asks page by page (200 at a time) or uses the
      export parameter. The filter drop-downs read their options from the server (for example
-     GET /receipts/tracking-options), not from the rows on screen. Screens still on the old way read with
-     all_rows=true (TEMPORARY, marked in apiAdapters.fetchReceipts / fetchMembers): Unapproved
-     Membership, Label List, Magazine, Receipt Entry's lists and Payment Mode Setup; each is moved to
-     server paging in turn and then loses the switch. Moved so far: Receipt Tracking, Membership List
-     (the member list takes search, filters, no_membership_type, is_active, sort_by and page / limit).
+     GET /receipts/tracking-options), not from the rows on screen.
+     Paged by the server now: Receipt Tracking, Membership List, Unapproved Membership, Assigned for
+     Approval, Label List, Magazine (recipients, label and delivery batches, label batch detail,
+     pauses and returns), Receipt Entry's two member lists and Payment Mode Setup (usage counts from
+     GET /receipts/payment-mode-usage). The masters, roles, modules and privileges are reference
+     data and keep their own limits. There is no "read everything" switch any more: a new list is
+     built paged from the start.
 
 --------------------------------------------------------------------------------
 RULE 11: HOW WE WORK (ALL AGENTS)

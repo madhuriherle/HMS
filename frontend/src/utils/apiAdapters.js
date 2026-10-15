@@ -254,13 +254,6 @@ export const receiptToApiPayload = (formData, selectedMember = null) => {
   };
 };
 
-export const fetchMembers = async (params = {}) => {
-  const query = { limit: 5000, ...params };
-  if (query.limit > 200) query.all_rows = true; // TEMPORARY: screens not yet moved to server paging still read everything (rule 10.6)
-  const { data } = await api.get('/members/', { params: query });
-  return unwrapList(data).map(normalizeMember);
-};
-
 // One page of the member list (at most 200 rows): the rows and the whole filtered set's total.
 export const fetchMemberPage = async (params = {}) => {
   const { data } = await api.get('/members/', { params: { limit: 25, ...params } });
@@ -271,13 +264,6 @@ export const fetchMemberPage = async (params = {}) => {
 export const fetchLabelPage = async (params = {}) => {
   const { data } = await api.get('/members/label-list', { params: { limit: 25, ...params } });
   return { rows: unwrapList(data).map(normalizeMember), total: data?.total ?? 0, pages: data?.pages ?? 1 };
-};
-
-export const fetchReceipts = async (params = {}) => {
-  const query = { limit: 5000, ...params };
-  if (query.limit > 200) query.all_rows = true; // TEMPORARY: screens not yet moved to server paging still read everything (rule 10.6)
-  const { data } = await api.get('/receipts/tracking', { params: query });
-  return unwrapList(data).map(normalizeReceipt);
 };
 
 // One page of the receipt register (at most 200 rows): the rows, the whole filtered set's total and counts.

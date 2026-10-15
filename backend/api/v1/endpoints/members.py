@@ -48,12 +48,11 @@ def read_members(
     no_membership_type: bool = False,   # members who have not reached any type yet
     receipt_assigned: Optional[bool] = None,   # True: has a receipt mapped; False: none yet
     with_receipt: bool = False,         # carry each member's latest receipt and the with / without counts
-    all_rows: bool = False,             # TEMPORARY: lifts the 200 cap for screens not yet moved to server paging
 ) -> Any:
     """Retrieve members with optional filters and search (offline + online). Newest first unless sort_by is given.
     At most 200 per request (rule 10.6); the search and the filters run on every member, the page is a slice."""
     from core.pagination import LIST_PAGE_MAX
-    limit = max(1, limit) if all_rows else max(1, min(limit, LIST_PAGE_MAX))
+    limit = max(1, min(limit, LIST_PAGE_MAX))
     query = db.query(Member).filter(Member.is_deleted == False)
     if include_deleted:
         query = db.query(Member)
