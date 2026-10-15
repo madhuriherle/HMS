@@ -42,6 +42,9 @@ def _to_plain(obj, exclude: Set[str]):
     }
 
 MAX_PAGE_SIZE = 25000
+# a list a person pages through never returns more than this per request (rule 10.6); exports and the few
+# reference lists that are not paged are the only callers allowed to ask for more
+LIST_PAGE_MAX = 200
 
 def paginate(query, page: int = 1, limit: int = 20, exclude: Optional[Set[str]] = None,
              serializer=None) -> dict:

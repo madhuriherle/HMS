@@ -103,7 +103,7 @@ SUB_MODULE_AREAS = {
         ]),
         ("receipts.tracking", "Receipt Tracking", [
             ("GET", r"^/receipts/?$"),
-            ("GET", r"^/receipts/(tracking|allocations|day-book)/?$"),
+            ("GET", r"^/receipts/(tracking|tracking-options|allocations|day-book)/?$"),
             ("GET", r"^/receipts/\d+(/allocations)?/?$"),
             ("PUT|DELETE", r"^/receipts/\d+/?$"),
             ("POST", r"^/receipts/\d+/(allocate|cancel|refund|payment-transactions)/?$"),

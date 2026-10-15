@@ -261,6 +261,19 @@ export const fetchMembers = async (params = {}) => {
 };
 
 export const fetchReceipts = async (params = {}) => {
-  const { data } = await api.get('/receipts/tracking', { params: { limit: 5000, ...params } });
+  const query = { limit: 5000, ...params };
+  if (query.limit > 200) query.all_rows = true; // TEMPORARY: screens not yet moved to server paging still read everything (rule 10.6)
+  const { data } = await api.get('/receipts/tracking', { params: query });
   return unwrapList(data).map(normalizeReceipt);
+};
+
+// One page of the receipt register (at most 200 rows): the rows, the whole filtered set's total and counts.
+export const fetchReceiptPage = async (params = {}) => {
+  const { data } = await api.get('/receipts/tracking', { params: { limit: 25, ...params } });
+  return {
+    rows: unwrapList(data).map(normalizeReceipt),
+    total: data?.total ?? 0,
+    pages: data?.pages ?? 1,
+    summary: data?.summary || {},
+  };
 };

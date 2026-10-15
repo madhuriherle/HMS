@@ -241,6 +241,19 @@ RULE 10: MASTERS AND SCREENS
      subscriptions. sort_by must be one of the list's own column names (anything else is a 400),
      and ties fall back to the newest id. The helper is core/sorting.py (sort_query).
 
+10.6 NEVER MORE THAN 200 ROWS IN ONE REQUEST, AND NEVER ALL OF A LIST AT ONCE. A list a person pages
+     through is read from the server one page at a time (default 25; the choices are 25 / 50 / 100 / 200;
+     core/pagination.LIST_PAGE_MAX = 200 caps a request). The SEARCH and EVERY FILTER are sent to the server
+     and run on the whole table in the database, never on the rows already in the browser; the answer
+     carries the total and the counts of the whole filtered set (summary), so footers and badges need no
+     extra download. The sort is the server's too (rule 12.18). Use components/Pager.jsx for the controls and
+     wait ~350 ms after typing before asking. An export asks page by page (200 at a time) or uses the
+     export parameter. The filter drop-downs read their options from the server (for example
+     GET /receipts/tracking-options), not from the rows on screen. Screens still on the old way read with
+     all_rows=true (TEMPORARY, marked in apiAdapters.fetchReceipts): Membership List, Unapproved
+     Membership, Label List, Magazine, Receipt Entry's lists and Payment Mode Setup; each is moved to
+     server paging in turn and then loses the switch. Receipt Tracking is moved (migration-free).
+
 --------------------------------------------------------------------------------
 RULE 11: HOW WE WORK (ALL AGENTS)
 --------------------------------------------------------------------------------

@@ -7045,3 +7045,40 @@ def test_every_page_of_magazine_reports_and_notifications_has_its_own_privilege(
                  "reports.receipts_report", "reports.magazines_report", "reports.saved_report", "notifications.campaigns",
                  "notifications.message_templates", "notifications.inbox", "members.import", "members.assigned", "masters.organisation"):
         assert asked[page] == f"{page}.read", page
+
+
+def test_receipt_tracking_pages_filters_and_counts_run_on_the_whole_register(client, admin_headers):
+    H = admin_headers
+    made = []
+    for i, (mode, part, amt) in enumerate([("CASH", "MEMBERSHIP", 111), ("UPI", "DONATION", 222), ("CASH", "DONATION", 333)]):
+        made.append(_make_receipt(client, H, receipt_type=part, payment_mode=mode, gross_amount=amt, net_amount=amt,
+                                  payer_name=f"Pager {i} Zorro", items=[{"item_type": part, "particular_name": part.title(), "description": f"Kind{i}", "amount": amt}]))
+
+    def tracking(**params):
+        r = client.get("/api/v1/receipts/tracking", headers=H, params=params)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    # a page never holds more than 200, whatever is asked
+    assert tracking(limit=5000)["limit"] == 200
+    assert len(tracking(limit=5000)["data"]) <= 200
+    # the search looks at the whole register, not at the rows of one page
+    found = tracking(limit=1, search="Zorro")
+    assert found["total"] >= 3 and len(found["data"]) == 1 and found["pages"] >= 3
+    # filters run in the database and the counts describe the whole filtered set
+    donations = tracking(limit=1, search="Zorro", particular="Donation")
+    assert donations["total"] == 2
+    assert donations["summary"]["total_amount"] == 555
+    assert sum(donations["summary"]["by_status"].values()) == 2
+    assert tracking(search="Zorro", sub_type="Kind2")["total"] == 1
+    assert tracking(search="Zorro", mode="upi")["total"] == 1
+    assert tracking(search="Zorro", fy=f"{date.today().year if date.today().month >= 4 else date.today().year - 1}-"
+                                      f"{str((date.today().year if date.today().month >= 4 else date.today().year - 1) + 1)[-2:]}")["total"] == 3
+    assert tracking(search="Zorro", fy="1999-00")["total"] == 0
+    assert client.get("/api/v1/receipts/tracking", headers=H, params={"fy": "nope"}).status_code == 400
+    # the legacy switch for screens not moved yet still lifts the cap
+    assert tracking(limit=5000, all_rows=True)["limit"] == 5000
+
+    options = client.get("/api/v1/receipts/tracking-options", headers=H).json()
+    assert options["financial_years"] and "Cash" in options["payment_modes"] and "Upi" in options["payment_modes"]
+    assert "Kind1" in options["sub_types"].get("Donation", [])

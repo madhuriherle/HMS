@@ -302,8 +302,17 @@ def read_receipt_tracking(
     export: Optional[str] = None,  # "csv" or "excel"
     sort_by: Optional[str] = None,   # id | receipt_date | receipt_number | amount | payer_name | payment_status
     sort_dir: str = "desc",
+    particular: Optional[str] = None,   # a line's particular, e.g. "Donation"
+    sub_type: Optional[str] = None,     # a line's sub type / detail, e.g. "Annadana"
+    fy: Optional[str] = None,           # financial year "2025-26" (1 Apr - 31 Mar)
+    mode: Optional[str] = None,         # payment mode as shown: "Cash", or the bank/account name
+    member_ids: Optional[str] = None,   # comma separated member ids (their receipts), at most 200
+    all_rows: bool = False,             # TEMPORARY: lifts the 200 cap for screens not yet moved to server paging
 ) -> Any:
     """Receipt register for the Receipt Tracking screen.
+
+    At most 200 receipts per request (rule 10.6): the search and every filter run on the whole register in the
+    database, the page only shows the slice asked for. ``summary`` holds the counts of the WHOLE filtered set.
 
     Use export=csv or export=excel to download the whole filtered register
     (the Tracking screen's Export button); it renders every data row and
@@ -316,10 +325,44 @@ def read_receipt_tracking(
     """
     # Cancelled (spoiled) receipts stay listed, with a Cancelled status, but add nothing to the totals.
     filters = [Receipt.is_deleted == False]  # noqa: E712
+    from core.pagination import LIST_PAGE_MAX
+    page = max(1, page)
+    limit = max(1, limit) if all_rows or export else max(1, min(limit, LIST_PAGE_MAX))
     if receipt_id:
         filters.append(Receipt.id == receipt_id)
     if receipt_status:
         filters.append(Receipt.receipt_status == receipt_status.upper())
+    if member_ids:
+        wanted = [int(x) for x in member_ids.split(",") if x.strip().isdigit()][:LIST_PAGE_MAX]
+        filters.append(Receipt.id.in_(
+            db.query(ReceiptAllocation.receipt_id).filter(
+                ReceiptAllocation.member_id.in_(wanted or [0]), ReceiptAllocation.is_deleted == False,  # noqa: E712
+            )
+        ))
+    if fy:
+        try:
+            start_year = int(fy.split("-")[0])
+        except ValueError:
+            raise HTTPException(400, "fy must look like 2025-26")
+        filters.append(Receipt.receipt_date >= date(start_year, 4, 1))
+        filters.append(Receipt.receipt_date <= date(start_year + 1, 3, 31))
+    if mode:
+        low = mode.strip().lower()
+        filters.append(or_(func.lower(Receipt.payment_mode) == low, func.lower(func.coalesce(Receipt.bank_account, "")) == low))
+    if particular:
+        filters.append(Receipt.id.in_(
+            db.query(ReceiptItem.receipt_id).filter(
+                ReceiptItem.is_deleted == False,  # noqa: E712
+                or_(func.lower(ReceiptItem.particular_name) == particular.strip().lower(),
+                    func.lower(ReceiptItem.item_type) == particular.strip().lower()),
+            )
+        ))
+    if sub_type:
+        filters.append(Receipt.id.in_(
+            db.query(ReceiptItem.receipt_id).filter(
+                ReceiptItem.is_deleted == False, func.trim(ReceiptItem.description) == sub_type.strip(),  # noqa: E712
+            )
+        ))
     if year:
         filters.append(func.extract("year", Receipt.receipt_date) == year)
     if month:
@@ -364,7 +407,15 @@ def read_receipt_tracking(
             Receipt.receipt_number.ilike(like),
             Receipt.transaction_reference.ilike(like),
             Receipt.cheque_number.ilike(like),
+            Receipt.payer_mobile.ilike(like),
+            Receipt.payer_membership_no.ilike(like),
             Receipt.id.in_(payee_receipt_ids),
+            Receipt.id.in_(
+                db.query(ReceiptItem.receipt_id).filter(
+                    ReceiptItem.is_deleted == False,  # noqa: E712
+                    or_(ReceiptItem.particular_name.ilike(like), ReceiptItem.description.ilike(like)),
+                )
+            ),
         ))
 
     # Per-mode summary over the SAME filter set, before pagination narrows it.
@@ -375,13 +426,16 @@ def read_receipt_tracking(
         .all()
     )
     total = db.query(func.count(Receipt.id)).filter(*filters).scalar()
-
-    rows = (
-        _sort_receipts(db.query(Receipt).filter(*filters), sort_by, sort_dir)
-        .offset((page - 1) * limit)
-        .limit(limit)
-        .all()
+    by_status = dict(
+        db.query(Receipt.receipt_status, func.count()).filter(*filters).group_by(Receipt.receipt_status).all()
     )
+    total_amount = float(
+        db.query(func.coalesce(func.sum(Receipt.net_amount), 0))
+        .filter(*filters, Receipt.receipt_status != "CANCELLED").scalar() or 0
+    )
+
+    ordered = _sort_receipts(db.query(Receipt).filter(*filters), sort_by, sort_dir)
+    rows = (ordered.all() if export else ordered.offset((page - 1) * limit).limit(limit).all())
     receipt_ids = [r.id for r in rows]
 
     allocs = (
@@ -481,12 +535,49 @@ def read_receipt_tracking(
         "summary": {
             "total_receipts": total,
             "by_payment_mode": mode_summary,
+            "by_status": {k or "UNASSIGNED": v for k, v in by_status.items()},
+            "total_amount": total_amount,
         },
         "total": total,
         "page": page,
         "limit": limit,
         "pages": (total + limit - 1) // limit if limit else 0,
         "data": data,
+    }
+
+
+@router.get("/tracking-options")
+def read_receipt_tracking_options(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """What the Receipt Tracking filters offer, read from the whole register: the financial years that have
+    receipts, each particular's sub types, and the payment modes in use (a bank account shows by its name)."""
+    live = [Receipt.is_deleted == False]  # noqa: E712
+    months = db.query(
+        func.extract("year", Receipt.receipt_date), func.extract("month", Receipt.receipt_date)
+    ).filter(*live).group_by(
+        func.extract("year", Receipt.receipt_date), func.extract("month", Receipt.receipt_date)
+    ).all()
+    years = sorted({int(y) if int(m) >= 4 else int(y) - 1 for y, m in months if y and m}, reverse=True)
+    sub_types: dict = {}
+    for name, desc in (
+        db.query(ReceiptItem.particular_name, ReceiptItem.description)
+        .join(Receipt, Receipt.id == ReceiptItem.receipt_id)
+        .filter(ReceiptItem.is_deleted == False, Receipt.is_deleted == False,  # noqa: E712
+                ReceiptItem.description.isnot(None), ReceiptItem.particular_name.isnot(None))
+        .distinct().limit(5000).all()
+    ):
+        d = (desc or "").strip()
+        if d and d.lower() != (name or "").strip().lower():
+            sub_types.setdefault(name, set()).add(d)
+    modes = set()
+    for pm, bank in db.query(Receipt.payment_mode, Receipt.bank_account).filter(*live).distinct().all():
+        modes.add((bank or "").strip() if (pm or "").upper() in ("NETBANKING", "OTHER") and (bank or "").strip() else (pm or "").title())
+    return {
+        "financial_years": [f"{y}-{str(y + 1)[-2:]}" for y in years],
+        "sub_types": {k: sorted(v) for k, v in sub_types.items()},
+        "payment_modes": sorted(m for m in modes if m),
     }
 
 

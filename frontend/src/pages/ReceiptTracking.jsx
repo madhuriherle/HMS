@@ -36,7 +36,8 @@ import { formatDate } from '../utils/dateUtils';
 import { apiErrorMessage } from '../utils/apiError';
 import { askForm, askReason, confirmYesNo } from '../utils/dialogs';
 import { notify } from '../utils/notify';
-import { fetchReceipts } from '../utils/apiAdapters';
+import { fetchReceiptPage } from '../utils/apiAdapters';
+import Pager from '../components/Pager';
 import { currentRules } from '../hooks/useRules';
 import { useList } from '../hooks/useLists';
 import { formatMoney } from '../utils/money';
@@ -142,7 +143,15 @@ export default function ReceiptTracking() {
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
   // Master Synchronized Stores
-  const [receipts, setReceipts] = useState([]);
+  const [receipts, setReceipts] = useState([]); // ONE page of the register (at most 200 rows), the rest stays on the server
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
+  const [summary, setSummary] = useState({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [loadingPage, setLoadingPage] = useState(true);
+  const [filterOptions, setFilterOptions] = useState({ financial_years: [], sub_types: {}, payment_modes: [] });
+  const [debouncedSearch, setDebouncedSearch] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
@@ -172,13 +181,53 @@ export default function ReceiptTracking() {
   const [paymentModeOptions, setPaymentModeOptions] = useState([]);
 
   const { sort, toggle: toggleSort, params: sortParams } = useSort();
+  // what the server is asked for: the page, the filters and the sort. The search and every filter run on the WHOLE
+  // register in the database; this screen only ever holds the page it shows.
+  const listParams = useMemo(() => {
+    const statusCode = { Assigned: 'ASSIGNED', Unassigned: 'UNASSIGNED', Cancelled: 'CANCELLED' };
+    return {
+      ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+      ...(particularsFilter !== 'ALL' ? { particular: particularsFilter } : {}),
+      ...(subTypeFilter !== 'ALL' ? { sub_type: subTypeFilter } : {}),
+      ...(statusFilter !== 'ALL' ? { receipt_status: statusCode[statusFilter] } : {}),
+      ...(fyFilter !== 'ALL' ? { fy: fyFilter } : {}),
+      ...(modeFilter !== 'ALL' ? { mode: modeFilter } : {}),
+      ...(fromDate ? { from_date: fromDate } : {}),
+      ...(toDate ? { to_date: toDate } : {}),
+      ...sortParams,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, particularsFilter, subTypeFilter, statusFilter, fyFilter, modeFilter, fromDate, toDate, sort.by, sort.dir]);
+
+  const requestSeq = useRef(0);
+  const loadPage = async () => {
+    const seq = (requestSeq.current += 1);
+    setLoadingPage(true);
+    try {
+      const result = await fetchReceiptPage({ ...listParams, page, limit: pageSize });
+      if (seq !== requestSeq.current) return; // a newer request is already on its way
+      setReceipts(result.rows);
+      setTotal(result.total);
+      setPages(Math.max(1, result.pages));
+      setSummary(result.summary);
+      if (page > Math.max(1, result.pages)) setPage(Math.max(1, result.pages));
+    } catch (error) {
+      if (seq !== requestSeq.current) return;
+      console.error('Failed to load receipts.', error);
+      showToast(error.response?.data?.detail || 'Failed to load receipts from the server.', 'error');
+    } finally {
+      if (seq === requestSeq.current) setLoadingPage(false);
+    }
+  };
+
   const reloadData = async () => {
     const fail = (what) => (error) => {
       console.error(`Failed to load ${what}.`, error);
       showToast(error.response?.data?.detail || `Failed to load ${what} from the server.`, 'error');
     };
     await Promise.all([
-      fetchReceipts(sortParams).then(setReceipts).catch(fail('receipts')),
+      loadPage(),
+      api.get('/receipts/tracking-options').then(({ data }) => setFilterOptions(data)).catch(fail('filter options')),
       loadParticulars()
         .then((all) => setParticularOptions(all.filter((p) => p.status === 'Active').map((p) => p.name)))
         .catch(fail('particulars')),
@@ -188,95 +237,37 @@ export default function ReceiptTracking() {
     ]);
   };
 
-  // Synchronize on mount
+  // masters and options once; the register again whenever the page, a filter or the sort changes
   useEffect(() => {
     reloadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sort.by, sort.dir]);
+  }, []);
+  useEffect(() => {
+    loadPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listParams, page, pageSize]);
+  // typing in the search box waits a moment, then asks the server
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+  // a new search / filter / sort starts again from page 1
+  useEffect(() => {
+    setPage(1);
+  }, [listParams, pageSize]);
 
-  // ----------------------------------------------------
-  // FILTERING LOGIC
-  // ----------------------------------------------------
-  const filteredReceipts = useMemo(() => {
-    return receipts.filter((r) => {
-      const isUnmapped = isReceiptUnmapped(r);
-
-      // 1. Search Query
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        const numMatch = (r.receiptNumber || '').toLowerCase().includes(q);
-        const nameMatch = (r.name || '').toLowerCase().includes(q);
-        const mobileMatch = (r.mobile || '').includes(q);
-        const memberNoMatch = (r.membershipNo || '').toLowerCase().includes(q);
-        const particularsMatch = (r.particulars || '').toLowerCase().includes(q);
-        const txnMatch = (r.transactionId || '').toLowerCase().includes(q);
-
-        if (
-          !numMatch &&
-          !nameMatch &&
-          !mobileMatch &&
-          !memberNoMatch &&
-          !particularsMatch &&
-          !txnMatch
-        ) {
-          return false;
-        }
-      }
-
-      // 2. Particulars / Receipt Type Filter
-      if (particularsFilter !== 'ALL') {
-        const rPart = (r.particulars || '').toLowerCase();
-        if (rPart !== particularsFilter.toLowerCase()) {
-          return false;
-        }
-      }
-
-      // Sub type (the detail on a receipt line, e.g. the donation kind)
-      if (subTypeFilter !== 'ALL' && !(r.items || []).some((i) => (i.description || '').trim() === subTypeFilter)) {
-        return false;
-      }
-
-      // 3. Status Filter (Assigned vs Unassigned)
-      if (fyFilter !== 'ALL' && fyOf(r.receiptDate) !== fyFilter) return false;
-      if (
-        modeFilter !== 'ALL' &&
-        (r.paymentMode || '').toLowerCase() !== modeFilter.toLowerCase() &&
-        (r.bankAccount || '').toLowerCase() !== modeFilter.toLowerCase()
-      ) {
-        return false;
-      }
-      if (fromDate && String(r.receiptDate || '') < fromDate) return false;
-      if (toDate && String(r.receiptDate || '') > toDate) return false;
-
-      const rs = r.receiptStatus || (isUnmapped ? 'UNASSIGNED' : 'ASSIGNED');
-      if (statusFilter === 'Assigned' && rs !== 'ASSIGNED') return false;
-      if (statusFilter === 'Unassigned' && rs !== 'UNASSIGNED') return false;
-      if (statusFilter === 'Cancelled' && rs !== 'CANCELLED') return false;
-
-      return true;
-    });
-  }, [receipts, searchQuery, particularsFilter, subTypeFilter, statusFilter, fyFilter, modeFilter, fromDate, toDate]);
+  const filteredReceipts = receipts; // the server already filtered, sorted and paged them
 
   // Receipt Type and Sub Type as one list: each type, then its sub types under it
   const typeOptions = useMemo(() => {
-    const subsOf = {};
-    receipts.forEach((r) => {
-      (r.items || []).forEach((i) => {
-        const d = (i.description || '').trim();
-        if (d && d.toLowerCase() !== String(r.particulars || '').toLowerCase()) {
-          if (!subsOf[r.particulars]) subsOf[r.particulars] = new Set();
-          subsOf[r.particulars].add(d);
-        }
-      });
-    });
     const out = [{ value: 'ALL', label: 'All Receipt Types' }];
     particularOptions.forEach((t) => {
-      const subs = [...(subsOf[t] || [])].sort();
+      const subs = filterOptions.sub_types?.[t] || [];
       out.push({ value: `T|${t}`, label: subs.length ? `${t} (all)` : t, bold: true });
-      subs.forEach((s) => out.push({ value: `S|${s}`, label: s, indent: true }));
+      subs.forEach((sub) => out.push({ value: `S|${sub}`, label: sub, indent: true }));
     });
     return out;
-  }, [receipts, particularOptions]);
+  }, [filterOptions, particularOptions]);
 
   const chooseType = (val) => {
     if (val === 'ALL') {
@@ -313,28 +304,36 @@ export default function ReceiptTracking() {
     }
   };
 
-  const fyOptions = useMemo(
-    () => [...new Set(receipts.map((r) => fyOf(r.receiptDate)).filter(Boolean))].sort().reverse(),
-    [receipts]
-  );
+  const fyOptions = filterOptions.financial_years || [];
   // every active mode from Payment Mode Setup, plus any mode a receipt already carries that the master lacks
   const modeOptions = useMemo(() => {
     const out = [...paymentModeOptions];
     const have = new Set(out.map((m) => m.toLowerCase()));
-    receipts.forEach((r) => {
-      if (r.paymentMode && !have.has(r.paymentMode.toLowerCase()) && !(r.bankAccount && have.has(r.bankAccount.toLowerCase()))) {
-        have.add(r.paymentMode.toLowerCase());
-        out.push(r.paymentMode);
+    (filterOptions.payment_modes || []).forEach((m) => {
+      if (!have.has(m.toLowerCase())) {
+        have.add(m.toLowerCase());
+        out.push(m);
       }
     });
-    return out.sort((a, b) => a.localeCompare(b));
-  }, [receipts, paymentModeOptions]);
+    return out.sort((x, y) => x.localeCompare(y));
+  }, [filterOptions, paymentModeOptions]);
   // ----------------------------------------------------
   // EXPORT, DAY BOOK
   // ----------------------------------------------------
-  const exportVisibleReceipts = () => {
+  const exportVisibleReceipts = async () => {
+    let everything = [];
+    try {
+      for (let n = 1; n <= 200; n += 1) {
+        const chunk = await fetchReceiptPage({ ...listParams, page: n, limit: 200 });
+        everything = everything.concat(chunk.rows);
+        if (n >= chunk.pages) break;
+      }
+    } catch (error) {
+      showToast(apiErrorMessage(error, 'Could not export the receipts.'), 'error');
+      return;
+    }
     const head = ['Receipt No', 'Date', 'Financial Year', 'Name', 'Mobile', 'Particulars', 'Amount', 'Payment Mode', 'Reference', 'Status'];
-    const rows = filteredReceipts.map((r) => [
+    const rows = everything.map((r) => [
       r.receiptNumber,
       r.receiptDate,
       fyOf(r.receiptDate),
@@ -430,12 +429,11 @@ export default function ReceiptTracking() {
     const num = deletingReceipt.receiptNumber;
     try {
       await api.delete(`/receipts/${deletingReceipt.id}`, { params: { reason: 'Deleted via UI' } });
-      setReceipts((prev) => prev.filter((r) => r.id !== deletingReceipt.id));
       showToast(`Receipt ${num} deleted successfully.`);
+      await loadPage();
     } catch (error) {
       if (error.response?.status === 404) {
         // Already removed (e.g. a repeated click): just refresh the list.
-        setReceipts((prev) => prev.filter((r) => r.id !== deletingReceipt.id));
         showToast(`Receipt ${num} was already deleted.`);
         reloadData();
       } else {
@@ -764,25 +762,28 @@ export default function ReceiptTracking() {
           </table>
         </div>
 
-        {/* Footer Summary bar */}
-        <div className="px-5 py-3.5 bg-[#FAF7F2] border-t border-[#E8DFD8] flex flex-col sm:flex-row items-center justify-between text-xs text-[#863221] gap-2">
-          <div>
-            Showing <strong className="text-[#180200]">{filteredReceipts.length}</strong> of{' '}
-            <strong className="text-[#180200]">{receipts.length}</strong> total receipts
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1 font-semibold text-emerald-800">
-              <span className="w-2 h-2 rounded-full bg-emerald-600" />
-              <span>{receipts.filter((r) => r.receiptStatus === 'ASSIGNED').length} Assigned</span>
+        {/* Footer: page controls, then the counts of the whole filtered set */}
+        <div className="px-5 py-3.5 bg-[#FAF7F2] border-t border-[#E8DFD8] space-y-2.5">
+          <Pager page={page} pages={pages} total={total} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#863221]">
+            <span>
+              {loadingPage ? 'Loading…' : <><strong className="text-[#180200]">{total}</strong> receipt(s) match</>}
+              {summary.total_amount != null && <> · <strong className="text-[#180200]">{formatMoney(summary.total_amount)}</strong> collected</>}
             </span>
-            <span className="inline-flex items-center gap-1 font-semibold text-amber-800">
-              <span className="w-2 h-2 rounded-full bg-amber-500" />
-              <span>{receipts.filter((r) => isReceiptUnmapped(r)).length} Unassigned</span>
-            </span>
-            <span className="inline-flex items-center gap-1 font-semibold text-red-800">
-              <span className="w-2 h-2 rounded-full bg-red-500" />
-              <span>{receipts.filter((r) => r.receiptStatus === 'CANCELLED').length} Cancelled</span>
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1 font-semibold text-emerald-800">
+                <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                <span>{summary.by_status?.ASSIGNED || 0} Assigned</span>
+              </span>
+              <span className="inline-flex items-center gap-1 font-semibold text-amber-800">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span>{summary.by_status?.UNASSIGNED || 0} Unassigned</span>
+              </span>
+              <span className="inline-flex items-center gap-1 font-semibold text-red-800">
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <span>{summary.by_status?.CANCELLED || 0} Cancelled</span>
+              </span>
+            </div>
           </div>
         </div>
       </div>
