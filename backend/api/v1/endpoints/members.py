@@ -45,8 +45,13 @@ def read_members(
     search: Optional[str] = None,
     sort_by: Optional[str] = None,   # id | created_at | name | member_code | mobile | approval_status | member_status
     sort_dir: str = "desc",
+    no_membership_type: bool = False,   # members who have not reached any type yet
+    all_rows: bool = False,             # TEMPORARY: lifts the 200 cap for screens not yet moved to server paging
 ) -> Any:
-    """Retrieve members with optional filters and search (offline + online). Newest first unless sort_by is given."""
+    """Retrieve members with optional filters and search (offline + online). Newest first unless sort_by is given.
+    At most 200 per request (rule 10.6); the search and the filters run on every member, the page is a slice."""
+    from core.pagination import LIST_PAGE_MAX
+    limit = max(1, limit) if all_rows else max(1, min(limit, LIST_PAGE_MAX))
     query = db.query(Member).filter(Member.is_deleted == False)
     if include_deleted:
         query = db.query(Member)
@@ -76,7 +81,15 @@ def read_members(
             MemberMembership.membership_type_id == membership_type_id,
             MemberMembership.is_deleted == False,
         ).distinct()
+    if no_membership_type:
+        query = query.filter(~Member.id.in_(
+            db.query(MemberMembership.member_id).filter(
+                MemberMembership.is_deleted == False,  # noqa: E712
+                MemberMembership.membership_type_id.isnot(None),
+            )
+        ))
     if search:
+        from models.masters import District, PostalCode  # the list also shows the place: search it too
         query = query.filter(or_(
             Member.first_name_en.ilike(f"%{search}%"),
             Member.last_name_en.ilike(f"%{search}%"),
@@ -85,6 +98,10 @@ def read_members(
             Member.alternate_mobile.ilike(f"%{search}%"),
             Member.member_code.ilike(f"%{search}%"),
             Member.email.ilike(f"%{search}%"),
+            Member.locality.ilike(f"%{search}%"),
+            Member.city.ilike(f"%{search}%"),
+            Member.district_id.in_(db.query(District.id).filter(District.name_en.ilike(f"%{search}%"))),
+            Member.pincode_id.in_(db.query(PostalCode.id).filter(PostalCode.pincode.ilike(f"%{search}%"))),
         ))
 
     from core.sorting import sort_query

@@ -42,7 +42,6 @@ import { calculateMemberMembershipStatus } from '../utils/displayHelpers';
 import {
   loadLocations,
   loadMembershipTypes,
-  loadReceipts,
   loadGothras,
   findLocationByPin
 } from '../utils/serverData';
@@ -53,8 +52,9 @@ import api from '../api';
 import MemberApplicationDetails from '../components/MemberApplicationDetails';
 import { askForm } from '../utils/dialogs';
 import { notify } from '../utils/notify';
+import Pager from '../components/Pager';
 import {
-  fetchMembers,
+  fetchMemberPage,
   memberToApiPayload,
   normalizeMember,
 } from '../utils/apiAdapters';
@@ -75,9 +75,12 @@ export default function MembershipList() {
   // ----------------------------------------------------
   // MASTER STORES
   // ----------------------------------------------------
-  const [members, setMembers] = useState([]);
+  const [members, setMembers] = useState([]); // ONE page of members (at most 200), the rest stays on the server
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
+  const [loadingPage, setLoadingPage] = useState(true);
   const [membershipTypes, setMembershipTypes] = useState([]);
-  const [receipts, setReceipts] = useState([]);
+  const receipts = []; // the member details popup further down is switched off; it used to read every receipt
   const [states, setStates] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [taluks, setTaluks] = useState([]);
@@ -85,21 +88,50 @@ export default function MembershipList() {
   const [gothras, setGothras] = useState([]);
 
   const { sort, toggle: toggleSort, params: sortParams } = useSort();
+  const requestSeq = useRef(0);
+  // what the server is asked for: the page, the search, the filters and the sort. They run on every member in the
+  // database; this screen only holds the page it shows (rule 10.6).
   const loadMembers = async () => {
+    const seq = (requestSeq.current += 1);
+    setLoadingPage(true);
     try {
-      setMembers(await fetchMembers({ approval_status: 'APPROVED', ...sortParams }));
+      const params = { approval_status: 'APPROVED', page: currentPage, limit: pageSize, ...sortParams };
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+      if (typeFilter === 'None' || typeFilter === 'Not Yet Reached') {
+        params.no_membership_type = true;
+      } else if (typeFilter !== 'ALL') {
+        const type = membershipTypes.find((mt) => mt.name === typeFilter);
+        if (type) params.membership_type_id = type.id;
+      }
+      if (statusFilter !== 'ALL') params.is_active = statusFilter === 'Active';
+      if (stateFilter !== 'ALL') {
+        const st = states.find((x) => x.name.toLowerCase() === stateFilter.toLowerCase());
+        if (st) params.state_id = st.id;
+      }
+      if (districtFilter !== 'ALL') {
+        const d = districts.find((x) => x.name.toLowerCase() === districtFilter.toLowerCase());
+        if (d) params.district_id = d.id;
+      }
+      const result = await fetchMemberPage(params);
+      if (seq !== requestSeq.current) return; // a newer request is on its way
+      setMembers(result.rows);
+      setTotal(result.total);
+      setPages(Math.max(1, result.pages));
+      if (currentPage > Math.max(1, result.pages)) setCurrentPage(Math.max(1, result.pages));
     } catch (error) {
+      if (seq !== requestSeq.current) return;
       console.error('Failed to load members.', error);
       showToast(error.response?.data?.detail || 'Failed to load members from the server.', 'error');
+    } finally {
+      if (seq === requestSeq.current) setLoadingPage(false);
     }
   };
 
   const loadMasters = async () => {
     try {
-      const [loc, types, recs, goth] = await Promise.all([
+      const [loc, types, goth] = await Promise.all([
         loadLocations(),
         loadMembershipTypes(),
-        loadReceipts(),
         loadGothras()
       ]);
       setStates(loc.states);
@@ -107,7 +139,6 @@ export default function MembershipList() {
       setTaluks(loc.taluks);
       setPostalCodes(loc.postalCodes);
       setMembershipTypes(types);
-      setReceipts(recs);
       setGothras(goth);
     } catch (error) {
       console.error('Failed to load master data.', error);
@@ -120,11 +151,7 @@ export default function MembershipList() {
     loadMasters();
   }, []);
 
-  // the member list is read again from the server whenever the sort changes (the default is newest first)
-  useEffect(() => {
-    loadMembers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sort.by, sort.dir]);
+
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState(null);
@@ -142,7 +169,23 @@ export default function MembershipList() {
   const [districtFilter, setDistrictFilter] = useState('ALL');
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
+
+  // the page is read again whenever the page, the search, a filter or the sort changes (default: newest first)
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const filterKey = [debouncedSearch, typeFilter, statusFilter, stateFilter, districtFilter, sort.by, sort.dir].join('|');
+  const mastersReady = membershipTypes.length > 0 || states.length > 0;
+  useEffect(() => {
+    loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey, currentPage, pageSize, mastersReady]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterKey, pageSize]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Row Selection (Set of Selected Members)
   const [selectedMemberIds, setSelectedMemberIds] = useState(new Set());
@@ -271,71 +314,7 @@ export default function MembershipList() {
     return st ? districts.filter((d) => d.stateId === st.id) : districts;
   }, [districts, states, stateFilter]);
 
-  // ----------------------------------------------------
-  // FILTERING LOGIC
-  // ----------------------------------------------------
-  const filteredMembers = useMemo(() => {
-    return members.filter((m) => {
-      // Search
-      if (searchQuery.trim()) {
-        const q = searchQuery.trim().toLowerCase();
-        const memberName = (m.fullName || m.name || '').toLowerCase();
-        const memberNo = String(m.membershipNumber || '').toLowerCase();
-        const mobile = (m.mobile || m.mobileNumber || '').toLowerCase();
-        const email = (m.email || '').toLowerCase();
-        const city = (m.city || m.place || m.talukName || '').toLowerCase();
-        const district = (m.districtName || '').toLowerCase();
-        const pin = (m.postalCode || '').toLowerCase();
-
-        if (
-          !memberName.includes(q) &&
-          !memberNo.includes(q) &&
-          !mobile.includes(q) &&
-          !email.includes(q) &&
-          !city.includes(q) &&
-          !district.includes(q) &&
-          !pin.includes(q)
-        ) {
-          return false;
-        }
-      }
-
-      // Membership Type Filter (the member's type as recorded on the server)
-      if (typeFilter !== 'ALL') {
-        const currentType = String(m.membershipType || '').toLowerCase();
-        if (typeFilter === 'None' || typeFilter === 'Not Yet Reached') {
-          if (currentType) return false;
-        } else if (currentType !== typeFilter.toLowerCase()) {
-          return false;
-        }
-      }
-
-      // Status Filter
-      if (statusFilter !== 'ALL') {
-        const normStatus = m.status === 'Approved' ? 'Active' : m.status;
-        if (normStatus !== statusFilter) return false;
-      }
-
-      // State Filter
-      if (stateFilter !== 'ALL') {
-        if ((m.stateName || '').toLowerCase() !== stateFilter.toLowerCase()) return false;
-      }
-
-      // District Filter
-      if (districtFilter !== 'ALL') {
-        if ((m.districtName || '').toLowerCase() !== districtFilter.toLowerCase()) return false;
-      }
-
-      return true;
-    });
-  }, [members, searchQuery, typeFilter, statusFilter, stateFilter, districtFilter]);
-
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / pageSize));
-  const paginatedMembers = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
-    return filteredMembers.slice(start, start + pageSize);
-  }, [filteredMembers, currentPage, pageSize]);
+  const paginatedMembers = members; // the server already searched, filtered, sorted and paged them
 
   // Checkbox selection helpers
   const isAllPaginatedSelected = useMemo(() => {
@@ -343,12 +322,13 @@ export default function MembershipList() {
     return paginatedMembers.every((m) => selectedMemberIds.has(m.id));
   }, [paginatedMembers, selectedMemberIds]);
 
+  const selectedCache = useRef(new Map()); // id -> member row, so a ticked member from another page still prints
   const handleToggleSelectAll = () => {
     const next = new Set(selectedMemberIds);
     if (isAllPaginatedSelected) {
       paginatedMembers.forEach((m) => next.delete(m.id));
     } else {
-      paginatedMembers.forEach((m) => next.add(m.id));
+      paginatedMembers.forEach((m) => { next.add(m.id); selectedCache.current.set(m.id, m); });
     }
     setSelectedMemberIds(next);
   };
@@ -359,6 +339,8 @@ export default function MembershipList() {
       next.delete(id);
     } else {
       next.add(id);
+      const row = members.find((m) => m.id === id);
+      if (row) selectedCache.current.set(id, row);
     }
     setSelectedMemberIds(next);
   };
@@ -526,7 +508,7 @@ export default function MembershipList() {
       try {
         const { data } = await api.post('/members/', memberToApiPayload(formData));
         const newMember = normalizeMember(data);
-        setMembers((prev) => [newMember, ...prev]);
+        loadMembers();
         showToast(`Member "${newMember.fullName}" (${newMember.membershipNumber}) registered successfully.`);
       } catch (error) {
         console.error('Failed to create member.', error);
@@ -634,7 +616,7 @@ export default function MembershipList() {
         setDeleteReason('');
         return;
       }
-      setMembers((prev) => prev.filter((m) => m.id !== deleteDialog.id));
+      loadMembers();
     } catch (error) {
       console.error('Failed to delete member.', error);
       showToast(error.response?.data?.detail || 'Failed to delete member through API.', 'error');
@@ -681,8 +663,8 @@ export default function MembershipList() {
   // LABEL PREVIEW ITEMS & PRINT TRIGGER
   // ----------------------------------------------------
   const selectedMembersForLabels = useMemo(() => {
-    return members.filter((m) => selectedMemberIds.has(m.id));
-  }, [members, selectedMemberIds]);
+    return [...selectedMemberIds].map((id) => selectedCache.current.get(id)).filter(Boolean);
+  }, [selectedMemberIds]);
 
   const handleTriggerPrint = () => {
     window.print();
@@ -856,7 +838,9 @@ export default function MembershipList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DFD8]">
-              {paginatedMembers.length === 0 ? (
+              {loadingPage && paginatedMembers.length === 0 ? (
+                <tr><td colSpan={8} className="py-12 text-center text-sm text-[#863221]">Loading members…</td></tr>
+              ) : paginatedMembers.length === 0 ? (
                 <tr>
                   <td colSpan="7" className="py-12 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center">
@@ -975,63 +959,10 @@ export default function MembershipList() {
           </table>
         </div>
 
-        {/* Pagination Section */}
-        {filteredMembers.length > 0 && (
-          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-[#863221]">
-            <div className="flex items-center gap-2">
-              <span>Showing</span>
-              <span className="font-bold text-[#180200]">
-                {Math.min((currentPage - 1) * pageSize + 1, filteredMembers.length)}
-              </span>
-              <span>to</span>
-              <span className="font-bold text-[#180200]">
-                {Math.min(currentPage * pageSize, filteredMembers.length)}
-              </span>
-              <span>of</span>
-              <span className="font-bold text-[#180200]">{filteredMembers.length}</span>
-              <span>members</span>
-            </div>
-
-            <div className="flex items-center gap-4 self-end sm:self-auto">
-              <div className="flex items-center gap-1.5">
-                <span>Rows per page:</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="py-1 px-2 text-xs bg-white border border-[#E8DFD8] rounded focus:outline-none focus:border-[#510601]"
-                >
-                  <option value={10}>10</option>
-                  <option value={25}>25</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={currentPage <= 1}
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="p-1.5 rounded-lg bg-white border border-[#E8DFD8] disabled:opacity-40 hover:bg-[#FAF7F2] transition-colors cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="px-2 font-bold text-[#180200]">
-                  {currentPage} / {totalPages}
-                </span>
-                <button
-                  type="button"
-                  disabled={currentPage >= totalPages}
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="p-1.5 rounded-lg bg-white border border-[#E8DFD8] disabled:opacity-40 hover:bg-[#FAF7F2] transition-colors cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+        {/* Pagination Section: the server pages the list */}
+        {total > 0 && (
+          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+            <Pager page={currentPage} pages={pages} total={total} pageSize={pageSize} onPage={setCurrentPage} onPageSize={setPageSize} />
           </div>
         )}
       </div>

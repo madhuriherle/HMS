@@ -4552,10 +4552,14 @@ def test_campaign_send_records_delivery_status(client, admin_headers, monkeypatc
 
 
 def test_page_size_clamped(client, admin_headers):
-    from core.pagination import MAX_PAGE_SIZE
+    from core.pagination import LIST_PAGE_MAX, MAX_PAGE_SIZE
 
+    # a list a person pages through never returns more than 200 rows per request (rule 10.6)
     response = client.get("/api/v1/members/", headers=admin_headers, params={"limit": 100000})
     assert response.status_code == 200, response.text
+    assert response.json()["limit"] == LIST_PAGE_MAX
+    # the screens not yet moved to server paging use the temporary switch, still capped by the hard maximum
+    response = client.get("/api/v1/members/", headers=admin_headers, params={"limit": 100000, "all_rows": True})
     assert response.json()["limit"] == MAX_PAGE_SIZE
 
 
@@ -7082,3 +7086,29 @@ def test_receipt_tracking_pages_filters_and_counts_run_on_the_whole_register(cli
     options = client.get("/api/v1/receipts/tracking-options", headers=H).json()
     assert options["financial_years"] and "Cash" in options["payment_modes"] and "Upi" in options["payment_modes"]
     assert "Kind1" in options["sub_types"].get("Donation", [])
+
+
+def test_member_list_pages_search_and_filters_run_on_every_member(client, admin_headers):
+    H = admin_headers
+    ids = [_create_member(client, H, f"96880000{n:02d}", f"Pagey{n:02d}")["id"] for n in range(1, 6)]
+
+    def listing(**params):
+        r = client.get("/api/v1/members/", headers=H, params=params)
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    # never more than 200 in one request; the screens still on the old way ask for all_rows
+    assert listing(limit=5000)["limit"] == 200
+    assert listing(limit=5000, all_rows=True)["limit"] == 5000
+    # a page is a slice; the total and the search cover every member
+    first = listing(limit=2, search="Pagey")
+    assert first["total"] >= 5 and len(first["data"]) == 2 and first["pages"] >= 3
+    second = listing(limit=2, page=2, search="Pagey")
+    assert {m["id"] for m in first["data"]}.isdisjoint({m["id"] for m in second["data"]})
+    # newest first, and the filters narrow the whole list
+    assert [m["id"] for m in listing(limit=5, search="Pagey")["data"]] == sorted(ids, reverse=True)[:5]
+    assert listing(search="Pagey03")["total"] == 1
+    assert listing(search="9688000004")["total"] == 1
+    no_type = listing(limit=200, search="Pagey", no_membership_type=True)
+    assert no_type["total"] >= 5
+    assert listing(search="Pagey", is_active=False)["total"] == 0

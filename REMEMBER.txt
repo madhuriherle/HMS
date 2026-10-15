@@ -250,9 +250,10 @@ RULE 10: MASTERS AND SCREENS
      wait ~350 ms after typing before asking. An export asks page by page (200 at a time) or uses the
      export parameter. The filter drop-downs read their options from the server (for example
      GET /receipts/tracking-options), not from the rows on screen. Screens still on the old way read with
-     all_rows=true (TEMPORARY, marked in apiAdapters.fetchReceipts): Membership List, Unapproved
+     all_rows=true (TEMPORARY, marked in apiAdapters.fetchReceipts / fetchMembers): Unapproved
      Membership, Label List, Magazine, Receipt Entry's lists and Payment Mode Setup; each is moved to
-     server paging in turn and then loses the switch. Receipt Tracking is moved (migration-free).
+     server paging in turn and then loses the switch. Moved so far: Receipt Tracking, Membership List
+     (the member list takes search, filters, no_membership_type, is_active, sort_by and page / limit).
 
 --------------------------------------------------------------------------------
 RULE 11: HOW WE WORK (ALL AGENTS)
