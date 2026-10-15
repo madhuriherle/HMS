@@ -38,8 +38,8 @@ def read_recycle_bin(
 ) -> Any:
     if entity and entity not in recycle_bin.ENTITIES:
         raise HTTPException(400, "Unknown record type")
-    out = recycle_bin.listing(db, search=search, entity=entity, page=page, limit=limit)
-    out["types"] = recycle_bin.counts(db)
+    out = recycle_bin.listing(db, search=search, entity=entity, page=page, limit=limit, viewer=current_user)
+    out["types"] = recycle_bin.counts(db, viewer=current_user)
     return out
 
 
@@ -47,14 +47,14 @@ def read_recycle_bin(
 def restore_from_recycle_bin(
     *, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("system.write")), body: BinItems,
 ) -> Any:
-    return recycle_bin.restore(db, current_user.id, [i.model_dump() for i in body.items])
+    return recycle_bin.restore(db, current_user.id, [i.model_dump() for i in body.items], viewer=current_user)
 
 
 @router.post("/recycle-bin/purge")
 def purge_from_recycle_bin(
     *, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("system.write")), body: BinItems,
 ) -> Any:
-    return recycle_bin.purge(db, [i.model_dump() for i in body.items])
+    return recycle_bin.purge(db, [i.model_dump() for i in body.items], viewer=current_user)
 
 
 @router.post("/recycle-bin/empty")
@@ -64,7 +64,7 @@ def empty_recycle_bin(
     """Permanently delete everything in the bin (or one record type). Records still used elsewhere stay."""
     if body.entity and body.entity not in recycle_bin.ENTITIES:
         raise HTTPException(400, "Unknown record type")
-    return recycle_bin.purge(db, recycle_bin.all_items(db, body.entity))
+    return recycle_bin.purge(db, recycle_bin.all_items(db, body.entity, viewer=current_user), viewer=current_user)
 
 
 class CleanupIn(BaseModel):

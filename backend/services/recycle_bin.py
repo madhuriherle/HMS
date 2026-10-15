@@ -85,20 +85,38 @@ def _deleted(model):
     return model.is_deleted == True  # noqa: E712
 
 
-def counts(db: Session) -> list:
+def _hidden(db: Session, viewer) -> set:
+    """Accounts above the viewer: a deleted Super Admin never shows in anyone else's bin, and what such an
+    account deleted is shown as done by the system."""
+    if viewer is None:
+        return set()
+    from api import deps
+    return deps.stronger_user_ids(db, viewer)
+
+
+def _bin_query(db: Session, e: Entity, hidden: set):
+    q = db.query(e.model).filter(_deleted(e.model))
+    if e.key == "user" and hidden:
+        q = q.filter(User.id.notin_(hidden))
+    return q
+
+
+def counts(db: Session, viewer=None) -> list:
+    hidden = _hidden(db, viewer)
     out = []
     for e in ENTITIES.values():
-        out.append({"value": e.key, "label": e.label, "count": db.query(e.model).filter(_deleted(e.model)).count()})
+        out.append({"value": e.key, "label": e.label, "count": _bin_query(db, e, hidden).count()})
     return out
 
 
-def listing(db: Session, search: str = "", entity: str = "", page: int = 1, limit: int = 25) -> dict:
+def listing(db: Session, search: str = "", entity: str = "", page: int = 1, limit: int = 25, viewer=None) -> dict:
+    hidden = _hidden(db, viewer)
     users = {}
     rows = []
     for e in ENTITIES.values():
         if entity and e.key != entity:
             continue
-        q = db.query(e.model).filter(_deleted(e.model))
+        q = _bin_query(db, e, hidden)
         if search:
             like = f"%{search.strip()}%"
             q = q.filter(or_(*[c.ilike(like) for c in e.search_cols]))
@@ -111,7 +129,7 @@ def listing(db: Session, search: str = "", entity: str = "", page: int = 1, limi
     window = rows[(page - 1) * limit: page * limit]
     ids = {r.deleted_by for _, r in window if r.deleted_by}
     if ids:
-        users = {u.id: u.name or u.username for u in db.query(User).filter(User.id.in_(ids)).all()}
+        users = {u.id: ("System" if u.id in hidden else (u.name or u.username)) for u in db.query(User).filter(User.id.in_(ids)).all()}
     data = [
         {
             "key": f"{e.key}:{r.id}",
@@ -127,18 +145,19 @@ def listing(db: Session, search: str = "", entity: str = "", page: int = 1, limi
     return {"data": data, "total": total, "page": page, "limit": limit, "pages": max(1, -(-total // limit))}
 
 
-def _get(db: Session, entity: str, entity_id: int):
+def _get(db: Session, entity: str, entity_id: int, hidden: set = frozenset()):
     e = ENTITIES.get(entity)
     if not e:
         return None, None
-    row = db.query(e.model).filter(e.model.id == entity_id, _deleted(e.model)).first()
+    row = _bin_query(db, e, set(hidden)).filter(e.model.id == entity_id).first()
     return e, row
 
 
-def restore(db: Session, user_id: int, items: list) -> dict:
+def restore(db: Session, user_id: int, items: list, viewer=None) -> dict:
     done, failed = [], []
+    hidden = _hidden(db, viewer)
     for it in items:
-        e, row = _get(db, it["entity"], it["id"])
+        e, row = _get(db, it["entity"], it["id"], hidden)
         if not row:
             failed.append({"key": f"{it['entity']}:{it['id']}", "error": "Not in the recycle bin any more."})
             continue
@@ -203,10 +222,11 @@ def _purge_dependents(db: Session, row) -> None:
         drop(District, *_gone(District, District.state_id == row.id))
 
 
-def purge(db: Session, items: list) -> dict:
+def purge(db: Session, items: list, viewer=None) -> dict:
     done, failed = 0, []
+    hidden = _hidden(db, viewer)
     for it in items:
-        e, row = _get(db, it["entity"], it["id"])
+        e, row = _get(db, it["entity"], it["id"], hidden)
         if not row:
             failed.append({"key": f"{it['entity']}:{it['id']}", "error": "Not in the recycle bin any more."})
             continue
@@ -223,10 +243,11 @@ def purge(db: Session, items: list) -> dict:
     return {"deleted": done, "failed": failed}
 
 
-def all_items(db: Session, entity: Optional[str] = None) -> list:
+def all_items(db: Session, entity: Optional[str] = None, viewer=None) -> list:
+    hidden = _hidden(db, viewer)
     out = []
     for e in ENTITIES.values():
         if entity and e.key != entity:
             continue
-        out += [{"entity": e.key, "id": i} for (i,) in db.query(e.model.id).filter(_deleted(e.model)).all()]
+        out += [{"entity": e.key, "id": i} for (i,) in _bin_query(db, e, hidden).with_entities(e.model.id).all()]
     return out

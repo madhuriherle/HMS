@@ -6926,3 +6926,35 @@ def test_nothing_reveals_that_someone_sits_above_the_admin(client, admin_headers
     seen = client.get("/api/v1/activity/users", headers=adm, params={"limit": 200, "show_navigation": True}).json()["data"]
     assert not any(r.get("user_id") == sa_id for r in seen)
     assert str(sa_id) not in client.get("/api/v1/activity/users/summary", headers=adm).json()["data"]
+
+
+def test_recycle_bin_hides_accounts_above_the_viewer(client, admin_headers):
+    """A deleted Super Admin shows in another Super Admin's recycle bin, never in a weaker viewer's, and what a
+    Super Admin deleted reads as done by the system for everyone below."""
+    from db.session import SessionLocal
+    from models.users import User
+    from services import recycle_bin
+
+    sa_role = _role_id(client, admin_headers, "SUPERADMIN")
+    made = client.post("/api/v1/users/", headers=admin_headers,
+                       json={"name": "Second Boss", "username": "bin_second_boss", "password": "Second@12345", "role_id": sa_role})
+    assert made.status_code == 200, made.text
+    boss_id = made.json()["id"]
+    assert client.delete(f"/api/v1/users/{boss_id}", headers=admin_headers).status_code == 200
+
+    _, _, adm = _staff_with_role(client, admin_headers, "bin_gate_admin", "Bin Gate Role", "BIN_GATE_ROLE",
+                                 permission_grants=[("users.management.read", False)], rank_level=1)
+    # the bin itself is a Settings tool: not reachable for an Admin at all
+    assert client.get("/api/v1/system/recycle-bin", headers=adm).status_code == 403
+
+    with SessionLocal() as db:
+        viewer_admin = db.query(User).filter(User.username == "bin_gate_admin").first()
+        viewer_super = db.query(User).filter(User.username == "admin").first() or db.query(User).filter(User.id == 1).first()
+        names = lambda out: [r["name"] for r in out["data"] if r["entity"] == "user"]
+        assert "Second Boss" in names(recycle_bin.listing(db, entity="user", viewer=viewer_super))
+        assert "Second Boss" not in names(recycle_bin.listing(db, entity="user", viewer=viewer_admin))
+        assert next(t["count"] for t in recycle_bin.counts(db, viewer=viewer_admin) if t["value"] == "user") < \
+               next(t["count"] for t in recycle_bin.counts(db, viewer=viewer_super) if t["value"] == "user")
+        # restoring or purging it as the weaker viewer answers like an item that is not there
+        out = recycle_bin.restore(db, viewer_admin.id, [{"entity": "user", "id": boss_id}], viewer=viewer_admin)
+        assert out["restored"] == 0 and out["failed"][0]["error"].startswith("Not in the recycle bin")
