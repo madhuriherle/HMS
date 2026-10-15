@@ -262,3 +262,19 @@ Index("uq_members_membership_number_active", Member.__table__.c.membership_numbe
       postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
 Index("uq_member_memberships_membership_number_active", MemberMembership.__table__.c.membership_number, unique=True,
       postgresql_where=text("is_deleted = false"), sqlite_where=text("is_deleted = false"))
+
+
+class MemberImportRun(AuditMixin, Base):
+    """One bulk member import (a file imported in batches): who ran it, when, the file and what happened."""
+    __tablename__ = "member_import_runs"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    run_id: Mapped[str] = mapped_column(String(40), nullable=False, unique=True)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=True)
+    total_rows: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    processed_rows: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    success_count: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    skipped_count: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    skip_duplicates: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    skipped: Mapped[list] = mapped_column(JSON, nullable=True)  # the first rows that were left out, with the reason
+    warning_count: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    warnings: Mapped[list] = mapped_column(JSON, nullable=True)  # rows imported with something to look at, e.g. a shared mobile
