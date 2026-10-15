@@ -7161,3 +7161,15 @@ def test_seeding_privileges_leaves_a_deleted_privilege_deleted(client, admin_hea
         finally:
             row.is_deleted = False
             db.commit()
+
+
+def test_payment_mode_usage_counts_come_from_the_server(client, admin_headers):
+    H = admin_headers
+    for mode in ("CASH", "CASH", "UPI"):
+        _make_receipt(client, H, payment_mode=mode, gross_amount=10, net_amount=10, items=[{"item_type": "MEMBERSHIP", "amount": 10}])
+    rows = client.get("/api/v1/receipts/payment-mode-usage", headers=H).json()
+    by_mode = {}
+    for r in rows:
+        by_mode[r["payment_mode"]] = by_mode.get(r["payment_mode"], 0) + r["count"]
+    assert by_mode["CASH"] >= 2 and by_mode["UPI"] >= 1
+    assert all(set(r) == {"payment_mode", "bank_account", "count"} for r in rows)

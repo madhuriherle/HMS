@@ -152,6 +152,8 @@ SHARED_READS = [
      ["receipts.entry.read", "receipts.tracking.read", "members.register.write", "reports.read", "reports.receipts_report.read"]),
     # the message templates a campaign picks from
     (r"^/notifications/templates(/.*)?$", ["notifications.campaigns.read"]),
+    # Payment Mode Setup shows how many receipts use each mode
+    (r"^/receipts/payment-mode-usage/?$", ["masters.payment_modes.read"]),
     # the member picker and member checks used by the receipt screens and the registration form
     (r"^/members/?$", ["receipts.entry.read", "receipts.tracking.read", "receipts.bulk_mapping.read", "events.write", "engagements.write", "notifications.write",
                        "notifications.campaigns.write", "magazines.subscribers.read", "magazines.labels_delivery.read"]),

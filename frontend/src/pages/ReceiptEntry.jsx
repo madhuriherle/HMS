@@ -39,14 +39,12 @@ import { notify } from '../utils/notify';
 import { apiErrorMessage } from '../utils/apiError';
 import { confirmYesNo } from '../utils/dialogs';
 import { formatDate, formatDateTime, getTodayISODate } from '../utils/dateUtils';
-import { receiptToApiPayload } from '../utils/apiAdapters';
+import { receiptToApiPayload, fetchMemberPage } from '../utils/apiAdapters';
 import { formatPaymentModeLabel } from '../utils/displayHelpers';
 import {
   loadParticulars,
   loadMembershipTypes,
   loadPaymentModeConfigs,
-  loadMembers,
-  loadReceipts,
   loadLocations,
   findLocationByPin
 } from '../utils/serverData';
@@ -174,10 +172,16 @@ export default function ReceiptEntry() {
 
   // Master datasets, all from the server
   const [particularsMaster, setParticularsMaster] = useState([]);
-  const [unapprovedMembers, setUnapprovedMembers] = useState([]);
-  const [registeredMembers, setRegisteredMembers] = useState([]);
+  // the two member lists on the right and at the bottom are read from the server one page at a time (rule 10.6)
+  const [registeredMembers, setRegisteredMembers] = useState([]); // the page of the Membership List
+  const [rightTotal, setRightTotal] = useState(0);
+  const [rightPages, setRightPages] = useState(1);
+  const [unapprovedMembers, setUnapprovedMembers] = useState([]); // the page of unassigned applicants
+  const [bottomTotal, setBottomTotal] = useState(0);
+  const [bottomPages, setBottomPages] = useState(1);
+  const [listsVersion, setListsVersion] = useState(0); // bumped to read both lists again
+  const [selectedMemberReceipts, setSelectedMemberReceipts] = useState([]); // receipts of the member picked
   const [membershipTypes, setMembershipTypes] = useState([]);
-  const [existingReceipts, setExistingReceipts] = useState([]);
   const [paymentModeConfigs, setPaymentModeConfigs] = useState([]);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [], postalCodes: [] });
   const [saving, setSaving] = useState(false);
@@ -185,14 +189,10 @@ export default function ReceiptEntry() {
 
   const lookupLocationByPin = (pin) => findLocationByPin(locations.postalCodes, pin);
 
-  // Which members already have a receipt linked (decided by the server's receipt links)
-  const assignedMemberIds = useMemo(
-    () => new Set(existingReceipts.filter((r) => r.memberId != null).map((r) => String(r.memberId))),
-    [existingReceipts]
-  );
-  const isMemberReceiptAssigned = (m) => Boolean(m) && assignedMemberIds.has(String(m.id));
+  // Whether the picked member already has a receipt linked (the server's receipt links, read for that one member)
+  const isMemberReceiptAssigned = (m) => Boolean(m) && Boolean(selectedMember) && String(m.id) === String(selectedMember.id) && selectedMemberReceipts.length > 0;
   const findMatchingReceiptForMember = (m) =>
-    m ? existingReceipts.find((r) => String(r.memberId) === String(m.id)) || null : null;
+    m && selectedMember && String(m.id) === String(selectedMember.id) ? selectedMemberReceipts[0] || null : null;
 
   // Active particulars come from the Particulars master
   const activeParticulars = useMemo(() => {
@@ -362,14 +362,8 @@ export default function ReceiptEntry() {
       loadParticulars().then(setParticularsMaster).catch(fail('particulars')),
       loadMembershipTypes().then(setMembershipTypes).catch(fail('membership types')),
       loadPaymentModeConfigs().then(setPaymentModeConfigs).catch(fail('payment modes')),
-      loadReceipts({ limit: 1000 }).then(setExistingReceipts).catch(fail('receipts')),
-      loadMembers({ approval_status: 'UNAPPROVED', limit: 1000 })
-        .then((rows) => setUnapprovedMembers(rows.map((m) => toEntryMember(m, loc))))
-        .catch(fail('unapproved members')),
-      loadMembers({ approval_status: 'APPROVED', limit: 1000 })
-        .then((rows) => setRegisteredMembers(rows.map((m) => toEntryMember(m, loc))))
-        .catch(fail('members'))
     ]);
+    setListsVersion((v) => v + 1); // read the two member lists again
   };
 
   useEffect(() => {
@@ -451,12 +445,21 @@ export default function ReceiptEntry() {
     // payment is for (a member may give a different donation each time), so they are left to the person
     // entering the receipt. The receipt number and date are never taken from the member.
     setMatchedExistingReceipt(null);
-    const lastPan = existingReceipts
-      .filter((r) => member.id != null && String(r.memberId) === String(member.id) && r.panNo)
-      .sort((a, b) => Number(b.id) - Number(a.id))[0]?.panNo;
+    setSelectedMemberReceipts([]);
+    if (member.id != null) {
+      api
+        .get('/receipts/tracking', { params: { member_ids: member.id, limit: 50 } })
+        .then(({ data }) => {
+          const rows = data?.data || [];
+          setSelectedMemberReceipts(rows);
+          const lastPan = [...rows].filter((r) => r.payer_pan).sort((x, y) => y.id - x.id)[0]?.payer_pan;
+          if (lastPan) setFormData((prev) => (prev.panNo ? prev : { ...prev, panNo: lastPan }));
+        })
+        .catch(() => {});
+    }
     setFormData((prev) => ({
       ...prev,
-      panNo: lastPan || '',
+      panNo: '',
       name: member.fullName || member.name || '',
       membershipNo: memNo,
       mobile: member.mobile || '',
@@ -678,16 +681,17 @@ export default function ReceiptEntry() {
     return () => clearTimeout(timer);
   }, [formData.membershipNo, entrySource]);
 
-  const findMemberByQuery = (query) => {
-    const clean = String(query || '').trim().toLowerCase();
+  // a membership number only (the member id and the registration number are not membership numbers): the server finds it
+  const findMemberByQuery = async (query) => {
+    const clean = String(query || '').trim();
     if (!clean) return null;
-    const same = (v) => v !== undefined && v !== null && String(v).trim().toLowerCase() === clean;
-    // a membership number only: the member id (MID) and the registration number are not membership numbers
-    return (
-      registeredMembers.find((m) => same(m.membershipNumber)) ||
-      unapprovedMembers.find((m) => same(m.membershipNumber)) ||
-      null
-    );
+    try {
+      const { data } = await api.get('/members/lookup', { params: { number: clean } });
+      const found = data?.member;
+      return found ? { id: found.id, memberId: found.id, fullName: found.name, name: found.name, membershipNumber: found.membership_number || found.member_code || '' } : null;
+    } catch {
+      return null;
+    }
   };
 
   // ----------------------------------------------------
@@ -842,25 +846,6 @@ export default function ReceiptEntry() {
     } else if (formData.receiptNumber.trim().length > 50) {
       errors.receiptNumber = 'Receipt No. can be at most 50 characters.';
     } else {
-      const fyOf = (d) => {
-        if (!d || d.length < 7) return '';
-        const y = Number(d.slice(0, 4));
-        const m = Number(d.slice(5, 7));
-        const start = m >= (rules?.financial_year?.start_month ?? 99) ? y : y - 1;
-        return `${start}-${String(start + 1).slice(-2)}`;
-      };
-      const wantedFy = fyOf(formData.receiptDate);
-      const typed = formData.receiptNumber.trim().toLowerCase();
-      const existingMatch = existingReceipts.find(
-        (r) =>
-          r.receiptNumber &&
-          r.receiptNumber.toLowerCase().trim() === typed &&
-          !(isEdit && r.id === editId) &&
-          (!wantedFy || fyOf(String(r.receiptDate || '')) === wantedFy)
-      );
-      if (existingMatch) {
-        errors.receiptNumber = `Receipt number "${formData.receiptNumber.trim()}" already exists in financial year ${wantedFy}. Use a different number, or change the receipt date to another financial year.`;
-      }
     }
 
 
@@ -1046,7 +1031,7 @@ export default function ReceiptEntry() {
 
     let targetMember = selectedMember;
     if (!targetMember && formData.membershipNo.trim()) {
-      targetMember = findMemberByQuery(formData.membershipNo);
+      targetMember = await findMemberByQuery(formData.membershipNo);
     }
 
     const isCash = String(formData.paymentMode || '').trim().toLowerCase() === 'cash';
@@ -1251,84 +1236,58 @@ export default function ReceiptEntry() {
   const typedNumber = activeBox === 'membershipNo' ? numberText : '';
   const typedName = activeBox === 'name' ? nameText : '';
   const typedMobile = activeBox === 'mobile' ? mobileText : '';
-  const filteredRightMembers = useMemo(() => {
-    let base = registeredMembers;
-    if (typedNumber) {
-      base = base.filter((m) =>
-        String(m.membershipNumber || '').toLowerCase().includes(typedNumber) ||
-        String(m.registrationNumber || '').toLowerCase().includes(typedNumber));
-    }
-    if (typedName) {
-      base = base.filter((m) => String(m.fullName || m.name || '').toLowerCase().includes(typedName));
-    }
-    if (typedMobile) {
-      base = base.filter((m) => String(m.contactNumber || m.mobile || m.mobileNumber || m.phone || '').replace(/\D/g, '').includes(typedMobile));
-    }
-    if (!rightSearchQuery.trim()) return base;
-    const q = rightSearchQuery.toLowerCase().trim();
-    return base.filter((m) => {
-      const memNo = String(m.membershipNumber || '').toLowerCase();
-      const regNo = String(m.registrationNumber || m.id || '').toLowerCase();
-      const name = String(m.fullName || m.name || '').toLowerCase();
-      const contact = String(m.contactNumber || m.mobile || m.mobileNumber || m.phone || '').toLowerCase();
-      const district = String(m.districtName || m.district || '').toLowerCase();
-      const location = String(m.locality || m.talukName || m.taluk || m.place || m.addressLine || m.address || '').toLowerCase();
+  // the box typed in last decides the Membership List; the search icon above it is used when no box does
+  const rightTerm = (typedNumber || typedName || typedMobile || rightSearchQuery).trim();
+  const [debouncedRightTerm, setDebouncedRightTerm] = useState('');
+  const [debouncedBottomTerm, setDebouncedBottomTerm] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedRightTerm(rightTerm), 350);
+    return () => clearTimeout(timer);
+  }, [rightTerm]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedBottomTerm(unapprovedSearchQuery.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [unapprovedSearchQuery]);
+  useEffect(() => { setRightPage(1); }, [debouncedRightTerm, rightPageSize]);
+  useEffect(() => { setUnapprovedPage(1); }, [debouncedBottomTerm, unapprovedPageSize]);
 
-      return (
-        memNo.includes(q) ||
-        regNo.includes(q) ||
-        name.includes(q) ||
-        contact.includes(q) ||
-        district.includes(q) ||
-        location.includes(q)
-      );
-    });
-  }, [registeredMembers, rightSearchQuery, typedNumber, typedName, typedMobile]);
+  const rightSeq = useRef(0);
+  useEffect(() => {
+    if (!locations.districts.length && !dataReady) return;
+    const seq = (rightSeq.current += 1);
+    fetchMemberPage({ approval_status: 'APPROVED', page: rightPage, limit: rightPageSize, ...(debouncedRightTerm ? { search: debouncedRightTerm } : {}) })
+      .then((res) => {
+        if (seq !== rightSeq.current) return;
+        setRegisteredMembers(res.rows.map((m) => toEntryMember(m, locations)));
+        setRightTotal(res.total);
+        setRightPages(Math.max(1, res.pages));
+      })
+      .catch((error) => showToast(apiErrorMessage(error, 'Failed to load the Membership List from the server.'), 'error'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedRightTerm, rightPage, rightPageSize, listsVersion, dataReady]);
 
-  useEffect(() => { setRightPage(1); }, [typedNumber, typedName, typedMobile]);
+  const bottomSeq = useRef(0);
+  useEffect(() => {
+    if (!locations.districts.length && !dataReady) return;
+    const seq = (bottomSeq.current += 1);
+    fetchMemberPage({ approval_status: 'UNAPPROVED', receipt_assigned: false, page: unapprovedPage, limit: unapprovedPageSize, ...(debouncedBottomTerm ? { search: debouncedBottomTerm } : {}) })
+      .then((res) => {
+        if (seq !== bottomSeq.current) return;
+        setUnapprovedMembers(res.rows.map((m) => toEntryMember(m, locations)));
+        setBottomTotal(res.total);
+        setBottomPages(Math.max(1, res.pages));
+      })
+      .catch((error) => showToast(apiErrorMessage(error, 'Failed to load the unassigned members from the server.'), 'error'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedBottomTerm, unapprovedPage, unapprovedPageSize, listsVersion, dataReady]);
 
-  const totalRightMembers = filteredRightMembers.length;
-  const totalRightPages = Math.max(1, Math.ceil(totalRightMembers / rightPageSize));
-  const paginatedRightMembers = useMemo(() => {
-    const start = (rightPage - 1) * rightPageSize;
-    return filteredRightMembers.slice(start, start + rightPageSize);
-  }, [filteredRightMembers, rightPage, rightPageSize]);
-
-  // ----------------------------------------------------
-  // BOTTOM UNAPPROVED MEMBERS (ONLY UNASSIGNED) FILTER & PAGINATION
-  // ----------------------------------------------------
-  const bottomUnassignedMembers = useMemo(() => {
-    return unapprovedMembers.filter((m) => !isMemberReceiptAssigned(m));
-  }, [unapprovedMembers]);
-
-  const filteredBottomMembers = useMemo(() => {
-    if (!unapprovedSearchQuery.trim()) return bottomUnassignedMembers;
-    const q = unapprovedSearchQuery.toLowerCase().trim();
-    return bottomUnassignedMembers.filter((m) => {
-      const regNo = String(m.registrationNumber || m.id || '').toLowerCase();
-      const name = String(m.fullName || m.name || '').toLowerCase();
-      const contact = String(m.contactNumber || m.mobile || m.mobileNumber || m.phone || '').toLowerCase();
-      const mType = String(m.membershipType || m.membershipTypeCategory || '').toLowerCase();
-      const district = String(m.districtName || m.district || '').toLowerCase();
-      const location = String(m.locality || m.talukName || m.taluk || m.place || m.addressLine || m.address || '').toLowerCase();
-
-      return (
-        regNo.includes(q) ||
-        name.includes(q) ||
-        contact.includes(q) ||
-        mType.includes(q) ||
-        district.includes(q) ||
-        location.includes(q)
-      );
-    });
-  }, [bottomUnassignedMembers, unapprovedSearchQuery]);
-
-  const totalBottomMembers = filteredBottomMembers.length;
-  const totalBottomPages = Math.max(1, Math.ceil(totalBottomMembers / unapprovedPageSize));
-  const paginatedBottomMembers = useMemo(() => {
-    const start = (unapprovedPage - 1) * unapprovedPageSize;
-    return filteredBottomMembers.slice(start, start + unapprovedPageSize);
-  }, [filteredBottomMembers, unapprovedPage, unapprovedPageSize]);
+  const filteredRightMembers = registeredMembers; // the server already searched and paged them
+  const totalRightMembers = rightTotal;
+  const totalRightPages = rightPages;
+  const paginatedRightMembers = registeredMembers;
+  const totalBottomMembers = bottomTotal;
+  const totalBottomPages = bottomPages;
+  const paginatedBottomMembers = unapprovedMembers;
 
   return (
     <PermissionGate required={isEdit ? 'receipts.tracking.write' : 'receipts.entry.read'}>
@@ -1774,9 +1733,9 @@ export default function ReceiptEntry() {
                   {/* what the typing found: a short note in the free half of this row */}
                   {(typedNumber || typedName || typedMobile) && (
                     <div className="self-end rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] px-3 py-2 text-xs min-h-[38px] flex items-center">
-                      {filteredRightMembers.length === 0 ? (
+                      {totalRightMembers === 0 ? (
                         <span className="text-[#863221]">No member matches. This will be saved as a non-member receipt.</span>
-                      ) : filteredRightMembers.length === 1 ? (
+                      ) : totalRightMembers === 1 ? (
                         (() => {
                           const m = filteredRightMembers[0];
                           return (
@@ -1790,7 +1749,7 @@ export default function ReceiptEntry() {
                           );
                         })()
                       ) : (
-                        <span className="text-[#863221]"><b className="text-[#180200]">{filteredRightMembers.length}</b> members match. Pick one from the Membership List.</span>
+                        <span className="text-[#863221]"><b className="text-[#180200]">{totalRightMembers}</b> members match. Pick one from the Membership List.</span>
                       )}
                     </div>
                   )}

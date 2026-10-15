@@ -548,6 +548,22 @@ def read_receipt_tracking(
     }
 
 
+@router.get("/payment-mode-usage")
+def read_payment_mode_usage(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """How many receipts were recorded with each payment mode / bank account: [{payment_mode, bank_account, count}].
+    Payment Mode Setup shows these counts; it never needs the receipts themselves."""
+    rows = (
+        db.query(Receipt.payment_mode, Receipt.bank_account, func.count())
+        .filter(Receipt.is_deleted == False)  # noqa: E712
+        .group_by(Receipt.payment_mode, Receipt.bank_account)
+        .all()
+    )
+    return [{"payment_mode": mode, "bank_account": bank, "count": n} for mode, bank, n in rows]
+
+
 @router.get("/tracking-options")
 def read_receipt_tracking_options(
     db: Session = Depends(deps.get_db),

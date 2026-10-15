@@ -21,7 +21,6 @@ import {
 import api from '../api';
 import { notify } from '../utils/notify';
 import { formatPaymentModeLabel } from '../utils/displayHelpers';
-import { loadReceipts } from '../utils/serverData';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
@@ -32,7 +31,7 @@ export default function BankDetailsManagement() {
 
   // Master state
   const [paymentConfigs, setPaymentConfigs] = useState([]);
-  const [receipts, setReceipts] = useState([]);
+  const [modeUsage, setModeUsage] = useState([]); // [{ payment_mode, bank_account, count }] counted by the server
   const [banks, setBanks] = useState([]);
 
   // Dropdown options and bank details come from the Bank master / existing payment modes
@@ -124,24 +123,12 @@ export default function BankDetailsManagement() {
 
   useEffect(() => {
     fetchConfigs();
-    loadReceipts({ limit: 25000 })
-      .then(setReceipts)
-      .catch((error) => showToast(error.response?.data?.detail || 'Failed to load receipts from the server.', 'error'));
+    api.get('/receipts/payment-mode-usage')
+      .then(({ data }) => setModeUsage(Array.isArray(data) ? data : []))
+      .catch((error) => showToast(error.response?.data?.detail || 'Failed to load the usage counts from the server.', 'error'));
   }, []);
 
 
-
-  // Receipts count per payment mode label
-  const usageCountMap = useMemo(() => {
-    const map = {};
-    receipts.forEach((r) => {
-      const mode = (r.paymentMode || '').trim();
-      if (mode) {
-        map[mode] = (map[mode] || 0) + 1;
-      }
-    });
-    return map;
-  }, [receipts]);
 
   // ----------------------------------------------------
   // SEARCH & FILTERING
@@ -396,11 +383,13 @@ export default function BankDetailsManagement() {
     const bank = (cfg.bankAccount || '').trim().toLowerCase();
     const mode = (cfg.paymentMode || '').trim().toLowerCase();
     const label = formatPaymentModeLabel(cfg).trim().toLowerCase();
-    return receipts.filter((r) => {
-      const rBank = (r.bankName || r.bankAccount || '').trim().toLowerCase();
-      const rMode = (r.paymentMode || '').trim().toLowerCase();
-      return bank ? rBank === bank : rMode === mode || rMode === label;
-    }).length;
+    return modeUsage
+      .filter((r) => {
+        const rBank = (r.bank_account || '').trim().toLowerCase();
+        const rMode = String(r.payment_mode || '').trim().toLowerCase();
+        return bank ? rBank === bank : rMode === mode || rMode === label;
+      })
+      .reduce((sum, r) => sum + r.count, 0);
   };
 
   const handleDeleteClick = (cfg) => {
