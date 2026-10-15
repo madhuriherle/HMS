@@ -189,6 +189,15 @@ RULE 8: MEMBERSHIP TYPE AND CREDIT
      deleted receipt). Moving down is a manual, reviewed change.
 8.3  Deleting a receipt that is assigned to a member removes its allocation from the
      member's history and lowers their credit; it does not change their type.
+8.5  CREDIT COUNTS THE LINES, NOT THE WHOLE RECEIPT: the money that counts is the amount of
+     the receipt's lines whose type is counted (Membership 500 + Donation 4500 counts 500),
+     capped by what was allocated to the member. The order of the lines and the receipt's
+     head type do not matter. Only receipts whose lines carry no known type fall back to the
+     receipt type.
+8.6  Editing a receipt re-checks the upgrade (a single allocation follows the credit lines).
+     When a cancelled / deleted / refunded receipt or a removed allocation leaves the credit
+     below the price of the member's type, the type stays (8.2) and the approvers get an inbox
+     notice "Membership type needs review" to decide.
 8.4  MEMBERSHIP TYPE PRICE: a type's price is a history of rows (MembershipTypePrice), not a
      field. The Amount on the Edit form and the Update Price screen use the SAME call
      (POST /masters/membership-types/{id}/prices): a changed amount is a new revision with a

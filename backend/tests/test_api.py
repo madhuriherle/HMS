@@ -6784,3 +6784,76 @@ def test_member_profile_service_usage_from_receipts(client, admin_headers):
     after = client.get(f"/api/v1/members/{member['id']}/profile/magazine", headers=admin_headers).json()
     assert len(after["usage_summary"]) == 1
     assert all(u["particular_name"] != "Plain Donation" for u in after["usage"])
+
+
+def _ladder_two_types(client, H, tag):
+    for t in client.get("/api/v1/masters/membership-types", headers=H, params={"limit": 500}).json()["data"]:
+        client.put(f"/api/v1/masters/membership-types/{t['id']}", headers=H, json={"status": False})
+    out = []
+    for code, price in ((f"{tag}_LOW", 1000), (f"{tag}_HIGH", 5000)):
+        t = _create_membership_type(client, H, code, code.title())
+        pr = client.post(f"/api/v1/masters/membership-types/{t['id']}/prices", headers=H,
+                         json={"amount": price, "effective_from": "2026-01-01"})
+        assert pr.status_code in (200, 201), pr.text
+        out.append(t)
+    return out
+
+
+def test_credit_counts_the_membership_lines_not_the_whole_receipt(client, admin_headers):
+    H = admin_headers
+    _ladder_two_types(client, H, "LNS")
+    credit = lambda mid: client.get(f"/api/v1/members/{mid}/membership-credit", headers=H).json()
+
+    # Membership 500 + Donation 4500 saved as a Membership receipt with all 5000 linked: only 500 counts
+    a = _create_member(client, H, "9611111101", "LinesOne")["id"]
+    _make_receipt(client, H, receipt_type="MEMBERSHIP", gross_amount=5000, net_amount=5000,
+                  items=[{"item_type": "MEMBERSHIP", "amount": 500}, {"item_type": "DONATION", "amount": 4500}],
+                  allocations=[{"member_id": a, "allocated_amount": 5000}])
+    c = credit(a)
+    assert c["credit_total"] == 500 and c["current_type"] is None
+
+    # the same lines the other way round (a Donation receipt carrying a membership line): the membership money counts
+    b = _create_member(client, H, "9611111102", "LinesTwo")["id"]
+    _make_receipt(client, H, receipt_type="DONATION", gross_amount=5500, net_amount=5500,
+                  items=[{"item_type": "DONATION", "amount": 4500}, {"item_type": "MEMBERSHIP", "amount": 1000}],
+                  allocations=[{"member_id": b, "allocated_amount": 5500}])
+    c = credit(b)
+    assert c["credit_total"] == 1000 and c["current_type"]["code"] == "LNS_LOW"
+
+
+def test_editing_a_receipt_rechecks_the_upgrade(client, admin_headers):
+    H = admin_headers
+    _ladder_two_types(client, H, "EDT")
+    mid = _create_member(client, H, "9611111103", "EditUp")["id"]
+    r = _make_receipt(client, H, receipt_type="DONATION", gross_amount=1000, net_amount=1000,
+                      items=[{"item_type": "DONATION", "amount": 1000}],
+                      allocations=[{"member_id": mid, "allocated_amount": 1000}])
+    credit = lambda: client.get(f"/api/v1/members/{mid}/membership-credit", headers=H).json()
+    assert credit()["credit_total"] == 0 and credit()["current_type"] is None
+
+    done = client.put(f"/api/v1/receipts/{r['id']}", headers=H, json={
+        "receipt_type": "MEMBERSHIP", "items": [{"item_type": "MEMBERSHIP", "amount": 1500}]})
+    assert done.status_code == 200, done.text
+    c = credit()
+    assert c["credit_total"] == 1500 and c["current_type"]["code"] == "EDT_LOW"
+
+
+def test_losing_credit_never_lowers_the_type_but_asks_for_a_review(client, admin_headers):
+    H = admin_headers
+    _ladder_two_types(client, H, "REV")
+    mid = _create_member(client, H, "9611111104", "ReviewMe")["id"]
+    r = _make_receipt(client, H, gross_amount=1000, net_amount=1000,
+                      items=[{"item_type": "MEMBERSHIP", "amount": 1000}],
+                      allocations=[{"member_id": mid, "allocated_amount": 1000}])
+    assert client.get(f"/api/v1/members/{mid}/membership-credit", headers=H).json()["current_type"]["code"] == "REV_LOW"
+
+    assert client.post(f"/api/v1/receipts/{r['id']}/cancel", headers=H, json={"reason": "bounced"}).status_code == 200
+    c = client.get(f"/api/v1/members/{mid}/membership-credit", headers=H).json()
+    assert c["current_type"]["code"] == "REV_LOW" and c["credit_total"] == 0   # type stays, credit is gone
+
+    from db.session import SessionLocal
+    from models.inbox import AppNotification
+    with SessionLocal() as db:
+        flagged = [n for n in db.query(AppNotification).all()
+                   if (n.data or {}).get("kind") == "MEMBERSHIP_CREDIT_REVIEW" and (n.data or {}).get("member_id") == mid]
+    assert flagged, "approvers were not told to review the type"

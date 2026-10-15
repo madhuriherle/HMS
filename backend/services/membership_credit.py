@@ -144,40 +144,72 @@ def ladder(db: Session) -> list:
     return tiers
 
 
-def credit_ledger(db: Session, member_id: int, types: Optional[list] = None) -> dict:
-    """Counted allocations for the member, with refund-adjusted amounts.
-    `types` overrides the saved setting (used for previews)."""
-    from models.receipts import Receipt, ReceiptAllocation, RefundTransaction
+def _counted_rows(db: Session, member_ids: list, types: list) -> list:
+    """[(allocation, receipt, counted gross Decimal, refund-adjusted counted Decimal)] for the members.
 
-    types = types if types is not None else credit_receipt_types(db)
+    What counts is the money on the receipt's *lines* of a counted type (a membership line yes, a donation line
+    no), capped by what was allocated to the member. So a receipt with Membership 500 + Donation 4500 counts 500,
+    and the order of the lines does not matter. A receipt whose lines carry no known type (old single-line
+    receipts) counts by its receipt type instead."""
+    from models.receipts import Receipt, ReceiptAllocation, ReceiptItem, RefundTransaction
+
     rows = (
         db.query(ReceiptAllocation, Receipt)
         .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
         .filter(
-            ReceiptAllocation.member_id == member_id,
+            ReceiptAllocation.member_id.in_(member_ids),
             ReceiptAllocation.is_deleted == False,  # noqa: E712
             Receipt.is_deleted == False,  # noqa: E712
             Receipt.payment_status.in_(COUNTED_STATUSES),
-            Receipt.receipt_type.in_(types),
         )
         .order_by(Receipt.receipt_date, ReceiptAllocation.id)
         .all()
     )
-    refunded = {}
     receipt_ids = {r.id for _, r in rows}
+    wanted = {t.upper() for t in types}
+    known = {t.upper() for t in all_receipt_types()}
+    line_total, has_typed_lines = {}, set()
+    refunded = {}
     if receipt_ids:
+        for it in db.query(ReceiptItem).filter(
+            ReceiptItem.receipt_id.in_(receipt_ids), ReceiptItem.is_deleted == False  # noqa: E712
+        ).all():
+            kind = (it.item_type or "").upper()
+            if kind in known:
+                has_typed_lines.add(it.receipt_id)
+                if kind in wanted:
+                    line_total[it.receipt_id] = line_total.get(it.receipt_id, Decimal(0)) + _d(it.amount)
         for rf in db.query(RefundTransaction).filter(
             RefundTransaction.receipt_id.in_(receipt_ids), RefundTransaction.is_deleted == False  # noqa: E712
         ).all():
             if (rf.status or "").upper() not in IGNORED_REFUND_STATUSES:
                 refunded[rf.receipt_id] = refunded.get(rf.receipt_id, Decimal(0)) + _d(rf.amount)
 
-    entries, total = [], Decimal(0)
+    room = {}   # counted money of a receipt not yet handed to an allocation (a receipt may be shared)
+    out = []
     for alloc, receipt in rows:
-        gross = _d(alloc.allocated_amount)
+        if receipt.id in has_typed_lines:
+            room.setdefault(receipt.id, line_total.get(receipt.id, Decimal(0)))
+        elif (receipt.receipt_type or "").upper() in wanted:
+            room.setdefault(receipt.id, _d(receipt.net_amount))
+        else:
+            continue
+        gross = min(_d(alloc.allocated_amount), room[receipt.id])
+        if gross <= 0:
+            continue
+        room[receipt.id] -= gross
         net_amount = _d(receipt.net_amount)
         fraction = min(Decimal(1), refunded.get(receipt.id, Decimal(0)) / net_amount) if net_amount > 0 else Decimal(0)
-        counted = (gross * (Decimal(1) - fraction)).quantize(Decimal("0.01"))
+        out.append((alloc, receipt, gross, (gross * (Decimal(1) - fraction)).quantize(Decimal("0.01"))))
+    return out
+
+
+def credit_ledger(db: Session, member_id: int, types: Optional[list] = None) -> dict:
+    """Counted allocations for the member, with refund-adjusted amounts.
+    `types` overrides the saved setting (used for previews)."""
+    types = types if types is not None else credit_receipt_types(db)
+    entries, total = [], Decimal(0)
+    for alloc, receipt, gross, counted in _counted_rows(db, [member_id], types):
         total += counted
         entries.append({
             "allocation_id": alloc.id, "receipt_id": receipt.id,
@@ -189,39 +221,41 @@ def credit_ledger(db: Session, member_id: int, types: Optional[list] = None) -> 
 
 
 def credit_totals(db: Session, member_ids: list, types: Optional[list] = None) -> dict:
-    """{member_id: credit total} for many members in two queries (same rules as credit_ledger)."""
-    from models.receipts import Receipt, ReceiptAllocation, RefundTransaction
-
+    """{member_id: credit total} for many members (same rules as credit_ledger)."""
     if not member_ids:
         return {}
     types = types if types is not None else credit_receipt_types(db)
-    rows = (
-        db.query(ReceiptAllocation, Receipt)
-        .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
-        .filter(
-            ReceiptAllocation.member_id.in_(member_ids),
-            ReceiptAllocation.is_deleted == False,  # noqa: E712
-            Receipt.is_deleted == False,  # noqa: E712
-            Receipt.payment_status.in_(COUNTED_STATUSES),
-            Receipt.receipt_type.in_(types),
-        )
-        .all()
-    )
-    refunded = {}
-    receipt_ids = {r.id for _, r in rows}
-    if receipt_ids:
-        for rf in db.query(RefundTransaction).filter(
-            RefundTransaction.receipt_id.in_(receipt_ids), RefundTransaction.is_deleted == False  # noqa: E712
-        ).all():
-            if (rf.status or "").upper() not in IGNORED_REFUND_STATUSES:
-                refunded[rf.receipt_id] = refunded.get(rf.receipt_id, Decimal(0)) + _d(rf.amount)
     totals = {}
-    for alloc, receipt in rows:
-        net_amount = _d(receipt.net_amount)
-        fraction = min(Decimal(1), refunded.get(receipt.id, Decimal(0)) / net_amount) if net_amount > 0 else Decimal(0)
-        counted = (_d(alloc.allocated_amount) * (Decimal(1) - fraction)).quantize(Decimal("0.01"))
+    for alloc, _receipt, _gross, counted in _counted_rows(db, list(member_ids), types):
         totals[alloc.member_id] = totals.get(alloc.member_id, Decimal(0)) + counted
     return {mid: float(v) for mid, v in totals.items()}
+
+
+def flag_for_review(db: Session, member_ids, reason: str) -> int:
+    """After money was taken away (a cancelled / deleted / refunded receipt, a removed allocation) the member may
+    hold a type their credit no longer pays for. The type is never lowered automatically (rule 8.2), so tell the
+    approvers to review it. Returns how many members were flagged."""
+    from services.approval_notify import notify_approvers
+    from services.pricing import active_price
+    from models.members import Member
+
+    flagged = 0
+    for mid in {m for m in member_ids if m}:
+        current = _current_membership(db, mid)
+        price = active_price(db, current.membership_type_id) if current else None
+        if not price or _d(price.amount) <= 0:
+            continue
+        total = credit_ledger(db, mid)["total"]
+        if total + Decimal("0.005") >= _d(price.amount):
+            continue
+        member = db.get(Member, mid)
+        who = " ".join(x for x in (member.name_title, member.first_name_en, member.last_name_en) if x) if member else f"Member {mid}"
+        flagged += 1 if notify_approvers(
+            db, "Membership type needs review",
+            f"{who}: credit is now {total} but their type costs {_d(price.amount)} ({reason}). The type was not lowered; review it.",
+            {"member_id": mid, "kind": "MEMBERSHIP_CREDIT_REVIEW"},
+        ) else 0
+    return flagged
 
 
 def _current_membership(db: Session, member_id: int):

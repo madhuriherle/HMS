@@ -52,6 +52,16 @@ def _validate_enum(value: str, allowed: set, field: str) -> None:
         raise HTTPException(400, f"{field} must be one of {sorted(allowed)}")
 
 
+def _allocated_member_ids(db: Session, receipt_id: int) -> list:
+    return [
+        row[0] for row in db.query(ReceiptAllocation.member_id).filter(
+            ReceiptAllocation.receipt_id == receipt_id,
+            ReceiptAllocation.is_deleted == False,  # noqa: E712
+            ReceiptAllocation.member_id != None,  # noqa: E711
+        ).all()
+    ]
+
+
 def _validate_lines(db: Session, items, net: float) -> None:
     """Multi-line receipts: every line must reference a real particular and the lines must add up to
     the receipt's net amount. (A single legacy line without a particular id is not cross-checked.)"""
@@ -1120,6 +1130,21 @@ def update_receipt(
                 ))
             db.commit()
             db.refresh(updated)
+        # the member's credit follows the receipt: a single allocation tracks the credit lines (as Receipt Entry
+        # sets it), and the upgrade is checked again (it only ever moves up)
+        allocs = db.query(ReceiptAllocation).filter(
+            ReceiptAllocation.receipt_id == receipt.id, ReceiptAllocation.is_deleted == False  # noqa: E712
+        ).all()
+        if len(allocs) == 1 and allocs[0].member_id:
+            lines = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == receipt.id, ReceiptItem.is_deleted == False).all()  # noqa: E712
+            credit = sum(float(i.amount) for i in lines if (i.item_type or "").upper() in ("MEMBERSHIP", "DONATION", "SCHOLARSHIP"))
+            allocs[0].allocated_amount = round(min(credit or float(updated.net_amount), float(updated.net_amount)), 2)
+            allocs[0].updated_by = current_user.id
+        member_ids = [a.member_id for a in allocs if a.member_id]
+        if member_ids:
+            membership_credit.recompute_members(db, member_ids, current_user.id)
+            db.commit()
+            membership_credit.flag_for_review(db, member_ids, f"receipt {updated.receipt_number} was edited")
         return updated
     except IntegrityError:
         db.rollback()
@@ -1140,6 +1165,7 @@ def delete_receipt(
     receipt = crud_receipts.receipt.get(db, id)
     if not receipt:
         raise HTTPException(404, "Receipt not found")
+    removed_members = _allocated_member_ids(db, receipt.id)
     if allocated_total(db, receipt.id) > 0:
         if not force:
             raise InUseError(
@@ -1154,7 +1180,10 @@ def delete_receipt(
         receipt_status.refresh(db, receipt)
     if dry_run is True:
         return None
-    return crud_receipts.receipt.remove(db, id=id, deleted_by=current_user.id)
+    members = removed_members
+    removed = crud_receipts.receipt.remove(db, id=id, deleted_by=current_user.id)
+    membership_credit.flag_for_review(db, members, f"receipt {receipt.receipt_number} was deleted")
+    return removed
 
 
 @router.post("/{id}/allocate", response_model=Union[schemas_receipts.ReceiptAllocation, PendingApproval], status_code=201)
@@ -1268,6 +1297,7 @@ def remove_allocation(
     receipt_status.refresh(db, receipt)
     db.commit()
     db.refresh(alloc)
+    membership_credit.flag_for_review(db, [alloc.member_id], f"receipt {receipt.receipt_number} was un-assigned")
     return alloc
 
 
@@ -1297,6 +1327,7 @@ def cancel_receipt(
     )
     db.add(cancellation)
     db.commit()
+    membership_credit.flag_for_review(db, _allocated_member_ids(db, id), f"receipt {receipt.receipt_number} was cancelled")
     return {"message": "Receipt cancelled successfully"}
 
 
@@ -1322,6 +1353,7 @@ def create_refund(
     db.add(refund)
     db.commit()
     db.refresh(refund)
+    membership_credit.flag_for_review(db, _allocated_member_ids(db, id), f"receipt {receipt.receipt_number} was refunded")
     return refund
 
 
