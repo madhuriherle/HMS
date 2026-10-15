@@ -374,3 +374,30 @@ def test_the_summary_lists_the_top_districts(client, admin_headers):
     assert isinstance(top, list) and len(top) <= 5
     assert all({"name", "count"} <= set(row) for row in top)
     assert [r["count"] for r in top] == sorted((r["count"] for r in top), reverse=True)
+
+
+def test_recipients_are_paged_with_their_subscription_pause_and_returns(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]
+    sub = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"][0]
+    assert client.post(f"{API}/magazines/returns", headers=h, json={
+        "subscription_id": sub["id"], "issue_month_year": "2031-02", "return_date": "2031-02-20",
+    }).status_code in (200, 201)
+
+    page = client.get(f"{API}/magazines/recipients", headers=h, params={"limit": 5000, "page": 1}).json()
+    assert page["limit"] == 200                                   # never more than 200 in one request
+    assert {"total", "active", "paused", "stopped"} <= set(page["summary"])
+    row = next(r for r in client.get(f"{API}/magazines/recipients", headers=h, params={"type": "MEMBER", "recipient_type": "MEMBER", "limit": 200}).json()["data"]
+               if r["recipient_id"] == mid)
+    assert row["subscription"]["id"] == sub["id"] and row["return_count"] == 1 and row["active_pause"] is None
+
+    # the filters run on every recipient, not on a page
+    returned = client.get(f"{API}/magazines/recipients", headers=h, params={"with_returns": True, "limit": 200}).json()
+    assert mid in [r["recipient_id"] for r in returned["data"]] and all(r["return_count"] >= 1 for r in returned["data"])
+    assert client.get(f"{API}/magazines/recipients", headers=h, params={"search": "zzz-nobody-zzz"}).json()["total"] == 0
+    # a page really is a slice
+    two = client.get(f"{API}/magazines/recipients", headers=h, params={"limit": 1, "page": 2}).json()
+    assert len(two["data"]) <= 1 and two["total"] >= 1 and two["pages"] == two["total"]
+    # the lists the screen reads next are capped as well
+    for path in ("subscriptions", "pauses", "returns", "label-batches", "delivery-batches"):
+        assert client.get(f"{API}/magazines/{path}", headers=h, params={"limit": 5000}).json()["limit"] == 200, path

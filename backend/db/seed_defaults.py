@@ -78,7 +78,7 @@ SUB_MODULE_AREAS = {
             "/magazines/unsubscribed-paid-members", "/magazines/backfill-subscriptions",
         ]),
         ("magazines.labels_delivery", "Magazine Labels & Delivery", [
-            "/magazines/label-batches", "/magazines/delivery-batches", "/magazines/generate-labels", "/magazines/all-recipients",
+            "/magazines/label-batches", "/magazines/delivery-batches", "/magazines/generate-labels", "/magazines/all-recipients", "/magazines/recipients",
         ]),
     ],
     "reports": [

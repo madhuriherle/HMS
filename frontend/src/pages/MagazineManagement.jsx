@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import PageActions, { PageActionsSlot } from '../components/PageActions';
 import Modal from '../components/Modal';
@@ -11,7 +11,7 @@ import PermissionGate from '../components/PermissionGate';
 import api from '../api';
 import { notify } from '../utils/notify';
 import { confirmYesNo } from '../utils/dialogs';
-import { loadMembers, loadLocations } from '../utils/serverData';
+import { loadLocations } from '../utils/serverData';
 import { formatDate } from '../utils/dateUtils';
 import useAuth from '../hooks/useAuth';
 import {
@@ -174,26 +174,16 @@ export default function MagazineManagement() {
   const canWrite = hasPermission(`${area}.write`);
   const canDelete = hasPermission(`${area}.delete`);
   const sectionTitle = { subscriptions: 'Subscriptions', 'labels-delivery': 'Labels & Delivery' }[tab];
-  const [members, setMembers] = useState([]);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [] });
 
-  // subscriptions are shared: the pause/return pickers need the same list
-  const [subscriptions, setSubscriptions] = useState([]);
+  // names of the people on screen, filled by the list that shows them (the screen never downloads every member)
+  const nameCache = useRef(new Map());
+  const rememberName = useCallback((id, name) => { if (id != null && name) nameCache.current.set(String(id), name); }, []);
+  const memberName = useCallback((id) => nameCache.current.get(String(id)) || `Member ${id}`, []);
+  const [subsVersion, setSubsVersion] = useState(0); // bumped to make the Subscriptions list read again
   const [unsubscribedPaid, setUnsubscribedPaid] = useState([]);
   const [backfillOpen, setBackfillOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-
-  const memberById = useMemo(() => new Map(members.map((m) => [String(m.id), m])), [members]);
-
-  const memberName = useCallback(
-    (id) => memberById.get(String(id))?.fullName || `Member ${id}`,
-    [memberById]
-  );
-
-  const loadSubscriptions = useCallback(async () => {
-    const { data } = await api.get('/magazines/subscriptions', { params: { limit: 5000 } });
-    setSubscriptions(Array.isArray(data?.data) ? data.data : []);
-  }, []);
 
   const loadUnsubscribed = useCallback(async () => {
     try {
@@ -208,14 +198,10 @@ export default function MagazineManagement() {
     let cancelled = false;
     (async () => {
       try {
-        const [mems, locs] = await Promise.all([
-          loadMembers({ limit: 5000 }),
-          loadLocations(),
-        ]);
+        const locs = await loadLocations();
         if (cancelled) return;
-        setMembers(mems);
         setLocations(locs);
-        await Promise.all([loadSubscriptions(), loadUnsubscribed()]);
+        await loadUnsubscribed();
       } catch (error) {
         if (!cancelled) notify(error.response?.data?.detail || 'Could not load magazine data.', 'error');
       } finally {
@@ -223,7 +209,7 @@ export default function MagazineManagement() {
       }
     })();
     return () => { cancelled = true; };
-  }, [loadSubscriptions, loadUnsubscribed]);
+  }, [loadUnsubscribed]);
 
   return (
     <PermissionGate required={`${area}.read`} title="Access Restricted" message="You need the privilege for this Magazine page to open it.">
@@ -266,10 +252,10 @@ export default function MagazineManagement() {
           <>
             {tab === 'subscriptions' && (
               <SubscriptionsTab
-                members={members}
                 memberName={memberName}
-                subscriptions={subscriptions}
-                reload={loadSubscriptions}
+                rememberName={rememberName}
+                reloadKey={subsVersion}
+                onChanged={loadUnsubscribed}
                 canWrite={canWrite}
                 canDelete={canDelete}
               />
@@ -288,7 +274,7 @@ export default function MagazineManagement() {
             isOpen={backfillOpen}
             onClose={() => setBackfillOpen(false)}
             onBackfilled={() => {
-              loadSubscriptions();
+              setSubsVersion((v) => v + 1);
               loadUnsubscribed();
             }}
             canWrite={canWrite}
@@ -300,14 +286,19 @@ export default function MagazineManagement() {
 }
 
 // ── Subscriptions ────────────────────────────────────────────
-function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite, canDelete }) {
-  const [recipients, setRecipients] = useState([]);
-  const [loadingRecipients, setLoadingRecipients] = useState(false);
+function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canWrite, canDelete }) {
+  const [rows, setRows] = useState([]);       // ONE page of recipients (at most 200)
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
+  const [summary, setSummary] = useState({ total: 0, active: 0, paused: 0, stopped: 0 });
+  const [loadingRows, setLoadingRows] = useState(true);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [returnsFilter, setReturnsFilter] = useState('ALL');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(25);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -317,50 +308,52 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
   const [returnFor, setReturnFor] = useState(null);    // subscription to mark a return on
   const [historyFor, setHistoryFor] = useState(null); // subscription whose pauses and returns are shown
   const [repeatOpen, setRepeatOpen] = useState(false);
-  const [activePauses, setActivePauses] = useState([]);
-  const [returnCounts, setReturnCounts] = useState({});
-  const [returnsFilter, setReturnsFilter] = useState('ALL');
 
+  // what the server is asked for: the page, the search and the filters. They run on every recipient (rule 10.6).
+  const requestSeq = useRef(0);
   const loadRecipients = useCallback(async () => {
-    setLoadingRecipients(true);
+    const seq = (requestSeq.current += 1);
+    setLoadingRows(true);
     try {
-      const { data } = await api.get('/magazines/all-recipients');
-      setRecipients(Array.isArray(data) ? data : []);
-    } catch {
-      // Fallback gracefully
+      const { data } = await api.get('/magazines/recipients', {
+        params: {
+          page, limit: pageSize,
+          ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
+          ...(typeFilter !== 'ALL' ? { recipient_type: typeFilter } : {}),
+          ...(statusFilter !== 'ALL' ? { delivery_status: statusFilter } : {}),
+          ...(returnsFilter === 'WITH' ? { with_returns: true } : {}),
+        },
+      });
+      if (seq !== requestSeq.current) return;
+      const list = Array.isArray(data?.data) ? data.data : [];
+      list.forEach((r) => { if (r.subscription) rememberName(r.subscription.member_id, r.name); });
+      setRows(list);
+      setTotal(data?.total ?? 0);
+      setPages(Math.max(1, data?.pages ?? 1));
+      if (data?.summary) setSummary(data.summary);
+      if (page > Math.max(1, data?.pages ?? 1)) setPage(Math.max(1, data?.pages ?? 1));
+    } catch (error) {
+      if (seq === requestSeq.current) notify(error.response?.data?.detail || 'Could not load the recipients.', 'error');
     } finally {
-      setLoadingRecipients(false);
+      if (seq === requestSeq.current) setLoadingRows(false);
     }
-  }, []);
+  }, [page, pageSize, debouncedSearch, typeFilter, statusFilter, returnsFilter, rememberName]);
 
   useEffect(() => {
     loadRecipients();
-  }, [loadRecipients, subscriptions]);
-
-  // pauses running today and how many returns each subscription has (shown as tags on the row)
-  const loadMarks = useCallback(async () => {
-    try {
-      const [p, r] = await Promise.all([
-        api.get('/magazines/pauses', { params: { limit: 5000, active_only: true } }),
-        api.get('/magazines/returns', { params: { limit: 5000 } }),
-      ]);
-      setActivePauses(Array.isArray(p.data?.data) ? p.data.data : []);
-      const counts = {};
-      for (const x of Array.isArray(r.data?.data) ? r.data.data : []) counts[x.subscription_id] = (counts[x.subscription_id] || 0) + 1;
-      setReturnCounts(counts);
-    } catch {
-      // the tags are a convenience; the list still works without them
-    }
-  }, []);
-
+  }, [loadRecipients, reloadKey]);
   useEffect(() => {
-    loadMarks();
-  }, [loadMarks, subscriptions]);
+    setPage(1);
+  }, [debouncedSearch, typeFilter, statusFilter, returnsFilter, pageSize]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
 
+  const reload = loadRecipients;
   const refreshAll = () => {
-    reload();
     loadRecipients();
-    loadMarks();
+    onChanged?.();
   };
 
   const resumeDelivery = async (pause) => {
@@ -373,53 +366,8 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
     }
   };
 
-  const stats = useMemo(() => {
-    let active = 0;
-    let paused = 0;
-    let stopped = 0;
-    const list = recipients.length > 0 ? recipients : subscriptions;
-    for (const item of list) {
-      if (item.delivery_status === 'ACTIVE') active++;
-      else if (item.delivery_status === 'PAUSED') paused++;
-      else stopped++;
-    }
-    return { total: list.length, active, paused, stopped };
-  }, [recipients, subscriptions]);
-
-  const memberOptions = useMemo(
-    () => members.map((m) => ({ value: m.id, label: `${m.fullName} (${m.membershipNumber})` })),
-    [members]
-  );
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const sourceList = recipients.length > 0
-      ? recipients
-      : subscriptions.map((s) => ({
-          recipient_type: 'MEMBER',
-          recipient_id: s.member_id,
-          name: memberName(s.member_id),
-          code_or_reg: members.find((m) => String(m.id) === String(s.member_id))?.membershipNumber || '',
-          delivery_status: s.delivery_status,
-          address_override: s.address_override,
-          notes: s.notes,
-        }));
-
-    return sourceList.filter((r) => {
-      const name = (r.name || '').toLowerCase();
-      const code = String(r.code_or_reg || '').toLowerCase();
-      const matchSearch = !q || name.includes(q) || code.includes(q);
-      const matchType = typeFilter === 'ALL' || r.recipient_type === typeFilter;
-      const matchStatus = statusFilter === 'ALL' || r.delivery_status === statusFilter;
-      const rowSub = r.recipient_type === 'MEMBER' ? subscriptions.find((x) => String(x.member_id) === String(r.recipient_id)) : null;
-      const matchReturns = returnsFilter === 'ALL' || (rowSub && returnCounts[rowSub.id] > 0);
-      return matchSearch && matchType && matchStatus && matchReturns;
-    });
-  }, [recipients, subscriptions, search, typeFilter, statusFilter, returnsFilter, returnCounts, memberName, members]);
-
-  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const current = Math.min(page, pages);
-  const rows = filtered.slice((current - 1) * pageSize, current * pageSize);
+  const stats = { total: summary.total, active: summary.active, paused: summary.paused, stopped: summary.stopped };
+  const subscriptions = rows.filter((r) => r.subscription).map((r) => r.subscription);
 
   const changeStatus = async (sub, delivery_status) => {
     try {
@@ -477,7 +425,7 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
             <input
               type="text"
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Search recipient name or code…"
               className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]"
             />
@@ -533,13 +481,13 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-200">
-              {rows.length === 0 ? (
+              {loadingRows && rows.length === 0 ? (
+                <EmptyRow colSpan={5} title="Loading…" />
+              ) : rows.length === 0 ? (
                 <EmptyRow colSpan={5} icon={BookOpen} title="No recipients found" hint="Start a subscription or enable magazine delivery for affiliates, associates or press." />
               ) : (
                 rows.map((row) => {
-                  const sub = row.recipient_type === 'MEMBER'
-                    ? subscriptions.find((s) => String(s.member_id) === String(row.recipient_id))
-                    : null;
+                  const sub = row.recipient_type === 'MEMBER' ? row.subscription : null;
                   return (
                     <tr key={`${row.recipient_type}-${row.recipient_id}`} className="hover:bg-amber-50/40 transition-colors">
                       <td className="px-4 py-3.5">
@@ -556,12 +504,12 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
                       <td className="px-4 py-3.5">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <Chip value={row.delivery_status} />
-                          {sub && activePauses.some((p) => String(p.subscription_id) === String(sub.id)) && row.delivery_status !== 'PAUSED' && (
+                          {sub && row.active_pause && row.delivery_status !== 'PAUSED' && (
                             <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">Paused</span>
                           )}
-                          {sub && returnCounts[sub.id] > 0 && (
+                          {sub && row.return_count > 0 && (
                             <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">
-                              {returnCounts[sub.id]} returned
+                              {row.return_count} returned
                             </span>
                           )}
                         </div>
@@ -593,7 +541,7 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
                                 </button>
                               )}
                               {canWrite && sub.delivery_status === 'ACTIVE' && (() => {
-                                const running = activePauses.find((p) => String(p.subscription_id) === String(sub.id));
+                                const running = row.active_pause;
                                 return running ? (
                                   <button type="button" onClick={() => resumeDelivery(running)} className="btn-act" title="Resume the paused delivery">
                                     <Play className="w-3.5 h-3.5" /><span>Resume</span>
@@ -656,23 +604,23 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
             </tbody>
           </table>
         </div>
-        {filtered.length > 0 && (
-          <Pager page={current} pages={pages} total={filtered.length} pageSize={pageSize} onPage={setPage} onPageSize={(n) => { setPageSize(n); setPage(1); }} />
+        {total > 0 && (
+          <Pager page={page} pages={pages} total={total} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
         )}
       </div>
 
       {formOpen && (
         <SubscriptionForm
           editing={editing}
-          memberOptions={memberOptions}
+          memberName={memberName}
           onClose={() => setFormOpen(false)}
-          onSaved={() => { setFormOpen(false); reload(); loadRecipients(); }}
+          onSaved={() => { setFormOpen(false); refreshAll(); }}
         />
       )}
       {monthlyFor && <MonthlyModal sub={monthlyFor} memberName={memberName} onClose={() => setMonthlyFor(null)} />}
       {pauseFor && (
         <PauseForm
-          subOptions={subscriptions.map((x) => ({ value: x.id, label: `${memberName(x.member_id)} — ${statusLabel(x.delivery_status)}` }))}
+          subOptions={[{ value: pauseFor.id, label: `${memberName(pauseFor.member_id)} — ${statusLabel(pauseFor.delivery_status)}` }]}
           presetSubscriptionId={pauseFor.id}
           onClose={() => setPauseFor(null)}
           onSaved={() => { setPauseFor(null); refreshAll(); }}
@@ -680,7 +628,7 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
       )}
       {returnFor && (
         <ReturnForm
-          subOptions={subscriptions.map((x) => ({ value: x.id, label: `${memberName(x.member_id)} — ${statusLabel(x.delivery_status)}` }))}
+          subOptions={[{ value: returnFor.id, label: `${memberName(returnFor.member_id)} — ${statusLabel(returnFor.delivery_status)}` }]}
           presetSubscriptionId={returnFor.id}
           onClose={() => setReturnFor(null)}
           onSaved={() => { setReturnFor(null); refreshAll(); }}
@@ -700,11 +648,11 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
               </section>
               <section className="space-y-3">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-[#510601]">Delivery pauses</h4>
-                <PausesTab subscriptions={subscriptions} memberName={memberName} canWrite={canWrite} canDelete={canDelete} subscriptionId={historyFor.id} onChanged={refreshAll} />
+                <PausesTab subscriptions={[historyFor]} memberName={memberName} canWrite={canWrite} canDelete={canDelete} subscriptionId={historyFor.id} onChanged={refreshAll} />
               </section>
               <section className="space-y-3">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-[#510601]">Returns</h4>
-                <ReturnsTab subscriptions={subscriptions} memberName={memberName} canWrite={canWrite} canDelete={canDelete} subscriptionId={historyFor.id} onChanged={refreshAll} />
+                <ReturnsTab subscriptions={[historyFor]} memberName={memberName} canWrite={canWrite} canDelete={canDelete} subscriptionId={historyFor.id} onChanged={refreshAll} />
               </section>
             </div>
             <ModalFooter kind="view" onCancel={() => setHistoryFor(null)} />
@@ -713,7 +661,7 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
       )}
       {repeatOpen && (
         <RepeatReturnsModal
-          subToMember={new Map(subscriptions.map((x) => [String(x.id), x.member_id]))}
+          subToMember={new Map()}
           memberName={memberName}
           onClose={() => setRepeatOpen(false)}
         />
@@ -729,7 +677,7 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
   );
 }
 
-function SubscriptionForm({ editing, memberOptions, onClose, onSaved }) {
+function SubscriptionForm({ editing, memberName, onClose, onSaved }) {
   const [form, setForm] = useState({
     member_id: editing?.member_id || '',
     delivery_status: editing?.delivery_status && SETTABLE_STATUSES.includes(editing.delivery_status) ? editing.delivery_status : 'ACTIVE',
@@ -738,6 +686,23 @@ function SubscriptionForm({ editing, memberOptions, onClose, onSaved }) {
   });
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
+  // the member is found by typing: the server searches every member and returns a few
+  const [memberQuery, setMemberQuery] = useState('');
+  const [memberHits, setMemberHits] = useState([]);
+  const [pickedLabel, setPickedLabel] = useState('');
+  useEffect(() => {
+    const q = memberQuery.trim();
+    if (editing || q.length < 2) {
+      setMemberHits([]);
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      api.get('/members/', { params: { search: q, limit: 8 } })
+        .then(({ data }) => setMemberHits(Array.isArray(data?.data) ? data.data : []))
+        .catch(() => setMemberHits([]));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [memberQuery, editing]);
 
   const save = async () => {
     const errs = {};
@@ -782,16 +747,45 @@ function SubscriptionForm({ editing, memberOptions, onClose, onSaved }) {
             <label className={LABEL}>Member <span className="text-[#ED4636]">*</span></label>
             {editing ? (
               <div className="px-3.5 py-2.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg text-sm text-[#180200]">
-                {memberOptions.find((o) => String(o.value) === String(editing.member_id))?.label || `Member ${editing.member_id}`}
+                {memberName(editing.member_id)}
               </div>
             ) : (
-              <SearchableFormSelect
-                value={form.member_id}
-                onChange={(v) => { setForm((f) => ({ ...f, member_id: v })); setErrors((e) => ({ ...e, member_id: '' })); }}
-                options={memberOptions}
-                placeholder="Choose a member"
-                hasError={Boolean(errors.member_id)}
-              />
+              <div>
+                {form.member_id ? (
+                  <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg text-sm text-[#180200]">
+                    <span className="font-semibold">{pickedLabel}</span>
+                    <button type="button" onClick={() => { setForm((f) => ({ ...f, member_id: '' })); setPickedLabel(''); }} className="text-xs font-semibold text-[#510601] hover:underline cursor-pointer">Change</button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={memberQuery}
+                      onChange={(e) => setMemberQuery(e.target.value)}
+                      placeholder="Type a name, membership number or mobile"
+                      className={`${INPUT} ${errors.member_id ? 'border-[#ED4636]' : ''}`}
+                    />
+                    {memberHits.length > 0 && (
+                      <ul className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-[#E8DFD8] bg-white divide-y divide-[#E8DFD8]">
+                        {memberHits.map((m) => {
+                          const label = `${m.name_title ? `${m.name_title} ` : ''}${m.full_name_en || [m.first_name_en, m.middle_name_en, m.last_name_en].filter(Boolean).join(' ')} (${m.member_code || m.membership_number || `ID ${m.id}`})`;
+                          return (
+                            <li key={m.id}>
+                              <button
+                                type="button"
+                                onClick={() => { setForm((f) => ({ ...f, member_id: m.id })); setPickedLabel(label); setErrors((e) => ({ ...e, member_id: '' })); setMemberHits([]); }}
+                                className="w-full px-3.5 py-2 text-left text-sm hover:bg-[#FAF7F2] cursor-pointer"
+                              >
+                                {label}{m.mobile ? <span className="ml-2 font-mono text-xs text-[#863221]">{m.mobile}</span> : null}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </>
+                )}
+              </div>
             )}
             <FieldError>{errors.member_id}</FieldError>
           </div>
@@ -977,9 +971,8 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete, subscriptio
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/magazines/pauses', { params: { limit: 5000, active_only: activeOnly } });
-      const all = Array.isArray(data?.data) ? data.data : [];
-      setPauses(subscriptionId ? all.filter((p) => String(p.subscription_id) === String(subscriptionId)) : all);
+      const { data } = await api.get('/magazines/pauses', { params: { limit: 200, active_only: activeOnly, ...(subscriptionId ? { subscription_id: subscriptionId } : {}) } });
+      setPauses(Array.isArray(data?.data) ? data.data : []);
     } catch (error) {
       notify(error.response?.data?.detail || 'Could not load delivery pauses.', 'error');
     } finally {
@@ -1219,7 +1212,7 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete, subscripti
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/magazines/returns', { params: { limit: 5000 } });
+      const { data } = await api.get('/magazines/returns', { params: { limit: 200, ...(subscriptionId ? { subscription_id: subscriptionId } : {}) } });
       const all = Array.isArray(data?.data) ? data.data : [];
       setReturns(subscriptionId ? all.filter((r) => String(r.subscription_id) === String(subscriptionId)) : all);
     } catch (error) {
@@ -1501,24 +1494,32 @@ function LabelsTab({ locations, canWrite }) {
 
   const [gen, setGen] = useState({ issue_month_year: thisMonth(), state_id: '', district_id: '', taluk_id: '', only_paid: true });
   const [deliveries, setDeliveries] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
 
+  // a page of label batches; the 200 newest delivery batches tell which issues were sent
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const [{ data }, del] = await Promise.all([
-        api.get('/magazines/label-batches', { params: { limit: 5000 } }),
-        api.get('/magazines/delivery-batches', { params: { limit: 5000 } }),
+        api.get('/magazines/label-batches', { params: { page, limit: pageSize } }),
+        api.get('/magazines/delivery-batches', { params: { limit: 200 } }),
       ]);
       setDeliveries(Array.isArray(del.data?.data) ? del.data.data : []);
       setBatches(Array.isArray(data?.data) ? data.data : []);
+      setTotal(data?.total ?? 0);
+      setPages(Math.max(1, data?.pages ?? 1));
     } catch (error) {
       notify(error.response?.data?.detail || 'Could not load label batches.', 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, pageSize]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setPage(1); }, [pageSize]);
 
   // the delivery batch of an issue month tells whether that month's labels were sent
   const deliveryOf = (issue) => deliveries.find((d) => d.issue_month_year === issue && ['DISPATCHED', 'COMPLETED'].includes(d.status));
@@ -1705,6 +1706,7 @@ function LabelsTab({ locations, canWrite }) {
             </tbody>
           </table>
         </div>
+        {total > 0 && <Pager page={page} pages={pages} total={total} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />}
       </div>
 
       {detail && <LabelBatchModal batch={detail} onClose={() => setDetail(null)} />}
@@ -1724,22 +1726,22 @@ function LabelBatchModal({ batch, onClose }) {
   const [returnsOnly, setReturnsOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
+  // one page of the labels; the type and the returned-only filters run on the whole batch (rule 10.6)
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api.get(`/magazines/label-batches/${batch.id}`, { params: { returns_only: returnsOnly } })
+    api.get(`/magazines/label-batches/${batch.id}`, { params: { returns_only: returnsOnly, page, limit: pageSize, ...(typeFilter !== 'ALL' ? { recipient_type: typeFilter } : {}) } })
       .then(({ data: d }) => { if (!cancelled) setData(d); })
       .catch((err) => { if (!cancelled) notify(err.response?.data?.detail || 'Could not load the batch.', 'error'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [batch.id, returnsOnly]);
+  }, [batch.id, returnsOnly, page, pageSize, typeFilter]);
+  useEffect(() => { setPage(1); }, [returnsOnly, typeFilter, pageSize]);
 
-  const items = useMemo(() => {
-    if (!data?.data) return [];
-    if (typeFilter === 'ALL') return data.data;
-    return data.data.filter((item) => item.recipient_type === typeFilter);
-  }, [data, typeFilter]);
+  const items = data?.data || [];
 
   return (
     <Modal isOpen onClose={onClose}>
@@ -1747,7 +1749,7 @@ function LabelBatchModal({ batch, onClose }) {
         <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold text-[#180200]">{batch.batch_name}</h3>
-            <p className="text-xs text-gray-500">{items.length} label{items.length === 1 ? '' : 's'} shown</p>
+            <p className="text-xs text-gray-500">{data?.total ?? 0} label{(data?.total ?? 0) === 1 ? '' : 's'}</p>
           </div>
           <div className="flex items-center gap-3">
             <label className="inline-flex items-center gap-2 text-xs font-semibold text-[#863221] cursor-pointer">
@@ -1805,6 +1807,7 @@ function LabelBatchModal({ batch, onClose }) {
             </table>
           )}
         </div>
+        {(data?.total ?? 0) > 0 && <Pager page={page} pages={Math.max(1, data?.pages ?? 1)} total={data.total} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />}
         <ModalFooter kind="view" onCancel={onClose} />
       </div>
     </Modal>
@@ -1817,20 +1820,27 @@ function DeliveryBatchesTab({ canWrite, canDelete }) {
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/magazines/delivery-batches', { params: { limit: 5000 } });
+      const { data } = await api.get('/magazines/delivery-batches', { params: { page, limit: pageSize } });
       setBatches(Array.isArray(data?.data) ? data.data : []);
+      setTotal(data?.total ?? 0);
+      setPages(Math.max(1, data?.pages ?? 1));
     } catch (error) {
       notify(error.response?.data?.detail || 'Could not load delivery batches.', 'error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, pageSize]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setPage(1); }, [pageSize]);
 
   const remove = async (batch) => {
     const ok = await confirmYesNo({ title: 'Delete delivery batch?', text: `"${batch.batch_name}" will be removed.`, confirmText: 'Yes, delete', danger: true });
@@ -1895,6 +1905,7 @@ function DeliveryBatchesTab({ canWrite, canDelete }) {
             </tbody>
           </table>
         </div>
+        {total > 0 && <Pager page={page} pages={pages} total={total} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />}
       </div>
 
       {formOpen && (

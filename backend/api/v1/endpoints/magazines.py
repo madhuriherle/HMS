@@ -17,7 +17,7 @@ from schemas import magazines as schemas_magazines
 from schemas.common import PendingApproval
 from crud import magazines as crud_magazines
 from core.config import settings
-from core.pagination import paginate
+from core.pagination import paginate, LIST_PAGE_MAX
 from services.whatsapp import whatsapp_service
 from services import approval_gate
 from datetime import datetime, date, timezone
@@ -25,6 +25,11 @@ import hashlib
 import secrets
 
 router = APIRouter()
+
+
+def _page_limit(limit: int) -> int:
+    """A list a person pages through never returns more than 200 rows per request (rule 10.6)."""
+    return max(1, min(int(limit), LIST_PAGE_MAX))
 
 VALID_DELIVERY_STATUSES = {"ACTIVE", "STOPPED", "CANCELLED"}
 VALID_FOLLOW_UP_STATUSES = {"PENDING", "CONTACTED", "RESOLVED"}
@@ -61,7 +66,7 @@ def read_subscriptions(
                    allowed={"id": MagazineSubscription.id, "created_at": MagazineSubscription.created_at,
                             "delivery_status": MagazineSubscription.delivery_status},
                    newest_first=(MagazineSubscription.id.desc(),))
-    return paginate(q, page, limit)
+    return paginate(q, page, _page_limit(limit))
 
 
 @router.get("/subscriptions/{sub_id}", response_model=schemas_magazines.MagazineSubscription)
@@ -156,7 +161,7 @@ def read_pauses(
             (MagazineDeliveryPause.pause_end_date >= today)
             | (MagazineDeliveryPause.pause_end_date == None),  # noqa: E711
         )
-    return paginate(q.order_by(MagazineDeliveryPause.id.desc()), page, limit)
+    return paginate(q.order_by(MagazineDeliveryPause.id.desc()), page, _page_limit(limit))
 
 
 @router.post("/pauses", response_model=Union[schemas_magazines.MagazineDeliveryPause, PendingApproval], status_code=201)
@@ -566,7 +571,7 @@ def read_returns(
         )
     if issue_month_year: q = q.filter(MagazineReturn.issue_month_year == issue_month_year)
     if follow_up_status: q = q.filter(MagazineReturn.follow_up_status == follow_up_status)
-    return paginate(q.order_by(MagazineReturn.id.desc()), page, limit)
+    return paginate(q.order_by(MagazineReturn.id.desc()), page, _page_limit(limit))
 
 
 @router.post("/returns", response_model=Union[schemas_magazines.MagazineReturn, PendingApproval], status_code=201)
@@ -676,7 +681,7 @@ def read_delivery_batches(
         db.query(MagazineDeliveryBatch)
         .filter(MagazineDeliveryBatch.is_deleted == False)
         .order_by(MagazineDeliveryBatch.id.desc()),
-        page, limit,
+        page, _page_limit(limit),
     )
 
 
@@ -989,7 +994,7 @@ def read_label_batches(
 ) -> Any:
     """Generated label batches (the 'generated' side of the labels report)."""
     q = db.query(MagazineLabelBatch).filter(MagazineLabelBatch.is_deleted == False)
-    return paginate(q.order_by(MagazineLabelBatch.id.desc()), page, limit)
+    return paginate(q.order_by(MagazineLabelBatch.id.desc()), page, _page_limit(limit))
 
 
 def _label_names(db: Session, items) -> dict:
@@ -1024,8 +1029,11 @@ def read_label_batch(
     current_user: User = Depends(deps.get_current_user),
     batch_id: int,
     returns_only: bool = False,
+    recipient_type: Optional[str] = None,   # MEMBER | AFFILIATION | ASSOCIATE | PRESS
+    page: int = 1,
+    limit: int = 25,
 ) -> Any:
-    """Label batch detail; returns_only=True lists just the returned issues."""
+    """Label batch detail, one page of the labels (at most 200); returns_only=True lists just the returned issues."""
     batch = db.query(MagazineLabelBatch).filter(
         MagazineLabelBatch.id == batch_id,
         MagazineLabelBatch.is_deleted == False,
@@ -1039,7 +1047,12 @@ def read_label_batch(
     )
     if returns_only:
         q = q.filter(MagazineLabelBatchItem.is_return == True)  # noqa: E712
-    items = q.order_by(MagazineLabelBatchItem.id).all()
+    if recipient_type and recipient_type.upper() != "ALL":
+        q = q.filter(MagazineLabelBatchItem.recipient_type == recipient_type.upper())
+    limit = _page_limit(limit)
+    page = max(1, page)
+    total_items = q.count()
+    items = q.order_by(MagazineLabelBatchItem.id).offset((page - 1) * limit).limit(limit).all()
     names = _label_names(db, items)
 
     return {
@@ -1051,7 +1064,10 @@ def read_label_batch(
             "total_labels": batch.total_labels,
             "filters_applied": batch.filters_applied,
         },
-        "total": len(items),
+        "total": total_items,
+        "page": page,
+        "limit": limit,
+        "pages": (total_items + limit - 1) // limit,
         "data": [
             {
                 "id": item.id,
@@ -1265,7 +1281,13 @@ def read_all_recipients(
     delivery_status: Optional[str] = None,
     search: Optional[str] = None,
 ) -> Any:
-    """Combined list of all magazine recipients: members with subscriptions, affiliations, associates, and press."""
+    """Combined list of magazine recipients: members with subscriptions, affiliations, associates, and press.
+    LEGACY: at most the first 200; the Subscriptions screen reads the paged GET /magazines/recipients."""
+    return _collect_recipients(db, recipient_type, delivery_status, search)[:LIST_PAGE_MAX]
+
+
+def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_status: Optional[str], search: Optional[str]) -> list:
+    """Every recipient matching the type, status and search (not paged)."""
     from models.engagements import Affiliation, AffiliationMagazineSetting, Associate, AssociateMagazineSetting, PressMedia, PressMediaMagazineSetting
 
     recipients: List[schemas_magazines.MagazineRecipientItem] = []
@@ -1405,4 +1427,86 @@ def read_all_recipients(
             )
 
     return recipients
+
+
+@router.get("/recipients")
+def read_recipients_page(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("magazines.read")),
+    page: int = 1,
+    limit: int = 25,
+    recipient_type: Optional[str] = None,
+    delivery_status: Optional[str] = None,
+    search: Optional[str] = None,
+    with_returns: bool = False,   # members whose subscription has a returned issue
+) -> Any:
+    """One page of the combined recipients (members with a subscription, affiliations, associates, press). The search
+    and the filters run on all of them; `summary` counts the whole set matching the type and the search, whatever the
+    status filter, and a member row carries its subscription, the pause running today and its returned-issue count."""
+    from models.magazines import MagazineReturn
+
+    everything = _collect_recipients(db, recipient_type, None, search)
+    summary = {"total": len(everything), "active": 0, "paused": 0, "stopped": 0}
+    for r in everything:
+        key = "active" if r.delivery_status == "ACTIVE" else "paused" if r.delivery_status == "PAUSED" else "stopped"
+        summary[key] += 1
+
+    rows = everything
+    if delivery_status and delivery_status.upper() != "ALL":
+        rows = [r for r in rows if r.delivery_status == delivery_status.upper()]
+
+    returned_sub_ids = {
+        sid for (sid,) in db.query(MagazineReturn.subscription_id).filter(MagazineReturn.is_deleted == False).distinct().all()  # noqa: E712
+    }
+    if with_returns:
+        members_with_returns = {
+            mid for (mid,) in db.query(MagazineSubscription.member_id).filter(
+                MagazineSubscription.id.in_(returned_sub_ids or {0}), MagazineSubscription.is_deleted == False  # noqa: E712
+            ).all()
+        }
+        rows = [r for r in rows if r.recipient_type == "MEMBER" and r.recipient_id in members_with_returns]
+
+    limit = _page_limit(limit)
+    page = max(1, page)
+    total = len(rows)
+    window = rows[(page - 1) * limit: page * limit]
+
+    # the member rows of this page: their subscription, the running pause and the returns
+    member_ids = [r.recipient_id for r in window if r.recipient_type == "MEMBER"]
+    subs = {}
+    if member_ids:
+        from core.pagination import _to_plain
+        for sub in db.query(MagazineSubscription).filter(
+            MagazineSubscription.member_id.in_(member_ids), MagazineSubscription.is_deleted == False  # noqa: E712
+        ).all():
+            subs[sub.member_id] = sub
+    today = date.today()
+    pauses = {}
+    counts = {}
+    if subs:
+        sub_ids = [s.id for s in subs.values()]
+        for p in db.query(MagazineDeliveryPause).filter(
+            MagazineDeliveryPause.subscription_id.in_(sub_ids), MagazineDeliveryPause.is_deleted == False,  # noqa: E712
+            MagazineDeliveryPause.pause_start_date <= today,
+            (MagazineDeliveryPause.pause_end_date >= today) | (MagazineDeliveryPause.pause_end_date == None),  # noqa: E711
+        ).all():
+            pauses.setdefault(p.subscription_id, p)
+        from sqlalchemy import func as _func
+        for sid, n in db.query(MagazineReturn.subscription_id, _func.count()).filter(
+            MagazineReturn.subscription_id.in_(sub_ids), MagazineReturn.is_deleted == False  # noqa: E712
+        ).group_by(MagazineReturn.subscription_id).all():
+            counts[sid] = n
+
+    from core.pagination import _to_plain
+    data = []
+    for r in window:
+        item = r.model_dump()
+        if r.recipient_type == "MEMBER":
+            sub = subs.get(r.recipient_id)
+            item["subscription"] = _to_plain(sub, set()) if sub else None
+            pause = pauses.get(sub.id) if sub else None
+            item["active_pause"] = _to_plain(pause, set()) if pause else None
+            item["return_count"] = counts.get(sub.id, 0) if sub else 0
+        data.append(item)
+    return {"total": total, "page": page, "limit": limit, "pages": (total + limit - 1) // limit, "data": data, "summary": summary}
 
