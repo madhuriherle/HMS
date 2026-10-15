@@ -94,7 +94,7 @@ function TypeCell({ receipt }) {
     setTip({ left: Math.min(r.left, window.innerWidth - 340), top: r.bottom + 6 });
   };
   return (
-    <div className="max-w-[220px] whitespace-normal break-words leading-snug" onMouseEnter={show} onMouseLeave={() => setTip(null)}>
+    <div className="max-w-[170px] whitespace-normal break-words leading-snug" onMouseEnter={show} onMouseLeave={() => setTip(null)}>
       <span className="cursor-default">{label}</span>
       {more > 0 && (
         <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-bold text-[#863221]">
@@ -712,8 +712,8 @@ export default function ReceiptTracking() {
                       <td className="py-3.5 px-4"><StatusDot receipt={receipt} /></td>
 
                       {/* Column 6: Action */}
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                      <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                        <div className="flex flex-nowrap items-center justify-end gap-1.5">
                           {/* View Action */}
                           <button
                             type="button"
