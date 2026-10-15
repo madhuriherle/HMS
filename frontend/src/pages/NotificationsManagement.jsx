@@ -299,7 +299,7 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
       <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold">
+            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
                 <th className="py-3 px-4">Campaign Name</th>
                 <th className="py-3 px-4">Channel</th>
@@ -526,7 +526,7 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
         <div className="p-6 space-y-3">
           <div className="overflow-x-auto max-h-80 overflow-y-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold sticky top-0">
+              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                 <tr>
                   <th className="py-2 px-3">Recipient Name</th>
                   <th className="py-2 px-3">Destination</th>
@@ -699,7 +699,7 @@ function TemplatesTab({ canWrite, canDelete }) {
       <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold">
+            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
                 <th className="py-3 px-4">Template Name</th>
                 <th className="py-3 px-4">Code</th>

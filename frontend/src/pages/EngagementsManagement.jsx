@@ -365,8 +365,8 @@ function AffiliationsView({ canWrite, canDelete }) {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-[#FAF7F2] text-[#863221] text-[10px] uppercase font-bold tracking-wider border-b border-[#E8DFD8]">
+              <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
+                <tr>
                   <th className="px-4 py-3">Group Name</th>
                   <th className="px-4 py-3">Contact Person</th>
                   <th className="px-4 py-3">Contact Phone</th>
@@ -573,8 +573,8 @@ function AffiliationsView({ canWrite, canDelete }) {
             ) : (
               <div className="border border-[#E8DFD8] rounded-xl overflow-hidden">
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-[#FAF7F2] text-[#863221] text-[10px] uppercase font-bold tracking-wider border-b border-[#E8DFD8]">
+                  <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
+                    <tr>
                       <th className="px-3 py-2">Name</th>
                       <th className="px-3 py-2">Designation</th>
                       <th className="px-3 py-2">Mobile</th>
@@ -902,8 +902,8 @@ function AssociatesView({ canWrite, canDelete }) {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-[#FAF7F2] text-[#863221] text-[10px] uppercase font-bold tracking-wider border-b border-[#E8DFD8]">
+              <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
+                <tr>
                   <th className="px-4 py-3">Associate Name</th>
                   <th className="px-4 py-3">Organization</th>
                   <th className="px-4 py-3">Mobile & Email</th>
@@ -1275,8 +1275,8 @@ function PressMediaView({ canWrite, canDelete }) {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-[#FAF7F2] text-[#863221] text-[10px] uppercase font-bold tracking-wider border-b border-[#E8DFD8]">
+              <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
+                <tr>
                   <th className="px-4 py-3">Publication / Channel</th>
                   <th className="px-4 py-3">Reporter / Contact</th>
                   <th className="px-4 py-3">Phone & Email</th>
@@ -1810,8 +1810,8 @@ function CommitteeView({ canWrite, canDelete }) {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-[#FAF7F2] text-[#863221] text-[10px] uppercase font-bold tracking-wider border-b border-[#E8DFD8]">
+              <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
+                <tr>
                   <th className="px-4 py-3">Member Name</th>
                   <th className="px-4 py-3">Designation</th>
                   <th className="px-4 py-3">Category</th>

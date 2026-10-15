@@ -606,12 +606,12 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           {subView === 'list' && (
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold">
+              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                 <tr>
                   {selectedColumns.map((colKey) => {
                     const col = MEMBER_COLUMNS.find((c) => c.key === colKey);
                     return (
-                      <th key={colKey} className="py-2.5 px-3 whitespace-nowrap">
+                      <th key={colKey} className="py-3 px-4 whitespace-nowrap">
                         {language === 'kn' ? (col?.labelKn || colKey) : (col?.labelEn || colKey)}
                       </th>
                     );
@@ -629,7 +629,7 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
                   paginatedRows.map((r, i) => (
                     <tr key={i} className="hover:bg-stone-50">
                       {selectedColumns.map((colKey) => (
-                        <td key={colKey} className="py-2.5 px-3 text-stone-700 whitespace-nowrap">
+                        <td key={colKey} className="py-3 px-4 text-stone-700 whitespace-nowrap">
                           {r[colKey] !== null && r[colKey] !== undefined ? String(r[colKey]) : '—'}
                         </td>
                       ))}
@@ -642,11 +642,11 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
 
           {subView === 'geography' && (
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold">
+              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-2.5 px-4">District</th>
-                  <th className="py-2.5 px-4">Taluk</th>
-                  <th className="py-2.5 px-4 text-right">Member Count</th>
+                  <th className="py-3 px-4">District</th>
+                  <th className="py-3 px-4">Taluk</th>
+                  <th className="py-3 px-4 text-right">Member Count</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8DFD8]">
@@ -659,9 +659,9 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
                 ) : (
                   paginatedRows.map((r, i) => (
                     <tr key={i} className="hover:bg-stone-50">
-                      <td className="py-2.5 px-4 font-semibold text-stone-800">{r.district_name || 'Unassigned'}</td>
-                      <td className="py-2.5 px-4 text-stone-600">{r.taluk_name || 'All Taluks'}</td>
-                      <td className="py-2.5 px-4 text-right font-bold text-[#510601]">{Number(r.count || r.member_count || 0).toLocaleString()}</td>
+                      <td className="py-3 px-4 font-semibold text-stone-800">{r.district_name || 'Unassigned'}</td>
+                      <td className="py-3 px-4 text-stone-600">{r.taluk_name || 'All Taluks'}</td>
+                      <td className="py-3 px-4 text-right font-bold text-[#510601]">{Number(r.count || r.member_count || 0).toLocaleString()}</td>
                     </tr>
                   ))
                 )}
@@ -671,11 +671,11 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
 
           {subView === 'gender' && (
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold">
+              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-2.5 px-4">Gender</th>
-                  <th className="py-2.5 px-4">Membership Type</th>
-                  <th className="py-2.5 px-4 text-right">Count</th>
+                  <th className="py-3 px-4">Gender</th>
+                  <th className="py-3 px-4">Membership Type</th>
+                  <th className="py-3 px-4 text-right">Count</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8DFD8]">
@@ -688,9 +688,9 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
                 ) : (
                   paginatedRows.map((r, i) => (
                     <tr key={i} className="hover:bg-stone-50">
-                      <td className="py-2.5 px-4 font-semibold text-stone-800">{r.gender || 'Unspecified'}</td>
-                      <td className="py-2.5 px-4 text-stone-600">{r.membership_type || 'All Types'}</td>
-                      <td className="py-2.5 px-4 text-right font-bold text-[#510601]">{Number(r.count || 0).toLocaleString()}</td>
+                      <td className="py-3 px-4 font-semibold text-stone-800">{r.gender || 'Unspecified'}</td>
+                      <td className="py-3 px-4 text-stone-600">{r.membership_type || 'All Types'}</td>
+                      <td className="py-3 px-4 text-right font-bold text-[#510601]">{Number(r.count || 0).toLocaleString()}</td>
                     </tr>
                   ))
                 )}
@@ -700,14 +700,14 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
 
           {subView === 'unapproved' && (
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold">
+              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-2.5 px-3">Applicant Name</th>
-                  <th className="py-2.5 px-3">Mobile</th>
-                  <th className="py-2.5 px-3">District</th>
-                  <th className="py-2.5 px-3">Taluk</th>
-                  <th className="py-2.5 px-3">Applied Date</th>
-                  <th className="py-2.5 px-3 text-right">Days Pending</th>
+                  <th className="py-3 px-4">Applicant Name</th>
+                  <th className="py-3 px-4">Mobile</th>
+                  <th className="py-3 px-4">District</th>
+                  <th className="py-3 px-4">Taluk</th>
+                  <th className="py-3 px-4">Applied Date</th>
+                  <th className="py-3 px-4 text-right">Days Pending</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8DFD8]">
@@ -720,12 +720,12 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
                 ) : (
                   paginatedRows.map((r, i) => (
                     <tr key={i} className="hover:bg-stone-50">
-                      <td className="py-2.5 px-3 font-semibold text-stone-800">{r.name || [r.first_name_en, r.last_name_en].filter(Boolean).join(' ') || '—'}</td>
-                      <td className="py-2.5 px-3 text-stone-600">{r.mobile || '—'}</td>
-                      <td className="py-2.5 px-3 text-stone-600">{r.district_name || '—'}</td>
-                      <td className="py-2.5 px-3 text-stone-600">{r.taluk_name || '—'}</td>
-                      <td className="py-2.5 px-3 text-stone-600">{formatDate(r.created_at) || '—'}</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-amber-700">{r.days_pending ?? '—'}</td>
+                      <td className="py-3 px-4 font-semibold text-stone-800">{r.name || [r.first_name_en, r.last_name_en].filter(Boolean).join(' ') || '—'}</td>
+                      <td className="py-3 px-4 text-stone-600">{r.mobile || '—'}</td>
+                      <td className="py-3 px-4 text-stone-600">{r.district_name || '—'}</td>
+                      <td className="py-3 px-4 text-stone-600">{r.taluk_name || '—'}</td>
+                      <td className="py-3 px-4 text-stone-600">{formatDate(r.created_at) || '—'}</td>
+                      <td className="py-3 px-4 text-right font-bold text-amber-700">{r.days_pending ?? '—'}</td>
                     </tr>
                   ))
                 )}
@@ -961,15 +961,15 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
       <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold">
+            <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="py-2.5 px-3">Receipt Number</th>
-                <th className="py-2.5 px-3">Date</th>
-                <th className="py-2.5 px-3">Payee / Member</th>
-                <th className="py-2.5 px-3">Payment Mode</th>
-                <th className="py-2.5 px-3">Bank Account</th>
-                <th className="py-2.5 px-3 text-right">Net Amount</th>
-                <th className="py-2.5 px-3">Status</th>
+                <th className="py-3 px-4">Receipt Number</th>
+                <th className="py-3 px-4">Date</th>
+                <th className="py-3 px-4">Payee / Member</th>
+                <th className="py-3 px-4">Payment Mode</th>
+                <th className="py-3 px-4">Bank Account</th>
+                <th className="py-3 px-4 text-right">Net Amount</th>
+                <th className="py-3 px-4">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DFD8]">
@@ -982,15 +982,15 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
               ) : (
                 paginatedRows.map((r, i) => (
                   <tr key={i} className="hover:bg-stone-50">
-                    <td className="py-2.5 px-3 font-semibold text-stone-800">{r.receipt_number || '—'}</td>
-                    <td className="py-2.5 px-3 text-stone-600">{formatDate(r.receipt_date) || '—'}</td>
-                    <td className="py-2.5 px-3 text-stone-800">{r.received_from || r.member_name || '—'}</td>
-                    <td className="py-2.5 px-3 text-stone-600">{r.payment_mode || '—'}</td>
-                    <td className="py-2.5 px-3 text-stone-600">{r.bank_account || '—'}</td>
-                    <td className="py-2.5 px-3 text-right font-bold text-stone-900">
+                    <td className="py-3 px-4 font-semibold text-stone-800">{r.receipt_number || '—'}</td>
+                    <td className="py-3 px-4 text-stone-600">{formatDate(r.receipt_date) || '—'}</td>
+                    <td className="py-3 px-4 text-stone-800">{r.received_from || r.member_name || '—'}</td>
+                    <td className="py-3 px-4 text-stone-600">{r.payment_mode || '—'}</td>
+                    <td className="py-3 px-4 text-stone-600">{r.bank_account || '—'}</td>
+                    <td className="py-3 px-4 text-right font-bold text-stone-900">
                       ₹{Number(r.net_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="py-2.5 px-3">
+                    <td className="py-3 px-4">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                         r.status === 'ACTIVE' || r.status === 'PAID'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -1186,14 +1186,14 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
         <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           {subType === 'returns' ? (
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold">
+              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-2.5 px-3">Issue Month</th>
-                  <th className="py-2.5 px-3">Member / Recipient</th>
-                  <th className="py-2.5 px-3">Return Reason</th>
-                  <th className="py-2.5 px-3">Return Date</th>
-                  <th className="py-2.5 px-3">Follow-up Status</th>
-                  <th className="py-2.5 px-3">Action Notes</th>
+                  <th className="py-3 px-4">Issue Month</th>
+                  <th className="py-3 px-4">Member / Recipient</th>
+                  <th className="py-3 px-4">Return Reason</th>
+                  <th className="py-3 px-4">Return Date</th>
+                  <th className="py-3 px-4">Follow-up Status</th>
+                  <th className="py-3 px-4">Action Notes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8DFD8]">
@@ -1206,11 +1206,11 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
                 ) : (
                   paginatedRows.map((r, i) => (
                     <tr key={i} className="hover:bg-stone-50">
-                      <td className="py-2.5 px-3 font-semibold text-stone-800">{r.issue_month_year || '—'}</td>
-                      <td className="py-2.5 px-3 text-stone-800">{r.member_name || r.name || '—'}</td>
-                      <td className="py-2.5 px-3 text-rose-700 font-medium">{r.reason || '—'}</td>
-                      <td className="py-2.5 px-3 text-stone-600">{formatDate(r.return_date) || '—'}</td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-3 px-4 font-semibold text-stone-800">{r.issue_month_year || '—'}</td>
+                      <td className="py-3 px-4 text-stone-800">{r.member_name || r.name || '—'}</td>
+                      <td className="py-3 px-4 text-rose-700 font-medium">{r.reason || '—'}</td>
+                      <td className="py-3 px-4 text-stone-600">{formatDate(r.return_date) || '—'}</td>
+                      <td className="py-3 px-4">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           r.follow_up_status === 'RESOLVED'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
@@ -1221,7 +1221,7 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
                           {r.follow_up_status || 'PENDING'}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-stone-600">{r.action_notes || '—'}</td>
+                      <td className="py-3 px-4 text-stone-600">{r.action_notes || '—'}</td>
                     </tr>
                   ))
                 )}
@@ -1229,13 +1229,13 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
             </table>
           ) : (
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold">
+              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-2.5 px-3">Batch Name</th>
-                  <th className="py-2.5 px-3">Issue Month</th>
-                  <th className="py-2.5 px-3">Generated Date</th>
-                  <th className="py-2.5 px-3 text-right">Total Labels</th>
-                  <th className="py-2.5 px-3">Status</th>
+                  <th className="py-3 px-4">Batch Name</th>
+                  <th className="py-3 px-4">Issue Month</th>
+                  <th className="py-3 px-4">Generated Date</th>
+                  <th className="py-3 px-4 text-right">Total Labels</th>
+                  <th className="py-3 px-4">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8DFD8]">
@@ -1248,11 +1248,11 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
                 ) : (
                   paginatedRows.map((r, i) => (
                     <tr key={i} className="hover:bg-stone-50">
-                      <td className="py-2.5 px-3 font-semibold text-stone-800">{r.batch_name || `Batch ${r.id}`}</td>
-                      <td className="py-2.5 px-3 text-stone-600">{r.issue_month_year || '—'}</td>
-                      <td className="py-2.5 px-3 text-stone-600">{formatDate(r.generation_date || r.created_at) || '—'}</td>
-                      <td className="py-2.5 px-3 text-right font-bold text-stone-900">{r.total_labels || r.count || 0}</td>
-                      <td className="py-2.5 px-3">
+                      <td className="py-3 px-4 font-semibold text-stone-800">{r.batch_name || `Batch ${r.id}`}</td>
+                      <td className="py-3 px-4 text-stone-600">{r.issue_month_year || '—'}</td>
+                      <td className="py-3 px-4 text-stone-600">{formatDate(r.generation_date || r.created_at) || '—'}</td>
+                      <td className="py-3 px-4 text-right font-bold text-stone-900">{r.total_labels || r.count || 0}</td>
+                      <td className="py-3 px-4">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                           {r.status || 'COMPLETED'}
                         </span>
@@ -1366,13 +1366,13 @@ function SavedReportsAndLogsTab({ onDownload, canSave }) {
       {subTab === 'saved' ? (
         <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold">
+            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="py-2.5 px-4">Report Name</th>
-                <th className="py-2.5 px-4">Module / Type</th>
-                <th className="py-2.5 px-4">Saved Filters</th>
-                <th className="py-2.5 px-4">Created At</th>
-                <th className="py-2.5 px-4 text-right">Actions</th>
+                <th className="py-3 px-4">Report Name</th>
+                <th className="py-3 px-4">Module / Type</th>
+                <th className="py-3 px-4">Saved Filters</th>
+                <th className="py-3 px-4">Created At</th>
+                <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DFD8]">
@@ -1385,13 +1385,13 @@ function SavedReportsAndLogsTab({ onDownload, canSave }) {
               ) : (
                 savedReports.map((r) => (
                   <tr key={r.id} className="hover:bg-stone-50">
-                    <td className="py-2.5 px-4 font-semibold text-stone-800">{r.report_name}</td>
-                    <td className="py-2.5 px-4 text-stone-600 uppercase">{r.report_key}</td>
-                    <td className="py-2.5 px-4 text-stone-500 font-mono text-[11px]">
+                    <td className="py-3 px-4 font-semibold text-stone-800">{r.report_name}</td>
+                    <td className="py-3 px-4 text-stone-600 uppercase">{r.report_key}</td>
+                    <td className="py-3 px-4 text-stone-500 font-mono text-[11px]">
                       {JSON.stringify(r.filters || {})}
                     </td>
-                    <td className="py-2.5 px-4 text-stone-600">{formatDate(r.created_at)}</td>
-                    <td className="py-2.5 px-4 text-right">
+                    <td className="py-3 px-4 text-stone-600">{formatDate(r.created_at)}</td>
+                    <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         {canSave && (
                           <button
@@ -1413,13 +1413,13 @@ function SavedReportsAndLogsTab({ onDownload, canSave }) {
       ) : (
         <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-stone-700 font-bold">
+            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
-                <th className="py-2.5 px-4">Export Timestamp</th>
-                <th className="py-2.5 px-4">Report Type</th>
-                <th className="py-2.5 px-4">Format</th>
-                <th className="py-2.5 px-4">Exported By</th>
-                <th className="py-2.5 px-4">Filters Applied</th>
+                <th className="py-3 px-4">Export Timestamp</th>
+                <th className="py-3 px-4">Report Type</th>
+                <th className="py-3 px-4">Format</th>
+                <th className="py-3 px-4">Exported By</th>
+                <th className="py-3 px-4">Filters Applied</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DFD8]">
@@ -1432,15 +1432,15 @@ function SavedReportsAndLogsTab({ onDownload, canSave }) {
               ) : (
                 exportLogs.map((l) => (
                   <tr key={l.id} className="hover:bg-stone-50">
-                    <td className="py-2.5 px-4 text-stone-800 font-semibold">{formatDate(l.exported_at)}</td>
-                    <td className="py-2.5 px-4 text-stone-700 font-medium uppercase">{l.report_key}</td>
-                    <td className="py-2.5 px-4">
+                    <td className="py-3 px-4 text-stone-800 font-semibold">{formatDate(l.exported_at)}</td>
+                    <td className="py-3 px-4 text-stone-700 font-medium uppercase">{l.report_key}</td>
+                    <td className="py-3 px-4">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-stone-100 text-stone-700 uppercase">
                         {l.format}
                       </span>
                     </td>
-                    <td className="py-2.5 px-4 text-stone-600">{l.user_name || l.exported_by || 'Staff'}</td>
-                    <td className="py-2.5 px-4 text-stone-500 font-mono text-[11px]">
+                    <td className="py-3 px-4 text-stone-600">{l.user_name || l.exported_by || 'Staff'}</td>
+                    <td className="py-3 px-4 text-stone-500 font-mono text-[11px]">
                       {JSON.stringify(l.filters || {})}
                     </td>
                   </tr>

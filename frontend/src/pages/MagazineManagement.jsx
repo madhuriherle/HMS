@@ -522,7 +522,7 @@ function SubscriptionsTab({ members, memberName, subscriptions, reload, canWrite
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
-            <thead className="bg-[#FAF7F2] border-b border-stone-200 text-xs font-semibold uppercase tracking-wider text-[#180200]">
+            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
                 <TH>Recipient</TH>
                 <TH>Type</TH>
@@ -927,7 +927,7 @@ function IssueHistory({ subscriptionId }) {
   return (
     <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
       <table className="w-full text-left text-sm text-gray-700">
-        <thead className="bg-[#FAF7F2] border-b border-stone-200 text-xs font-semibold uppercase tracking-wider text-[#180200]">
+        <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
           <tr><TH>Issue</TH><TH>What happened</TH><TH>Detail</TH></tr>
         </thead>
         <tbody className="divide-y divide-stone-200">
@@ -1033,7 +1033,7 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete, subscriptio
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
-            <thead className="bg-[#FAF7F2] border-b border-stone-200 text-xs font-semibold uppercase tracking-wider text-[#180200]">
+            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
                 <TH>Member</TH>
                 <TH>From</TH>
@@ -1283,7 +1283,7 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete, subscripti
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
-            <thead className="bg-[#FAF7F2] border-b border-stone-200 text-xs font-semibold uppercase tracking-wider text-[#180200]">
+            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
                 <TH>Member</TH>
                 <TH>Issue</TH>
@@ -1466,7 +1466,7 @@ function RepeatReturnsModal({ subToMember, memberName, onClose }) {
             <p className="p-6 text-sm text-gray-500">No subscription had repeated returns. Nothing to pause.</p>
           ) : (
             <table className="w-full text-left text-sm text-gray-700">
-              <thead className="bg-[#FAF7F2] border-b border-stone-200 text-xs font-semibold uppercase tracking-wider text-[#180200]">
+              <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                 <tr><TH>Member</TH><TH>Returns</TH><TH>Last issue</TH><TH>Delivery</TH></tr>
               </thead>
               <tbody className="divide-y divide-stone-200">
@@ -1656,7 +1656,7 @@ function LabelsTab({ locations, canWrite }) {
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
-            <thead className="bg-[#FAF7F2] border-b border-stone-200 text-xs font-semibold uppercase tracking-wider text-[#180200]">
+            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
                 <TH>Batch</TH>
                 <TH>Issue</TH>
@@ -1782,7 +1782,7 @@ function LabelBatchModal({ batch, onClose }) {
             <p className="p-6 text-sm text-gray-500">No labels to show.</p>
           ) : (
             <table className="w-full text-left text-sm text-gray-700">
-              <thead className="bg-[#FAF7F2] border-b border-stone-200 text-xs font-semibold uppercase tracking-wider text-[#180200]">
+              <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                 <tr><TH>Recipient</TH><TH>Type</TH><TH>Address</TH></tr>
               </thead>
               <tbody className="divide-y divide-stone-200">
@@ -1857,7 +1857,7 @@ function DeliveryBatchesTab({ canWrite, canDelete }) {
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
-            <thead className="bg-[#FAF7F2] border-b border-stone-200 text-xs font-semibold uppercase tracking-wider text-[#180200]">
+            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
                 <TH>Batch</TH>
                 <TH>Issue</TH>

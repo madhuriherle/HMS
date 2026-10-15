@@ -601,8 +601,8 @@ export default function EventsManagement() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="bg-[#FAF7F2] text-[#863221] text-[10px] uppercase font-bold tracking-wider border-b border-[#E8DFD8]">
+                <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
+                  <tr>
                     <th className="px-4 py-3">Event Date</th>
                     <th className="px-4 py-3">Event Title & Details</th>
                     <th className="px-4 py-3">Location</th>

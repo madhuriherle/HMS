@@ -347,6 +347,10 @@ RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
 12.16 THE PANEL FONT IS NUNITO (rounded, friendly), loaded in index.html and set in tailwind.config.js and
      index.css. Inter is only the fallback. Numbers and codes use the same font (font-mono is mapped to it
      with equal-width digits); do not bring back a typewriter-style monospace font.
+12.17 TABLE HEADER ROW IS THE SAME EVERYWHERE: <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221]
+     font-bold uppercase tracking-wider text-[11px]"> (add "sticky top-0 z-10" when it must stay in view),
+     cells py-3 px-4, table text-xs. Reports, Magazine, Events, Engagements and Notifications follow it;
+     older pages with another header style are changed when next touched.
 
 --------------------------------------------------------------------------------
 RULE 13: PERMISSIONS AND ACCESS
