@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';
+import { confirmAction } from '../utils/actionConfirm';
 import { askChecklist } from '../utils/dialogs';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
@@ -65,6 +66,8 @@ export default function ModulesManagement() {
   const [formData, setFormData] = useState(emptyForm);
   const [formErrors, setFormErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [sibOrders, setSibOrders] = useState({}); // neighbours renumbered by placing this module in the preview: id -> order
+  const [dragFrom, setDragFrom] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [toastMessage, setToastMessage] = useState(null);
@@ -147,6 +150,7 @@ export default function ModulesManagement() {
     setEditingModule(null);
     setFormData({ ...emptyForm });
     setFormErrors({});
+    setSibOrders({});
     setIsAddEditOpen(true);
   };
 
@@ -170,6 +174,7 @@ export default function ModulesManagement() {
       status: Boolean(m.status)
     });
     setFormErrors({});
+    setSibOrders({});
     setIsAddEditOpen(true);
   };
 
@@ -184,6 +189,7 @@ export default function ModulesManagement() {
 
   const handleFormChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'parent_id' || name === 'display_order' || name === 'type') setSibOrders({});
     if (name === 'status') {
       setFormData((prev) => ({ ...prev, status: value === 'true' }));
       return;
@@ -228,6 +234,13 @@ export default function ModulesManagement() {
       errors.display_order = 'Display order must be a whole number of 0 or more';
     }
 
+    if (formData.min_rank_level !== '' && formData.min_rank_level != null) {
+      const rank = Number(formData.min_rank_level);
+      if (!Number.isInteger(rank) || rank < 0) {
+        errors.min_rank_level = 'Rank gate must be a whole number of 0 or more (leave empty for none)';
+      }
+    }
+
     const parentId = formData.parent_id === '' ? null : Number(formData.parent_id);
     if (parentId != null && editingModule && parentId === editingModule.id) {
       errors.parent_id = 'A module cannot be its own parent';
@@ -268,14 +281,28 @@ export default function ModulesManagement() {
     setIsAddEditOpen(false);
     setSaving(true);
     try {
+      // neighbours renumbered in the preview are saved with the same reason, before the module itself
+      const moved = Object.entries(sibOrders)
+        .map(([id, order]) => ({ m: modules.find((x) => String(x.id) === id), order }))
+        .filter(({ m, order }) => m && (m.display_order ?? 0) !== order);
+      let reasonHeaders = {};
+      if (moved.length) {
+        const reason = await confirmAction(modalMode === 'add' ? 'post' : 'put', '/users/modules');
+        if (!reason) { setSaving(false); return; }
+        reasonHeaders = { 'X-Action-Reason': reason };
+        await api.put('/users/modules/reorder',
+          { items: moved.map(({ m, order }) => ({ id: m.id, parent_id: m.parent_id ?? null, display_order: order })) },
+          { headers: reasonHeaders });
+      }
       if (modalMode === 'add') {
-        await api.post('/users/modules', buildPayload());
+        await api.post('/users/modules', buildPayload(), { headers: reasonHeaders });
         showToast(`Module created with ${formData.type === 'section' ? 0 : formData.privileges.length} privilege(s) linked.`);
       } else {
-        await api.put(`/users/modules/${editingModule.id}`, buildPayload());
+        await api.put(`/users/modules/${editingModule.id}`, buildPayload(), { headers: reasonHeaders });
         showToast('Module updated successfully.');
       }
       setFormData(emptyForm);
+      setSibOrders({});
       await fetchModules();
     } catch (err) {
       showToast(errDetail(err, 'Error saving module'), 'error');
@@ -355,7 +382,7 @@ export default function ModulesManagement() {
         </div>
         <h2 className="text-lg font-bold text-[#180200]">Access Restricted</h2>
         <p className="text-xs text-[#863221] mt-2 max-w-md mx-auto leading-relaxed">
-          The module catalogue controls menu visibility, and privileges across the system.
+          The module catalogue controls menu visibility, privileges and rank gates across the system.
           Your role is not allowed to manage it.
         </p>
         <Link
@@ -476,7 +503,8 @@ export default function ModulesManagement() {
                 <th className="px-6 py-3.5">Module</th>
                 <th className="px-6 py-3.5">Route</th>
                 <th className="px-6 py-3.5 text-center">Order</th>
-                                <th className="px-6 py-3.5 text-center">Privileges</th>
+                <th className="px-6 py-3.5 text-center">Rank Gate</th>
+                <th className="px-6 py-3.5 text-center">Privileges</th>
                 <th className="px-6 py-3.5">Status</th>
                 <th className="px-6 py-3.5 text-right">Actions</th>
               </tr>
@@ -513,6 +541,18 @@ export default function ModulesManagement() {
                     </td>
                     <td className="px-6 py-4 text-center text-xs font-semibold text-[#180200]">
                       {m.display_order ?? 0}
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      {m.min_rank_level != null ? (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 bg-[#FFC107]/15 border border-[#FFC107]/40 text-[#863221] text-[10px] font-bold rounded-md"
+                          title={`Roles ranked worse than ${m.min_rank_level} cannot access this module`}
+                        >
+                          Rank {m.min_rank_level}+
+                        </span>
+                      ) : (
+                        <span className="text-xs text-stone-400">Any</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className="inline-flex items-center px-2.5 py-1 bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg text-xs font-semibold text-[#180200]">
@@ -826,6 +866,74 @@ export default function ModulesManagement() {
                   </p>
                 )}
                   <p className="text-[10px] text-[#863221]/70 mt-1">Or drag it in Arrange menu.</p>
+                  {(() => {
+                    // live preview: the menu entries next to this one, in the order the sidebar shows them.
+                    // Drag this module (or use the arrows) to place it; the neighbours are renumbered 10, 20, 30...
+                    const parent = formData.parent_id === '' || formData.parent_id == null ? null : String(formData.parent_id);
+                    const order = Number(formData.display_order) || 0;
+                    const others = modules
+                      .filter((m) => (m.parent_id == null ? null : String(m.parent_id)) === parent && (!editingModule || m.id !== editingModule.id))
+                      .map((m) => ({ id: m.id, name_en: m.name_en, display_order: sibOrders[m.id] ?? m.display_order ?? 0 }))
+                      .sort((x, y) => (x.display_order - y.display_order) || (x.id - y.id));
+                    const mine = { id: editingModule ? editingModule.id : Number.MAX_SAFE_INTEGER, name_en: (formData.name_en || '').trim() || 'This module', display_order: order, current: true };
+                    const rows = [...others, mine].sort((x, y) => (x.display_order - y.display_order) || (x.id - y.id));
+                    const myIndex = rows.findIndex((r) => r.current);
+                    const place = (index) => {
+                      const i = Math.max(0, Math.min(others.length, index));
+                      const next = {};
+                      let k = 0;
+                      others.forEach((o, j) => {
+                        if (j === i) k += 1; // the slot kept for this module
+                        k += 1;
+                        next[o.id] = k * 10;
+                      });
+                      setSibOrders(next);
+                      setFormData((prev) => ({ ...prev, display_order: (i + 1) * 10 }));
+                    };
+                    return (
+                      <div className="mt-2 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] p-2">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#863221] mb-1">
+                          Preview{parent ? ' (inside its section)' : ' (top level)'} - drag your module or use the arrows
+                        </p>
+                        <ol className="max-h-56 overflow-y-auto space-y-0.5">
+                          {rows.map((r, i) => (
+                            <li key={r.current ? 'me' : r.id}
+                              draggable={Boolean(r.current)}
+                              onDragStart={r.current ? () => setDragFrom(true) : undefined}
+                              onDragEnd={() => setDragFrom(false)}
+                              onDragOver={dragFrom && !r.current ? (e) => e.preventDefault() : undefined}
+                              onDrop={dragFrom && !r.current ? (e) => { e.preventDefault(); setDragFrom(false); place(i); } : undefined}
+                              className={`flex items-center gap-2 px-2 py-1 rounded-lg text-xs ${r.current ? 'bg-[#510601] text-white font-bold cursor-grab' : 'text-[#180200]'} ${dragFrom && !r.current ? 'outline-dashed outline-1 outline-[#510601]/40' : ''}`}>
+                              <span className="w-5 text-right opacity-60">{i + 1}</span>
+                              <span className="flex-1 truncate">{r.name_en}</span>
+                              <span className="opacity-60">{r.display_order ?? 0}</span>
+                              {r.current && (
+                                <span className="flex gap-1">
+                                  <button type="button" disabled={myIndex === 0} onClick={() => place(myIndex - 1)}
+                                    className="px-1.5 rounded bg-white/20 hover:bg-white/30 disabled:opacity-30 cursor-pointer" aria-label="Move up">&#9650;</button>
+                                  <button type="button" disabled={myIndex === rows.length - 1} onClick={() => place(myIndex + 1)}
+                                    className="px-1.5 rounded bg-white/20 hover:bg-white/30 disabled:opacity-30 cursor-pointer" aria-label="Move down">&#9660;</button>
+                                </span>
+                              )}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">Rank gate</label>
+                  <input type="number" name="min_rank_level" min="0" value={formData.min_rank_level} onChange={handleFormChange}
+                    className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none font-semibold ${formErrors.min_rank_level ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20' : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'}`} />
+                  <p className="text-[10px] text-[#863221]/70 mt-1">Roles ranked worse than this number will not see it. Empty = everyone.</p>
+                {formErrors.min_rank_level && (
+                  <p className="text-xs text-[#ED4636] mt-1 font-medium flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    {formErrors.min_rank_level}
+                  </p>
+                )}
                 </div>
 
                 {formData.type === 'page' && (

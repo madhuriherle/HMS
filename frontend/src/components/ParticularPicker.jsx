@@ -152,7 +152,10 @@ export default function ParticularPicker({
                       key={card.name}
                       className={`mb-4 break-inside-avoid rounded-xl border border-[#E8DFD8] bg-white p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
                     >
-                      <p className="mb-2 border-b border-[#E8DFD8] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.name}</p>
+                      {/* a particular with no sub types is just its one button: no heading above it, so the name is not written twice */}
+                      {card.hasSubs && (
+                        <p className="mb-2 border-b border-[#E8DFD8] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.name}</p>
+                      )}
                       <div className="flex flex-wrap gap-1.5">
                         {card.buttons.map((btn) => {
                           const isTaken = takenKeys.has(btn.key);
