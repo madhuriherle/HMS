@@ -2030,7 +2030,7 @@ def test_rank_hierarchy_rules(client, admin_headers):
         ],
         rank_level=3,
     )
-    assert client.get("/api/v1/users/roles/%d" % mgr_role, headers=mgr).status_code == 403  # own rank is not reachable
+    assert client.get("/api/v1/users/roles/%d" % mgr_role, headers=mgr).status_code == 404  # own rank is not reachable
 
     # cannot create a role of the same / higher rank
     assert client.post("/api/v1/users/roles", headers=mgr, json={"name": "Peer", "code": "PEER", "rank_level": 3}).status_code == 400
@@ -2180,7 +2180,7 @@ def test_security_stamp_invalidates_sessions(client, admin_headers):
 
 def test_me_returns_role_rank_and_privileges(client, admin_headers):
     me = client.get("/api/v1/auth/me", headers=admin_headers).json()
-    assert me["is_all_access"] is True and me["role_rank_level"] == 1 and me["role_name"]
+    assert me["is_all_access"] is True and me["role_rank_level"] == 0 and me["role_name"]
     uid, role_id, headers = _staff_with_role(
         client, admin_headers, "me_user", "Me Role", "ME_ROLE", permission_grants=[("masters.write", False)],
     )
@@ -2190,11 +2190,11 @@ def test_me_returns_role_rank_and_privileges(client, admin_headers):
 
 
 def test_superadmin_protections(client, admin_headers):
-    # the built-in Super Admin role: rank 1, all-access, not deletable / editable
+    # the built-in Super Admin role: rank 0, all-access, not deletable / editable
     sa_role = _role_id(client, admin_headers, "SUPERADMIN")
     assert client.delete(f"/api/v1/users/roles/{sa_role}", headers=admin_headers).status_code in (403, 409)
     assert client.post("/api/v1/users/roles", headers=admin_headers,
-                       json={"name": "Another Top", "code": "ANOTHER_TOP", "rank_level": 1}).status_code == 400
+                       json={"name": "Another Top", "code": "ANOTHER_TOP", "rank_level": 0}).status_code == 400
     assert client.put(f"/api/v1/users/roles/{sa_role}", headers=admin_headers, json={"rank_level": 50}).status_code == 403
     # the admin account cannot delete or deactivate itself
     assert client.delete("/api/v1/users/1", headers=admin_headers).status_code == 400
@@ -6595,7 +6595,7 @@ def test_equal_rank_users_can_manage_each_other_with_safeguards(client, admin_he
     assert client.delete(f"/api/v1/users/{boss2.json()['id']}", headers=admin_headers).status_code == 200
 
     # the last active holder of a top-two rank role cannot be deleted or deactivated
-    top = client.post("/api/v1/users/roles", headers=admin_headers, json={"name": "Top Two", "code": "TOP_TWO", "rank_level": 2}).json()
+    top = client.post("/api/v1/users/roles", headers=admin_headers, json={"name": "Top Two", "code": "TOP_TWO", "rank_level": 1}).json()
     first = client.post("/api/v1/users/", headers=admin_headers,
                         json={"name": "Top A", "username": "top_a", "password": "Topaaaa@123", "role_id": top["id"]}).json()
     assert client.delete(f"/api/v1/users/{first['id']}", headers=admin_headers).status_code == 400

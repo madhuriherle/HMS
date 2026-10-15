@@ -3,9 +3,9 @@
 Rules (same as the Anegudde inventory system):
 
 * one role per user (users.role_id);
-* rank_level: 1 is the top, larger is weaker. A user can see, create, edit or
+* rank_level: 0 is the top (Super Admin, never shown), 1 the top anyone sees, larger is weaker. A user can see, create, edit or
   delete users of their own rank or weaker (an Admin can manage another
-  Admin); Rank 1 (Super Admin) stays strictly above everyone. Roles — seeing,
+  Admin); Rank 0 (Super Admin) stays strictly above everyone. Roles — seeing,
   editing, re-privileging — still need a role strictly weaker than yours, so
   nobody can raise their own role's power;
 * privileges are ``<module>.read|write|delete``; a role with ``is_all_access``
@@ -14,7 +14,7 @@ Rules (same as the Anegudde inventory system):
   enforced for every privilege linked to it;
 * any change to a user's identity, role, status or password rotates their
   ``security_stamp``, which invalidates all of their existing sessions;
-* module / privilege-catalog management is Rank 1 only.
+* module / privilege-catalog management is Rank 0 only.
 """
 
 import uuid
@@ -64,7 +64,7 @@ def read_users(
     role_id: Optional[int] = None,
 ) -> Any:
     """Staff accounts whose role is the same rank as yours or weaker (members are not users). A stronger rank is
-    never listed or opened: a rank 2 Admin does not see the Super Admin; a rank 1 sees everyone else. Your own account is
+    never listed or opened: a rank 1 Admin does not see the Super Admin (rank 0); rank 0 sees everyone else. Your own account is
     not listed (My Profile edits it)."""
     my_rank = deps.user_rank(db, current_user)
     q = (
@@ -109,7 +109,7 @@ def create_user(
     if not role:
         raise HTTPException(400, "Invalid role_id")
     if not can_manage_rank(deps.user_rank(db, current_user), role.rank_level):
-        raise HTTPException(403, "Cannot create a user with a rank higher than yours")
+        raise HTTPException(403, "You cannot give this role")
     _check_password(user_in.password)
     data = user_in.model_dump()
     data["password_hash"] = get_password_hash(data.pop("password"))
@@ -122,7 +122,7 @@ def create_user(
     return out
 
 
-# ═════════════════════════ MODULES (Rank 1) ═════════════════════════
+# ═════════════════════════ MODULES (Rank 0) ═════════════════════════
 def _module_permission_count(db: Session, module_id: int) -> int:
     return db.query(Permission).filter(Permission.module_id == module_id, Permission.is_deleted == False).count()  # noqa: E712
 
@@ -407,7 +407,7 @@ def reorder_modules(
     current_user: User = Depends(deps.get_current_active_superuser),
     payload: ModuleReorder,
 ) -> Any:
-    """Rearrange the sidebar: set parent and display order of many modules in one call (Rank 1)."""
+    """Rearrange the sidebar: set parent and display order of many modules in one call (Rank 0)."""
     ids = [i.id for i in payload.items]
     if len(set(ids)) != len(ids):
         raise HTTPException(400, "A module appears more than once")
@@ -486,7 +486,7 @@ def link_privileges(
     current_user: User = Depends(deps.get_current_active_superuser),
     module_id: int, permission_ids: List[int],
 ) -> Any:
-    """Attach privileges to a module (Rank 1)."""
+    """Attach privileges to a module (Rank 0)."""
     module = crud_users.module.get(db, module_id)
     if not module:
         raise HTTPException(404, "Module not found")
@@ -522,22 +522,22 @@ def _role_permission_codes(db: Session, role_id: int) -> List[str]:
 
 
 def _visible_role(db: Session, me: User, role: Optional[Role]) -> Role:
-    """404 unless the role exists and is strictly weaker than mine (Rank 1
+    """404 unless the role exists and is strictly weaker than mine (Rank 0
     may also see its own rank)."""
     if not role or role.is_deleted:
         raise HTTPException(404, "Role not found")
     my_rank = deps.user_rank(db, me)
-    if my_rank != 1 and role.rank_level <= my_rank:
-        raise HTTPException(403, "Cannot access a role with the same or higher rank than yours")
+    if my_rank != 0 and role.rank_level <= my_rank:
+        raise HTTPException(404, "Role not found")
     return role
 
 
 def _manageable_role(db: Session, me: User, role: Optional[Role]) -> Role:
-    """The role must be strictly weaker than mine, always (Rank 1 included)."""
+    """The role must be strictly weaker than mine, always (Rank 0 included)."""
     if not role or role.is_deleted:
         raise HTTPException(404, "Role not found")
     if role.rank_level <= deps.user_rank(db, me):
-        raise HTTPException(403, "Cannot modify a role with the same or higher rank than yours")
+        raise HTTPException(403, "You cannot change this role")
     return role
 
 
@@ -549,13 +549,13 @@ def can_manage_rank(my_rank: int, target_rank: int) -> bool:
     return target_rank >= my_rank
 
 
-_TOP_RANKS = 2  # Super Admin / Admin: never leave the system without one active holder
+_TOP_RANKS = 1  # Super Admin / Admin: never leave the system without one active holder
 
 
 def _protect_user(db: Session, me: User, user: User, what: str) -> None:
     """Guards for deleting / deactivating / re-roling a user."""
-    if user.username == "admin" and deps.user_rank(db, me) != 1:
-        raise HTTPException(403, "The built-in admin account can only be changed by the Super Admin")
+    if user.username == "admin" and deps.user_rank(db, me) != 0:
+        raise HTTPException(403, "You cannot change this account")
     role = deps.get_user_role(db, user)
     if role and role.rank_level <= _TOP_RANKS:
         others = (
@@ -574,14 +574,14 @@ def read_roles(
     page: int = 1, limit: int = 50,
     assignable: bool = False,
 ) -> Any:
-    """Roles weaker than yours (Rank 1 sees every role). ``assignable=true`` lists the roles you may
+    """Roles weaker than yours (Rank 0 sees every role). ``assignable=true`` lists the roles you may
     give to a user: weaker than yours, plus your own (a Super Admin may create another Super Admin)."""
     my_rank = deps.user_rank(db, current_user)
     q = db.query(Role).filter(Role.is_deleted == False)  # noqa: E712
     if assignable:
         q = q.filter(Role.code != "MEMBER")
         q = q.filter(Role.rank_level >= my_rank)
-    elif my_rank > 1:
+    elif my_rank > 0:
         q = q.filter(Role.rank_level > my_rank)
     page_data = paginate(q.order_by(Role.rank_level, Role.id), page, limit)
     for role in page_data["data"]:
@@ -608,7 +608,7 @@ def _check_role_scope_module(db: Session, module_id: Optional[int]) -> None:
 @approval_gate.gated("users", "CREATE", "Role", "roles.write")
 def create_role(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("roles.write")), role_in: schemas_users.RoleCreate) -> Any:
     if role_in.rank_level <= deps.user_rank(db, current_user):
-        raise HTTPException(400, "Cannot create a role with the same or higher rank than yours")
+        raise HTTPException(400, "Choose a lower rank for this role")
     if role_in.is_all_access and not deps.is_all_access(db, current_user):
         raise HTTPException(403, "Only an all-access role can create another all-access role")
     if db.query(Role).filter(Role.code == role_in.code, Role.is_deleted == False).first():  # noqa: E712
@@ -626,7 +626,7 @@ def update_role(*, db: Session = Depends(deps.get_db), current_user: User = Depe
     data = role_in.model_dump(exclude_unset=True)
     my_rank = deps.user_rank(db, current_user)
     if data.get("rank_level") is not None and data["rank_level"] <= my_rank:
-        raise HTTPException(400, "New rank must be weaker than yours")
+        raise HTTPException(400, "Choose a lower rank for this role")
     if data.get("is_all_access") and not deps.is_all_access(db, current_user):
         raise HTTPException(403, "Only an all-access role can grant all-access")
     if data.get("name") and data["name"] != role.name and db.query(Role).filter(Role.name == data["name"], Role.is_deleted == False, Role.id != role_id).first():  # noqa: E712
@@ -681,7 +681,7 @@ def _check_grantable(db: Session, role: Role, perms: List[Permission], me: User)
         and role.rank_level > modules[p.module_id].min_rank_level
     ]
     if blocked:
-        raise HTTPException(403, f"Selected role rank cannot access: {', '.join(sorted(blocked))}")
+        raise HTTPException(403, f"This role cannot be given: {', '.join(sorted(blocked))}")
 
 
 @router.post("/roles/{role_id}/permissions")
@@ -828,7 +828,7 @@ def read_permissions(
 
 # ═════════════════════════ USER BY ID ═════════════════════════
 def _visible_user(db: Session, me: User, user: Optional[User]) -> User:
-    """A user is only reachable if their role is mine or weaker (Rank 1: strictly weaker);
+    """A user is only reachable if their role is mine or weaker (Rank 0: strictly weaker);
     you can always reach yourself."""
     if not user or user.is_deleted:
         raise HTTPException(404, "User not found")

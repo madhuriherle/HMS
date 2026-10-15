@@ -80,9 +80,9 @@ def is_all_access(db: Session, user: User) -> bool:
 def get_current_active_superuser(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ) -> User:
-    """Rank-1 only (module/privilege-catalog management, system settings)."""
-    if user_rank(db, current_user) != 1:
-        raise HTTPException(status_code=403, detail="Strictly reserved for Super Admin (Rank 1)")
+    """Rank-0 only (module/privilege-catalog management, system settings)."""
+    if user_rank(db, current_user) != 0:
+        raise HTTPException(status_code=403, detail="You do not have access to this")
     return current_user
 
 
@@ -153,10 +153,10 @@ def _module_gate(db: Session, user: User, permission_code: str) -> None:
         seen.add(row.id)
         if not row.status:
             raise HTTPException(403, f"The '{row.name_en}' module is currently disabled by administrator.")
-        if row.min_rank_level:
+        if row.min_rank_level is not None:
             rank = user_rank(db, user) if rank is None else rank
             if rank > row.min_rank_level:
-                raise HTTPException(403, f"This module requires Rank {row.min_rank_level} or higher access.")
+                raise HTTPException(403, "You do not have access to this module.")
         row = db.query(Module).filter(Module.id == row.parent_id).first() if row.parent_id else None
 
 

@@ -36,7 +36,7 @@ const CARDS = [
     title: 'Data Cleanup',
     text: 'Clear operational history while keeping master setup data protected.',
     action: 'Open',
-    allowed: ({ hasPermission, myRank }) => myRank <= 1 && hasPermission('system.cleanup.read'),
+    allowed: ({ hasPermission, myRank }) => myRank <= 0 && hasPermission('system.cleanup.read'),
   },
 ];
 

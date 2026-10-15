@@ -9,7 +9,7 @@ const readProfile = () => {
 };
 
 // Current signed-in user's rank / privileges, from GET /auth/me (stored at login).
-// rank_level: 1 = top (Super Admin), larger = weaker (default 99).
+// rank_level: 0 = Super Admin (never shown), 1 = top anyone sees, larger = weaker (default 99).
 export default function useAuth() {
   const [profile, setProfile] = useState(readProfile);
 
@@ -24,7 +24,7 @@ export default function useAuth() {
   }, []);
 
   const parsedRank = Number(profile?.role_rank_level);
-  const myRank = Number.isFinite(parsedRank) && parsedRank > 0 ? parsedRank : 99;
+  const myRank = Number.isFinite(parsedRank) && parsedRank >= 0 ? parsedRank : 99;
   const isAllAccess = Boolean(profile?.is_all_access);
   const privileges = Array.isArray(profile?.privileges) ? profile.privileges : [];
 

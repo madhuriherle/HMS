@@ -43,7 +43,7 @@ import ModalFooter from '../components/ModalFooter';
 export default function UserManagement() {
   const { myRank, hasPermission } = useAuth();
   const rules = useRules(); // formats and limits from the server
-  // Roles weaker than mine, or my own rank (not Rank 1) can be assigned — mirrors the backend rule.
+  // Roles weaker than mine, or my own rank can be assigned — mirrors the backend rule.
   const sameRankOk = (rank) => rank >= myRank;
   const availableRoles = roles => roles.filter(r => r.code !== 'MEMBER' && r.name?.toLowerCase() !== 'member' && sameRankOk(r.rank_level ?? 99));
   const getUserRank = (user) => {
@@ -236,7 +236,7 @@ export default function UserManagement() {
 
   const openEditModal = (user) => {
     if (!canManageUser(user)) {
-      showToast('This user has a higher rank than you and cannot be edited.', 'error');
+      showToast('You cannot edit this user.', 'error');
       return;
     }
     setModalMode('edit');
@@ -393,11 +393,11 @@ export default function UserManagement() {
 
   const promptToggleStatus = (user) => {
     if (user.isCurrentAdmin || user.username === 'admin' || user.id === 1) {
-      showToast('Super Administrator account cannot be deactivated.', 'error');
+      showToast('This account cannot be deactivated.', 'error');
       return;
     }
     if (!canManageUser(user)) {
-      showToast('This user has a higher rank than you and cannot be changed.', 'error');
+      showToast('You cannot change this user.', 'error');
       return;
     }
     const active = isUserActive(user);
@@ -435,7 +435,7 @@ export default function UserManagement() {
     if (!deleteTargetUser) return;
     if (deleteTargetUser.isCurrentAdmin || deleteTargetUser.username === 'admin') return;
     if (!canManageUser(deleteTargetUser)) {
-      showToast('This user has a higher rank than you and cannot be deleted.', 'error');
+      showToast('You cannot delete this user.', 'error');
       setDeleteTargetUser(null);
       return;
     }
@@ -464,7 +464,7 @@ export default function UserManagement() {
       if (d.isCurrentAdmin || d.username === 'admin') {
         return {
           title: 'Cannot delete user',
-          text: `${name} is the active Super Administrator account and cannot be deleted.`,
+          text: `${name} is the active main account and cannot be deleted.`,
           confirmText: 'OK',
           info: true,
         };
@@ -669,14 +669,6 @@ export default function UserManagement() {
                       {/* Role */}
                       <td className="px-6 py-4">
                         <span className="text-xs font-semibold text-[#510601]">{roleObj ? roleObj.name : (user.role_name || 'Unassigned')}</span>
-                        {rowRank != null && (
-                          <span
-                            className="ml-1.5 text-[10px] font-semibold text-[#863221]/70"
-                            title={`Role rank ${rowRank} (1 = highest authority)`}
-                          >
-                            R{rowRank}
-                          </span>
-                        )}
                       </td>
 
                       {/* Status */}
@@ -695,9 +687,9 @@ export default function UserManagement() {
                             !hasPermission('users.management.write')
                               ? 'You need the users.management.write permission'
                               : user.isCurrentAdmin || user.username === 'admin' || user.id === 1
-                                ? 'Super Administrator account is permanently Active'
+                                ? 'This account is permanently Active'
                                 : isRankLocked
-                                  ? 'User has a higher rank than you'
+                                  ? 'You cannot change this user'
                                   : (isActive ? 'Click to deactivate user' : 'Click to activate user')
                           }
                         >
@@ -726,7 +718,7 @@ export default function UserManagement() {
                               disabled={isRankLocked}
                               onClick={() => !isRankLocked && openEditModal(user)}
                               className={`btn-act ${isRankLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
-                              title={!hasPermission('users.management.write') ? 'You need the users.management.write permission' : isRankLocked ? 'User has a higher rank than you' : 'Edit User'}
+                              title={!hasPermission('users.management.write') ? 'You need the users.management.write permission' : isRankLocked ? 'You cannot change this user' : 'Edit User'}
                             >
                               <Pencil className="w-3.5 h-3.5" />
                               <span>Edit</span>
@@ -1287,18 +1279,13 @@ export default function UserManagement() {
                 const roleRank = userRole?.rank_level ?? viewingUser.role_rank_level;
                 // the roles list carries permission_codes (the privilege codes the role holds)
                 const roleCodes = userRole?.permission_codes || userRole?.privileges || [];
-                const fullAccess = Boolean(userRole?.is_all_access) || (!userRole && roleRank === 1);
+                const fullAccess = Boolean(userRole?.is_all_access) || (!userRole && roleRank === 0);
                 return (
                   <div className="p-3.5 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8] space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-[#180200] flex items-center gap-1.5">
                         <Shield className="w-3.5 h-3.5 text-[#510601]" />
                         Assigned Role: {roleName || 'Unassigned'}
-                        {roleRank != null && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 bg-[#510601]/10 text-[#510601] rounded-full">
-                            Rank {roleRank}
-                          </span>
-                        )}
                       </span>
                       <span className="text-[10px] font-bold px-2 py-0.5 bg-[#510601]/10 text-[#510601] rounded-full">
                         {fullAccess ? 'All privileges' : `${roleCodes.length} Privileges`}

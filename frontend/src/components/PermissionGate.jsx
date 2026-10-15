@@ -33,13 +33,8 @@ export default function PermissionGate({
       <h2 className="text-lg font-bold text-[#180200]">{title || 'Access Restricted'}</h2>
       <p className="text-xs text-[#863221] mt-2 max-w-md mx-auto leading-relaxed">
         {message ||
-          'Your role does not include the required permission to view or use this screen. Ask a Super Admin to grant it through Roles & Privileges.'}
+          'Your role does not include the required permission to view or use this screen. Please contact your administrator.'}
       </p>
-      {!rankOk && minRank != null && (
-        <p className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 bg-[#FFC107]/15 border border-[#FFC107]/40 text-[#863221] text-xs font-bold rounded-lg">
-          Requires rank {minRank} or better
-        </p>
-      )}
       {!granted && (
         <div className="flex flex-wrap justify-center gap-1.5 mt-3">
           {missing.filter(Boolean).map((code) => (

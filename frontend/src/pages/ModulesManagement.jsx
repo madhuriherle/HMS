@@ -48,7 +48,7 @@ const emptyForm = {
 
 export default function ModulesManagement() {
   const { myRank } = useAuth();
-  const isRank1 = myRank === 1;
+  const isRank1 = myRank === 0;
 
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -228,13 +228,6 @@ export default function ModulesManagement() {
       errors.display_order = 'Display order must be a whole number of 0 or more';
     }
 
-    if (formData.min_rank_level !== '' && formData.min_rank_level != null) {
-      const rank = Number(formData.min_rank_level);
-      if (!Number.isInteger(rank) || rank < 1) {
-        errors.min_rank_level = 'Rank gate must be a whole number of 1 or more (leave empty for none)';
-      }
-    }
-
     const parentId = formData.parent_id === '' ? null : Number(formData.parent_id);
     if (parentId != null && editingModule && parentId === editingModule.id) {
       errors.parent_id = 'A module cannot be its own parent';
@@ -360,10 +353,10 @@ export default function ModulesManagement() {
         <div className="w-14 h-14 rounded-full bg-[#FFC107]/15 text-[#863221] flex items-center justify-center mx-auto mb-4">
           <Lock className="w-7 h-7" />
         </div>
-        <h2 className="text-lg font-bold text-[#180200]">Module Master is Rank-1 Only</h2>
+        <h2 className="text-lg font-bold text-[#180200]">Access Restricted</h2>
         <p className="text-xs text-[#863221] mt-2 max-w-md mx-auto leading-relaxed">
-          The module catalogue controls menu visibility, privileges and rank gates across the system.
-          It can only be managed by the Super Admin role (Rank 1). Your rank is {myRank}.
+          The module catalogue controls menu visibility, and privileges across the system.
+          Your role is not allowed to manage it.
         </p>
         <Link
           to="/dashboard"
@@ -483,8 +476,7 @@ export default function ModulesManagement() {
                 <th className="px-6 py-3.5">Module</th>
                 <th className="px-6 py-3.5">Route</th>
                 <th className="px-6 py-3.5 text-center">Order</th>
-                <th className="px-6 py-3.5 text-center">Rank Gate</th>
-                <th className="px-6 py-3.5 text-center">Privileges</th>
+                                <th className="px-6 py-3.5 text-center">Privileges</th>
                 <th className="px-6 py-3.5">Status</th>
                 <th className="px-6 py-3.5 text-right">Actions</th>
               </tr>
@@ -521,18 +513,6 @@ export default function ModulesManagement() {
                     </td>
                     <td className="px-6 py-4 text-center text-xs font-semibold text-[#180200]">
                       {m.display_order ?? 0}
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {m.min_rank_level != null ? (
-                        <span
-                          className="inline-flex items-center px-2 py-0.5 bg-[#FFC107]/15 border border-[#FFC107]/40 text-[#863221] text-[10px] font-bold rounded-md"
-                          title={`Roles ranked worse than ${m.min_rank_level} cannot access this module`}
-                        >
-                          Rank {m.min_rank_level}+
-                        </span>
-                      ) : (
-                        <span className="text-xs text-stone-400">Any</span>
-                      )}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <span className="inline-flex items-center px-2.5 py-1 bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg text-xs font-semibold text-[#180200]">
@@ -846,19 +826,6 @@ export default function ModulesManagement() {
                   </p>
                 )}
                   <p className="text-[10px] text-[#863221]/70 mt-1">Or drag it in Arrange menu.</p>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">Rank gate</label>
-                  <input type="number" name="min_rank_level" min="1" value={formData.min_rank_level} onChange={handleFormChange}
-                    className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm text-[#180200] focus:outline-none font-semibold ${formErrors.min_rank_level ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20' : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'}`} />
-                  <p className="text-[10px] text-[#863221]/70 mt-1">Roles ranked worse than this number will not see it. Empty = everyone.</p>
-                {formErrors.min_rank_level && (
-                  <p className="text-xs text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    {formErrors.min_rank_level}
-                  </p>
-                )}
                 </div>
 
                 {formData.type === 'page' && (

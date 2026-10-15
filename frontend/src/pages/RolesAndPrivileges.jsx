@@ -277,7 +277,7 @@ export default function RolesAndPrivileges() {
   const openEditModal = (role) => {
     if (!canManageRole(role)) {
       showToast(
-        isSystemRole(role) ? 'System roles cannot be edited.' : 'This role is at or above your rank and cannot be edited.',
+        isSystemRole(role) ? 'System roles cannot be edited.' : 'You cannot edit this role.',
         'error'
       );
       return;
@@ -323,13 +323,6 @@ export default function RolesAndPrivileges() {
       }
     }
 
-    const rank = Number(formData.rank_level);
-    if (!Number.isInteger(rank) || rank < 1) {
-      errors.rank_level = 'Rank must be a whole number of 1 or more.';
-    } else if (rank <= myRankLevel) {
-      errors.rank_level = `Rank must be weaker (a higher number) than your own rank (${myRankLevel}).`;
-    }
-
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -348,7 +341,7 @@ export default function RolesAndPrivileges() {
           name: formData.name.trim(),
           description: formData.description.trim(),
           status: statusActive,
-          rank_level: Number(formData.rank_level)
+          rank_level: 99
         });
         if (isPendingApproval(res.data)) {
           showToast('Role creation submitted for approval.');
@@ -359,8 +352,7 @@ export default function RolesAndPrivileges() {
         const res = await api.put(`/users/roles/${editingRole.id}`, {
           name: formData.name.trim(),
           description: formData.description.trim(),
-          status: statusActive,
-          rank_level: Number(formData.rank_level)
+          status: statusActive
         });
         if (isPendingApproval(res.data)) {
           showToast('Role update submitted for approval.');
@@ -379,7 +371,7 @@ export default function RolesAndPrivileges() {
   const promptToggleStatus = (role) => {
     if (!canManageRole(role)) {
       showToast(
-        isSystemRole(role) ? 'System roles cannot be deactivated.' : 'This role is at or above your rank and cannot be changed.',
+        isSystemRole(role) ? 'System roles cannot be deactivated.' : 'You cannot change this role.',
         'error'
       );
       return;
@@ -518,7 +510,7 @@ export default function RolesAndPrivileges() {
   const handleSavePrivileges = async () => {
     if (!privilegeTargetRole || savingPrivileges) return;
     if (!canManageRole(privilegeTargetRole)) {
-      showToast('This role is at or above your rank; its privileges cannot be modified.', 'error');
+      showToast('You cannot change the privileges of this role.', 'error');
       return;
     }
     const target = privilegeTargetRole;
@@ -554,7 +546,7 @@ export default function RolesAndPrivileges() {
     () => setDeleteTargetRole(null),
     (d) => {
       if (d.usersCount > 0 || isSystemRole(d)) {
-        const system = d.isSystem || d.is_all_access || d.rank_level === 1;
+        const system = d.isSystem || d.is_all_access || d.rank_level === 0;
         return {
           title: 'Cannot delete role',
           text: system
@@ -756,7 +748,7 @@ export default function RolesAndPrivileges() {
                                 ? 'chip chip-on cursor-pointer'
                                 : 'chip chip-off cursor-pointer'
                           }`}
-                          title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? 'System role is permanently Active' : isLocked ? 'Role is at or above your rank' : (isActive ? 'Click to deactivate role' : 'Click to activate role')}
+                          title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? 'System role is permanently Active' : isLocked ? 'You cannot change this role' : (isActive ? 'Click to deactivate role' : 'Click to activate role')}
                         >
                           {isActive ? 'Active' : 'Inactive'}
                         </button>
@@ -774,7 +766,7 @@ export default function RolesAndPrivileges() {
                             <span>Privileges</span>
                           </button>
 
-                          {/* View details (rank, description, privileges, dates) */}
+                          {/* View details (description, privileges, dates) */}
                           <button
                             onClick={() => setViewingRole(role)}
                             className="btn-act"
@@ -790,7 +782,7 @@ export default function RolesAndPrivileges() {
                               disabled={isLocked}
                               onClick={() => !isLocked && openEditModal(role)}
                               className={`btn-act ${isLocked ? 'opacity-40 cursor-not-allowed' : ''}`}
-                              title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? 'System role cannot be edited' : isLocked ? 'Role is at or above your rank' : 'Edit Role'}
+                              title={!hasPermission('roles.write') ? 'You need the roles.write permission' : isSys ? 'System role cannot be edited' : isLocked ? 'You cannot change this role' : 'Edit Role'}
                             >
                               <Pencil className="w-3.5 h-3.5" />
                               <span>Edit</span>
@@ -995,33 +987,6 @@ export default function RolesAndPrivileges() {
               />
             </div>
 
-            {/* Rank Level */}
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
-                Rank Level <span className="text-[#ED4636]">*</span>
-              </label>
-              <input
-                type="number"
-                name="rank_level"
-                min={myRankLevel + 1}
-                value={formData.rank_level}
-                onChange={handleFormChange}
-                className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-semibold text-[#180200] placeholder-[#863221]/40 focus:outline-none transition-colors ${formErrors.rank_level
-                  ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 bg-red-50/20'
-                  : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
-                  }`}
-              />
-              <p className="text-[10px] text-[#863221]/70 mt-1">
-                1 = highest authority, larger = weaker (default 99). Must be weaker than your own rank ({myRankLevel}).
-              </p>
-              {formErrors.rank_level && (
-                <p className="text-xs text-[#ED4636] mt-1 font-medium flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  {formErrors.rank_level}
-                </p>
-              )}
-            </div>
-
             {/* Status */}
             <div>
               <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">
@@ -1062,7 +1027,7 @@ export default function RolesAndPrivileges() {
                   <span>Configure Privileges – {privilegeTargetRole.name}</span>
                   {isReadOnly && (
                     <span className="px-2 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[11px] font-bold rounded-md tracking-normal">
-                      {isSysTarget ? 'System Role (Read-Only)' : 'Rank-Protected (Read-Only)'}
+                      {isSysTarget ? 'System Role (Read-Only)' : 'Protected (Read-Only)'}
                     </span>
                   )}
                 </h1>
@@ -1139,7 +1104,7 @@ export default function RolesAndPrivileges() {
                     return (
                       <div className="py-12 text-center text-[#863221]">
                         <p className="text-sm font-semibold">
-                          {reachable.length === 0 ? 'No modules are reachable from this role\u2019s rank.' : `No privileges match "${privilegeSearch}"`}
+                          {reachable.length === 0 ? 'No modules are available for this role.' : `No privileges match "${privilegeSearch}"`}
                         </p>
                         {reachable.length > 0 && (
                           <button onClick={() => setPrivilegeSearch('')} className="text-xs text-[#510601] hover:underline mt-1 font-medium">
@@ -1255,9 +1220,6 @@ export default function RolesAndPrivileges() {
                                   <span className={r.hasChildren ? 'text-xs font-bold uppercase tracking-wide text-[#180200]' : 'text-sm font-medium text-[#180200]'}>
                                     {r.name}
                                   </span>
-                                  {r.min_rank_level != null && (
-                                    <span className="px-1.5 py-0.5 bg-[#FFC107]/20 text-[#863221] text-[9px] font-bold rounded">Rank {r.min_rank_level}+</span>
-                                  )}
                                   {r.disabled && (
                                     <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-bold rounded-full">Coming soon</span>
                                   )}
@@ -1427,12 +1389,9 @@ export default function RolesAndPrivileges() {
 
                 <div className="grid grid-cols-3 gap-3 text-xs">
                   <div className="p-3 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8]">
-                    <p className="text-[#863221] font-semibold uppercase">Rank</p>
+                    <p className="text-[#863221] font-semibold uppercase">Access</p>
                     <p className="text-base font-bold text-[#180200] mt-0.5">
-                      {viewingRole.rank_level ?? 99}
-                      {viewingRole.is_all_access && (
-                        <span className="ml-1.5 text-[10px] font-bold text-[#3D705C]">All-Access</span>
-                      )}
+                      {viewingRole.is_all_access ? <span className="text-[#3D705C]">All-Access</span> : 'Selected privileges'}
                     </p>
                   </div>
 

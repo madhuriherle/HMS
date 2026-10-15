@@ -15,7 +15,7 @@ Access model (mirrors the Anegudde inventory system):
   every privilege linked to it.
 
 The `modules`, `permissions` and `roles` TABLES are the source of truth: the
-menu, privilege tree, rank gates and role screens all read them, and Rank 1
+menu, privilege tree, rank gates and role screens all read them, and Rank 0
 manages them through the API. This file only supplies the starting rows. It is
 applied by migration 0015, by ``python scripts/seed_defaults.py`` on a fresh
 database, and by the test fixtures — never on application startup.
@@ -154,13 +154,13 @@ MODULE_CATALOG = [
     ("events", "Events", None, "/events", "calendar", 90, None),
     ("engagements", "PR & Communications", None, "/engagements", "link", 100, None),
     ("imports", "Imports", None, None, "upload", 110, None),
-    ("system", "Settings", None, None, "settings", 120, 1),  # holds Organisation Settings (a Masters page) and future screens
+    ("system", "Settings", None, None, "settings", 120, 0),  # holds Organisation Settings (a Masters page) and future screens
 ]
 # Settings tools reached from the System Settings page (no sidebar entry of their own, so no route).
-# Data Cleanup is also locked to rank 1 roles, whatever a role is granted.
+# Data Cleanup is also locked to rank 0 roles, whatever a role is granted.
 MODULE_CATALOG += [
     ("system.recycle_bin", "Recycle Bin", "system", None, None, 4, None),
-    ("system.cleanup", "Data Cleanup", "system", None, None, 5, 1),
+    ("system.cleanup", "Data Cleanup", "system", None, None, 5, 0),
 ]
 
 _READ_WRITE_DELETE = (
@@ -261,9 +261,9 @@ BANK_CATALOG = [
 # ── roles ────────────────────────────────────────────────────
 # (code, name, rank_level, is_all_access, description)
 ROLE_CATALOG = [
-    ("SUPERADMIN", "Super Admin", 1, True, "Developer / owner account — full access"),
-    ("ADMIN", "Admin", 2, False, "Administrator"),
-    ("STAFF", "Staff", 4, False, "Office staff"),
+    ("SUPERADMIN", "Super Admin", 0, True, "Developer / owner account — full access"),
+    ("ADMIN", "Admin", 1, False, "Administrator"),
+    ("STAFF", "Staff", 3, False, "Office staff"),
     ("MEMBER", "Member", 99, False, "Registered member (login created with the membership)"),
 ]
 
@@ -316,7 +316,7 @@ MENU_PAGE_CATALOG = [
     ("receipts.entry", "Receipt Entry", "receipts", "/dashboard/receipts/entry", "file-plus", 1, "receipts.entry.read", None),
     ("receipts.tracking", "Receipt Tracking", "receipts", "/dashboard/receipts/tracking", "search", 2, "receipts.tracking.read", None),
     ("receipts.bulk_mapping", "Bulk Receipt Mapping", "receipts", "/dashboard/receipts/bulk-mapping", "link", 3, "receipts.bulk_mapping.read", None),
-    ("users.modules", "Modules", "users", "/dashboard/users/modules", "layout-grid", 4, None, 1),
+    ("users.modules", "Modules", "users", "/dashboard/users/modules", "layout-grid", 4, None, 0),
     ("masters.location", "Location Setup", "masters", "/dashboard/master/location-setup", "map-pin", 1, "masters.location.read", None),
     ("masters.membership_types", "Membership Types", "masters", "/dashboard/master/membership-type", "badge", 2, "masters.membership_types.read", None),
     ("masters.particulars", "Particulars Master", "masters", "/dashboard/master/receipt-type", "list-checks", 3, "masters.particulars.read", None),
@@ -599,8 +599,8 @@ def seed_roles(db) -> int:
         if r is None:
             db.add(Role(code=code, name=name, rank_level=rank, is_all_access=all_access, description=desc))
             created += 1
-        elif code == "SUPERADMIN" and (r.rank_level != 1 or not r.is_all_access):
-            r.rank_level, r.is_all_access = 1, True
+        elif code == "SUPERADMIN" and (r.rank_level != 0 or not r.is_all_access):
+            r.rank_level, r.is_all_access = 0, True
     if created or db.dirty:
         db.commit()
     return created

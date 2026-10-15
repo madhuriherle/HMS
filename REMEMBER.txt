@@ -383,15 +383,17 @@ RULE 13: PERMISSIONS AND ACCESS
 13.4 SIDEBAR: a page shows only when the role holds its privilege; a group (Masters,
      Receipts ...) shows only when at least one page inside it shows. A parent follows its
      children automatically. A disabled module is hidden for everyone.
-13.5 SUPER ADMIN ONLY AREAS (rank 1) stay rank-gated and get NO grantable privilege: the
-     Modules page, Menu Arranger, and the Settings group (min_rank_level 1). Do not add
+13.5 SUPER ADMIN ONLY AREAS (rank 0) stay rank-gated and get NO grantable privilege: the
+     Modules page, Menu Arranger, and the Settings group (min_rank_level 0). Do not add
      privileges for them. Data Cleanup has privileges (system.cleanup.read / write) but is
-     also locked to rank 1 roles.
-13.6 USERS AND ROLES (rank 1 = top, bigger = weaker):
+     also locked to rank 0 roles.
+13.6 USERS AND ROLES (rank 0 = Super Admin, hidden and never named on any screen; rank 1 = Admin, the top
+     anyone else sees; bigger = weaker). NEVER show a rank number, rank gate or 'higher rank' wording in the UI
+     or in error messages; new roles are created at 99 (no rank field on the role form):
      - User Management lists staff accounts of your own rank or weaker (members are never
-       users); see rule 13.10. A rank 1 user sees everyone.
+       users); see rule 13.10. A rank 0 user sees everyone.
      - Changing a user (edit, status, delete) needs the target to be the same rank or weaker.
-       This includes rank 1: a Super Admin may create and manage another Super Admin (a
+       This includes rank 0: a Super Admin may create and manage another Super Admin (a
        lower rank never can). Stronger users' rows show locked buttons.
      - Roles list and edit only roles strictly weaker than yours, never your own rank. The
        roles you may GIVE to a user are your own rank and weaker.

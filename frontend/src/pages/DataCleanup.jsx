@@ -105,7 +105,7 @@ export default function DataCleanup() {
   const labelOf = (key) => groups.find((g) => g.key === key)?.label || key;
 
   return (
-    <PermissionGate required="system.cleanup.read" minRank={1} title="Access Restricted" message="Data Cleanup needs its privilege and a rank 1 role.">
+    <PermissionGate required="system.cleanup.read" minRank={0} title="Access Restricted" message="You do not have access to this page.">
       <div className="space-y-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Data Cleanup</h1>

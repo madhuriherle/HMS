@@ -2,7 +2,7 @@
 
 Privileges: ``system.recycle_bin.read|write`` and ``system.cleanup.read|write`` (the routes ask for
 ``system.read`` / ``system.write``; services.permission_areas maps them by path). Data Cleanup's module is
-also limited to rank 1 roles.
+also limited to rank 0 roles.
 """
 from typing import Any, List, Optional
 

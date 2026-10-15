@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import api from '../api';
 import CountryCodeSelect from '../components/CountryCodeSelect';
 import { askReason } from '../utils/dialogs';
@@ -13,15 +13,6 @@ const inputCls =
   'w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] disabled:bg-[#FAF7F2] disabled:text-[#863221]';
 const buttonCls =
   'h-10 min-w-[110px] px-5 inline-flex items-center justify-center rounded-xl text-sm font-semibold text-white bg-[#510601] hover:bg-[#8C1801] disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed transition-colors';
-
-// everything below the people in the menu: groups, then the pages inside them
-const accessNames = (nodes) =>
-  (nodes || []).map((n) => ({
-    name: n.name,
-    pages: (n.submodules || []).flatMap(function flat(c) {
-      return c.submodules?.length ? c.submodules.flatMap(flat) : [c.name];
-    }),
-  }));
 
 const endSession = (navigate) => {
   try {
@@ -42,10 +33,24 @@ const Field = ({ id, label, error, children }) => (
   </div>
 );
 
+// password input with a show / hide eye
+const PasswordInput = ({ id, value, onChange, autoComplete }) => {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <input id={id} type={show ? 'text' : 'password'} autoComplete={autoComplete} className={`${inputCls} pr-10`}
+        value={value} onChange={onChange} />
+      <button type="button" onClick={() => setShow((v) => !v)} aria-label={show ? 'Hide password' : 'Show password'}
+        className="absolute inset-y-0 right-0 px-3 text-[#863221] hover:text-[#510601] cursor-pointer">
+        {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+};
+
 export default function MyProfile() {
   const navigate = useNavigate();
   const [me, setMe] = useState(null);
-  const [menu, setMenu] = useState([]);
   const [form, setForm] = useState({ name: '', username: '', email: '', mobile: '', mobile_country_code: '+91' });
   const [countryIso, setCountryIso] = useState('IN');
   const [errors, setErrors] = useState({});
@@ -58,9 +63,8 @@ export default function MyProfile() {
   useEffect(() => {
     (async () => {
       try {
-        const [{ data: u }, { data: m }] = await Promise.all([api.get('/auth/me'), api.get('/users/modules/menu')]);
+        const { data: u } = await api.get('/auth/me');
         setMe(u);
-        setMenu(accessNames(m));
         setForm({
           name: u.name || '', username: u.username || '', email: u.email || '',
           mobile: u.mobile || '', mobile_country_code: u.mobile_country_code || '+91',
@@ -121,15 +125,9 @@ export default function MyProfile() {
     if (pw.next !== pw.confirm) e.confirm = 'The passwords do not match.';
     setErrors((prev) => ({ ...prev, pw: e }));
     if (Object.keys(e).length) return;
-    const reason = await askReason({
-      title: 'Change your password?',
-      text: 'You will be signed out and asked to log in again. Why are you changing it?',
-      confirmText: 'Update',
-    });
-    if (!reason) return;
     setPwSaving(true);
     try {
-      await api.post('/auth/change-password', { current_password: pw.current, new_password: pw.next }, { params: { reason } });
+      await api.post('/auth/change-password', { current_password: pw.current, new_password: pw.next });
       notify('Password changed. Please log in again.');
       endSession(navigate);
     } catch (err) {
@@ -154,7 +152,7 @@ export default function MyProfile() {
         <div className="min-w-0">
           <p className="text-lg font-bold text-[#180200] truncate">{me.name}</p>
           <p className="text-sm text-[#863221]">
-            {me.role_name || 'No role'}{me.role_rank_level != null ? ` · Rank ${me.role_rank_level}` : ''} · {me.status ? 'Active' : 'Inactive'}
+            {me.role_name || 'No role'} · {me.status ? 'Active' : 'Inactive'}
           </p>
         </div>
         <div className="ml-auto text-xs text-[#863221] text-right space-y-0.5">
@@ -163,8 +161,7 @@ export default function MyProfile() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 items-start">
-      <div className="xl:col-span-2 space-y-5">
+      <div className="space-y-5">
       <form onSubmit={save} className="bg-white rounded-2xl border border-[#E8DFD8] overflow-hidden">
         <div className="px-6 h-14 flex items-center border-b border-[#E8DFD8] bg-[#FAF7F2]">
           <h2 className="text-base font-bold text-[#180200]">Profile Information</h2>
@@ -218,15 +215,15 @@ export default function MyProfile() {
           <form onSubmit={changePassword}>
             <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-5 border-t border-[#E8DFD8]">
               <Field id="pw-current" label="Current Password" error={pwErr.current}>
-                <input id="pw-current" type="password" autoComplete="current-password" className={inputCls}
+                <PasswordInput id="pw-current" autoComplete="current-password"
                   value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} />
               </Field>
               <Field id="pw-next" label="New Password" error={pwErr.next}>
-                <input id="pw-next" type="password" autoComplete="new-password" className={inputCls}
+                <PasswordInput id="pw-next" autoComplete="new-password"
                   value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} />
               </Field>
               <Field id="pw-confirm" label="Confirm New Password" error={pwErr.confirm}>
-                <input id="pw-confirm" type="password" autoComplete="new-password" className={inputCls}
+                <PasswordInput id="pw-confirm" autoComplete="new-password"
                   value={pw.confirm} onChange={(e) => setPw({ ...pw, confirm: e.target.value })} />
               </Field>
             </div>
@@ -237,33 +234,6 @@ export default function MyProfile() {
         )}
       </div>
 
-      </div>
-
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] overflow-hidden">
-        <div className="px-6 h-14 flex items-center border-b border-[#E8DFD8] bg-[#FAF7F2]">
-          <h2 className="text-base font-bold text-[#180200]">My Access</h2>
-        </div>
-        <div className="p-6">
-          {me.is_all_access ? (
-            <p className="text-sm text-[#180200]">Your role has full access to every module.</p>
-          ) : menu.length === 0 ? (
-            <p className="text-sm text-[#863221]">Your role has no pages assigned yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {menu.map((g) => (
-                <div key={g.name} className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className="text-sm font-bold text-[#180200] min-w-[130px]">{g.name}</span>
-                  <span className="flex flex-wrap gap-1.5">
-                    {(g.pages.length ? g.pages : ['Open']).map((p) => (
-                      <span key={p} className="px-2.5 py-0.5 rounded-full border border-[#E8DFD8] bg-[#FAF7F2] text-xs text-[#180200]">{p}</span>
-                    ))}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
       </div>
     </div>
   );
