@@ -5,10 +5,10 @@ from models.base import Base, AuditMixin
 class Member(AuditMixin, Base):
     __tablename__ = "members"
     __table_args__ = (
-        # One active member per mobile number (deleted members don't block it).
+        # Non-unique index for fast lookup; family members can share the same mobile.
         Index(
-            "uq_members_mobile_active", "mobile",
-            unique=True,
+            "ix_members_mobile_active", "mobile",
+            unique=False,
             postgresql_where=text("is_deleted = false"),
             sqlite_where=text("is_deleted = false"),
         ),

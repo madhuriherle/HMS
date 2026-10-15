@@ -124,8 +124,8 @@ MAGAZINE_KINDS = {"PHYSICAL", "EMAIL", "BOTH"}
 
 
 def _magazine_choice(data: dict, *, needed, own_email=None) -> None:
-    """Check the magazine choice and tidy it: the kind must be known, an e-copy needs an email (the member's own
-    email is used when none is typed), and a member who only wants the e-copy has no delivery address."""
+    """Check the magazine choice and tidy it: the kind must be known, an e-copy is read online so an email is
+    optional (kept when typed, else the member's own), and a member who only wants the e-copy has no delivery address."""
     kind = data.get("magazine_kind")
     if kind is not None and kind not in MAGAZINE_KINDS:
         raise HTTPException(400, f"magazine_kind must be one of {sorted(MAGAZINE_KINDS)}")
@@ -134,10 +134,7 @@ def _magazine_choice(data: dict, *, needed, own_email=None) -> None:
     kind = kind or "PHYSICAL"
     data["magazine_kind"] = kind
     if kind in ("EMAIL", "BOTH"):
-        email = (data.get("magazine_email") or own_email or "").strip()
-        if not email:
-            raise HTTPException(400, "An e-copy needs an email address for the magazine")
-        data["magazine_email"] = email
+        data["magazine_email"] = (data.get("magazine_email") or own_email or "").strip() or None
     else:
         data["magazine_email"] = None
     if kind == "EMAIL":
@@ -161,21 +158,8 @@ def create_member(
     from models.users import User as UserModel
     from models.members import Member as MemberModel
 
-    # ── Duplicate validation ──
-    if member_in.mobile:
-        existing = db.query(MemberModel).filter(
-            MemberModel.mobile == member_in.mobile,
-            MemberModel.is_deleted == False,
-        ).first()
-        if existing:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    f"Duplicate: member with mobile {member_in.mobile} already "
-                    f"exists (ID: {existing.id}, code: {existing.member_code})"
-                ),
-            )
-    if member_in.full_name_kn:
+    # ── Duplicate validation (shared family mobile is allowed; warn only on Kannada name + DOB) ──
+    if member_in.full_name_kn and member_in.date_of_birth:
         existing_kn = db.query(MemberModel).filter(
             MemberModel.full_name_kn == member_in.full_name_kn,
             MemberModel.date_of_birth == member_in.date_of_birth,
@@ -311,20 +295,7 @@ def public_register_member(
     from models.masters import PostalCode, State, District, Taluk
     from models.members import Member as MemberModel
 
-    # ── Duplicate validation (same rules as staff registration) ──
-    if member_in.mobile:
-        existing = db.query(MemberModel).filter(
-            MemberModel.mobile == member_in.mobile,
-            MemberModel.is_deleted == False,  # noqa: E712
-        ).first()
-        if existing:
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    f"Duplicate: a member with mobile {member_in.mobile} is already "
-                    f"registered (ID: {existing.id})"
-                ),
-            )
+    # ── Duplicate validation (shared family mobile is allowed; warn on Kannada name + DOB) ──
     if member_in.full_name_kn and member_in.date_of_birth:
         existing_kn = db.query(MemberModel).filter(
             MemberModel.full_name_kn == member_in.full_name_kn,
@@ -517,7 +488,7 @@ def duplicate_check(
     digits = re.sub(r"\D", "", mobile or "")[-10:]
     same_mobile = []
     if len(digits) == 10:
-        same_mobile = db.query(Member).filter(*live, Member.mobile == digits).limit(3).all()
+        same_mobile = db.query(Member).filter(*live, Member.mobile == digits).limit(10).all()
     similar = []
     if first_name and dob:
         q = db.query(Member).filter(

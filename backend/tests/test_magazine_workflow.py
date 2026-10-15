@@ -276,9 +276,11 @@ def test_a_physical_copy_is_the_default_and_needs_no_email(client, admin_headers
     assert m["magazine_kind"] == "PHYSICAL" and m["magazine_email"] is None
 
 
-def test_an_e_copy_needs_an_email_and_has_no_address(client, admin_headers):
+def test_an_e_copy_has_no_address_and_the_email_is_optional(client, admin_headers):
     h, s = admin_headers, _sfx()
-    assert _register(client, h, s, magazine_kind="EMAIL").status_code == 400
+    plain = _register(client, h, s, magazine_kind="EMAIL")      # read online: no email needed
+    assert plain.status_code in (200, 201), plain.text
+    s = _sfx()
     bad = _register(client, h, s, magazine_kind="PAPER")
     assert bad.status_code == 400
     ok = _register(client, h, s, magazine_kind="EMAIL", magazine_email="e@example.com", magazine_delivery_address="Ignored St")

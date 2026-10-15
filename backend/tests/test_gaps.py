@@ -77,7 +77,7 @@ def test_public_register_requires_contact(client):
     assert "mobile or email" in str(response.json())
 
 
-def test_public_register_duplicate_mobile(client):
+def test_public_register_shared_mobile_allowed(client):
     first = client.post(
         "/api/v1/members/public-register",
         json={"first_name_en": "DupOne", "mobile": "9340000904"},
@@ -87,8 +87,7 @@ def test_public_register_duplicate_mobile(client):
         "/api/v1/members/public-register",
         json={"first_name_en": "DupTwo", "mobile": "9340000904"},
     )
-    assert second.status_code == 409, second.text
-    assert "already registered" in second.json()["detail"]
+    assert second.status_code == 201, second.text   # rule 2.2: family members may share a mobile
 
 
 def test_public_register_makes_no_member_login(client, admin_headers):

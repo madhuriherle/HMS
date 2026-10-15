@@ -2223,14 +2223,13 @@ def test_offline_registration_bilingual_and_duplicates(client, admin_headers):
     assert member["registration_source"] == "OFFLINE"
     assert member["approval_status"] == "UNAPPROVED"
 
-    # duplicate mobile → 409 with the existing id
-    dup = client.post(
+    # a family member may share the mobile (rule 2.2): not rejected
+    shared = client.post(
         "/api/v1/members/",
         headers=admin_headers,
         json={"first_name_en": "Other", "mobile": "9330000001"},
     )
-    assert dup.status_code == 409, dup.text
-    assert "Duplicate" in dup.json()["detail"]
+    assert shared.status_code == 201, shared.text
 
     # duplicate Kannada name + same DOB → 409
     dup_kn = client.post(
@@ -3516,25 +3515,19 @@ def test_invalid_user_type_rejected(client, admin_headers):
     assert response.status_code == 422, response.text
 
 
-def test_duplicate_mobile_blocked_at_api_and_db(client, admin_headers):
+def test_family_members_can_share_a_mobile(client, admin_headers):
+    # rule 2.2: a mobile is not unique among members; the duplicate-check lists who already uses it
     _create_member(client, admin_headers, "9000000022", "Original")
 
-    duplicate = client.post(
+    second = client.post(
         "/api/v1/members/",
         headers=admin_headers,
-        json={"first_name_en": "Duplicate", "mobile": "9000000022"},
+        json={"first_name_en": "Relative", "mobile": "9000000022"},
     )
-    assert duplicate.status_code == 409, duplicate.text
-
-    # and the partial unique index backstops races around the API check
-    from sqlalchemy.exc import IntegrityError
-    from db.session import SessionLocal
-    from models.members import Member
-
-    with pytest.raises(IntegrityError):
-        with SessionLocal() as db:
-            db.add(Member(first_name_en="Racy Duplicate", mobile="9000000022"))
-            db.commit()
+    assert second.status_code == 201, second.text
+    check = client.get("/api/v1/members/duplicate-check", headers=admin_headers, params={"mobile": "9000000022"})
+    assert check.status_code == 200, check.text
+    assert len(check.json()["same_mobile"]) == 2
 
 
 def test_permission_revoke_and_regrant(client, admin_headers):

@@ -4,6 +4,7 @@ import {
   User,
   ChevronRight,
   ChevronLeft,
+  Check,
   CheckCircle2,
   AlertCircle,
   Phone,
@@ -17,7 +18,8 @@ import {
   Trash2,
   Search,
   Users,
-  Heart
+  Heart,
+  Printer
 } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';
@@ -59,8 +61,12 @@ export default function RegisterNewMember() {
   const lists = useLists(); // child relations, YES/NO, country codes (GET /meta/lists)
   const COUNTRY_CODES = useCountryCodes();
   const BLOOD_GROUPS = rules?.blood_groups || [];
-  const BEHALF_OPTIONS = rules?.applied_on_behalf_of || [];
-  const NAME_TITLES = rules?.name_titles || [];
+  const BEHALF_OPTIONS = (rules?.applied_on_behalf_of && rules.applied_on_behalf_of.length)
+    ? rules.applied_on_behalf_of
+    : ['Self', 'Father', 'Mother', 'Husband', 'Wife', 'Son', 'Daughter', 'Brother', 'Sister', 'Grandson', 'Granddaughter', 'Family', 'Relative', 'Others'];
+  const NAME_TITLES = (rules?.name_titles && rules.name_titles.length > 2)
+    ? rules.name_titles
+    : ['SRI.', 'SMT.', 'KUMARI', 'DR.', 'PROF.', 'PANDIT', 'MS.'];
   const CATEGORY_OPTIONS = rules?.membership_type_categories || [];
   const minAge = rules?.member?.min_age ?? 0;
 
@@ -705,10 +711,6 @@ export default function RegisterNewMember() {
     const cleanAddress = formData.address.trim();
     const cleanPin = formData.postalCode.trim();
 
-    if (!formData.membershipTypeId) {
-      errors.membershipTypeId = 'Please select a Havyaka Membership Type';
-    }
-
     if (!cleanName) {
       errors.name = 'New Member Name is required';
     }
@@ -765,12 +767,6 @@ export default function RegisterNewMember() {
 
     if (cleanPin && !hasDigits(cleanPin, rules?.pincode?.digits)) {
       errors.postalCode = `PIN Code must be ${rules?.pincode?.digits} numeric digits`;
-    }
-
-    if (formData.magazineNeeded === 'YES' && formData.magazineKind !== 'PHYSICAL') {
-      const mail = (formData.magazineEmail || '').trim();
-      if (!mail) errors.magazineEmail = 'An e-copy needs an email address';
-      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) errors.magazineEmail = 'Please enter a valid email address';
     }
 
     setFormErrors(errors);
@@ -913,23 +909,7 @@ export default function RegisterNewMember() {
       applied_on_behalf_of: formData.appliedOnBehalfOf || null,
       magazine_needed: formData.magazineNeeded === 'YES',
       magazine_kind: formData.magazineNeeded === 'YES' ? formData.magazineKind || 'PHYSICAL' : null,
-      magazine_email: formData.magazineNeeded === 'YES' && formData.magazineKind !== 'PHYSICAL' ? (formData.magazineEmail || '').trim() || null : null,
       magazine_delivery_address: formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' && formData.magazineDeliveryChoice === 'DIFFERENT' ? (formData.magazineDeliveryAddress || '').trim() || null : null,
-      membership_type_category: formData.membershipTypeCategory || null,
-      ...(isEditMode && formData.membershipTypeId ? { membership_type_id: Number(formData.membershipTypeId) } : {}),
-      referred_by_number: formData.referredMembershipNo.trim() || null,
-      referred_by_name: formData.referredMembershipName.trim() || null,
-      family_membership_number: formData.familyMembershipNo.trim() || null,
-      family_membership_name: formData.familyMembershipName.trim() || null,
-      registration_payment: {
-        payment_mode: formData.paymentMode || null,
-        bank_account: formData.bankAccount.trim() || null,
-        amount: formData.amount ? Number(formData.amount) : null,
-        receipt_date: toISODate(formData.receiptDate) || null,
-        transaction_id: formData.transactionId.trim() || null,
-        transaction_date: toISODate(formData.transactionDate) || null,
-        remarks: formData.paymentRemarks.trim() || null
-      },
       // where the record came from is set once, when it is created; editing never changes it
       ...(isEditMode ? {} : { registration_source: 'OFFLINE' })
     };
@@ -944,7 +924,6 @@ export default function RegisterNewMember() {
     }
     if (!validateForm()) {
       showToast('Please fix the required fields marked with *.', 'error');
-      setActiveFormSection('membershipDetails');
       return;
     }
 
@@ -973,10 +952,6 @@ export default function RegisterNewMember() {
         navigate('/dashboard/membership/unapproved');
         return;
       }
-      // the chosen membership type, then the photo
-      if (formData.membershipTypeId) {
-        await api.post(`/members/${data.id}/memberships`, { membership_type_id: Number(formData.membershipTypeId) });
-      }
       if (photoFile) {
         const form = new FormData();
         form.append('file', photoFile);
@@ -992,143 +967,90 @@ export default function RegisterNewMember() {
     }
   };
 
+  const previewAddress = useMemo(() => {
+    const isDifferent =
+      formData.magazineNeeded === 'YES' &&
+      formData.magazineKind !== 'EMAIL' &&
+      formData.magazineDeliveryChoice === 'DIFFERENT' &&
+      formData.magazineDeliveryAddress;
+    const addressLine = isDifferent ? formData.magazineDeliveryAddress : (formData.address || '');
+    return {
+      line: addressLine,
+      locality: formData.locality || '',
+      taluk: formData.taluk || '',
+      district: formData.district || '',
+      state: formData.state || 'Karnataka',
+      pin: formData.postalCode || ''
+    };
+  }, [
+    formData.magazineNeeded,
+    formData.magazineKind,
+    formData.magazineDeliveryChoice,
+    formData.magazineDeliveryAddress,
+    formData.address,
+    formData.locality,
+    formData.taluk,
+    formData.district,
+    formData.state,
+    formData.postalCode
+  ]);
+
+  const isLabelReady = Boolean(
+    formData.name?.trim() &&
+    formData.address?.trim() &&
+    formData.postalCode?.trim() &&
+    formData.mobile?.trim()
+  );
+
   return (
     <PermissionGate required={isViewMode ? 'members.list.read' : isEditMode ? 'members.list.write' : 'members.register.write'}>
-    <div className="max-w-[1240px] mx-auto space-y-6">
-      {/* ---------------------------------------------------- */}
-      {/* BREADCRUMB & HEADER                                  */}
-      {/* ---------------------------------------------------- */}
-      <div>
-        <div className="flex items-center justify-between gap-4 w-full">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight flex items-center gap-3">
-              <span>{isViewMode ? 'View Member Details' : isEditMode ? 'Edit Member Details' : 'Register New Member'}</span>
-              {(isViewMode || isEditMode) && targetMember?.registrationNumber && (
-                <span className="font-mono text-sm font-bold bg-[#FAF7F2] text-[#510601] px-3 py-1 rounded-xl border border-[#E8DFD8]" title="Record ID">
-                  ID: {targetMember.registrationNumber}
-                </span>
-              )}
-              {(isViewMode || isEditMode) && targetMember?.membershipNumber && targetMember.membershipNumber !== 'Not Assigned' && targetMember.approvalStatus === 'Approved' && (
-                <span className="font-mono text-sm font-bold bg-emerald-50 text-emerald-800 px-3 py-1 rounded-xl border border-emerald-200" title="Membership Number">
-                  {targetMember.membershipNumber}
-                </span>
-              )}
-            </h1>
-          </div>
-        </div>
-      </div>
-
-      {/* ---------------------------------------------------- */}
-      {/* FORM CARD CONTAINER                                  */}
-      {/* ---------------------------------------------------- */}
-      <div className="w-full bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden">
-        {/* Form Top Bar with Tabs */}
-        <div className="px-6 sm:px-8 pt-6 sm:pt-7 pb-3 border-b border-[#E8DFD8]">
-          <div className="flex items-center justify-between pb-3 border-b-2 border-[#8C1801]">
-            <h2 className="text-base sm:text-lg font-bold text-[#180200]">
-              {isViewMode
-                ? `Membership Details: ${formData.name || targetMember?.fullName || 'Member Record'}`
-                : isEditMode
-                ? `Edit Membership: ${formData.name || targetMember?.fullName || 'Member Record'}`
-                : 'New Membership Form'}
-            </h2>
-            <span className="text-xs sm:text-sm text-[#863221] font-medium">
-              {isViewMode ? (
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
-                  targetMember?.status === 'Unapproved' || targetMember?.approvalStatus === 'Unapproved'
-                    ? 'bg-amber-50 text-amber-800 border-amber-200'
-                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                }`}>
-                  {targetMember?.status === 'Unapproved' || targetMember?.approvalStatus === 'Unapproved' ? 'Unapproved' : (targetMember?.status || targetMember?.approvalStatus || 'Active Member')}
-                </span>
-              ) : (
-                '* Required fields'
-              )}
-            </span>
-          </div>
-
-          {/* Navigation Tabs */}
-          <div className="flex items-center gap-2 mt-4">
-            <button
-              type="button"
-              onClick={() => setActiveFormSection('membershipDetails')}
-              className={`px-6 py-2.5 text-xs sm:text-sm font-bold rounded-t-lg border-t border-x transition-all cursor-pointer ${activeFormSection === 'membershipDetails'
-                ? 'bg-[#510601] text-white border-[#510601] shadow-xs'
-                : 'bg-[#FAF7F2] text-[#510601] border-[#E8DFD8] hover:bg-white'
-                }`}
-            >
-              Membership Details
-            </button>
-            <button
-              type="button"
-              onClick={goToPaymentStep}
-              className={`px-6 py-2.5 text-xs sm:text-sm font-bold rounded-t-lg border-t border-x transition-all cursor-pointer ${activeFormSection === 'paymentInfo'
-                ? 'bg-[#510601] text-white border-[#510601] shadow-xs'
-                : 'bg-[#FAF7F2] text-[#510601] border-[#E8DFD8] hover:bg-white'
-                }`}
-            >
-              Payment Information
-            </button>
-          </div>
-        </div>
-
-        {/* Form Body */}
-        <form onSubmit={handleSaveMember}>
-          <div className="px-6 sm:px-8 py-6 sm:py-7 space-y-6">
-            {/* TAB 1: MEMBERSHIP DETAILS */}
-            {activeFormSection === 'membershipDetails' && (
-              <div className="space-y-6">
-                <fieldset disabled={isViewMode} className="space-y-6 disabled:opacity-95">
-                {/* Top Row: Membership Type & Select Havyaka Membership Type */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Membership Type:
-                    </label>
-                    <select
-                      value={formData.membershipTypeCategory}
-                      onChange={(e) =>
-                        setFormData({ ...formData, membershipTypeCategory: e.target.value })
-                      }
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 transition-all cursor-pointer shadow-2xs"
-                    >
-                      {CATEGORY_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-
-                  </div>
-
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Select Havyaka Membership Type: <span className="text-red-600">*</span>
-                    </label>
-                    <select
-                      value={formData.membershipTypeId}
-                      onChange={(e) => handleMembershipTypeSelect(e.target.value)}
-                      className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 transition-all cursor-pointer shadow-2xs ${formErrors.membershipTypeId ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
-                        }`}
-                    >
-                      <option value="">Select a Havyaka membership type</option>
-                      {activeMembershipTypes.map((mt) => (
-                        <option key={mt.id} value={mt.id}>
-                          {mt.name} ({formatMoney(mt.currentPrice ?? mt.price ?? mt.fee)})
-                        </option>
-                      ))}
-                    </select>
-                    {formErrors.membershipTypeId && (
-                      <p className="text-[11px] text-red-600 mt-1">{formErrors.membershipTypeId}</p>
+    <div className="max-w-[1440px] mx-auto space-y-6">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Member Registration Form */}
+        <div className="xl:col-span-8 space-y-6">
+          <div className="w-full bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden">
+            {/* Clean Form Header */}
+            <div className="px-6 sm:px-8 py-5 border-b border-[#E8DFD8] bg-[#FAF7F2]/40">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight flex items-center gap-3">
+                    <span>{isViewMode ? 'View Member Details' : isEditMode ? 'Edit Member Details' : 'Register New Member'}</span>
+                    {(isViewMode || isEditMode) && targetMember?.registrationNumber && (
+                      <span className="font-mono text-sm font-bold bg-[#FAF7F2] text-[#510601] px-3 py-1 rounded-xl border border-[#E8DFD8]" title="Record ID">
+                        ID: {targetMember.registrationNumber}
+                      </span>
                     )}
-                  </div>
+                    {(isViewMode || isEditMode) && targetMember?.membershipNumber && targetMember.membershipNumber !== 'Not Assigned' && targetMember.approvalStatus === 'Approved' && (
+                      <span className="font-mono text-sm font-bold bg-emerald-50 text-emerald-800 px-3 py-1 rounded-xl border border-emerald-200" title="Membership Number">
+                        {targetMember.membershipNumber}
+                      </span>
+                    )}
+                  </h1>
                 </div>
+                <div className="text-xs sm:text-sm text-[#863221] font-medium shrink-0">
+                  {isViewMode ? (
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
+                      targetMember?.status === 'Unapproved' || targetMember?.approvalStatus === 'Unapproved'
+                        ? 'bg-amber-50 text-amber-800 border-amber-200'
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    }`}>
+                      {targetMember?.status === 'Unapproved' || targetMember?.approvalStatus === 'Unapproved' ? 'Unapproved' : (targetMember?.status || targetMember?.approvalStatus || 'Active Member')}
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <span className="text-red-600 font-bold">*</span> All fields required unless noted
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
 
-                {/* Red separator bar */}
-                <div className="border-b border-[#8C1801]/30 my-2" />
-
-                {/* Photo upload + Basic Details */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            {/* Form Body */}
+            <form onSubmit={handleSaveMember}>
+              <div className="px-6 sm:px-8 py-6 space-y-6">
+                <fieldset disabled={isViewMode} className="space-y-6 disabled:opacity-95">
+                  {/* Photo upload + Basic Details */}
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                   {/* Left: Passport Size Photo Upload */}
                   <div className="md:col-span-3 flex flex-col items-center justify-center p-1">
                     <div className="w-32 sm:w-36 h-40 sm:h-44 border-2 border-dashed border-[#DFD5CC] bg-[#FAF7F2] flex flex-col items-center justify-center relative overflow-hidden rounded-lg shadow-2xs hover:border-[#8C1801]/50 transition-colors">
@@ -1161,217 +1083,257 @@ export default function RegisterNewMember() {
                     />
                   </div>
 
-                  {/* Right: Member Name, Father/Husband Name, Mobile, WhatsApp, DOB, Age */}
-                  <div className="md:col-span-9 grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    {/* New Member Name */}
-                    <div>
-                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        New Member Name: <span className="text-red-600">*</span>
-                      </label>
-                      <div className="flex gap-2">
-                        <div className="w-24 shrink-0">
-                          <select
-                            value={formData.nameTitle}
-                            onChange={(e) => handleTitleChange(e.target.value)}
-                            className="w-full px-2.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm font-bold text-[#510601] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 cursor-pointer shadow-2xs transition-all"
-                          >
-                            {NAME_TITLES.map((t) => (
-                              <option key={t} value={t}>
-                                {t}
-                              </option>
-                            ))}
-                          </select>
+                  {/* Right: Member Name, DOB, Age in single line, Mobile, Relationship, WhatsApp, Father Name */}
+                  <div className="md:col-span-9 space-y-4">
+                    {/* Row 1: Name (Title + Full Name), DOB, and Age in a SINGLE LINE */}
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+                      {/* Member Name */}
+                      <div className="sm:col-span-6">
+                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                          New Member Name: <span className="text-red-600">*</span>
+                        </label>
+                        <div className="flex gap-1.5">
+                          <div className="w-24 shrink-0">
+                            <select
+                              value={formData.nameTitle}
+                              onChange={(e) => handleTitleChange(e.target.value)}
+                              className="w-full px-2 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm font-bold text-[#510601] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 cursor-pointer shadow-2xs transition-all"
+                            >
+                              {NAME_TITLES.map((t) => (
+                                <option key={t} value={t}>
+                                  {t}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <input
+                              type="text"
+                              placeholder="Full Name"
+                              value={formData.name}
+                              onChange={(e) => {
+                                setFormData({ ...formData, name: e.target.value });
+                                if (formErrors.name) setFormErrors({ ...formErrors, name: '' });
+                              }}
+                              className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                                formErrors.name ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                              }`}
+                            />
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
+                        {formErrors.name && (
+                          <p className="text-[11px] text-red-600 mt-1">{formErrors.name}</p>
+                        )}
+                      </div>
+
+                      {/* Date of Birth */}
+                      <div className="sm:col-span-4">
+                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                          Date of Birth: <span className="text-red-600">*</span>
+                        </label>
+                        <DateInput
+                          disabled={isViewMode}
+                          max={maxAllowedDobDate}
+                          value={formData.birthDate}
+                          onChange={handleDobChange}
+                          name="birthDate"
+                          className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                            formErrors.birthDate ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                          }`}
+                        />
+                        {formErrors.birthDate && (
+                          <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.birthDate}</p>
+                        )}
+                      </div>
+
+                      {/* Age */}
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">Age:</label>
+                        <input
+                          type="text"
+                          readOnly
+                          value={formData.age}
+                          placeholder="Age"
+                          className="w-full px-2.5 py-2 bg-[#F5EFEB] border border-[#DFD5CC] rounded-lg text-xs sm:text-sm font-bold text-[#510601] text-center placeholder:text-[#9E8B7F] placeholder:font-normal focus:outline-none cursor-default shadow-2xs transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 2: Mobile Number & Relationship & WhatsApp */}
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
+                      {/* Mobile Number */}
+                      <div className="sm:col-span-5">
+                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                          Mobile Number: <span className="text-red-600">*</span>
+                        </label>
+                        <div className="flex gap-1.5">
+                          <div className="w-24 shrink-0">
+                            <CountryCodeSelect
+                              value={formData.mobileCountryCode}
+                              countryIso={formData.mobileCountryIso}
+                              onChange={handleMobileCountryChange}
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <input
+                              type="tel"
+                              placeholder="Mobile Number"
+                              value={formData.mobile}
+                              onChange={(e) => handleMobileChange(e.target.value)}
+                              onBlur={() => checkPhoneField('mobile')}
+                              className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                                formErrors.mobile ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                              }`}
+                            />
+                          </div>
+                        </div>
+                        {formErrors.mobile && (
+                          <p className="text-[11px] text-red-600 mt-1">{formErrors.mobile}</p>
+                        )}
+                        {/* Shared family mobile notice (Non-blocking) */}
+                        {dupInfo.same_mobile.length > 0 && (
+                          <div className="mt-1.5 p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] font-medium text-amber-900 space-y-1">
+                            <div className="font-semibold text-amber-800 flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0 text-amber-700" />
+                              <span>Shared Mobile ({dupInfo.same_mobile.length} existing member{dupInfo.same_mobile.length > 1 ? 's' : ''}):</span>
+                            </div>
+                            <div className="space-y-0.5 pl-3">
+                              {dupInfo.same_mobile.map((d) => (
+                                <div key={d.id} className="flex items-center justify-between gap-2">
+                                  <span>
+                                    &bull; {d.name} {d.membership_number || d.member_code ? `(${d.membership_number || d.member_code})` : ''}
+                                  </span>
+                                  <a
+                                    href={`/dashboard/membership/profile/${d.id}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="underline text-[#510601] font-semibold text-[10px]"
+                                  >
+                                    View
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                            <p className="text-[10px] text-amber-700 italic">Family members can share mobile numbers. Registration is not blocked.</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Membership Belongs To / Relationship */}
+                      <div className="sm:col-span-3">
+                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold truncate" title="Membership Belongs To / Relationship">
+                          Belongs To / Relation:
+                        </label>
+                        <select
+                          value={formData.appliedOnBehalfOf}
+                          onChange={(e) => {
+                            setFormData({ ...formData, appliedOnBehalfOf: e.target.value });
+                            if (formErrors.appliedOnBehalfOf) setFormErrors({ ...formErrors, appliedOnBehalfOf: '' });
+                          }}
+                          className="w-full px-2.5 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer"
+                        >
+                          {BEHALF_OPTIONS.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* WhatsApp Number */}
+                      <div className="sm:col-span-4">
+                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                          WhatsApp Number:
+                        </label>
+                        <div className="flex gap-1.5">
+                          <div className="w-24 shrink-0">
+                            <CountryCodeSelect
+                              value={formData.whatsappCountryCode}
+                              countryIso={formData.whatsappCountryIso}
+                              onChange={handleWhatsAppCountryChange}
+                              disabled={isWhatsAppSameAsMobile}
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <input
+                              type="tel"
+                              placeholder="WhatsApp"
+                              value={formData.whatsappNumber}
+                              onChange={(e) => handleWhatsAppChange(e.target.value)}
+                              onBlur={() => checkPhoneField('whatsappNumber')}
+                              readOnly={isWhatsAppSameAsMobile}
+                              className={`w-full px-3 py-2 border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                                isWhatsAppSameAsMobile
+                                  ? 'bg-stone-100 text-stone-500 border-[#DFD5CC] cursor-not-allowed'
+                                  : 'bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border-[#DFD5CC] hover:border-[#8C1801]/60'
+                              } ${formErrors.whatsappNumber ? 'border-red-500 ring-2 ring-red-500/20' : ''}`}
+                            />
+                          </div>
+                        </div>
+                        <label className="flex items-center gap-1.5 mt-1 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={isWhatsAppSameAsMobile}
+                            onChange={(e) => handleWhatsAppSameAsMobileToggle(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded text-[#510601] focus:ring-[#510601] border-[#DFD5CC] accent-[#510601] cursor-pointer"
+                          />
+                          <span className="text-[11px] text-[#3D140C] font-medium">
+                            Same as mobile
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Row 3: Father's Name */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                      <div>
+                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                          Father's Name:
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Father's Full Name"
+                          value={formData.fatherName || formData.fatherHusbandName}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormData({ ...formData, fatherName: val, fatherHusbandName: val });
+                            if (formErrors.fatherName || formErrors.fatherHusbandName)
+                              setFormErrors({ ...formErrors, fatherName: '', fatherHusbandName: '' });
+                          }}
+                          className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                            (formErrors.fatherName || formErrors.fatherHusbandName) ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                          }`}
+                        />
+                        {(formErrors.fatherName || formErrors.fatherHusbandName) && (
+                          <p className="text-[11px] text-red-600 mt-1">
+                            {formErrors.fatherName || formErrors.fatherHusbandName}
+                          </p>
+                        )}
+                      </div>
+
+                      {SHOW_KANNADA_FIELDS && (
+                        <div>
+                          <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                            Name (Kannada):
+                          </label>
                           <input
                             type="text"
-                            value={formData.name}
-                            onChange={(e) => {
-                              setFormData({ ...formData, name: e.target.value });
-                              if (formErrors.name) setFormErrors({ ...formErrors, name: '' });
-                            }}
-
-                            className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${formErrors.name ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
-                              }`}
+                            placeholder="ಹೆಸರು (Kannada)"
+                            value={formData.nameKn}
+                            onChange={(e) => setFormData({ ...formData, nameKn: e.target.value })}
+                            className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                           />
                         </div>
-                      </div>
-                      {formErrors.name && (
-                        <p className="text-[11px] text-red-600 mt-1">{formErrors.name}</p>
                       )}
-                    </div>
-
-                    {/* Name (Kannada) */}
-                    {SHOW_KANNADA_FIELDS && (
-                    <div>
-                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        Name (Kannada):
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="ಹೆಸರು (Kannada)"
-                        value={formData.nameKn}
-                        onChange={(e) => setFormData({ ...formData, nameKn: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
-                      />
-                    </div>
-                    )}
-
-                    {/* Father Name */}
-                    <div>
-                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        Father's Name:
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Father's Full Name"
-                        value={formData.fatherName || formData.fatherHusbandName}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setFormData({ ...formData, fatherName: val, fatherHusbandName: val });
-                          if (formErrors.fatherName || formErrors.fatherHusbandName)
-                            setFormErrors({ ...formErrors, fatherName: '', fatherHusbandName: '' });
-                        }}
-                        className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
-                          (formErrors.fatherName || formErrors.fatherHusbandName) ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
-                        }`}
-                      />
-                      {(formErrors.fatherName || formErrors.fatherHusbandName) && (
-                        <p className="text-[11px] text-red-600 mt-1">
-                          {formErrors.fatherName || formErrors.fatherHusbandName}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Mobile / Phone Number */}
-                    <div>
-                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        Mobile / Phone Number: <span className="text-red-600">*</span>
-                      </label>
-                      <div className="flex gap-2">
-                        <div className="w-28 shrink-0">
-                          <CountryCodeSelect
-                            value={formData.mobileCountryCode}
-                            countryIso={formData.mobileCountryIso}
-                            onChange={handleMobileCountryChange}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <input
-                            type="tel"
-                            value={formData.mobile}
-                            onChange={(e) => handleMobileChange(e.target.value)}
-                            onBlur={() => checkPhoneField('mobile')}
-
-                            className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${formErrors.mobile ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
-                              }`}
-                          />
-                        </div>
-                      </div>
-                      {formErrors.mobile && (
-                        <p className="text-[11px] text-red-600 mt-1">{formErrors.mobile}</p>
-                      )}
-                      {[...dupInfo.same_mobile.map((d) => ({ ...d, why: 'has this mobile number' })),
-                        ...dupInfo.similar.map((d) => ({ ...d, why: 'has the same name and date of birth' }))].map((d) => (
-                        <div key={`${d.id}${d.why}`} className="mt-1.5 flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] font-semibold text-amber-800">
-                          <span>
-                            {d.name} {(d.membership_number || d.member_code) ? `(${d.membership_number || d.member_code})` : '(applicant)'} already {d.why}.
-                          </span>
-                          <a
-                            href={`/dashboard/membership/profile/${d.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline text-[#510601]"
-                          >
-                            View profile
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* WhatsApp Number */}
-                    <div>
-                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        WhatsApp Number:
-                      </label>
-                      <div className="flex gap-2">
-                        <div className="w-28 shrink-0">
-                          <CountryCodeSelect
-                            value={formData.whatsappCountryCode}
-                            countryIso={formData.whatsappCountryIso}
-                            onChange={handleWhatsAppCountryChange}
-                            disabled={isWhatsAppSameAsMobile}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <input
-                            type="tel"
-                            value={formData.whatsappNumber}
-                            onChange={(e) => handleWhatsAppChange(e.target.value)}
-                            onBlur={() => checkPhoneField('whatsappNumber')}
-
-                            readOnly={isWhatsAppSameAsMobile}
-                            className={`w-full px-3.5 py-2.5 border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${isWhatsAppSameAsMobile
-                              ? 'bg-stone-100 text-stone-500 border-[#DFD5CC] cursor-not-allowed'
-                              : 'bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border-[#DFD5CC] hover:border-[#8C1801]/60'
-                              } ${formErrors.whatsappNumber ? 'border-red-500 ring-2 ring-red-500/20' : ''}`}
-                          />
-                        </div>
-                      </div>
-                      {formErrors.whatsappNumber && (
-                        <p className="text-[11px] text-red-600 mt-1">{formErrors.whatsappNumber}</p>
-                      )}
-                      <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={isWhatsAppSameAsMobile}
-                          onChange={(e) => handleWhatsAppSameAsMobileToggle(e.target.checked)}
-                          className="w-4 h-4 rounded text-[#510601] focus:ring-[#510601] border-[#DFD5CC] accent-[#510601] cursor-pointer"
-                        />
-                        <span className="text-xs text-[#3D140C] font-medium">
-                          WhatsApp number is same as mobile/phone number
-                        </span>
-                      </label>
-                    </div>
-
-                    {/* Date of Birth */}
-                    <div>
-                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        Date of Birth: <span className="text-red-600">*</span>
-                      </label>
-                      <DateInput
-                        disabled={isViewMode}
-                        max={maxAllowedDobDate}
-                        value={formData.birthDate}
-                        onChange={handleDobChange}
-                        name="birthDate"
-                        className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${formErrors.birthDate ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
-                          }`}
-                      />
-                      {formErrors.birthDate && (
-                        <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.birthDate}</p>
-                      )}
-                    </div>
-
-                    {/* Age */}
-                    <div>
-                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">Age:</label>
-                      <input
-                        type="text"
-                        readOnly
-                        value={formData.age}
-
-                        className="w-full px-3.5 py-2.5 bg-[#F5EFEB] border border-[#DFD5CC] rounded-lg text-sm font-semibold text-[#510601] placeholder:text-[#9E8B7F] placeholder:font-normal focus:outline-none cursor-default shadow-2xs transition-all"
-                      />
                     </div>
                   </div>
                 </div>
 
-                {/* 2-Column Grid Fields: Community, Identity & Address Details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2 border-t border-[#DFD5CC]">
+                {/* Compact 4-Column Grid: Gothra, Gender, Blood Group, Aadhar Number */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-3 border-t border-[#DFD5CC]">
                   {/* Gothra */}
                   <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
+                    <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                       Gothra:
                     </label>
                     <select
@@ -1380,8 +1342,9 @@ export default function RegisterNewMember() {
                         setFormData({ ...formData, gothra: e.target.value });
                         if (formErrors.gothra) setFormErrors({ ...formErrors, gothra: '' });
                       }}
-                      className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer ${formErrors.gothra ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
-                        }`}
+                      className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer ${
+                        formErrors.gothra ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                      }`}
                     >
                       <option value="">Select Gotra</option>
                       {gothras.map((g) => (
@@ -1397,7 +1360,7 @@ export default function RegisterNewMember() {
 
                   {/* Gender */}
                   <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
+                    <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                       Gender:
                     </label>
                     <select
@@ -1406,8 +1369,9 @@ export default function RegisterNewMember() {
                         setFormData({ ...formData, gender: e.target.value });
                         if (formErrors.gender) setFormErrors({ ...formErrors, gender: '' });
                       }}
-                      className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer ${formErrors.gender ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
-                        }`}
+                      className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer ${
+                        formErrors.gender ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                      }`}
                     >
                       <option value="">Select Gender</option>
                       {(rules?.genders || []).map((g) => {
@@ -1422,13 +1386,13 @@ export default function RegisterNewMember() {
 
                   {/* Blood Group */}
                   <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
+                    <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                       Blood Group:
                     </label>
                     <select
                       value={formData.bloodGroup}
                       onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer"
+                      className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer"
                     >
                       <option value="">Select Blood Group</option>
                       {BLOOD_GROUPS.map((bg) => (
@@ -1441,22 +1405,22 @@ export default function RegisterNewMember() {
 
                   {/* Aadhar Number */}
                   <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
+                    <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                       Aadhar Number:
                     </label>
                     <input
                       type="text"
                       maxLength={12}
+                      placeholder="12-digit Aadhar"
                       value={formData.aadharNumber}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
                         setFormData({ ...formData, aadharNumber: val });
-                        if (formErrors.aadharNumber)
-                          setFormErrors({ ...formErrors, aadharNumber: '' });
+                        if (formErrors.aadharNumber) setFormErrors({ ...formErrors, aadharNumber: '' });
                       }}
-
-                      className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${formErrors.aadharNumber ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
-                        }`}
+                      className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                        formErrors.aadharNumber ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                      }`}
                     />
                     {formErrors.aadharNumber && (
                       <p className="text-[11px] text-red-600 mt-1">{formErrors.aadharNumber}</p>
@@ -1605,34 +1569,6 @@ export default function RegisterNewMember() {
                     />
                   </div>
 
-                  {/* Applying this Membership on behalf of */}
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Applying this Membership on behalf of:
-                    </label>
-                    <select
-                      value={formData.appliedOnBehalfOf}
-                      onChange={(e) => {
-                        setFormData({ ...formData, appliedOnBehalfOf: e.target.value });
-                        if (formErrors.appliedOnBehalfOf)
-                          setFormErrors({ ...formErrors, appliedOnBehalfOf: '' });
-                      }}
-                      className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer ${formErrors.appliedOnBehalfOf ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
-                        }`}
-                    >
-                      {BEHALF_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                    {formErrors.appliedOnBehalfOf && (
-                      <p className="text-[11px] text-red-600 mt-1">
-                        {formErrors.appliedOnBehalfOf}
-                      </p>
-                    )}
-                  </div>
-
                   {/* Qualification */}
                   <div>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
@@ -1646,8 +1582,6 @@ export default function RegisterNewMember() {
                           setFormErrors({ ...formErrors, qualification: '' });
                       }}
                       options={qualifications}
-
-
                       hasError={Boolean(formErrors.qualification)}
                       maxHeightClass="max-h-52"
                     />
@@ -1663,123 +1597,157 @@ export default function RegisterNewMember() {
                     </label>
                     <input
                       type="text"
+                      placeholder="Occupation / Profession"
                       value={formData.employment}
                       onChange={(e) => setFormData({ ...formData, employment: e.target.value })}
-
                       className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
                   </div>
 
-                  {/* Magazine Needed */}
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Do you need Havyaka Magazine Every month?
-                    </label>
-                    <select
-                      value={formData.magazineNeeded}
-                      onChange={(e) => {
-                        setFormData({ ...formData, magazineNeeded: e.target.value });
-                        if (formErrors.magazineNeeded)
-                          setFormErrors({ ...formErrors, magazineNeeded: '' });
-                      }}
-                      className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer ${formErrors.magazineNeeded ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
-                        }`}
-                    >
-                      <option value="">Select YES/NO</option>
-                      {(lists?.yes_no || []).map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
-                    </select>
-                    {formErrors.magazineNeeded && (
-                      <p className="text-[11px] text-red-600 mt-1">{formErrors.magazineNeeded}</p>
+                  {/* Consolidated Havyaka Magazine Subscription Block */}
+                  <div className="md:col-span-2 bg-[#FAF7F2] p-4 sm:p-5 rounded-xl border border-[#DFD5CC] space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-[#510601] flex items-center gap-2">
+                          <span>Havyaka Magazine Subscription</span>
+                        </h3>
+                        <p className="text-xs text-stone-600 mt-0.5">
+                          Do you need Havyaka Magazine Every month?
+                        </p>
+                      </div>
+                      <div className="inline-flex rounded-lg border border-[#DFD5CC] bg-white p-0.5 shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, magazineNeeded: 'NO' }));
+                            if (formErrors.magazineNeeded) setFormErrors({ ...formErrors, magazineNeeded: '' });
+                          }}
+                          className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                            formData.magazineNeeded !== 'YES'
+                              ? 'bg-[#510601] text-white shadow-xs'
+                              : 'text-stone-700 hover:text-[#510601]'
+                          }`}
+                        >
+                          No
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, magazineNeeded: 'YES' }));
+                            if (formErrors.magazineNeeded) setFormErrors({ ...formErrors, magazineNeeded: '' });
+                          }}
+                          className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                            formData.magazineNeeded === 'YES'
+                              ? 'bg-[#510601] text-white shadow-xs'
+                              : 'text-stone-700 hover:text-[#510601]'
+                          }`}
+                        >
+                          Yes
+                        </button>
+                      </div>
+                    </div>
+
+                    {formData.magazineNeeded === 'YES' && (
+                      <div className="space-y-4 pt-3 border-t border-[#DFD5CC]/80 bg-white p-4 rounded-lg border border-[#DFD5CC]">
+                        {/* Magazine Edition Options */}
+                        <div>
+                          <label className="block text-xs font-bold text-[#510601] uppercase tracking-wider mb-2">
+                            Select Magazine Edition:
+                          </label>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {[
+                              ['PHYSICAL', 'Physical Copy', 'Posted monthly to postal address'],
+                              ['EMAIL', 'E-Magazine', 'Read online on website (No email needed)'],
+                              ['BOTH', 'Both Editions', 'Physical copy posted + Website access']
+                            ].map(([code, title, desc]) => (
+                              <label
+                                key={code}
+                                className={`flex flex-col p-3 rounded-lg border cursor-pointer transition-all ${
+                                  formData.magazineKind === code
+                                    ? 'border-[#510601] bg-[#FAF7F2] ring-1 ring-[#510601]/20 shadow-2xs'
+                                    : 'border-[#DFD5CC] hover:border-[#8C1801]/40 bg-white'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 mb-1">
+                                  <input
+                                    type="radio"
+                                    name="magazineKind"
+                                    value={code}
+                                    checked={formData.magazineKind === code}
+                                    onChange={() => setFormData({ ...formData, magazineKind: code })}
+                                    className="w-4 h-4 text-[#510601] focus:ring-[#510601] accent-[#510601] cursor-pointer"
+                                  />
+                                  <span className="text-xs font-bold text-[#180200]">{title}</span>
+                                </div>
+                                <span className="text-[11px] text-stone-500 pl-6 leading-tight">{desc}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Delivery Destination (when physical copy is required) */}
+                        {formData.magazineKind !== 'EMAIL' && (
+                          <div className="pt-2 space-y-2.5">
+                            <label className="block text-xs font-bold text-[#510601] uppercase tracking-wider">
+                              Postal Delivery Address:
+                            </label>
+                            <div className="flex flex-wrap gap-5 text-xs font-semibold text-[#863221]">
+                              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                  type="radio"
+                                  name="magazineDeliveryChoice"
+                                  value="COMMUNICATION"
+                                  checked={formData.magazineDeliveryChoice !== 'DIFFERENT'}
+                                  onChange={() => setFormData({ ...formData, magazineDeliveryChoice: 'COMMUNICATION' })}
+                                  className="w-4 h-4 text-[#510601] focus:ring-[#510601] accent-[#510601] cursor-pointer"
+                                />
+                                <span>Deliver to Current Communication Address</span>
+                              </label>
+                              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                  type="radio"
+                                  name="magazineDeliveryChoice"
+                                  value="DIFFERENT"
+                                  checked={formData.magazineDeliveryChoice === 'DIFFERENT'}
+                                  onChange={() => setFormData({ ...formData, magazineDeliveryChoice: 'DIFFERENT' })}
+                                  className="w-4 h-4 text-[#510601] focus:ring-[#510601] accent-[#510601] cursor-pointer"
+                                />
+                                <span>Deliver to Different Postal Address</span>
+                              </label>
+                            </div>
+
+                            {/* Show current address preview if COMMUNICATION is selected */}
+                            {formData.magazineDeliveryChoice !== 'DIFFERENT' ? (
+                              <div className="p-3 bg-[#FAF7F2] rounded-lg border border-[#DFD5CC] text-xs text-stone-700">
+                                <div className="text-[11px] font-bold text-[#510601] uppercase mb-1">Current Delivery Address:</div>
+                                {formData.address ? (
+                                  <div>
+                                    <div className="font-medium text-[#180200]">{formData.address}</div>
+                                    <div className="text-[11px] text-stone-600">
+                                      {[formData.locality, formData.taluk, formData.district, formData.state].filter(Boolean).join(', ')}
+                                      {formData.postalCode ? ` - ${formData.postalCode}` : ''}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-stone-400 italic">No communication address entered above yet. Please fill the communication address above.</div>
+                                )}
+                              </div>
+                            ) : (
+                              <div>
+                                <textarea
+                                  rows={2}
+                                  value={formData.magazineDeliveryAddress || ''}
+                                  onChange={(e) => setFormData({ ...formData, magazineDeliveryAddress: e.target.value })}
+                                  placeholder="Enter different delivery address (House/Door No, Street, Locality, City/Taluk, District, PIN code)..."
+                                  className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
-
-                  {/* How the member wants the magazine (shown when YES) */}
-                  {formData.magazineNeeded === 'YES' && (
-                    <div className="md:col-span-2 bg-[#FAF7F2] p-4 rounded-xl border border-[#E8DFD8] space-y-3">
-                      <label className="block text-xs font-bold text-[#510601] uppercase tracking-wider">
-                        How do you want the magazine?
-                      </label>
-                      <div className="flex flex-wrap gap-5 text-xs font-semibold text-[#863221]">
-                        {[
-                          ['PHYSICAL', 'Physical copy (posted)'],
-                          ['EMAIL', 'E-copy (by email)'],
-                          ['BOTH', 'Both']
-                        ].map(([code, label]) => (
-                          <label key={code} className="inline-flex items-center gap-2 cursor-pointer select-none">
-                            <input
-                              type="radio"
-                              name="magazineKind"
-                              value={code}
-                              checked={formData.magazineKind === code}
-                              onChange={() => setFormData({ ...formData, magazineKind: code })}
-                              className="w-4 h-4 text-[#510601] focus:ring-[#510601] accent-[#510601] cursor-pointer"
-                            />
-                            <span>{label}</span>
-                          </label>
-                        ))}
-                      </div>
-                      {formData.magazineKind !== 'PHYSICAL' && (
-                        <div className="pt-1">
-                          <label className="block text-xs text-[#863221] mb-1 font-semibold">E-copy Email Address *</label>
-                          <input
-                            type="email"
-                            value={formData.magazineEmail || ''}
-                            onChange={(e) => {
-                              setFormData({ ...formData, magazineEmail: e.target.value });
-                              if (formErrors.magazineEmail) setFormErrors({ ...formErrors, magazineEmail: '' });
-                            }}
-                            placeholder="name@example.com"
-                            className={`w-full px-3.5 py-2 bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] ${formErrors.magazineEmail ? 'border-red-500' : 'border-[#DFD5CC]'}`}
-                          />
-                          {formErrors.magazineEmail && <p className="text-[11px] text-red-600 mt-1">{formErrors.magazineEmail}</p>}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Magazine Delivery Address (shown when YES and a posted copy is wanted) */}
-                  {formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' && (
-                    <div className="md:col-span-2 bg-[#FAF7F2] p-4 rounded-xl border border-[#E8DFD8] space-y-3">
-                      <label className="block text-xs font-bold text-[#510601] uppercase tracking-wider">
-                        Magazine Delivery Destination
-                      </label>
-                      <div className="flex flex-wrap gap-5 text-xs font-semibold text-[#863221]">
-                        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                          <input
-                            type="radio"
-                            name="magazineDeliveryChoice"
-                            value="COMMUNICATION"
-                            checked={formData.magazineDeliveryChoice !== 'DIFFERENT'}
-                            onChange={() => setFormData({ ...formData, magazineDeliveryChoice: 'COMMUNICATION' })}
-                            className="w-4 h-4 text-[#510601] focus:ring-[#510601] accent-[#510601] cursor-pointer"
-                          />
-                          <span>Deliver to Communication Address</span>
-                        </label>
-                        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                          <input
-                            type="radio"
-                            name="magazineDeliveryChoice"
-                            value="DIFFERENT"
-                            checked={formData.magazineDeliveryChoice === 'DIFFERENT'}
-                            onChange={() => setFormData({ ...formData, magazineDeliveryChoice: 'DIFFERENT' })}
-                            className="w-4 h-4 text-[#510601] focus:ring-[#510601] accent-[#510601] cursor-pointer"
-                          />
-                          <span>Deliver to a Different Address</span>
-                        </label>
-                      </div>
-                      {formData.magazineDeliveryChoice === 'DIFFERENT' && (
-                        <div className="pt-1">
-                          <textarea
-                            rows={2}
-                            value={formData.magazineDeliveryAddress || ''}
-                            onChange={(e) => setFormData({ ...formData, magazineDeliveryAddress: e.target.value })}
-                            placeholder="Enter delivery address (House/Door No, Street, Locality, City/Taluk, District, PIN code)..."
-                            className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {/* ═══════════════════════════════════════════════════════ */}
@@ -2009,427 +1977,267 @@ export default function RegisterNewMember() {
                     )}
                   </div>
 
-                  {/* 3. Children Details */}
-                  <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E8DFD8] space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <h4 className="text-xs font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
-                          <Users className="w-3.5 h-3.5 text-[#8C1801]" />
-                          <span>Children Details</span>
-                        </h4>
-                        <p className="text-xs text-stone-600 mt-0.5">Do you have children?</p>
-                      </div>
-
-                      <div className="inline-flex rounded-lg border border-[#DFD5CC] bg-white p-0.5 shadow-2xs">
-                        <button
-                          type="button"
-                          onClick={() => setFormData({ ...formData, hasChildren: 'NO' })}
-                          className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                            formData.hasChildren !== 'YES'
-                              ? 'bg-[#510601] text-white shadow-xs'
-                              : 'text-stone-700 hover:text-[#510601]'
-                          }`}
-                        >
-                          No
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFormData((prev) => ({
-                              ...prev,
-                              hasChildren: 'YES',
-                              children: prev.children && prev.children.length > 0
-                                ? prev.children
-                                : [{ name: '', gender: 'Male', membershipNo: '', dob: '' }]
-                            }));
-                          }}
-                          className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
-                            formData.hasChildren === 'YES'
-                              ? 'bg-[#510601] text-white shadow-xs'
-                              : 'text-stone-700 hover:text-[#510601]'
-                          }`}
-                        >
-                          Yes
-                        </button>
-                      </div>
-                    </div>
-
-                    {formData.hasChildren === 'YES' && (
-                      <div className="space-y-3 pt-3 border-t border-[#DFD5CC]">
-                        {formData.children && formData.children.length > 0 ? (
-                          <div className="space-y-2.5">
-                            {formData.children.map((child, index) => (
-                              <div
-                                key={index}
-                                className="bg-white p-3 rounded-lg border border-[#DFD5CC] grid grid-cols-1 sm:grid-cols-12 gap-3 items-center shadow-2xs"
-                              >
-                                <div className="sm:col-span-1 text-xs font-bold text-[#8C1801] flex items-center justify-center">
-                                  #{index + 1}
-                                </div>
-                                <div className="sm:col-span-4">
-                                  <input
-                                    type="text"
-                                    placeholder="Child Full Name *"
-                                    value={child.name}
-                                    onChange={(e) => handleChildChange(index, 'name', e.target.value)}
-                                    className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20"
-                                  />
-                                </div>
-                                <div className="sm:col-span-3">
-                                  <select
-                                    value={child.gender || 'Male'}
-                                    onChange={(e) => handleChildChange(index, 'gender', e.target.value)}
-                                    className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] focus:outline-none focus:border-[#510601] cursor-pointer"
-                                  >
-                                    {(lists?.child_relations || []).map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
-                                  </select>
-                                </div>
-                                <div className="sm:col-span-3">
-                                  <input
-                                    type="text"
-                                    placeholder="Member No. (if any)"
-                                    value={child.membershipNo}
-                                    onChange={(e) => handleChildChange(index, 'membershipNo', e.target.value)}
-                                    className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20"
-                                  />
-                                </div>
-                                <div className="sm:col-span-1 flex justify-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveChild(index)}
-                                    title="Remove child"
-                                    className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="bg-white p-4 rounded-lg border border-dashed border-[#DFD5CC] text-center text-xs text-stone-500">
-                            No children added yet. Click "+ Add Child" below.
-                          </div>
-                        )}
-
+                  {/* 3. Children Details (Only shown if Married) */}
+                  {formData.isMarried === 'YES' && (
+                    <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E8DFD8] space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
+                          <h4 className="text-xs font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
+                            <Users className="w-3.5 h-3.5 text-[#8C1801]" />
+                            <span>Children Details</span>
+                          </h4>
+                          <p className="text-xs text-stone-600 mt-0.5">Do you have children?</p>
+                        </div>
+
+                        <div className="inline-flex rounded-lg border border-[#DFD5CC] bg-white p-0.5 shadow-2xs">
                           <button
                             type="button"
-                            onClick={handleAddChild}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-[#FAF7F2] text-[#510601] border border-[#510601]/30 hover:border-[#510601] text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            onClick={() => setFormData({ ...formData, hasChildren: 'NO' })}
+                            className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                              formData.hasChildren !== 'YES'
+                                ? 'bg-[#510601] text-white shadow-xs'
+                                : 'text-stone-700 hover:text-[#510601]'
+                            }`}
                           >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Add Child</span>
+                            No
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                hasChildren: 'YES',
+                                children: prev.children && prev.children.length > 0
+                                  ? prev.children
+                                  : [{ name: '', gender: 'Male', membershipNo: '', dob: '' }]
+                              }));
+                            }}
+                            className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                              formData.hasChildren === 'YES'
+                                ? 'bg-[#510601] text-white shadow-xs'
+                                : 'text-stone-700 hover:text-[#510601]'
+                            }`}
+                          >
+                            Yes
                           </button>
                         </div>
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                {/* Section: Membership Referred By */}
-                <div className="pt-3 border-t border-[#DFD5CC]">
-                  <h3 className="text-sm font-bold text-[#8C1801] mb-2">
-                    Membership Referred By:
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="flex items-center gap-1.5 text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        <span>Membership Number:</span>
-                        <span
-                          className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#FFC107] text-[#180200] text-[9px] font-bold cursor-pointer"
-                          title="Referral membership number"
-                        >
-                          i
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.referredMembershipNo}
-                        onChange={(e) =>
-                          setFormData({ ...formData, referredMembershipNo: e.target.value })
-                        }
+                      {formData.hasChildren === 'YES' && (
+                        <div className="space-y-3 pt-3 border-t border-[#DFD5CC]">
+                          {formData.children && formData.children.length > 0 ? (
+                            <div className="space-y-2.5">
+                              {formData.children.map((child, index) => (
+                                <div
+                                  key={index}
+                                  className="bg-white p-3 rounded-lg border border-[#DFD5CC] grid grid-cols-1 sm:grid-cols-12 gap-3 items-center shadow-2xs"
+                                >
+                                  <div className="sm:col-span-1 text-xs font-bold text-[#8C1801] flex items-center justify-center">
+                                    #{index + 1}
+                                  </div>
+                                  <div className="sm:col-span-4">
+                                    <input
+                                      type="text"
+                                      placeholder="Child Full Name *"
+                                      value={child.name}
+                                      onChange={(e) => handleChildChange(index, 'name', e.target.value)}
+                                      className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20"
+                                    />
+                                  </div>
+                                  <div className="sm:col-span-3">
+                                    <select
+                                      value={child.gender || 'Male'}
+                                      onChange={(e) => handleChildChange(index, 'gender', e.target.value)}
+                                      className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] focus:outline-none focus:border-[#510601] cursor-pointer"
+                                    >
+                                      {(lists?.child_relations || []).map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="sm:col-span-3">
+                                    <input
+                                      type="text"
+                                      placeholder="Member No. (if any)"
+                                      value={child.membershipNo}
+                                      onChange={(e) => handleChildChange(index, 'membershipNo', e.target.value)}
+                                      className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20"
+                                    />
+                                  </div>
+                                  <div className="sm:col-span-1 flex justify-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveChild(index)}
+                                      title="Remove child"
+                                      className="p-1.5 text-stone-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="bg-white p-4 rounded-lg border border-dashed border-[#DFD5CC] text-center text-xs text-stone-500">
+                              No children added yet. Click "+ Add Child" below.
+                            </div>
+                          )}
 
-                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        Membership Name:
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.referredMembershipName}
-                        onChange={(e) =>
-                          setFormData({ ...formData, referredMembershipName: e.target.value })
-                        }
-
-                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section: Mahasabha Membership Details in Family */}
-                <div className="pt-3 border-t border-[#DFD5CC]">
-                  <h3 className="text-sm font-bold text-[#8C1801] mb-2">
-                    Mahasabha Membership Details in Family:
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="flex items-center gap-1.5 text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        <span>Membership Number:</span>
-                        <span
-                          className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#FFC107] text-[#180200] text-[9px] font-bold cursor-pointer"
-                          title="Family member membership number"
-                        >
-                          i
-                        </span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.familyMembershipNo}
-                        onChange={(e) =>
-                          setFormData({ ...formData, familyMembershipNo: e.target.value })
-                        }
-
-                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        Membership Name:
-                      </label>
-                      <input
-                        type="text"
-                        value={formData.familyMembershipName}
-                        onChange={(e) =>
-                          setFormData({ ...formData, familyMembershipName: e.target.value })
-                        }
-
-                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
-                      />
-                    </div>
-                  </div>
-                </div>
-                </fieldset>
-
-                {/* Next / Save buttons on Tab 1 */}
-                <div className="flex items-center justify-between pt-5 border-t border-[#DFD5CC]">
-                  <button
-                    type="button"
-                    onClick={() => navigate(returnPath)}
-                    className="px-5 py-2.5 border border-[#DFD5CC] hover:border-[#8C1801]/50 text-[#510601] bg-white hover:bg-[#FAF7F2] text-sm font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    <span>{isViewMode ? 'Back' : 'Cancel'}</span>
-                  </button>
-                  <div className="flex items-center gap-3">
-                    {isEditMode && hasPermission('members.list.write') && (
-                      <button
-                        type="submit"
-                        className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] text-white font-bold text-sm rounded-lg shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                      >
-                        <Save className="w-4 h-4" />
-                        <span>Update Member</span>
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={goToPaymentStep}
-                      className="px-6 py-2.5 bg-[#510601] hover:bg-[#8C1801] text-white font-bold text-sm rounded-lg shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <span>Next: Payment Information</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* TAB 2: PAYMENT INFORMATION */}
-            {activeFormSection === 'paymentInfo' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {/* Payment Mode */}
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Payment Mode: {!isViewMode && <span className="text-red-600">*</span>}
-                    </label>
-                    <select
-                      disabled={isViewMode}
-                      value={formData.paymentMode}
-                      onChange={(e) => setFormData({ ...formData, paymentMode: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer disabled:opacity-90 disabled:cursor-not-allowed"
-                    >
-                      {paymentModes.map((mode) => (
-                        <option key={mode} value={mode}>
-                          {mode}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Bank Account / Name */}
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Bank Account / Name:
-                    </label>
-                    <input
-                      type="text"
-                      disabled={isViewMode}
-                      value={formData.bankAccount}
-                      onChange={(e) => setFormData({ ...formData, bankAccount: e.target.value })}
-
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all disabled:opacity-90 disabled:cursor-not-allowed"
-                    />
-                  </div>
-
-                  {/* Amount */}
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Amount (Rs.): {!isViewMode && <span className="text-red-600">*</span>}
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      disabled={isViewMode}
-                      readOnly={amountIsFixed}
-                      title={amountIsFixed ? 'Taken from the membership type chosen in step 1' : undefined}
-                      value={formData.amount}
-                      onChange={(e) => {
-                        if (amountIsFixed) return;
-                        const val = e.target.value.replace(/[^\d.]/g, '');
-                        setFormData({ ...formData, amount: val });
-                      }}
-                      onWheel={(e) => e.target.blur()}
-
-                      className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm font-semibold text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all disabled:opacity-90 disabled:cursor-not-allowed ${amountIsFixed ? 'cursor-not-allowed opacity-90' : ''}`}
-                    />
-                  </div>
-
-                  {/* Receipt Date */}
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Receipt Date: {!isViewMode && <span className="text-red-600">*</span>}
-                    </label>
-                    <DateInput
-                      disabled={isViewMode || !isEditMode}
-                      value={formData.receiptDate}
-                      onChange={(e) => setFormData({ ...formData, receiptDate: e.target.value })}
-                      name="receiptDate"
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all disabled:opacity-90 disabled:cursor-not-allowed"
-                    />
-                  </div>
-
-                  {/* Transaction ID / Cheque No */}
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Transaction ID / Cheque No.:
-                    </label>
-                    <input
-                      type="text"
-                      disabled={isViewMode}
-                      value={formData.transactionId}
-                      onChange={(e) =>
-                        setFormData({ ...formData, transactionId: e.target.value })
-                      }
-
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all disabled:opacity-90 disabled:cursor-not-allowed"
-                    />
-                  </div>
-
-                  {/* Transaction Date */}
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Transaction Date:
-                    </label>
-                    <DateInput
-                      disabled={isViewMode}
-                      value={formData.transactionDate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, transactionDate: e.target.value })
-                      }
-                      name="transactionDate"
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all disabled:opacity-90 disabled:cursor-not-allowed"
-                    />
-                  </div>
-
-                  {/* Receipt Number (if assigned or in view mode) */}
-                  {(isViewMode || targetMember?.assignedReceiptNumber || targetMember?.receiptNumber) && (
-                    <div className="md:col-span-2">
-                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                        Receipt Number:
-                      </label>
-                      <input
-                        type="text"
-                        disabled
-                        value={targetMember?.assignedReceiptNumber || targetMember?.receiptNumber || 'Not Assigned'}
-                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] border border-[#DFD5CC] rounded-lg text-sm font-mono font-bold text-[#510601] shadow-2xs cursor-default"
-                      />
+                          <div>
+                            <button
+                              type="button"
+                              onClick={handleAddChild}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white hover:bg-[#FAF7F2] text-[#510601] border border-[#510601]/30 hover:border-[#510601] text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-2xs"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Add Child</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
-
-                  {/* Payment Remarks */}
-                  <div className="md:col-span-2">
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Payment Received Details / Remarks:
-                    </label>
-                    <textarea
-                      rows={2}
-                      disabled={isViewMode}
-                      value={formData.paymentRemarks}
-                      onChange={(e) =>
-                        setFormData({ ...formData, paymentRemarks: e.target.value })
-                      }
-
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all disabled:opacity-90 disabled:cursor-not-allowed"
-                    />
-                  </div>
                 </div>
 
-                {/* Footer buttons on tab 2 */}
-                <div className="flex items-center justify-between pt-5 border-t border-[#DFD5CC]">
-                  <button
-                    type="button"
-                    onClick={() => setActiveFormSection('membershipDetails')}
-                    className="px-5 py-2.5 border border-[#DFD5CC] text-[#3D140C] hover:bg-[#FAF7F2] text-xs sm:text-sm font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    <span>Previous</span>
-                  </button>
-                  <div className="flex items-center gap-3">
-                    {isViewMode ? (
-                      <button
-                        type="button"
-                        onClick={() => navigate(returnPath)}
-                        className="px-5 py-2.5 border border-[#DFD5CC] text-[#3D140C] hover:bg-[#FAF7F2] text-xs sm:text-sm font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                        <span>Back</span>
-                      </button>
+                  </fieldset>
+
+                  {/* Form Footer Action Buttons */}
+                  <div className="flex items-center justify-between pt-5 border-t border-[#DFD5CC]">
+                    <button
+                      type="button"
+                      onClick={() => navigate(returnPath)}
+                      className="px-5 py-2.5 border border-[#DFD5CC] hover:border-[#8C1801]/50 text-[#510601] bg-white hover:bg-[#FAF7F2] text-xs sm:text-sm font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>{isViewMode ? 'Back' : 'Cancel'}</span>
+                    </button>
+                    <div className="flex items-center gap-3">
+                      {isViewMode ? null : (
+                        hasPermission(isEditMode ? 'members.list.write' : 'members.register.write') && (
+                          <button
+                            type="submit"
+                            disabled={saving}
+                            className="disabled:opacity-50 px-6 py-2.5 bg-[#510601] hover:bg-[#8C1801] text-white font-bold text-xs sm:text-sm rounded-lg shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                          >
+                            <Save className="w-4 h-4" />
+                            <span>{saving ? 'Saving...' : isEditMode ? 'Update Member' : 'Register Member'}</span>
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* Right Column: Sticky Live Postal Label Preview */}
+          <div className="xl:col-span-4 sticky top-6 space-y-4">
+            <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden p-5">
+              {/* Card Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-[#E8DFD8]">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-[#510601] text-white rounded-lg shadow-xs">
+                    <Printer className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-[#180200]">Postal Label Preview</h2>
+                    <p className="text-[11px] text-stone-500">Live dispatch print simulation</p>
+                  </div>
+                </div>
+                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
+                  isLabelReady
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>
+                  {isLabelReady ? 'Ready for Dispatch' : 'Awaiting Details'}
+                </span>
+              </div>
+
+              {/* Printable Dispatch Sticker Preview Card */}
+              <div className="mt-4 p-4 rounded-xl border-2 border-dashed border-[#8C1801]/40 bg-[#FAF7F2] relative flex flex-col justify-between shadow-2xs min-h-[220px]">
+                {/* Organization Header Bar */}
+                <div className="border-b border-[#DFD5CC] pb-2 mb-2 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-extrabold text-[11px] tracking-wider text-[#8C1801] uppercase">
+                      Havyaka MahaSabha
+                    </span>
+                  </div>
+                  <span className="font-mono text-[9px] font-bold bg-white text-[#510601] px-2 py-0.5 rounded border border-[#DFD5CC]">
+                    BOOK-POST / STICKER
+                  </span>
+                </div>
+
+                {/* Recipient Details */}
+                <div className="text-xs space-y-1 text-[#180200] flex-1">
+                  <div className="font-bold text-sm tracking-tight text-[#180200]">
+                    To: {formData.nameTitle} {formData.name?.trim() ? formData.name.trim().toUpperCase() : 'MEMBER FULL NAME'}
+                  </div>
+
+                  {/* Care of Father / Spouse */}
+                  {(formData.isMarried === 'YES' && formData.spouseName?.trim()) ? (
+                    <div className="text-[11px] text-[#863221] font-medium">
+                      C/o Spouse: {formData.spouseName.trim()}
+                    </div>
+                  ) : (formData.fatherName?.trim() || formData.fatherHusbandName?.trim()) ? (
+                    <div className="text-[11px] text-[#863221] font-medium">
+                      C/o Father: {(formData.fatherName || formData.fatherHusbandName).trim()}
+                    </div>
+                  ) : null}
+
+                  {/* Address Lines */}
+                  <div className="text-xs text-stone-800 leading-snug pt-1 whitespace-pre-line font-medium">
+                    {previewAddress.line ? previewAddress.line : <span className="italic text-stone-400">Door No., Street / Cross, Locality...</span>}
+                  </div>
+                  <div className="text-xs text-stone-700">
+                    {(previewAddress.locality || previewAddress.taluk || previewAddress.district) ? (
+                      <span>
+                        {[previewAddress.locality, previewAddress.taluk, previewAddress.district].filter(Boolean).join(', ')}
+                      </span>
                     ) : (
-                      hasPermission(isEditMode ? 'members.list.write' : 'members.register.write') && (
-                        <button
-                          type="submit"
-                          disabled={saving}
-                          className="disabled:opacity-50 px-6 py-2.5 bg-[#510601] hover:bg-[#8C1801] text-white font-bold text-xs sm:text-sm rounded-lg shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                        >
-                          <Save className="w-4 h-4" />
-                          <span>{isEditMode ? 'Update Member' : 'Register Member'}</span>
-                        </button>
-                      )
+                      <span className="italic text-stone-400">Post Office / Taluk, District</span>
                     )}
                   </div>
+                  <div className="text-xs font-semibold text-stone-900">
+                    {previewAddress.state} — <span className="font-bold font-mono text-[#510601] text-sm">{previewAddress.pin || 'PIN CODE'}</span>
+                  </div>
+                </div>
+
+                {/* Footer Bar */}
+                <div className="border-t border-[#DFD5CC] pt-2 mt-3 flex items-center justify-between text-[11px] text-stone-600">
+                  <span className="flex items-center gap-1 font-mono font-bold text-[#510601]">
+                    <Phone className="h-3 w-3 text-[#8C1801]" />
+                    {formData.mobile ? `${formData.mobileCountryCode} ${formData.mobile}` : '+91 XXXXX XXXXX'}
+                  </span>
+                  <span className="text-[10px] font-mono text-stone-500 font-bold">
+                    {formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' ? 'MAGAZINE DISPATCH' : 'GENERAL POST'}
+                  </span>
                 </div>
               </div>
-            )}
+
+              {/* Informational Guidance */}
+              <div className="mt-4 p-3 bg-[#FAF7F2] rounded-xl border border-[#E8DFD8] text-[11px] text-[#863221] space-y-1.5">
+                <div className="font-bold text-[#510601] flex items-center gap-1">
+                  <span>Standard Postal Sticker Sheet (100mm x 50mm)</span>
+                </div>
+                <p className="text-stone-600 leading-relaxed">
+                  This preview updates in real-time as you type, reflecting how member address details appear on printed envelope stickers and magazine dispatch labels.
+                </p>
+                {formData.magazineNeeded === 'YES' && (
+                  <div className="pt-1 text-[11px] text-emerald-800 font-semibold flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>
+                      {formData.magazineKind === 'PHYSICAL'
+                        ? 'Physical copy dispatch enabled.'
+                        : formData.magazineKind === 'BOTH'
+                        ? 'Physical dispatch + website access enabled.'
+                        : 'E-copy (hosted online on website).'}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </form>
+        </div>
       </div>
-    </div>
     </PermissionGate>
   );
 }

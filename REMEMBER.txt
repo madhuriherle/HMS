@@ -51,6 +51,12 @@ RULE 2: MEMBER vs. USER SEPARATION
      - NEVER auto-provision a User record when registering or approving a Member.
      - In User Management, NEVER display Members or assign them back-office roles.
 
+2.2  FAMILY MEMBERS MAY SHARE ONE MOBILE NUMBER:
+     - A mobile number is NOT unique among members (migration 0077 drops the unique index).
+     - Registration never rejects a mobile that is already in use. The form shows a note listing
+       the members who already use it, and the operator carries on.
+     - A duplicate Kannada name + same date of birth is still rejected (409).
+
 --------------------------------------------------------------------------------
 RULE 3: RECEIPT ENTRY & ALLOCATION (LINKING)
 --------------------------------------------------------------------------------
