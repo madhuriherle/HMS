@@ -73,6 +73,57 @@ const numberToWords = (num) => {
 };
 
 // the status names and chip colours come from the server (receipt_statuses in GET /meta/lists)
+// What a receipt line is called: the sub type the clerk picked, else the particular itself
+const lineLabel = (i) => {
+  const sub = (i.description || '').trim();
+  return sub && sub.toLowerCase() !== String(i.particular || '').trim().toLowerCase() ? sub : (i.particular || '');
+};
+
+// Receipt Type cell: the main thing picked (the sub type), "+N" for more lines, and a hover card listing every line
+function TypeCell({ receipt }) {
+  const [tip, setTip] = useState(null);
+  const items = receipt.items || [];
+  const first = items[0];
+  const label = first ? lineLabel(first) : receipt.particulars || 'Membership';
+  const more = items.length - 1;
+  const show = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ left: Math.min(r.left, window.innerWidth - 340), top: r.bottom + 6 });
+  };
+  return (
+    <div className="inline-block" onMouseEnter={show} onMouseLeave={() => setTip(null)}>
+      <span className="cursor-default">{label}</span>
+      {more > 0 && (
+        <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-bold text-[#863221]">
+          +{more}
+        </span>
+      )}
+      {tip && items.length > 0 && (
+        <div style={{ position: 'fixed', left: tip.left, top: tip.top, width: 320 }} className="z-50 rounded-xl border border-[#E8DFD8] bg-white p-3 shadow-xl">
+          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#863221]">Receipt {receipt.receiptNumber}</p>
+          <ul className="divide-y divide-[#E8DFD8]">
+            {items.map((i, idx) => (
+              <li key={idx} className="flex items-start justify-between gap-3 py-1.5 text-xs">
+                <span className="min-w-0">
+                  <span className="block font-semibold text-[#180200]">{lineLabel(i)}</span>
+                  {lineLabel(i) !== i.particular && <span className="block text-[11px] font-normal text-[#863221]">{i.particular}</span>}
+                </span>
+                <span className="shrink-0 font-mono font-bold text-[#510601]">{formatMoney(i.amount)}</span>
+              </li>
+            ))}
+          </ul>
+          {items.length > 1 && (
+            <div className="mt-1 flex justify-between border-t border-[#E8DFD8] pt-1.5 text-xs font-bold text-[#180200]">
+              <span>Total</span>
+              <span className="font-mono">{formatMoney(receipt.amount)}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StatusDot({ receipt }) {
   const statuses = useList('receipt_statuses');
   const key = receipt.receiptStatus || (isReceiptUnmapped(receipt) ? 'UNASSIGNED' : 'ASSIGNED');
@@ -648,15 +699,7 @@ export default function ReceiptTracking() {
 
                       {/* Column 5: Receipt Type */}
                       <td className="py-3.5 px-4 font-semibold text-[#510601] text-xs">
-                        {receipt.items?.length > 1 ? receipt.items[0].particular : `${receipt.particulars || 'Membership'}${receipt.items?.[0]?.description && receipt.items[0].description !== receipt.particulars ? ` › ${receipt.items[0].description}` : ''}`}
-                        {receipt.items?.length > 1 && (
-                          <span
-                            className="ml-1.5 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-bold text-[#863221]"
-                            title={receipt.items.map((i) => `${i.particular}${i.description && i.description !== i.particular ? ` (${i.description})` : ''}: ${formatMoney(i.amount)}`).join(', ')}
-                          >
-                            +{receipt.items.length - 1} more
-                          </span>
-                        )}
+                        <TypeCell receipt={receipt} />
                       </td>
 
                       {/* Column 5b/5c: Amount and Payment Mode */}
