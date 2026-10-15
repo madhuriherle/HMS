@@ -1796,7 +1796,7 @@ export default function ReceiptEntry() {
                     )}
 
                     {/* Amount */}
-                    <div className={`col-span-12 ${showDescription ? 'sm:col-span-3' : 'sm:col-span-5'}`}>
+                    <div className={`col-span-12 ${showDescription ? 'sm:col-span-2' : 'sm:col-span-4'}`}>
                       <label className="block text-xs font-bold text-[#180200] mb-1">
                         Amount <span className="text-[#ED4636]">*</span>
                       </label>
@@ -1821,6 +1821,19 @@ export default function ReceiptEntry() {
                           {formErrors.amount}
                         </p>
                       )}
+                    </div>
+
+                    {/* Add another item: a plus at the right end of the first line */}
+                    <div className="col-span-12 sm:col-span-1 flex items-center justify-end pb-0.5">
+                      <button
+                        type="button"
+                        onClick={handleAddLine}
+                        title="Add another item"
+                        aria-label="Add another item"
+                        className="p-2 rounded-xl text-[#510601] bg-[#FAF1EE] border border-[#E8DFD8] hover:bg-[#510601] hover:text-white transition-colors cursor-pointer shadow-sm"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
 
@@ -1885,22 +1898,11 @@ export default function ReceiptEntry() {
                     </div>
                   )}
 
-                  {/* Add Item button at bottom of items section */}
-                  <div className="pt-1 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={handleAddLine}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-[#510601] bg-[#FAF1EE] border border-[#E8DFD8] hover:bg-[#510601] hover:text-white transition-colors cursor-pointer shadow-sm"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Add Item</span>
-                    </button>
-                    {extraLines.length > 0 && (
-                      <span className="text-[11px] font-semibold text-[#863221]">
-                        {extraLines.length + 1} items total
-                      </span>
-                    )}
-                  </div>
+                  {extraLines.length > 0 && (
+                    <p className="text-right text-[11px] font-semibold text-[#863221]">
+                      {extraLines.length + 1} items total
+                    </p>
+                  )}
 
                   {formErrors.extraLines && (
                     <p className="text-[11px] text-[#ED4636] font-medium flex items-center gap-1">
