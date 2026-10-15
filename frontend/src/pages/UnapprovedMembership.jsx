@@ -288,13 +288,33 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   // waiting for a member and maps the picked one to this applicant, instead of opening the entry form
   // again (which would book a second receipt for money that is already recorded).
   // ----------------------------------------------------
+  const [assignTotal, setAssignTotal] = useState(0);
+  const [assignPages, setAssignPages] = useState(1);
+  const assignSeq = useRef(0);
+  const [assignDebounced, setAssignDebounced] = useState('');
   const loadAssignCandidates = async () => {
+    if (!assigningMember) return;
+    const seq = (assignSeq.current += 1);
     setAssignLoading(true);
     setAssignError('');
     try {
-      const { data } = await api.get('/receipts/unassigned-candidates', { params: { limit: 500 } });
+      const { data } = await api.get('/receipts/unassigned-candidates', {
+        params: {
+          page: assignPage, limit: assignPageSize, applicant_id: assigningMember.id,
+          ...(assignDebounced.trim() ? { search: assignDebounced.trim() } : {}),
+          ...(assignFrom ? { from_date: assignFrom } : {}),
+          ...(assignTo ? { to_date: assignTo } : {}),
+          ...(assignMin !== '' ? { min_amount: assignMin } : {}),
+          ...(assignMax !== '' ? { max_amount: assignMax } : {}),
+          ...(assignMatchOnly ? { likely_only: true } : {}),
+        },
+      });
+      if (seq !== assignSeq.current) return;
       setAssignCandidates(data?.candidates || []);
+      setAssignTotal(data?.total || 0);
+      setAssignPages(Math.max(1, data?.pages || 1));
     } catch (error) {
+      if (seq !== assignSeq.current) return;
       setAssignCandidates([]);
       setAssignError(
         error.response?.status === 403
@@ -302,7 +322,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           : error.response?.data?.detail || 'Could not load the receipts waiting for a member.'
       );
     } finally {
-      setAssignLoading(false);
+      if (seq === assignSeq.current) setAssignLoading(false);
     }
   };
 
@@ -315,7 +335,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     setAssignMax('');
     setAssignMatchOnly(false);
     setAssignPage(1);
-    loadAssignCandidates();
   };
 
   const handleMapReceipt = async (candidate) => {
@@ -348,31 +367,18 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
   // Every parked receipt, filtered by what the clerk types and ranked: one that carries this applicant's
   // mobile / id / name comes first and is labelled, but none is ever mapped without a click.
-  const assignRows = useMemo(() => {
-    const q = assignSearch.trim().toLowerCase();
-    const min = assignMin === '' ? null : Number(assignMin);
-    const max = assignMax === '' ? null : Number(assignMax);
-    const matching = assignCandidates.filter((c) => {
-      if (q && ![c.receipt_number, c.payer_name, c.payer_membership_no, c.payer_mobile, String(c.net_amount ?? '')].some(
-        (value) => String(value ?? '').toLowerCase().includes(q)
-      )) return false;
-      const day = String(c.receipt_date || '').slice(0, 10);
-      if (assignFrom && day < assignFrom) return false;
-      if (assignTo && day > assignTo) return false;
-      if (min !== null && Number(c.net_amount) < min) return false;
-      if (max !== null && Number(c.net_amount) > max) return false;
-      if (assignMatchOnly && receiptMatchScore(c, assigningMember) <= 0) return false;
-      return true;
-    });
-    return [...matching].sort((a, b) => receiptMatchScore(b, assigningMember) - receiptMatchScore(a, assigningMember));
-  }, [assignCandidates, assignSearch, assignFrom, assignTo, assignMin, assignMax, assignMatchOnly, assigningMember]);
-
-  const assignTotalPages = Math.max(1, Math.ceil(assignRows.length / assignPageSize));
-  const assignPageRows = useMemo(
-    () => assignRows.slice((assignPage - 1) * assignPageSize, assignPage * assignPageSize),
-    [assignRows, assignPage, assignPageSize]
-  );
-  useEffect(() => { setAssignPage(1); }, [assignSearch, assignFrom, assignTo, assignMin, assignMax, assignMatchOnly, assignPageSize]);
+  const assignRows = assignCandidates; // the server filtered, ranked (likeliest first) and paged them
+  const assignTotalPages = assignPages;
+  const assignPageRows = assignCandidates;
+  useEffect(() => {
+    const timer = setTimeout(() => setAssignDebounced(assignSearch), 350);
+    return () => clearTimeout(timer);
+  }, [assignSearch]);
+  useEffect(() => { setAssignPage(1); }, [assignDebounced, assignFrom, assignTo, assignMin, assignMax, assignMatchOnly, assignPageSize]);
+  useEffect(() => {
+    loadAssignCandidates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assigningMember?.id, assignPage, assignPageSize, assignDebounced, assignFrom, assignTo, assignMin, assignMax, assignMatchOnly]);
 
   // ----------------------------------------------------
   // APPROVAL TRIGGER & VALIDATION
@@ -879,7 +885,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
               <div className="py-12 text-center">
                 <CheckCircle2 className="w-7 h-7 text-[#3D705C]/50 mx-auto mb-1.5" />
                 <p className="font-semibold text-sm text-[#180200]">
-                  {assignCandidates.length === 0 ? 'No receipt is waiting for a member' : 'No receipt matches these filters'}
+                  {!(assignDebounced.trim() || assignFrom || assignTo || assignMin !== '' || assignMax !== '' || assignMatchOnly) ? 'No receipt is waiting for a member' : 'No receipt matches these filters'}
                 </p>
               </div>
             ) : assignView === 'table' ? (
@@ -897,7 +903,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                   </thead>
                   <tbody className="divide-y divide-[#E8DFD8]">
                     {assignPageRows.map((c) => {
-                      const hinted = receiptMatchScore(c, assigningMember) > 0;
+                      const hinted = c.likely_score > 0;
                       return (
                         <tr key={c.receipt_id} className="bg-white hover:bg-[#FAF7F2] transition-colors">
                           <td className="py-2.5 px-3 align-top">
@@ -932,7 +938,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {assignPageRows.map((c) => {
-                  const hinted = receiptMatchScore(c, assigningMember) > 0;
+                  const hinted = c.likely_score > 0;
                   return (
                     <div key={c.receipt_id} className={`rounded-xl border p-3 bg-white ${hinted ? 'border-[#3D705C]/50' : 'border-[#E8DFD8]'}`}>
                       <div className="flex items-start justify-between gap-2">
@@ -971,7 +977,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
             {assignRows.length > 0 && !assignLoading && !assignError && (
               <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#863221]">
                 <span>
-                  Showing {(assignPage - 1) * assignPageSize + 1}–{Math.min(assignPage * assignPageSize, assignRows.length)} of {assignRows.length}
+                  Showing {(assignPage - 1) * assignPageSize + 1}–{Math.min(assignPage * assignPageSize, assignTotal)} of {assignTotal}
                 </span>
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-1.5">

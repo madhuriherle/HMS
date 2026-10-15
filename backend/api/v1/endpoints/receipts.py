@@ -982,92 +982,115 @@ def get_unassigned_candidates(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("receipts.read")),  # the path decides: Bulk Receipt Mapping read
     search: Optional[str] = None,
-    filter_type: Optional[str] = "ALL",  # ALL, MATCHED, UNMATCHED
-    limit: int = 500,
+    filter_type: Optional[str] = "ALL",  # ALL, MATCHED, UNMATCHED (the number on the receipt is a member's membership number)
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None,
+    applicant_id: Optional[int] = None,  # rank the receipts by how likely they belong to this member
+    likely_only: bool = False,           # only those that carry something of the applicant
+    page: int = 1,
+    limit: int = 25,
 ) -> Any:
-    """Fetch unassigned receipts and cross-reference with members for auto-mapping."""
+    """The receipts still waiting for a member, one page at a time (at most 200, rule 10.6). The search, the dates, the
+    amounts and the match filters run on all of them. A receipt whose typed number is exactly a member's permanent
+    membership number is an EXACT_NUMBER match (never the member id, name or phone). With ``applicant_id`` each receipt
+    gets a ``likely_score`` (mobile 4, the applicant's id or membership number typed on it 3 each, the same name 2) and
+    the likeliest come first."""
+    from core.pagination import LIST_PAGE_MAX
+    from sqlalchemy import case, literal
+
+    limit = max(1, min(limit, LIST_PAGE_MAX))
+    page = max(1, page)
     q = db.query(Receipt).filter(
-        Receipt.is_deleted == False,
+        Receipt.is_deleted == False,  # noqa: E712
         Receipt.receipt_status == "UNASSIGNED",
         Receipt.payment_status != "CANCELLED",
     )
-
     if search:
         s = f"%{search.strip()}%"
-        q = q.filter(
-            or_(
-                Receipt.receipt_number.ilike(s),
-                Receipt.payer_name.ilike(s),
-                Receipt.payer_membership_no.ilike(s),
-                Receipt.payer_mobile.ilike(s),
-            )
-        )
+        q = q.filter(or_(
+            Receipt.receipt_number.ilike(s), Receipt.payer_name.ilike(s),
+            Receipt.payer_membership_no.ilike(s), Receipt.payer_mobile.ilike(s),
+        ))
+    if from_date:
+        q = q.filter(Receipt.receipt_date >= from_date)
+    if to_date:
+        q = q.filter(Receipt.receipt_date <= to_date)
+    if min_amount is not None:
+        q = q.filter(Receipt.net_amount >= min_amount)
+    if max_amount is not None:
+        q = q.filter(Receipt.net_amount <= max_amount)
 
-    receipts = q.order_by(Receipt.id.desc()).limit(limit).all()
+    # a receipt is matched when its typed number is exactly a member's permanent membership number
+    typed = func.upper(func.trim(func.coalesce(Receipt.payer_membership_no, "")))
+    numbers_a = db.query(func.upper(func.trim(Member.membership_number))).filter(
+        Member.is_deleted == False, Member.membership_number != None  # noqa: E712,E711
+    )
+    numbers_b = (
+        db.query(func.upper(func.trim(MemberMembership.membership_number)))
+        .join(Member, Member.id == MemberMembership.member_id)
+        .filter(Member.is_deleted == False, MemberMembership.is_deleted == False,  # noqa: E712
+                MemberMembership.membership_number != None)  # noqa: E711
+    )
+    matched_cond = (typed != "") & (typed.in_(numbers_a) | typed.in_(numbers_b))
 
-    # Pre-fetch candidate members strictly by the permanent membership number (member_code) written on the receipt
-    mem_nums = {
-        r.payer_membership_no.strip().upper()
-        for r in receipts
-        if r.payer_membership_no and r.payer_membership_no.strip()
-    }
+    total_unassigned = q.count()
+    total_matched = q.filter(matched_cond).count()
+    if filter_type == "MATCHED":
+        q = q.filter(matched_cond)
+    elif filter_type == "UNMATCHED":
+        q = q.filter(~matched_cond)
 
+    score = literal(0)
+    if applicant_id:
+        me = db.query(Member).filter(Member.id == applicant_id, Member.is_deleted == False).first()  # noqa: E712
+        if me is not None:
+            digits = "".join(ch for ch in (me.mobile or "") if ch.isdigit())[-10:]
+            parts = []
+            if digits:
+                clean_mobile = func.replace(func.replace(func.replace(func.coalesce(Receipt.payer_mobile, ""), " ", ""), "-", ""), "+", "")
+                parts.append(case((clean_mobile.like(f"%{digits}"), 4), else_=0))
+            parts.append(case((typed == str(me.id), 3), else_=0))
+            if (me.membership_number or "").strip():
+                parts.append(case((typed == me.membership_number.strip().upper(), 3), else_=0))
+            name = " ".join((me.display_name or "").lower().split())
+            if name:
+                parts.append(case((func.lower(func.trim(func.coalesce(Receipt.payer_name, ""))) == name, 2), else_=0))
+            for part in parts:
+                score = score + part
+    score = score.label("likely_score")
+    if applicant_id and likely_only:
+        q = q.filter(score.element > 0)
+
+    total = q.count()
+    ordered = q.add_columns(score)
+    ordered = ordered.order_by(score.desc(), Receipt.id.desc()) if applicant_id else ordered.order_by(Receipt.id.desc())
+    rows = ordered.offset((page - 1) * limit).limit(limit).all()
+
+    # the members those receipts name (exact number only)
+    wanted = {(r.payer_membership_no or "").strip().upper() for r, _ in rows if (r.payer_membership_no or "").strip()}
     matched_by_num = {}
-    if mem_nums:
-        # 1. Match strictly on Member.membership_number (member_code synonym)
-        m_rows = (
-            db.query(Member)
-            .filter(
-                Member.is_deleted == False,
-                Member.membership_number != None,
-                func.upper(func.trim(Member.membership_number)).in_(mem_nums),
-            )
-            .all()
-        )
-        for m in m_rows:
-            if m.membership_number:
-                m_num = m.membership_number.strip().upper()
-                matched_by_num[m_num] = m
-
-        # 2. Also check MemberMembership table for permanent membership_number
-        mm_rows = (
+    if wanted:
+        for m in db.query(Member).filter(
+            Member.is_deleted == False, Member.membership_number != None,  # noqa: E712,E711
+            func.upper(func.trim(Member.membership_number)).in_(wanted),
+        ).all():
+            matched_by_num[m.membership_number.strip().upper()] = m
+        for m, mm in (
             db.query(Member, MemberMembership)
             .join(MemberMembership, MemberMembership.member_id == Member.id)
-            .filter(
-                Member.is_deleted == False,
-                MemberMembership.is_deleted == False,
-                MemberMembership.membership_number != None,
-                func.upper(func.trim(MemberMembership.membership_number)).in_(mem_nums),
-            )
+            .filter(Member.is_deleted == False, MemberMembership.is_deleted == False,  # noqa: E712
+                    MemberMembership.membership_number != None,  # noqa: E711
+                    func.upper(func.trim(MemberMembership.membership_number)).in_(wanted))
             .all()
-        )
-        for m, mm in mm_rows:
-            if mm.membership_number:
-                key = mm.membership_number.strip().upper()
-                if key not in matched_by_num:
-                    matched_by_num[key] = m
+        ):
+            matched_by_num.setdefault(mm.membership_number.strip().upper(), m)
 
     candidates = []
-    total_matched = 0
-
-    for r in receipts:
-        r_num = (r.payer_membership_no or "").strip().upper()
-
-        matched_m = None
-        match_type = "NONE"
-
-        if r_num and r_num in matched_by_num:
-            matched_m = matched_by_num[r_num]
-            match_type = "EXACT_NUMBER"
-
-        if match_type != "NONE":
-            total_matched += 1
-
-        if filter_type == "MATCHED" and match_type == "NONE":
-            continue
-        if filter_type == "UNMATCHED" and match_type != "NONE":
-            continue
-
+    for r, likely in rows:
+        key = (r.payer_membership_no or "").strip().upper()
+        matched_m = matched_by_num.get(key) if key else None
         item = {
             "receipt_id": r.id,
             "receipt_number": r.receipt_number,
@@ -1076,23 +1099,26 @@ def get_unassigned_candidates(
             "payer_name": r.payer_name,
             "payer_membership_no": r.payer_membership_no,
             "payer_mobile": r.payer_mobile,
-            "match_type": match_type,
+            "match_type": "EXACT_NUMBER" if matched_m else "NONE",
             "matched_member": None,
+            "likely_score": int(likely or 0),
         }
         if matched_m:
-            full_name = matched_m.display_name
             item["matched_member"] = {
                 "id": matched_m.id,
-                "name": full_name or matched_m.full_name_kn or f"Member {matched_m.id}",
+                "name": matched_m.display_name or matched_m.full_name_kn or f"Member {matched_m.id}",
                 "membership_number": matched_m.membership_number or matched_m.member_code,
                 "mobile": matched_m.mobile,
                 "status": matched_m.approval_status,
             }
-
         candidates.append(item)
 
     return {
-        "total_unassigned": len(receipts),
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit,
+        "total_unassigned": total_unassigned,
         "total_matched": total_matched,
         "candidates": candidates,
     }

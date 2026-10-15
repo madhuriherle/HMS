@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import Pager from '../components/Pager';
 import { Link } from 'react-router-dom';
 import {
   Link2,
@@ -36,6 +37,11 @@ export default function BulkReceiptMapping() {
   const [candidates, setCandidates] = useState([]);
   const [totalUnassigned, setTotalUnassigned] = useState(0);
   const [totalMatched, setTotalMatched] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -56,14 +62,17 @@ export default function BulkReceiptMapping() {
   const fetchCandidates = async () => {
     setLoading(true);
     try {
-      const params = {};
-      if (searchQuery.trim()) params.search = searchQuery.trim();
+      // one page of the waiting receipts; the search and the filter run on all of them (rule 10.6)
+      const params = { page, limit: pageSize };
+      if (debouncedQuery.trim()) params.search = debouncedQuery.trim();
       if (filterTab !== 'ALL') params.filter_type = filterTab;
 
       const { data } = await api.get('/receipts/unassigned-candidates', { params });
       setCandidates(data?.candidates || []);
       setTotalUnassigned(data?.total_unassigned || 0);
       setTotalMatched(data?.total_matched || 0);
+      setTotal(data?.total || 0);
+      setPages(Math.max(1, data?.pages || 1));
       setSelectedReceiptIds(new Set());
     } catch (err) {
       console.error(err);
@@ -75,11 +84,19 @@ export default function BulkReceiptMapping() {
 
   useEffect(() => {
     fetchCandidates();
-  }, [filterTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterTab, page, pageSize, debouncedQuery]);
+  useEffect(() => {
+    setPage(1);
+  }, [filterTab, pageSize, debouncedQuery]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
-    fetchCandidates();
+    setDebouncedQuery(searchQuery);
   };
 
   // Toggle selection
@@ -104,27 +121,28 @@ export default function BulkReceiptMapping() {
 
   // 1-Click Bulk Auto-Map for all matched receipts
   const handleBulkAutoMapAll = async () => {
-    const matchItems = candidates
-      .filter((c) => c.matched_member)
-      .map((c) => ({
-        receipt_id: c.receipt_id,
-        member_id: c.matched_member.id,
-        allocated_amount: c.net_amount
-      }));
-
-    if (matchItems.length === 0) {
-      notify('No matched receipts available to map.', 'error');
-      return;
-    }
-
     setIsAllocating(true);
     try {
-      const { data } = await api.post('/receipts/bulk-allocate', {
-        allocations: matchItems
-      });
+      const matchItems = [];
+      for (let n = 1; n <= 500; n += 1) {
+        const { data: chunk } = await api.get('/receipts/unassigned-candidates', { params: { filter_type: 'MATCHED', page: n, limit: 200 } });
+        (chunk?.candidates || []).forEach((c) => {
+          if (c.matched_member) matchItems.push({ receipt_id: c.receipt_id, member_id: c.matched_member.id, allocated_amount: c.net_amount });
+        });
+        if (n >= (chunk?.pages || 1)) break;
+      }
+      if (matchItems.length === 0) {
+        notify('No matched receipts available to map.', 'error');
+        return;
+      }
+      let mapped = 0;
+      for (let i = 0; i < matchItems.length; i += 200) {
+        const { data } = await api.post('/receipts/bulk-allocate', { allocations: matchItems.slice(i, i + 200) });
+        mapped += data?.allocated_count || 0;
+      }
 
       notify(
-        `Successfully auto-mapped ${data?.allocated_count || matchItems.length} receipts to their respective members!`,
+        `Successfully auto-mapped ${mapped || matchItems.length} receipts to their respective members!`,
         'success'
       );
       await fetchCandidates();
@@ -310,7 +328,7 @@ export default function BulkReceiptMapping() {
             </span>
             <div className="flex items-baseline justify-between mt-1">
               <span className="text-2xl font-bold text-[#180200] font-mono">{totalUnassigned.toLocaleString()}</span>
-              <span className="text-xs font-semibold text-[#863221]">{formatMoney(totalAmount)}</span>
+              
             </div>
             <p className="text-[10px] text-[#863221]/70 mt-1">Receipts waiting to be linked to members</p>
           </div>
@@ -321,7 +339,7 @@ export default function BulkReceiptMapping() {
             </span>
             <div className="flex items-baseline justify-between mt-1">
               <span className="text-2xl font-bold text-[#3D705C] font-mono">{totalMatched.toLocaleString()}</span>
-              <span className="text-xs font-semibold text-[#3D705C]">{formatMoney(matchedAmount)}</span>
+              
             </div>
             <p className="text-[10px] text-[#3D705C]/80 mt-1">Member number matches imported register</p>
           </div>
@@ -334,9 +352,7 @@ export default function BulkReceiptMapping() {
               <span className="text-2xl font-bold text-[#180200] font-mono">
                 {Math.max(0, totalUnassigned - totalMatched).toLocaleString()}
               </span>
-              <span className="text-xs font-semibold text-[#863221]">
-                {formatMoney(Math.max(0, totalAmount - matchedAmount))}
-              </span>
+
             </div>
             <p className="text-[10px] text-[#863221]/70 mt-1">Can be mapped manually via member picker</p>
           </div>
@@ -412,7 +428,7 @@ export default function BulkReceiptMapping() {
                     ) : (
                       <Sparkles className="w-4 h-4 text-emerald-200" />
                     )}
-                    ⚡ Auto-Map All {totalMatched} Matched Receipts ({formatMoney(matchedAmount)})
+                    ⚡ Auto-Map All {totalMatched} Matched Receipts
                   </button>
                 )
               )}
@@ -454,7 +470,7 @@ export default function BulkReceiptMapping() {
               </div>
 
               <span>
-                Showing <b>{candidates.length}</b> receipts
+                Showing <b>{candidates.length}</b> of <b>{total}</b> receipts
               </span>
             </div>
           )}
@@ -630,6 +646,11 @@ export default function BulkReceiptMapping() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+          {total > 0 && (
+            <div className="px-4 py-3 border-t border-[#E8DFD8] bg-[#FAF7F2]">
+              <Pager page={page} pages={pages} total={total} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
             </div>
           )}
         </div>

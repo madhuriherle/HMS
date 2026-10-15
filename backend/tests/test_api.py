@@ -7170,3 +7170,34 @@ def test_payment_mode_usage_counts_come_from_the_server(client, admin_headers):
         by_mode[r["payment_mode"]] = by_mode.get(r["payment_mode"], 0) + r["count"]
     assert by_mode["CASH"] >= 2 and by_mode["UPI"] >= 1
     assert all(set(r) == {"payment_mode", "bank_account", "count"} for r in rows)
+
+
+def test_unassigned_receipts_are_paged_filtered_and_ranked_by_the_server(client, admin_headers):
+    H = admin_headers
+    boss = _create_member(client, H, "9688100001", "Zrank")
+    mk = lambda **kw: _make_receipt(client, H, gross_amount=kw.pop("amt", 100), net_amount=kw.get("net", 0) or 0, **kw) if False else None
+    def receipt(num_typed=None, name="Someone", mobile=None, amount=100, date_="2026-02-02"):
+        return _make_receipt(client, H, receipt_date=date_, gross_amount=amount, net_amount=amount, payer_name=name,
+                             payer_mobile=mobile, payer_membership_no=num_typed, items=[{"item_type": "MEMBERSHIP", "amount": amount}])
+    by_mobile = receipt(name="Zq1 other", mobile="9688100001", amount=111)
+    by_name = receipt(name=boss["first_name_en"] if "first_name_en" in boss else "Zrank", amount=222)
+    none = receipt(name="Zq3 nobody", amount=333, date_="2026-05-05")
+
+    def listing(**p):
+        r = client.get("/api/v1/receipts/unassigned-candidates", headers=H, params={"search": "Zq", **p})
+        assert r.status_code == 200, r.text
+        return r.json()
+
+    page = listing(limit=5000)
+    assert page["limit"] == 200 and page["total"] >= 2
+    two = listing(limit=1, page=2)
+    assert len(two["candidates"]) == 1 and two["pages"] == two["total"]
+    # dates and amounts run on all of them
+    assert [c["receipt_id"] for c in listing(from_date="2026-04-01")["candidates"]] == [none["id"]]
+    assert {c["receipt_id"] for c in listing(min_amount=200)["candidates"]} == {none["id"]}
+    # with an applicant, the receipts that carry something of them come first and only they with likely_only
+    ranked = client.get("/api/v1/receipts/unassigned-candidates", headers=H, params={"search": "", "applicant_id": boss["id"], "limit": 200}).json()["candidates"]
+    first = next(c for c in ranked if c["receipt_id"] == by_mobile["id"])
+    assert first["likely_score"] == 4 and ranked.index(first) < next(i for i, c in enumerate(ranked) if c["likely_score"] == 0)
+    only = client.get("/api/v1/receipts/unassigned-candidates", headers=H, params={"applicant_id": boss["id"], "likely_only": True, "limit": 200}).json()["candidates"]
+    assert all(c["likely_score"] > 0 for c in only) and by_mobile["id"] in [c["receipt_id"] for c in only] and none["id"] not in [c["receipt_id"] for c in only]
