@@ -79,6 +79,23 @@ const humanizeKey = (key) => {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
+// Flatten nested payloads to one row per leaf: { 'Items 1 › Amount': 44, ... }
+const flattenPayload = (val, label = '', out = {}) => {
+  const isObj = val && typeof val === 'object';
+  if (Array.isArray(val) && val.length > 0 && val.some((v) => v && typeof v === 'object')) {
+    val.forEach((item, i) => flattenPayload(item, `${label}${val.length > 1 ? ` ${i + 1}` : ''}`, out));
+  } else if (isObj && !Array.isArray(val)) {
+    const entries = Object.entries(val).filter(([k]) => !k.startsWith('_'));
+    if (entries.length === 0 && label) out[label] = val;
+    entries.forEach(([k, v]) => flattenPayload(v, label ? `${label} › ${humanizeKey(k)}` : humanizeKey(k), out));
+  } else {
+    out[label] = val;
+  }
+  return out;
+};
+
+const isEmptyVal = (v) => v === null || v === undefined || v === '';
+
 const formatPayloadSummary = (payload) => {
   if (!payload || typeof payload !== 'object') return '';
   const entries = Object.entries(payload).filter(([k]) => !k.startsWith('_'));
@@ -377,52 +394,53 @@ export default function Approvals() {
       const { _warning: _, _previous: __, ...newVals } = payload;
       const action = String(raw.action || '').toUpperCase();
 
+      const newFlat = flattenPayload(newVals);
+      const prevFlat = prev ? flattenPayload(prev) : null;
+
       if (action === 'CREATE') {
-        const keys = Object.keys(newVals);
+        const keys = Object.keys(newFlat).filter((k) => !isEmptyVal(newFlat[k]));
         if (keys.length === 0) {
           return [{ field: 'Record Status', previous: '—', proposed: 'New Record Creation', changed: true }];
         }
         return keys.map((key) => ({
-          field: humanizeKey(key),
-          previous: '(None — New Record)',
-          proposed: formatValue(newVals[key]),
+          field: key,
+          previous: '—',
+          proposed: formatValue(newFlat[key]),
           changed: true,
         }));
       }
 
       if (action === 'DELETE') {
         const rows = [{ field: 'Record Status', previous: 'Active / Existing', proposed: 'Deleted', changed: true }];
-        if (prev) {
-          Object.keys(prev).forEach((k) => {
-            rows.push({
-              field: humanizeKey(k),
-              previous: formatValue(prev[k]),
-              proposed: '(Deleted)',
-              changed: true,
+        if (prevFlat) {
+          Object.keys(prevFlat)
+            .filter((k) => !isEmptyVal(prevFlat[k]))
+            .forEach((k) => {
+              rows.push({ field: k, previous: formatValue(prevFlat[k]), proposed: '(Deleted)', changed: true });
             });
-          });
         }
         return rows;
       }
 
-      // Action is UPDATE:
-      const keys = Object.keys(newVals);
+      // Action is UPDATE: show only fields that actually changed when the old values are known
+      const keys = Object.keys(newFlat);
       if (keys.length === 0) {
         return [{ field: 'Status', previous: 'Existing', proposed: 'Update Requested', changed: true }];
       }
 
-      return keys.map((key) => {
-        const oldVal = prev ? prev[key] : undefined;
-        const newVal = newVals[key];
-        const prevFormatted = oldVal !== undefined ? formatValue(oldVal) : '(Current Value)';
-        const nextFormatted = formatValue(newVal);
+      const rows = keys.map((key) => {
+        const known = prevFlat && key in prevFlat;
+        const prevFormatted = known ? formatValue(prevFlat[key]) : '(Current Value)';
+        const nextFormatted = formatValue(newFlat[key]);
         return {
-          field: humanizeKey(key),
+          field: key,
           previous: prevFormatted,
           proposed: nextFormatted,
-          changed: oldVal !== undefined ? prevFormatted !== nextFormatted : true,
+          changed: known ? prevFormatted !== nextFormatted : true,
         };
       });
+      const changedRows = rows.filter((r) => r.changed);
+      return changedRows.length > 0 ? changedRows : rows;
     }
 
     return [];
