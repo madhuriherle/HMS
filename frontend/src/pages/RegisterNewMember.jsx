@@ -39,7 +39,7 @@ import DateInput from '../components/DateInput';
 import CountryCodeSelect from '../components/CountryCodeSelect';
 import PermissionGate from '../components/PermissionGate';
 import PageTitle from '../components/PageTitle';
-import SearchableFormSelect from '../components/SearchableFormSelect';
+import OptionPicker from '../components/OptionPicker';
 import useAuth from '../hooks/useAuth';
 import useRules, { hasDigits } from '../hooks/useRules';
 import { formatMoney } from '../utils/money';
@@ -1610,7 +1610,7 @@ export default function RegisterNewMember() {
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
                       Qualification:
                     </label>
-                    <SearchableFormSelect
+                    <OptionPicker
                       value={formData.qualification}
                       onChange={(val) => {
                         setFormData({ ...formData, qualification: val });
@@ -1618,8 +1618,9 @@ export default function RegisterNewMember() {
                           setFormErrors({ ...formErrors, qualification: '' });
                       }}
                       options={qualifications}
+                      title="Select Qualification"
+                      placeholder="Select qualification"
                       hasError={Boolean(formErrors.qualification)}
-                      maxHeightClass="max-h-52"
                     />
                     {formErrors.qualification && (
                       <p className="text-[11px] text-red-600 mt-1">{formErrors.qualification}</p>
