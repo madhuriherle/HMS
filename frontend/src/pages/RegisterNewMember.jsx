@@ -1099,7 +1099,7 @@ export default function RegisterNewMember() {
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                   {/* Left: Passport Size Photo Upload */}
                   <div className="md:col-span-2 flex flex-col items-center justify-start">
-                    <div className="w-24 h-28 border-2 border-dashed border-[#DFD5CC] bg-[#FAF7F2] flex flex-col items-center justify-center relative overflow-hidden rounded-lg shadow-2xs hover:border-[#8C1801]/50 transition-colors">
+                    <div className="w-24 h-28 border-2 border-dashed border-[#E8DFD8] bg-[#FAF7F2] flex flex-col items-center justify-center relative overflow-hidden rounded-lg shadow-2xs hover:border-[#8C1801]/50 transition-colors">
                       {formData.photoUrl ? (
                         <img
                           src={formData.photoUrl}
@@ -1143,7 +1143,7 @@ export default function RegisterNewMember() {
                             <select
                               value={formData.nameTitle}
                               onChange={(e) => handleTitleChange(e.target.value)}
-                              className="w-full px-2 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm font-bold text-[#510601] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 cursor-pointer shadow-2xs transition-all"
+                              className="w-full px-2 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm font-bold text-[#510601] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 cursor-pointer shadow-2xs transition-all"
                             >
                               {NAME_TITLES.map((t) => (
                                 <option key={t} value={t}>
@@ -1162,7 +1162,7 @@ export default function RegisterNewMember() {
                                 if (formErrors.name) setFormErrors({ ...formErrors, name: '' });
                               }}
                               className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
-                                formErrors.name ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                                formErrors.name ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
                               }`}
                             />
                           </div>
@@ -1184,7 +1184,7 @@ export default function RegisterNewMember() {
                           onChange={handleDobChange}
                           name="birthDate"
                           className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
-                            formErrors.birthDate ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                            formErrors.birthDate ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
                           }`}
                         />
                         {formErrors.birthDate && (
@@ -1202,7 +1202,7 @@ export default function RegisterNewMember() {
                           value={formData.birthDate ? calculateAge(formData.birthDate) : ''}
                           placeholder="-"
                           title="Worked out from the Date of Birth"
-                          className="w-full px-3 py-2 bg-[#F3EEE8] border border-[#DFD5CC] rounded-lg text-xs sm:text-sm font-semibold text-[#510601] focus:outline-none shadow-2xs cursor-default"
+                          className="w-full px-3 py-2 bg-[#F3EEE8] border border-[#E8DFD8] rounded-lg text-xs sm:text-sm font-semibold text-[#510601] focus:outline-none shadow-2xs cursor-default"
                         />
                       </div>
                     </div>
@@ -1230,7 +1230,7 @@ export default function RegisterNewMember() {
                               onChange={(e) => handleMobileChange(e.target.value)}
                               onBlur={() => checkPhoneField('mobile')}
                               className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
-                                formErrors.mobile ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                                formErrors.mobile ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
                               }`}
                             />
                           </div>
@@ -1284,7 +1284,7 @@ export default function RegisterNewMember() {
                             setFormData({ ...formData, appliedOnBehalfOf: e.target.value });
                             if (formErrors.appliedOnBehalfOf) setFormErrors({ ...formErrors, appliedOnBehalfOf: '' });
                           }}
-                          className={`${formData.appliedOnBehalfOf === 'Others' ? 'w-28 shrink-0' : 'w-full'} px-2.5 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer`}
+                          className={`${formData.appliedOnBehalfOf === 'Others' ? 'w-28 shrink-0' : 'w-full'} px-2.5 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer`}
                         >
                           {BEHALF_OPTIONS.map((opt) => (
                             <option key={opt} value={opt}>
@@ -1299,7 +1299,7 @@ export default function RegisterNewMember() {
                             placeholder="Specify relation"
                             value={formData.behalfOtherText}
                             onChange={(e) => setFormData({ ...formData, behalfOtherText: e.target.value })}
-                            className="flex-1 min-w-0 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                            className="flex-1 min-w-0 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                           />
                         )}
                         </div>
@@ -1329,8 +1329,8 @@ export default function RegisterNewMember() {
                               readOnly={isWhatsAppSameAsMobile}
                               className={`w-full px-3 py-2 border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
                                 isWhatsAppSameAsMobile
-                                  ? 'bg-stone-100 text-stone-500 border-[#DFD5CC] cursor-not-allowed'
-                                  : 'bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border-[#DFD5CC] hover:border-[#8C1801]/60'
+                                  ? 'bg-stone-100 text-stone-500 border-[#E8DFD8] cursor-not-allowed'
+                                  : 'bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border-[#E8DFD8] hover:border-[#8C1801]/60'
                               } ${formErrors.whatsappNumber ? 'border-red-500 ring-2 ring-red-500/20' : ''}`}
                             />
                           </div>
@@ -1340,7 +1340,7 @@ export default function RegisterNewMember() {
                             type="checkbox"
                             checked={isWhatsAppSameAsMobile}
                             onChange={(e) => handleWhatsAppSameAsMobileToggle(e.target.checked)}
-                            className="w-3.5 h-3.5 rounded text-[#510601] focus:ring-[#510601] border-[#DFD5CC] accent-[#510601] cursor-pointer"
+                            className="w-3.5 h-3.5 rounded text-[#510601] focus:ring-[#510601] border-[#E8DFD8] accent-[#510601] cursor-pointer"
                           />
                           <span className="text-[11px] text-[#3D140C] font-medium">
                             Same as mobile
@@ -1362,7 +1362,7 @@ export default function RegisterNewMember() {
                             placeholder="ಹೆಸರು (Kannada)"
                             value={formData.nameKn}
                             onChange={(e) => setFormData({ ...formData, nameKn: e.target.value })}
-                            className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                            className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                           />
                         </div>
                       )}
@@ -1372,7 +1372,7 @@ export default function RegisterNewMember() {
                 </div>
 
                 {/* Community & identity: four across */}
-                <div className="pt-4 border-t border-[#DFD5CC] space-y-3">
+                <div className="pt-4 border-t border-[#E8DFD8] space-y-3">
                   <div className="pb-2 border-b border-[#E8DFD8]"><h3 className="text-sm font-bold text-[#8C1801] uppercase tracking-wider">Community & Identity</h3></div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                   {/* Gothra */}
@@ -1387,7 +1387,7 @@ export default function RegisterNewMember() {
                         if (formErrors.gothra) setFormErrors({ ...formErrors, gothra: '' });
                       }}
                       className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer ${
-                        formErrors.gothra ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                        formErrors.gothra ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
                       }`}
                     >
                       <option value="">Select Gotra</option>
@@ -1414,7 +1414,7 @@ export default function RegisterNewMember() {
                         if (formErrors.gender) setFormErrors({ ...formErrors, gender: '' });
                       }}
                       className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer ${
-                        formErrors.gender ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                        formErrors.gender ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
                       }`}
                     >
                       <option value="">Select Gender</option>
@@ -1436,7 +1436,7 @@ export default function RegisterNewMember() {
                     <select
                       value={formData.bloodGroup}
                       onChange={(e) => setFormData({ ...formData, bloodGroup: e.target.value })}
-                      className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer"
+                      className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer"
                     >
                       <option value="">Select Blood Group</option>
                       {BLOOD_GROUPS.map((bg) => (
@@ -1463,7 +1463,7 @@ export default function RegisterNewMember() {
                         if (formErrors.aadharNumber) setFormErrors({ ...formErrors, aadharNumber: '' });
                       }}
                       className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
-                        formErrors.aadharNumber ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                        formErrors.aadharNumber ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
                       }`}
                     />
                     {formErrors.aadharNumber && (
@@ -1475,7 +1475,7 @@ export default function RegisterNewMember() {
                 </div>
 
                 {/* Address & work */}
-                <div className="pt-4 border-t border-[#DFD5CC] space-y-3">
+                <div className="pt-4 border-t border-[#E8DFD8] space-y-3">
                   <div className="pb-2 border-b border-[#E8DFD8]"><h3 className="text-sm font-bold text-[#8C1801] uppercase tracking-wider">Address & Work</h3></div>
                 {/* the fields take two thirds, the sticker preview one third */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
@@ -1493,7 +1493,7 @@ export default function RegisterNewMember() {
                         if (formErrors.address) setFormErrors({ ...formErrors, address: '' });
                       }}
 
-                      className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${formErrors.address ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                      className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${formErrors.address ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
                         }`}
                     />
                     {formErrors.address && (
@@ -1512,7 +1512,7 @@ export default function RegisterNewMember() {
                       placeholder="ವಿಳಾಸ (Kannada)"
                       value={formData.addressKn}
                       onChange={(e) => setFormData({ ...formData, addressKn: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
                   </div>
                   )}
@@ -1539,7 +1539,7 @@ export default function RegisterNewMember() {
                         }}
 
                         className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm font-mono text-[#180200] placeholder:text-[#9E8B7F] placeholder:font-sans focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
-                          formErrors.postalCode ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+                          formErrors.postalCode ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
                         }`}
                       />
                     </div>
@@ -1549,7 +1549,7 @@ export default function RegisterNewMember() {
 
                     {/* Autocomplete Suggestions Dropdown */}
                     {isPinSuggestionsOpen && pinSuggestions.length > 0 && (
-                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#DFD5CC] rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto divide-y divide-stone-100">
+                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#E8DFD8] rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto divide-y divide-stone-100">
                         {pinSuggestions.map((item, idx) => (
                           <button
                             key={`${item.postalCode}-${item.area}-${idx}`}
@@ -1565,7 +1565,7 @@ export default function RegisterNewMember() {
                                 Taluk: <span className="font-medium text-stone-700">{item.talukName || '—'}</span> &bull; District: <span className="font-medium text-stone-700">{item.districtName || '—'}</span>
                               </div>
                             </div>
-                            <span className="shrink-0 text-xs font-mono font-bold text-[#8C1801] bg-[#FAF7F2] px-2 py-0.5 rounded border border-[#DFD5CC]">
+                            <span className="shrink-0 text-xs font-mono font-bold text-[#8C1801] bg-[#FAF7F2] px-2 py-0.5 rounded border border-[#E8DFD8]">
                               {item.postalCode}
                             </span>
                           </button>
@@ -1584,7 +1584,7 @@ export default function RegisterNewMember() {
                       value={formData.locality}
                       onChange={(e) => setFormData({ ...formData, locality: e.target.value })}
 
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
                     {(formData.taluk || formData.district) && (
                       <p className="text-xs text-stone-600 mt-1 flex items-center gap-1.5 font-medium">
@@ -1604,7 +1604,7 @@ export default function RegisterNewMember() {
                       value={formData.nativePlace}
                       onChange={(e) => setFormData({ ...formData, nativePlace: e.target.value })}
 
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
                   </div>
 
@@ -1619,7 +1619,7 @@ export default function RegisterNewMember() {
                       placeholder="ಸ್ಥಳ (Kannada)"
                       value={formData.localityKn}
                       onChange={(e) => setFormData({ ...formData, localityKn: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
                   </div>
                   )}
@@ -1656,7 +1656,7 @@ export default function RegisterNewMember() {
                       placeholder="Occupation / Profession"
                       value={formData.employment}
                       onChange={(e) => setFormData({ ...formData, employment: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
                   </div>
 
@@ -1714,7 +1714,7 @@ export default function RegisterNewMember() {
                 </div>
 
                 {/* Magazine subscription */}
-                  <div className="bg-[#FAF7F2] p-5 sm:p-6 rounded-xl border border-[#DFD5CC] space-y-5">
+                  <div className="bg-[#FAF7F2] p-5 sm:p-6 rounded-xl border border-[#E8DFD8] space-y-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <h3 className="text-sm font-bold text-[#510601] flex items-center gap-2">
@@ -1724,7 +1724,7 @@ export default function RegisterNewMember() {
                           Do you need Havyaka Magazine Every month?
                         </p>
                       </div>
-                      <div className="inline-flex rounded-lg border border-[#DFD5CC] bg-white p-0.5 shadow-2xs">
+                      <div className="inline-flex rounded-lg border border-[#E8DFD8] bg-white p-0.5 shadow-2xs">
                         <button
                           type="button"
                           onClick={() => {
@@ -1757,7 +1757,7 @@ export default function RegisterNewMember() {
                     </div>
 
                     {formData.magazineNeeded === 'YES' && (
-                      <div className="space-y-4 pt-3 border-t border-[#DFD5CC]/80 bg-white p-4 rounded-lg border border-[#DFD5CC]">
+                      <div className="space-y-4 pt-3 border-t border-[#E8DFD8]/80 bg-white p-4 rounded-lg border border-[#E8DFD8]">
                         {/* Magazine Edition Options */}
                         <div>
                           <label className="block text-xs font-bold text-[#510601] uppercase tracking-wider mb-2">
@@ -1773,7 +1773,7 @@ export default function RegisterNewMember() {
                                 className={`flex flex-col p-3 rounded-lg border cursor-pointer transition-all ${
                                   formData.magazineKind === code
                                     ? 'border-[#510601] bg-[#FAF7F2] ring-1 ring-[#510601]/20 shadow-2xs'
-                                    : 'border-[#DFD5CC] hover:border-[#8C1801]/40 bg-white'
+                                    : 'border-[#E8DFD8] hover:border-[#8C1801]/40 bg-white'
                                 }`}
                               >
                                 <div className="flex items-center gap-2 mb-1">
@@ -1800,7 +1800,7 @@ export default function RegisterNewMember() {
                 {/* ═══════════════════════════════════════════════════════ */}
                 {/* Section: Family & Relationship Details */}
                 {/* ═══════════════════════════════════════════════════════ */}
-                <div className="pt-4 border-t border-[#DFD5CC] space-y-5">
+                <div className="pt-4 border-t border-[#E8DFD8] space-y-5">
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4 text-[#8C1801]" />
                     <h3 className="text-sm font-bold text-[#8C1801]">
@@ -1815,7 +1815,7 @@ export default function RegisterNewMember() {
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       {/* Father's Info */}
-                      <div className="space-y-3 bg-white p-3.5 rounded-lg border border-[#DFD5CC]">
+                      <div className="space-y-3 bg-white p-3.5 rounded-lg border border-[#E8DFD8]">
                         <div>
                           <label className="block text-xs text-[#3D140C] mb-1 font-semibold">
                             Father's Name:
@@ -1832,7 +1832,7 @@ export default function RegisterNewMember() {
                               }
                             }}
                             className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
-                              (formErrors.fatherName || formErrors.fatherHusbandName) ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC]'
+                              (formErrors.fatherName || formErrors.fatherHusbandName) ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8]'
                             }`}
                           />
                           {(formErrors.fatherName || formErrors.fatherHusbandName) && (
@@ -1850,7 +1850,7 @@ export default function RegisterNewMember() {
                               placeholder="e.g. HMS-00123"
                               value={formData.fatherMembershipNo}
                               onChange={(e) => setFormData({ ...formData, fatherMembershipNo: e.target.value })}
-                              className="flex-1 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                              className="flex-1 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                             />
                             <button
                               type="button"
@@ -1876,7 +1876,7 @@ export default function RegisterNewMember() {
                       </div>
 
                       {/* Mother's Info */}
-                      <div className="space-y-3 bg-white p-3.5 rounded-lg border border-[#DFD5CC]">
+                      <div className="space-y-3 bg-white p-3.5 rounded-lg border border-[#E8DFD8]">
                         <div>
                           <label className="block text-xs text-[#3D140C] mb-1 font-semibold">
                             Mother's Name:
@@ -1886,7 +1886,7 @@ export default function RegisterNewMember() {
                             placeholder="Mother's Full Name"
                             value={formData.motherName}
                             onChange={(e) => setFormData({ ...formData, motherName: e.target.value })}
-                            className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                            className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                           />
                         </div>
 
@@ -1900,7 +1900,7 @@ export default function RegisterNewMember() {
                               placeholder="e.g. HMS-00124"
                               value={formData.motherMembershipNo}
                               onChange={(e) => setFormData({ ...formData, motherMembershipNo: e.target.value })}
-                              className="flex-1 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                              className="flex-1 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                             />
                             <button
                               type="button"
@@ -1938,7 +1938,7 @@ export default function RegisterNewMember() {
                         <p className="text-xs text-stone-600 mt-0.5">Are you married?</p>
                       </div>
 
-                      <div className="inline-flex rounded-lg border border-[#DFD5CC] bg-white p-0.5 shadow-2xs">
+                      <div className="inline-flex rounded-lg border border-[#E8DFD8] bg-white p-0.5 shadow-2xs">
                         <button
                           type="button"
                           onClick={() => setFormData({ ...formData, isMarried: 'NO' })}
@@ -1965,7 +1965,7 @@ export default function RegisterNewMember() {
                     </div>
 
                     {formData.isMarried === 'YES' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-3 border-t border-[#DFD5CC] bg-white p-3.5 rounded-lg border">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-3 border-t border-[#E8DFD8] bg-white p-3.5 rounded-lg border">
                         <div>
                           <label className="block text-xs text-[#3D140C] mb-1 font-semibold">
                             Spouse Name:
@@ -1979,7 +1979,7 @@ export default function RegisterNewMember() {
                               if (formErrors.spouseName) setFormErrors({ ...formErrors, spouseName: '' });
                             }}
                             className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
-                              formErrors.spouseName ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC]'
+                              formErrors.spouseName ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8]'
                             }`}
                           />
                           {formErrors.spouseName && (
@@ -1997,7 +1997,7 @@ export default function RegisterNewMember() {
                               placeholder="e.g. HMS-00125"
                               value={formData.spouseMembershipNo}
                               onChange={(e) => setFormData({ ...formData, spouseMembershipNo: e.target.value })}
-                              className="flex-1 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                              className="flex-1 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                             />
                             <button
                               type="button"
@@ -2036,7 +2036,7 @@ export default function RegisterNewMember() {
                           <p className="text-xs text-stone-600 mt-0.5">Do you have children?</p>
                         </div>
 
-                        <div className="inline-flex rounded-lg border border-[#DFD5CC] bg-white p-0.5 shadow-2xs">
+                        <div className="inline-flex rounded-lg border border-[#E8DFD8] bg-white p-0.5 shadow-2xs">
                           <button
                             type="button"
                             onClick={() => setFormData({ ...formData, hasChildren: 'NO' })}
@@ -2071,13 +2071,13 @@ export default function RegisterNewMember() {
                       </div>
 
                       {formData.hasChildren === 'YES' && (
-                        <div className="space-y-3 pt-3 border-t border-[#DFD5CC]">
+                        <div className="space-y-3 pt-3 border-t border-[#E8DFD8]">
                           {formData.children && formData.children.length > 0 ? (
                             <div className="space-y-2.5">
                               {formData.children.map((child, index) => (
                                 <div
                                   key={index}
-                                  className="bg-white p-3 rounded-lg border border-[#DFD5CC] grid grid-cols-1 sm:grid-cols-12 gap-3 items-center shadow-2xs"
+                                  className="bg-white p-3 rounded-lg border border-[#E8DFD8] grid grid-cols-1 sm:grid-cols-12 gap-3 items-center shadow-2xs"
                                 >
                                   <div className="sm:col-span-1 text-xs font-bold text-[#8C1801] flex items-center justify-center">
                                     #{index + 1}
@@ -2088,14 +2088,14 @@ export default function RegisterNewMember() {
                                       placeholder="Child Full Name *"
                                       value={child.name}
                                       onChange={(e) => handleChildChange(index, 'name', e.target.value)}
-                                      className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20"
+                                      className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-xs text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20"
                                     />
                                   </div>
                                   <div className="sm:col-span-3">
                                     <select
                                       value={child.gender || 'Male'}
                                       onChange={(e) => handleChildChange(index, 'gender', e.target.value)}
-                                      className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] focus:outline-none focus:border-[#510601] cursor-pointer"
+                                      className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-xs text-[#180200] focus:outline-none focus:border-[#510601] cursor-pointer"
                                     >
                                       {(lists?.child_relations || []).map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
                                     </select>
@@ -2106,7 +2106,7 @@ export default function RegisterNewMember() {
                                       placeholder="Member No. (if any)"
                                       value={child.membershipNo}
                                       onChange={(e) => handleChildChange(index, 'membershipNo', e.target.value)}
-                                      className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] rounded-lg text-xs text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20"
+                                      className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-xs text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]/20"
                                     />
                                   </div>
                                   <div className="sm:col-span-1 flex justify-center">
@@ -2123,7 +2123,7 @@ export default function RegisterNewMember() {
                               ))}
                             </div>
                           ) : (
-                            <div className="bg-white p-4 rounded-lg border border-dashed border-[#DFD5CC] text-center text-xs text-stone-500">
+                            <div className="bg-white p-4 rounded-lg border border-dashed border-[#E8DFD8] text-center text-xs text-stone-500">
                               No children added yet. Click "+ Add Child" below.
                             </div>
                           )}
@@ -2147,11 +2147,11 @@ export default function RegisterNewMember() {
                   </fieldset>
 
                   {/* Form Footer Action Buttons */}
-                  <div className="flex items-center justify-between pt-5 border-t border-[#DFD5CC]">
+                  <div className="flex items-center justify-between pt-5 border-t border-[#E8DFD8]">
                     <button
                       type="button"
                       onClick={() => navigate(returnPath)}
-                      className="px-5 py-2.5 border border-[#DFD5CC] hover:border-[#8C1801]/50 text-[#510601] bg-white hover:bg-[#FAF7F2] text-xs sm:text-sm font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                      className="px-5 py-2.5 border border-[#E8DFD8] hover:border-[#8C1801]/50 text-[#510601] bg-white hover:bg-[#FAF7F2] text-xs sm:text-sm font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer inline-flex items-center gap-1.5"
                     >
                       <ChevronLeft className="w-4 h-4" />
                       <span>{isViewMode ? 'Back' : 'Cancel'}</span>

@@ -7,24 +7,13 @@ import { notify } from '../utils/notify';
 import {
   Printer,
   Search,
-  Trash2,
   CheckCircle2,
   X,
   AlertCircle,
-  AlertTriangle,
   RefreshCw,
-  ChevronRight,
-  ChevronLeft,
   User,
-  Phone,
-  MapPin,
-  Calendar,
   CheckSquare,
-  Square,
-  Building,
   FileText,
-  SlidersHorizontal,
-  Download
 } from 'lucide-react';
 import { loadMembershipTypes } from '../utils/serverData';
 import { fetchLabelPage } from '../utils/apiAdapters';
@@ -33,8 +22,8 @@ import { formatDate } from '../utils/dateUtils';
 import api from '../api';
 import { askForm } from '../utils/dialogs';
 import useAuth from '../hooks/useAuth';
-
 import ModalFooter from '../components/ModalFooter';
+
 export default function LabelList() {
   const { hasPermission } = useAuth();
   // Synchronized stores
@@ -71,8 +60,7 @@ export default function LabelList() {
     notify(message, type);
   };
 
-  // what the server is asked for: the page, the search, the type and the last-receipt dates. They run on every paid
-  // member in the database; this screen only holds the page it shows (rule 10.6).
+  // what the server is asked for: the page, the search, the type and the last-receipt dates.
   const labelParams = () => ({
     ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
     ...(membershipTypeFilter !== 'ALL' ? { membership_type_id: membershipTypeFilter } : {}),
@@ -119,10 +107,8 @@ export default function LabelList() {
   // members ticked on any page stay printable
   const selectedCache = useRef(new Map()); // id -> { item, member }
   const getMember = (memberId) => members.find((m) => m.id === memberId) || selectedCache.current.get(memberId)?.member;
-  const getMembershipType = (typeId) => membershipTypes.find((mt) => mt.id === typeId);
 
   // the server already searched, filtered and paged them
-  const filteredList = labelList;
   const paginatedList = labelList;
 
   // Selection handlers
@@ -156,24 +142,9 @@ export default function LabelList() {
     });
   };
 
-  // every member the filters match, read 200 at a time
-  const handleSelectAllAcrossAllPages = async () => {
-    const ids = [];
-    for (let n = 1; n <= 200; n += 1) {
-      const chunk = await fetchLabelPage({ ...labelParams(), page: n, limit: 200 });
-      chunk.rows.forEach((m) => {
-        selectedCache.current.set(m.id, { item: { id: m.id, memberId: m.id, addedDate: m.last_receipt_date || '' }, member: m });
-        ids.push(m.id);
-      });
-      if (n >= chunk.pages) break;
-    }
-    setSelectedIds(ids);
-  };
-
   const handleClearSelection = () => {
     setSelectedIds([]);
   };
-
 
   // Get items for printing
   const itemsToPrint = useMemo(() => {
@@ -237,7 +208,7 @@ export default function LabelList() {
       {/* Toast Alert */}
       {toast.show && (
         <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg px-4 py-3 shadow-lg transition-all animate-bounce ${
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl px-4 py-3 shadow-lg transition-all animate-bounce ${
             toast.type === 'success'
               ? 'bg-[#3D705C] text-white'
               : toast.type === 'info'
@@ -253,7 +224,7 @@ export default function LabelList() {
           <span className="text-sm font-medium">{toast.message}</span>
           <button
             onClick={() => setToast({ show: false, message: '', type: 'success' })}
-            className="ml-2 rounded p-1 hover:bg-white/20"
+            className="ml-2 rounded-lg p-1 hover:bg-white/20 cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -262,90 +233,90 @@ export default function LabelList() {
 
       {/* Action Buttons Toolbar */}
       <div className="flex flex-wrap items-center justify-end gap-3 -mb-2">
-          <Link
-            to="/dashboard/membership/list"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-stone-50 transition-colors"
-          >
-            <User className="h-4 w-4 text-[#8C1801]" />
-            <span>Membership List</span>
-          </Link>
+        <Link
+          to="/dashboard/membership/list"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-[#E8DFD8] bg-white px-3.5 py-2 text-xs font-semibold text-[#863221] hover:bg-[#FAF7F2] shadow-xs transition-colors"
+        >
+          <User className="h-4 w-4 text-[#8C1801]" />
+          <span>Membership List</span>
+        </Link>
 
-          {hasPermission('magazines.write') && (
-            <button
-              type="button"
-              onClick={handleGenerateBatch}
-              title={'Generate a label batch (PDF) for paid members'}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#E8DFD8] bg-white px-4 py-2 text-sm font-medium text-[#510601] shadow-sm hover:bg-[#FAF7F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              <Printer className="h-4 w-4" />
-              <span>Generate Batch (PDF)</span>
-            </button>
-          )}
-
+        {hasPermission('magazines.write') && (
           <button
             type="button"
-            disabled={selectedIds.length === 0}
-            onClick={() => setIsPrintModalOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#8C1801] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#510601] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            onClick={handleGenerateBatch}
+            title="Generate a label batch (PDF) for paid members"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#E8DFD8] bg-white px-4 py-2 text-xs font-semibold text-[#510601] shadow-xs hover:bg-[#FAF7F2] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
           >
             <Printer className="h-4 w-4" />
-            <span>Print Labels</span>
-            {selectedIds.length > 0 && (
-              <span className="ml-1 inline-flex items-center justify-center rounded-full bg-[#FFC107] px-2 py-0.5 text-xs font-bold text-[#180200]">
-                {selectedIds.length}
-              </span>
-            )}
+            <span>Generate Batch (PDF)</span>
           </button>
-        </div>
+        )}
 
-      {/* Summary Cards */}
+        <button
+          type="button"
+          disabled={selectedIds.length === 0}
+          onClick={() => setIsPrintModalOpen(true)}
+          className="inline-flex items-center gap-2 rounded-xl bg-[#510601] px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-[#3D0400] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+        >
+          <Printer className="h-4 w-4" />
+          <span>Print Labels</span>
+          {selectedIds.length > 0 && (
+            <span className="ml-1 inline-flex items-center justify-center rounded-full bg-[#FFC107] px-2 py-0.5 text-[10px] font-bold text-[#180200]">
+              {selectedIds.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-[#E8DFD8] bg-white p-5 shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-gray-500">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#863221]">
               Total In Queue
             </span>
-            <div className="rounded-lg bg-amber-50 p-2 text-[#8C1801]">
+            <div className="rounded-xl bg-amber-50 p-2 text-[#8C1801] border border-amber-200">
               <Printer className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-[#180200]">{total}</span>
-            <span className="text-xs text-gray-500">Ready to print</span>
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-2xl font-bold font-mono text-[#180200]">{total}</span>
+            <span className="text-xs text-[#863221]/70">Ready to print</span>
           </div>
         </div>
 
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-[#E8DFD8] bg-white p-5 shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-gray-500">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#863221]">
               Selected for Printing
             </span>
-            <div className="rounded-lg bg-emerald-50 p-2 text-emerald-700">
+            <div className="rounded-xl bg-emerald-50 p-2 text-[#3D705C] border border-emerald-200">
               <CheckSquare className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-emerald-700">{selectedIds.length}</span>
-            <span className="text-xs font-medium text-emerald-600">
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-2xl font-bold font-mono text-[#3D705C]">{selectedIds.length}</span>
+            <span className="text-xs font-semibold text-[#3D705C]">
               {total ? `${Math.round((selectedIds.length / total) * 100)}% of queue` : '0%'}
             </span>
           </div>
         </div>
 
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-[#E8DFD8] bg-white p-5 shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium uppercase tracking-wider text-gray-500">
-              Total Members
+            <span className="text-xs font-bold uppercase tracking-wider text-[#863221]">
+              In Current View
             </span>
-            <div className="rounded-lg bg-stone-100 p-2 text-stone-700">
+            <div className="rounded-xl bg-[#FAF7F2] p-2 text-[#510601] border border-[#E8DFD8]">
               <User className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-2 flex items-baseline justify-between">
-            <span className="text-2xl font-bold text-stone-800">
+          <div className="mt-3 flex items-baseline justify-between">
+            <span className="text-2xl font-bold font-mono text-[#180200]">
               {members.length}
             </span>
-            <span className="text-xs text-gray-500">Registered members</span>
+            <span className="text-xs text-[#863221]/70">Displaying on page</span>
           </div>
         </div>
       </div>
@@ -374,7 +345,7 @@ export default function LabelList() {
               <button
                 type="button"
                 onClick={handleClearSelection}
-                className="ml-1 text-xs underline text-[#863221] hover:text-[#510601]"
+                className="ml-1 text-xs underline text-[#863221] hover:text-[#510601] cursor-pointer"
               >
                 Clear
               </button>
@@ -398,10 +369,10 @@ export default function LabelList() {
       </SearchFilterBar>
 
       {/* Label List Table */}
-      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-[#E8DFD8] bg-white shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)]">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-700">
-            <thead className="bg-[#FAF7F2] border-b border-stone-200 text-xs font-semibold uppercase tracking-wider text-[#180200]">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[11px] font-bold uppercase tracking-wider text-[#863221]">
               <tr>
                 {/* Select All Checkbox */}
                 <th className="w-12 px-4 py-3.5 text-center">
@@ -410,31 +381,38 @@ export default function LabelList() {
                     checked={isAllSelected}
                     onChange={handleToggleSelectAll}
                     aria-label="Select all members on this page"
-                    className="h-4 w-4 rounded border-stone-300 text-[#8C1801] focus:ring-[#8C1801]"
+                    className="h-4 w-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer"
                   />
                 </th>
-                <th className="px-4 py-3.5">Name</th>
-                <th className="px-4 py-3.5">Member No.</th>
-                <th className="px-4 py-3.5">Type</th>
-                <th className="px-4 py-3.5">Mobile</th>
-                <th className="px-4 py-3.5 min-w-[240px]">Address</th>
-                <th className="px-4 py-3.5">Added On</th>
-                <th className="px-4 py-3.5 text-center">Actions</th>
+                <th className="py-3 px-4">Name</th>
+                <th className="py-3 px-4">Member No.</th>
+                <th className="py-3 px-4">Type</th>
+                <th className="py-3 px-4">Mobile</th>
+                <th className="py-3 px-4 min-w-[240px]">Address</th>
+                <th className="py-3 px-4">Added On</th>
+                <th className="py-3 px-4 text-center">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-200">
-              {paginatedList.length === 0 ? (
+            <tbody className="divide-y divide-[#E8DFD8]">
+              {loadingPage ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-gray-500">
+                  <td colSpan={8} className="py-12 text-center text-[#863221]">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#510601]" />
+                    Loading label list...
+                  </td>
+                </tr>
+              ) : paginatedList.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center space-y-2">
-                      <Printer className="h-10 w-10 text-stone-300" />
-                      <p className="text-base font-medium text-gray-700">No members in label list</p>
-                      <p className="text-xs text-gray-500">
+                      <Printer className="h-10 w-10 text-[#863221]/30" />
+                      <p className="text-sm font-semibold text-[#180200]">No members in label list</p>
+                      <p className="text-xs text-[#863221]/70">
                         Select members from the Membership List to add to the label printing queue.
                       </p>
                       <Link
                         to="/dashboard/membership/list"
-                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#8C1801] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#510601]"
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-[#510601] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#3D0400] transition-colors"
                       >
                         <User className="h-3.5 w-3.5" />
                         <span>Go to Membership List</span>
@@ -453,8 +431,8 @@ export default function LabelList() {
                   return (
                     <tr
                       key={item.id}
-                      className={`hover:bg-amber-50/40 transition-colors ${
-                        isSelected ? 'bg-amber-50/70' : ''
+                      className={`hover:bg-[#FAF7F2]/60 transition-colors ${
+                        isSelected ? 'bg-amber-50/60' : ''
                       }`}
                     >
                       {/* Individual Checkbox */}
@@ -464,45 +442,45 @@ export default function LabelList() {
                           checked={isSelected}
                           onChange={() => handleToggleSelectItem(item.id)}
                           aria-label={`Select ${member.fullName}`}
-                          className="h-4 w-4 rounded border-stone-300 text-[#8C1801] focus:ring-[#8C1801]"
+                          className="h-4 w-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer"
                         />
                       </td>
 
                       {/* Member Name */}
                       <td className="px-4 py-3.5">
-                        <div className="font-semibold text-gray-900">{member.fullName}</div>
+                        <div className="font-semibold text-[#180200]">{member.fullName}</div>
                       </td>
 
                       {/* Membership Number */}
-                      <td className="px-4 py-3.5 font-mono text-xs font-medium text-gray-800">
+                      <td className="px-4 py-3.5 font-mono text-xs font-bold text-[#510601]">
                         {member.membershipNumber}
                       </td>
 
                       {/* Membership Type */}
                       <td className="px-4 py-3.5 text-xs">
-                        <span className="inline-flex items-center rounded-md bg-stone-100 px-2 py-1 text-xs font-medium text-stone-800">
+                        <span className="inline-flex items-center rounded-full bg-[#FAF7F2] border border-[#E8DFD8] px-2.5 py-0.5 text-[10px] font-bold text-[#863221]">
                           {memType?.name || '—'}
                         </span>
                       </td>
 
                       {/* Mobile Number */}
-                      <td className="px-4 py-3.5 font-mono text-xs text-gray-700">
+                      <td className="px-4 py-3.5 font-mono text-xs text-[#863221]">
                         {member.mobile}
                       </td>
 
                       {/* Full Address */}
-                      <td className="px-4 py-3.5 text-xs text-gray-700 leading-relaxed">
+                      <td className="px-4 py-3.5 text-xs text-[#180200] leading-relaxed">
                         <div>{member.addressLine || '—'}</div>
-                        <div className="text-gray-500 text-[11px]">
+                        <div className="text-[#863221] text-[11px]">
                           {member.talukName}, {member.districtName}, {member.stateName} -{' '}
-                          <span className="font-mono font-semibold text-gray-800">
+                          <span className="font-mono font-bold text-[#180200]">
                             {member.postalCode}
                           </span>
                         </div>
                       </td>
 
                       {/* Added Date */}
-                      <td className="px-4 py-3.5 text-xs text-gray-600">
+                      <td className="px-4 py-3.5 text-xs text-[#863221]">
                         {formatDate(item.addedDate)}
                       </td>
 
@@ -511,9 +489,9 @@ export default function LabelList() {
                         <Link
                           to="/dashboard/receipts/tracking"
                           title="Receipts decide who is on the label list"
-                          className="btn-act"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-[#863221] bg-[#FAF7F2] hover:bg-[#E8DFD8] border border-[#E8DFD8] rounded-lg transition-colors cursor-pointer"
                         >
-                          <FileText className="w-3.5 h-3.5" />
+                          <FileText className="w-3.5 h-3.5 text-[#510601]" />
                           <span>View receipts</span>
                         </Link>
                       </td>
@@ -527,44 +505,44 @@ export default function LabelList() {
 
         {/* Table Footer: the server pages the list */}
         {total > 0 && (
-          <div className="border-t border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3">
+          <div className="border-t border-[#E8DFD8] bg-[#FAF7F2]/40 px-4 py-3">
             <Pager page={currentPage} pages={pages} total={total} pageSize={pageSize} onPage={setCurrentPage} onPageSize={setPageSize} />
           </div>
         )}
       </div>
 
       {/* ========================================================= */}
-      {/* 10, 11. PRINT PREVIEW / PRINTABLE LABELS MODAL            */}
+      {/* PRINT PREVIEW / PRINTABLE LABELS MODAL                    */}
       {/* ========================================================= */}
       <Modal isOpen={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)}>
-        <div className="relative w-full max-w-4xl rounded-2xl bg-white shadow-2xl border border-stone-200 overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+        <div className="relative w-full max-w-4xl rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
           {/* Modal Header */}
-          <div className="flex items-center justify-between border-b border-stone-200 bg-[#FAF7F2] px-6 py-4 print:hidden no-print">
-            <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-[#8C1801] p-2 text-white">
+          <div className="flex items-center justify-between border-b border-[#E8DFD8] bg-[#FAF7F2] px-6 py-4 print:hidden no-print">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl bg-[#510601] p-2 text-white">
                 <Printer className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-[#180200]">
+                <h3 className="text-base font-bold text-[#180200]">
                   Print Member Labels
                 </h3>
-                <p className="text-xs text-gray-600">
+                <p className="text-xs text-[#863221]">
                   {itemsToPrint.length} label{itemsToPrint.length !== 1 ? 's' : ''} ready for dispatch printing
                 </p>
               </div>
             </div>
             <button
               onClick={() => setIsPrintModalOpen(false)}
-              className="rounded-lg p-1 text-gray-400 hover:bg-stone-200 hover:text-gray-700"
+              className="rounded-lg p-1 text-[#863221]/60 hover:bg-[#FAF7F2] hover:text-[#510601] cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
           {/* Modal Printable Body */}
-          <div className="flex-1 overflow-y-auto p-6 bg-stone-100/60 print:bg-white print:p-0" ref={printAreaRef}>
-            <div className="mb-4 flex items-center gap-2.5 rounded-lg bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200 print:hidden no-print">
-              <AlertCircle className="h-4 w-4 shrink-0 text-amber-700" />
+          <div className="flex-1 overflow-y-auto p-6 bg-[#FAF7F2]/40 print:bg-white print:p-0" ref={printAreaRef}>
+            <div className="mb-4 flex items-center gap-2.5 rounded-xl bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200 print:hidden no-print">
+              <AlertCircle className="h-4 w-4 shrink-0 text-[#EE6A00]" />
               <span>
                 A4 sticker sheet, 3 columns x 7 rows: membership number, name and address on each label.
               </span>
@@ -579,23 +557,23 @@ export default function LabelList() {
                 return (
                   <div
                     key={item.id}
-                    className="printable-label-card border border-stone-200 bg-white px-3 py-2.5 relative"
+                    className="printable-label-card border border-[#E8DFD8] bg-white px-3 py-2.5 relative"
                     style={{ minHeight: '42.4mm' }}
                   >
-                    {/* Recipient Details: membership number, name in bold, address (the sticker sheet's own format) */}
+                    {/* Recipient Details: membership number, name in bold, address */}
                     <div className="leading-tight text-black">
-                      <div className="text-[12px] mb-0.5">
+                      <div className="text-[12px] mb-0.5 font-mono font-bold text-[#510601]">
                         {member.membershipNumber}
                       </div>
-                      <div className="font-bold text-[12px] mb-0.5 uppercase">
+                      <div className="font-bold text-[12px] mb-0.5 uppercase text-[#180200]">
                         {member.fullName}
                       </div>
-                      <div className="text-[13px] leading-snug">
+                      <div className="text-[13px] leading-snug text-[#180200]">
                         {member.addressLine}
                         <br />
                         {[member.talukName, member.districtName].filter(Boolean).join(', ')}
                         <br />
-                        {member.stateName} - <span className="font-semibold">{member.postalCode}</span>
+                        {member.stateName} - <span className="font-semibold font-mono">{member.postalCode}</span>
                       </div>
                     </div>
                   </div>
@@ -612,15 +590,10 @@ export default function LabelList() {
             onCancel={() => setIsPrintModalOpen(false)}
             onSubmit={handleTriggerPrint}
             className="print:hidden no-print"
-            left={<span className="text-xs text-[#863221]">Total {itemsToPrint.length} label{itemsToPrint.length !== 1 ? 's' : ''} to print</span>}
+            left={<span className="text-xs font-semibold text-[#863221]">Total {itemsToPrint.length} label{itemsToPrint.length !== 1 ? 's' : ''} to print</span>}
           />
         </div>
       </Modal>
-
-      {/* ========================================================= */}
-      {/* 12. REMOVE CONFIRMATION DIALOG                            */}
-      {/* ========================================================= */}
-
     </div>
   );
 }

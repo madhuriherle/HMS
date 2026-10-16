@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
-import { Download, Trash2 } from 'lucide-react';
+import { Download, Trash2, AlertTriangle, ShieldCheck } from 'lucide-react';
 import api from '../api';
 import PermissionGate from '../components/PermissionGate';
+import PageTitle from '../components/PageTitle';
 import { askReason } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import { apiErrorMessage } from '../utils/apiError';
@@ -106,14 +107,29 @@ export default function DataCleanup() {
 
   return (
     <PermissionGate required="system.cleanup.read" minRank={0} title="Access Restricted" message="You do not have access to this page.">
-      <div className="space-y-6">
-        {error && <p className="text-xs font-semibold text-red-700">{error}</p>}
+      <div className="space-y-6 pb-12">
+        <PageTitle>Data Cleanup</PageTitle>
 
-        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden">
+        {/* Warning / Informational Alert Banner */}
+        <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-2xl p-4 flex items-start gap-3 shadow-xs">
+          <div className="p-2 rounded-xl bg-amber-50 text-[#EE6A00] border border-amber-200 shrink-0 mt-0.5">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+          <div className="text-xs text-[#863221] leading-relaxed">
+            <p className="font-bold text-[#180200] text-sm mb-0.5">Irreversible Data Purge Control</p>
+            <p>
+              Selected operational data can be cleared permanently. Master configuration (Taluks, Districts, Banks, and Membership Types) will always remain safely preserved. An automated CSV backup ZIP is created before deletion.
+            </p>
+          </div>
+        </div>
+
+        {error && <p className="text-xs font-semibold text-[#8C1801]">{error}</p>}
+
+        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="bg-[#FAF7F2] text-[10px] font-bold uppercase tracking-wider text-[#863221] border-b border-[#E8DFD8]">
+                <tr className="bg-[#FAF7F2] text-[11px] font-bold uppercase tracking-wider text-[#863221] border-b border-[#E8DFD8]">
                   <th className="py-3 pl-5 pr-2 w-10" />
                   <th className="py-3 px-3">Data group</th>
                   <th className="py-3 px-3">Rows</th>
@@ -121,7 +137,7 @@ export default function DataCleanup() {
                   <th className="py-3 px-3">Note</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-[#E8DFD8]">
                 {groups.map((g) => {
                   const on = effective.has(g.key);
                   const empty = g.rows === 0 && !forced(g.key);
@@ -129,12 +145,12 @@ export default function DataCleanup() {
                     <tr
                       key={g.key}
                       onClick={() => !empty && !forced(g.key) && canWrite && toggle(g.key)}
-                      className={`border-b last:border-b-0 border-[#F1E9E2] ${empty ? 'opacity-50' : 'cursor-pointer hover:bg-[#FAF7F2]/60'} ${on ? 'bg-[#FAF1EE]/50' : ''}`}
+                      className={`hover:bg-[#FAF7F2]/60 transition-colors ${empty ? 'opacity-50' : 'cursor-pointer'} ${on ? 'bg-amber-50/50' : ''}`}
                     >
                       <td className="py-3 pl-5 pr-2 align-top">
                         <input
                           type="checkbox"
-                          className="w-4 h-4 mt-0.5 cursor-pointer disabled:cursor-not-allowed"
+                          className="w-4 h-4 mt-0.5 cursor-pointer accent-[#510601] disabled:cursor-not-allowed"
                           checked={on}
                           disabled={empty || forced(g.key) || !canWrite}
                           onClick={(e) => e.stopPropagation()}
@@ -142,25 +158,29 @@ export default function DataCleanup() {
                           aria-label={`Clear ${g.label}`}
                         />
                       </td>
-                      <td className="py-3 px-3 align-top text-sm font-bold text-[#180200] whitespace-nowrap">{g.label}</td>
+                      <td className="py-3 px-3 align-top font-bold text-[#180200] whitespace-nowrap">{g.label}</td>
                       <td className="py-3 px-3 align-top">
-                        <span className={`chip ${g.rows ? 'chip-warn' : 'chip-off'}`}>{g.rows}</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${
+                          g.rows > 0 ? 'bg-amber-50 text-[#863221] border border-amber-200' : 'bg-[#FAF7F2] text-[#863221]/60 border border-[#E8DFD8]'
+                        }`}>
+                          {g.rows}
+                        </span>
                       </td>
-                      <td className="py-3 px-3 align-top text-xs text-[#180200]/70 min-w-[18rem]">{g.description}</td>
+                      <td className="py-3 px-3 align-top text-xs text-[#863221] min-w-[18rem]">{g.description}</td>
                       <td className="py-3 px-3 align-top">
                         <div className="flex flex-wrap gap-1.5">
                           {g.requires.length > 0 && (
-                            <span className="chip chip-brand" title="Cleared together with this group">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FAF7F2] border border-[#E8DFD8] text-[#510601]" title="Cleared together with this group">
                               Also clears {g.requires.map(labelOf).join(', ')}
                             </span>
                           )}
-                          {forced(g.key) && <span className="chip chip-brand">Cleared along with your selection</span>}
+                          {forced(g.key) && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FAF7F2] border border-[#E8DFD8] text-[#510601]">Cleared along with your selection</span>}
                           {g.has_files && (
-                            <span className="chip chip-off inline-flex items-center gap-1" title="Uploaded files of these records are deleted from the server too">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FAF7F2] border border-[#E8DFD8] text-[#863221]" title="Uploaded files of these records are deleted from the server too">
                               <Trash2 className="w-3 h-3" /> Files deleted
                             </span>
                           )}
-                          {g.warning && <span className="chip chip-bad" title={g.warning}>{on ? g.warning : 'Signs everyone out'}</span>}
+                          {g.warning && <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 border border-rose-200 text-[#8C1801]" title={g.warning}>{on ? g.warning : 'Signs everyone out'}</span>}
                         </div>
                       </td>
                     </tr>
@@ -171,18 +191,22 @@ export default function DataCleanup() {
           </div>
         </div>
 
-        <div className="sticky bottom-3 flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl border border-[#E8DFD8] shadow-sm px-5 py-3">
+        <div className="sticky bottom-3 flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_16px_-2px_rgba(24,2,0,0.08)] px-5 py-3">
           <label className="flex items-center gap-2 text-xs font-semibold text-[#180200] cursor-pointer">
-            <input type="checkbox" className="w-4 h-4" checked={backup} onChange={(e) => setBackup(e.target.checked)} />
+            <input type="checkbox" className="w-4 h-4 accent-[#510601] cursor-pointer" checked={backup} onChange={(e) => setBackup(e.target.checked)} />
             <Download className="w-4 h-4 text-[#863221]" /> Download a backup (CSV files) before clearing
           </label>
           <div className="flex items-center gap-4">
-            <span className="text-xs text-[#863221]">
+            <span className="text-xs font-semibold text-[#863221]">
               {chosen.length === 0 ? 'Nothing selected' : `${chosen.length} group${chosen.length > 1 ? 's' : ''} selected · ${rows} rows`}
             </span>
             {canWrite && (
-              <button type="button" onClick={clear} disabled={busy || chosen.length === 0}
-                className="px-4 py-2 rounded-xl bg-[#ED4636] text-white text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+              <button
+                type="button"
+                onClick={clear}
+                disabled={busy || chosen.length === 0}
+                className="px-4 py-2 rounded-xl bg-[#510601] hover:bg-[#3D0400] text-white text-xs font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs transition-colors"
+              >
                 {busy ? 'Clearing...' : 'Clear selected data'}
               </button>
             )}

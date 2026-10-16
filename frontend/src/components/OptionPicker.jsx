@@ -55,7 +55,7 @@ export default function OptionPicker({
         disabled={disabled}
         title={current ? current.label : placeholder}
         className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] border rounded-lg text-sm text-left cursor-pointer transition-all shadow-2xs disabled:cursor-not-allowed disabled:opacity-60 ${
-          hasError ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+          hasError ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
         } ${current ? 'text-[#180200]' : 'text-[#9E8B7F]'}`}
       >
         <span className="truncate">{current ? current.label : placeholder}</span>

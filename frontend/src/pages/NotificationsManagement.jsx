@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import PageActions, { PageActionsSlot } from '../components/PageActions';
 import PageTitle from '../components/PageTitle';
+import SearchFilterBar from '../components/SearchFilterBar';
+import FilterSelect from '../components/FilterSelect';
+import Pager from '../components/Pager';
 import {
   Bell,
   MessageSquare,
@@ -30,7 +33,7 @@ const TABS = [
 ];
 
 const CHANNELS = [
-  { key: 'WHATSAPP', label: 'WhatsApp', icon: Smartphone, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
+  { key: 'WHATSAPP', label: 'WhatsApp', icon: Smartphone, color: 'text-[#3D705C] bg-emerald-50 border-emerald-200' },
   { key: 'SMS', label: 'SMS', icon: MessageSquare, color: 'text-blue-700 bg-blue-50 border-blue-200' },
   { key: 'EMAIL', label: 'Email', icon: Mail, color: 'text-purple-700 bg-purple-50 border-purple-200' },
 ];
@@ -93,9 +96,31 @@ export default function NotificationsManagement() {
       {/* Dynamic Page Title in Header Bar */}
       <PageTitle>{TABS.find((t) => t.key === activeTab)?.label || 'Notifications'}</PageTitle>
 
-      {/* Action Toolbar */}
+      {/* Action Toolbar slot for title bar */}
       <div className="flex justify-end -mb-2">
         <PageActionsSlot />
+      </div>
+
+      {/* Top Module Tab Switcher */}
+      <div className="bg-[#FAF7F2] p-1.5 rounded-2xl border border-[#E8DFD8] flex flex-wrap gap-1 shadow-sm">
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setTab(tab.key)}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-[#510601] text-white shadow-sm'
+                  : 'text-[#863221] hover:bg-white hover:text-[#510601]'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Tab Views */}
@@ -134,6 +159,13 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [templates, setTemplates] = useState([]);
+
+  // Filter & Search & Pagination states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [channelFilter, setChannelFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // Campaign Form State
   const [formData, setFormData] = useState({
@@ -250,56 +282,115 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
     }
   };
 
+  // Filtered campaigns
+  const filteredCampaigns = useMemo(() => {
+    return campaigns.filter((c) => {
+      if (channelFilter !== 'ALL' && c.channel !== channelFilter) return false;
+      if (statusFilter !== 'ALL' && (c.status || 'DRAFT') !== statusFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const name = (c.campaign_name || '').toLowerCase();
+        const tname = (c.template_name || '').toLowerCase();
+        if (!name.includes(q) && !tname.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [campaigns, channelFilter, statusFilter, searchQuery]);
+
+  const activeFiltersCount = (channelFilter !== 'ALL' ? 1 : 0) + (statusFilter !== 'ALL' ? 1 : 0);
+
+  const resetFilters = () => {
+    setChannelFilter('ALL');
+    setStatusFilter('ALL');
+    setSearchQuery('');
+    setPage(1);
+  };
+
+  const total = filteredCampaigns.length;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const paginatedCampaigns = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredCampaigns.slice(start, start + pageSize);
+  }, [filteredCampaigns, page, pageSize]);
+
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="text-xs text-stone-600">
-          Broadcast campaigns dispatched across WhatsApp, SMS, or Email
-        </div>
-        <PageActions>
-          <button
-            onClick={loadCampaigns}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-stone-700 bg-white border border-[#E8DFD8] rounded-lg hover:bg-stone-50 cursor-pointer shadow-sm transition-colors"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh</span>
-          </button>
-          {canWrite && (
+      {/* Search & Filter Toolbar */}
+      <SearchFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={(q) => { setSearchQuery(q); setPage(1); }}
+        searchPlaceholder="Search campaigns by name or template..."
+        activeFiltersCount={activeFiltersCount}
+        onResetFilters={resetFilters}
+        rightSlot={
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                setFormData({
-                  campaign_name: '',
-                  channel: 'WHATSAPP',
-                  template_id: templates[0]?.id ? String(templates[0].id) : '',
-                  target_audience: 'ALL_APPROVED',
-                  district_id: '',
-                  taluk_id: '',
-                  membership_type_id: '',
-                });
-                setModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-lg hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
+              onClick={loadCampaigns}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#863221] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer shadow-xs transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>Create Campaign</span>
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Refresh</span>
             </button>
-          )}
-          {canWrite && (
-            <button
-              type="button"
-              onClick={() => setQuickSendOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-[#FAF7F2] cursor-pointer shadow-sm transition-colors"
-            >
-              <Smartphone className="w-4 h-4" />
-              <span>Quick Send</span>
-            </button>
-          )}
-        </PageActions>
-      </div>
+            {canWrite && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setQuickSendOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer shadow-xs transition-colors"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  <span>Quick Send</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setFormData({
+                      campaign_name: '',
+                      channel: 'WHATSAPP',
+                      template_id: templates[0]?.id ? String(templates[0].id) : '',
+                      target_audience: 'ALL_APPROVED',
+                      district_id: '',
+                      taluk_id: '',
+                      membership_type_id: '',
+                    });
+                    setModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-xl hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Create Campaign</span>
+                </button>
+              </>
+            )}
+          </div>
+        }
+      >
+        <FilterSelect
+          value={channelFilter}
+          onChange={(v) => { setChannelFilter(v); setPage(1); }}
+          placeholder="All Channels"
+          options={[
+            { value: 'ALL', label: 'All Channels' },
+            { value: 'WHATSAPP', label: 'WhatsApp' },
+            { value: 'SMS', label: 'SMS' },
+            { value: 'EMAIL', label: 'Email' },
+          ]}
+        />
+        <FilterSelect
+          value={statusFilter}
+          onChange={(v) => { setStatusFilter(v); setPage(1); }}
+          placeholder="All Statuses"
+          options={[
+            { value: 'ALL', label: 'All Statuses' },
+            { value: 'DRAFT', label: 'Draft' },
+            { value: 'SENDING', label: 'Sending' },
+            { value: 'SENT', label: 'Sent' },
+            { value: 'FAILED', label: 'Failed' },
+          ]}
+        />
+      </SearchFilterBar>
 
-      {/* Campaigns Table */}
-      <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
+      {/* Campaigns Table Card */}
+      <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
@@ -315,48 +406,48 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
             <tbody className="divide-y divide-[#E8DFD8]">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-stone-400">
-                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8C1801]" />
+                  <td colSpan="6" className="py-12 text-center text-[#863221]">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#510601]" />
                     Loading campaigns...
                   </td>
                 </tr>
-              ) : campaigns.length === 0 ? (
+              ) : paginatedCampaigns.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-stone-400">
-                    No broadcast campaigns created yet.
+                  <td colSpan="6" className="py-12 text-center text-[#863221]/70">
+                    No broadcast campaigns match the specified criteria.
                   </td>
                 </tr>
               ) : (
-                campaigns.map((c) => {
+                paginatedCampaigns.map((c) => {
                   const ch = CHANNELS.find((x) => x.key === c.channel) || CHANNELS[0];
                   return (
-                    <tr key={c.id} className="hover:bg-stone-50">
-                      <td className="py-3 px-4 font-semibold text-stone-800">{c.campaign_name}</td>
+                    <tr key={c.id} className="hover:bg-[#FAF7F2]/50 transition-colors">
+                      <td className="py-3 px-4 font-semibold text-[#180200]">{c.campaign_name}</td>
                       <td className="py-3 px-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${ch.color}`}>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${ch.color}`}>
                           {ch.label}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-stone-600">{c.template_name || `Template ${c.template_id}`}</td>
+                      <td className="py-3 px-4 text-[#863221]">{c.template_name || `Template ${c.template_id}`}</td>
                       <td className="py-3 px-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                           c.status === 'SENT'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            ? 'bg-emerald-50 text-[#3D705C] border border-emerald-200'
                             : c.status === 'SENDING' || c.status === 'PARTIAL'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                            ? 'bg-amber-50 text-[#EE6A00] border border-amber-200'
                             : c.status === 'FAILED'
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                            : 'bg-stone-100 text-stone-600 border border-stone-200'
+                            ? 'bg-rose-50 text-[#8C1801] border border-rose-200'
+                            : 'bg-[#FAF7F2] text-[#863221] border border-[#E8DFD8]'
                         }`}>
                           {c.status || 'DRAFT'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-stone-600">{formatDate(c.created_at)}</td>
+                      <td className="py-3 px-4 text-[#863221]">{formatDate(c.created_at)}</td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => openRecipients(c)}
-                            className="inline-flex items-center gap-1 px-2 py-1 text-xs text-stone-700 bg-stone-100 hover:bg-stone-200 rounded transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs text-[#863221] bg-[#FAF7F2] hover:bg-[#E8DFD8] border border-[#E8DFD8] rounded-lg transition-colors cursor-pointer font-medium"
                             title="View Recipients"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -365,7 +456,7 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
                           {canWrite && c.status !== 'SENT' && (
                             <button
                               onClick={() => handleSendCampaign(c.id)}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-xs text-white bg-[#510601] hover:bg-[#3D0400] rounded transition-colors cursor-pointer font-semibold"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-xs text-white bg-[#510601] hover:bg-[#3D0400] rounded-lg transition-colors cursor-pointer font-semibold shadow-xs"
                               title="Send Now"
                             >
                               <Send className="w-3.5 h-3.5" />
@@ -375,10 +466,10 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
                           {canDelete && (
                             <button
                               onClick={() => handleDeleteCampaign(c.id)}
-                              className="p-1 text-stone-400 hover:text-red-700 rounded transition-colors cursor-pointer"
+                              className="p-1.5 text-[#863221]/60 hover:text-[#8C1801] rounded-lg transition-colors cursor-pointer hover:bg-rose-50"
                               title="Delete Campaign"
                             >
-                              <Trash2 className="w-4 h-4" /><span>Delete</span>
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           )}
                         </div>
@@ -390,6 +481,19 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
             </tbody>
           </table>
         </div>
+
+        {total > 0 && (
+          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/30">
+            <Pager
+              page={page}
+              pages={pages}
+              total={total}
+              pageSize={pageSize}
+              onPage={setPage}
+              onPageSize={(s) => { setPageSize(s); setPage(1); }}
+            />
+          </div>
+        )}
       </div>
 
       <QuickSendModal isOpen={quickSendOpen} onClose={() => setQuickSendOpen(false)} canWrite={canWrite} />
@@ -409,23 +513,23 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
       >
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Campaign Name *</label>
+            <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Campaign Name *</label>
             <input
               type="text"
               value={formData.campaign_name}
               onChange={(e) => setFormData({ ...formData, campaign_name: e.target.value })}
               placeholder="e.g. Annual General Body Meeting Announcement"
-              className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+              className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Communication Channel</label>
+              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Communication Channel</label>
               <select
                 value={formData.channel}
                 onChange={(e) => setFormData({ ...formData, channel: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+                className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
               >
                 <option value="WHATSAPP">WhatsApp</option>
                 <option value="SMS">SMS</option>
@@ -433,11 +537,11 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Message Template *</label>
+              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Message Template *</label>
               <select
                 value={formData.template_id}
                 onChange={(e) => setFormData({ ...formData, template_id: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+                className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
               >
                 <option value="">Select a template...</option>
                 {templates
@@ -450,11 +554,11 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Target Audience</label>
+            <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Target Audience</label>
             <select
               value={formData.target_audience}
               onChange={(e) => setFormData({ ...formData, target_audience: e.target.value })}
-              className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+              className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
             >
               <option value="ALL_APPROVED">All Approved Members</option>
               <option value="UNAPPROVED">Unapproved / Pending Applicants</option>
@@ -463,14 +567,14 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
           </div>
 
           <div className="border-t border-[#E8DFD8] pt-3">
-            <span className="block text-xs font-bold text-stone-600 uppercase mb-2">Optional Geographic / Category Filters</span>
+            <span className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-2">Optional Geographic / Category Filters</span>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
-                <label className="block text-[11px] text-stone-500 mb-1">District</label>
+                <label className="block text-[11px] font-semibold text-[#863221]/80 mb-1">District</label>
                 <select
                   value={formData.district_id}
                   onChange={(e) => setFormData({ ...formData, district_id: e.target.value, taluk_id: '' })}
-                  className="w-full px-2 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800"
+                  className="w-full px-2.5 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] cursor-pointer"
                 >
                   <option value="">All Districts</option>
                   {districts.map((d) => (
@@ -480,12 +584,12 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
               </div>
 
               <div>
-                <label className="block text-[11px] text-stone-500 mb-1">Taluk</label>
+                <label className="block text-[11px] font-semibold text-[#863221]/80 mb-1">Taluk</label>
                 <select
                   value={formData.taluk_id}
                   onChange={(e) => setFormData({ ...formData, taluk_id: e.target.value })}
                   disabled={!formData.district_id}
-                  className="w-full px-2 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 disabled:opacity-50"
+                  className="w-full px-2.5 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] disabled:opacity-50 cursor-pointer"
                 >
                   <option value="">All Taluks</option>
                   {taluks
@@ -497,11 +601,11 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
               </div>
 
               <div>
-                <label className="block text-[11px] text-stone-500 mb-1">Membership Type</label>
+                <label className="block text-[11px] font-semibold text-[#863221]/80 mb-1">Membership Type</label>
                 <select
                   value={formData.membership_type_id}
                   onChange={(e) => setFormData({ ...formData, membership_type_id: e.target.value })}
-                  className="w-full px-2 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800"
+                  className="w-full px-2.5 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] cursor-pointer"
                 >
                   <option value="">All Types</option>
                   {membershipTypes.map((mt) => (
@@ -527,36 +631,36 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
         }
       >
         <div className="p-6 space-y-3">
-          <div className="overflow-x-auto max-h-80 overflow-y-auto">
+          <div className="overflow-x-auto max-h-80 overflow-y-auto rounded-xl border border-[#E8DFD8]">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="py-2 px-3">Recipient Name</th>
-                  <th className="py-2 px-3">Destination</th>
-                  <th className="py-2 px-3">Status</th>
+                  <th className="py-2.5 px-3">Recipient Name</th>
+                  <th className="py-2.5 px-3">Destination</th>
+                  <th className="py-2.5 px-3">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8DFD8]">
                 {loadingRecipients ? (
                   <tr>
-                    <td colSpan="3" className="py-8 text-center text-stone-400">Loading recipients...</td>
+                    <td colSpan="3" className="py-8 text-center text-[#863221]">Loading recipients...</td>
                   </tr>
                 ) : recipients.length === 0 ? (
                   <tr>
-                    <td colSpan="3" className="py-8 text-center text-stone-400">No recipients queued or recorded.</td>
+                    <td colSpan="3" className="py-8 text-center text-[#863221]/70">No recipients queued or recorded.</td>
                   </tr>
                 ) : (
                   recipients.map((r, i) => (
-                    <tr key={i} className="hover:bg-stone-50">
-                      <td className="py-2 px-3 font-medium text-stone-800">{r.name || r.recipient_name || 'Member'}</td>
-                      <td className="py-2 px-3 text-stone-600">{r.destination || r.mobile || r.email || '—'}</td>
-                      <td className="py-2 px-3">
+                    <tr key={i} className="hover:bg-[#FAF7F2]/50 transition-colors">
+                      <td className="py-2.5 px-3 font-medium text-[#180200]">{r.name || r.recipient_name || 'Member'}</td>
+                      <td className="py-2.5 px-3 text-[#863221]">{r.destination || r.mobile || r.email || '—'}</td>
+                      <td className="py-2.5 px-3">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           r.status === 'SENT'
-                            ? 'bg-emerald-50 text-emerald-700'
+                            ? 'bg-emerald-50 text-[#3D705C] border border-emerald-200'
                             : r.status === 'FAILED'
-                            ? 'bg-rose-50 text-rose-700'
-                            : 'bg-stone-100 text-stone-600'
+                            ? 'bg-rose-50 text-[#8C1801] border border-rose-200'
+                            : 'bg-[#FAF7F2] text-[#863221] border border-[#E8DFD8]'
                         }`}>
                           {r.status || 'PENDING'}
                         </span>
@@ -581,6 +685,13 @@ function TemplatesTab({ canWrite, canDelete }) {
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState(null);
+
+  // Filters & Pagination
+  const [searchQuery, setSearchQuery] = useState('');
+  const [channelFilter, setChannelFilter] = useState('ALL');
+  const [purposeFilter, setPurposeFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -659,47 +770,104 @@ function TemplatesTab({ canWrite, canDelete }) {
     }));
   };
 
+  // Filtered templates
+  const filteredTemplates = useMemo(() => {
+    return templates.filter((t) => {
+      if (channelFilter !== 'ALL' && t.channel !== channelFilter) return false;
+      if (purposeFilter !== 'ALL' && t.purpose !== purposeFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const name = (t.name || '').toLowerCase();
+        const code = (t.code || '').toLowerCase();
+        const body = (t.body || '').toLowerCase();
+        if (!name.includes(q) && !code.includes(q) && !body.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [templates, channelFilter, purposeFilter, searchQuery]);
+
+  const activeFiltersCount = (channelFilter !== 'ALL' ? 1 : 0) + (purposeFilter !== 'ALL' ? 1 : 0);
+
+  const resetFilters = () => {
+    setChannelFilter('ALL');
+    setPurposeFilter('ALL');
+    setSearchQuery('');
+    setPage(1);
+  };
+
+  const total = filteredTemplates.length;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const paginatedTemplates = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredTemplates.slice(start, start + pageSize);
+  }, [filteredTemplates, page, pageSize]);
+
   return (
     <div className="space-y-4">
-      {/* Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="text-xs text-stone-600">
-          Reusable message templates with dynamic tags like <code className="bg-stone-100 px-1 py-0.5 rounded text-[#510601]">{'{{name}}'}</code>, <code className="bg-stone-100 px-1 py-0.5 rounded text-[#510601]">{'{{member_code}}'}</code>
-        </div>
-        <PageActions>
-          <button
-            onClick={loadTemplates}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-stone-700 bg-white border border-[#E8DFD8] rounded-lg hover:bg-stone-50 cursor-pointer shadow-sm transition-colors"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh</span>
-          </button>
-          {canWrite && (
+      {/* Search & Filter Toolbar */}
+      <SearchFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={(q) => { setSearchQuery(q); setPage(1); }}
+        searchPlaceholder="Search templates by name, code or content..."
+        activeFiltersCount={activeFiltersCount}
+        onResetFilters={resetFilters}
+        rightSlot={
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                setEditingTemplate(null);
-                setFormData({
-                  name: '',
-                  code: '',
-                  channel: 'WHATSAPP',
-                  purpose: 'GENERAL',
-                  subject: '',
-                  body: '',
-                  language: 'kn',
-                });
-                setModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-lg hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
+              onClick={loadTemplates}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#863221] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer shadow-xs transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              <span>Create Template</span>
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Refresh</span>
             </button>
-          )}
-        </PageActions>
-      </div>
+            {canWrite && (
+              <button
+                onClick={() => {
+                  setEditingTemplate(null);
+                  setFormData({
+                    name: '',
+                    code: '',
+                    channel: 'WHATSAPP',
+                    purpose: 'GENERAL',
+                    subject: '',
+                    body: '',
+                    language: 'kn',
+                  });
+                  setModalOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-xl hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create Template</span>
+              </button>
+            )}
+          </div>
+        }
+      >
+        <FilterSelect
+          value={channelFilter}
+          onChange={(v) => { setChannelFilter(v); setPage(1); }}
+          placeholder="All Channels"
+          options={[
+            { value: 'ALL', label: 'All Channels' },
+            { value: 'WHATSAPP', label: 'WhatsApp' },
+            { value: 'SMS', label: 'SMS' },
+            { value: 'EMAIL', label: 'Email' },
+          ]}
+        />
+        <FilterSelect
+          value={purposeFilter}
+          onChange={(v) => { setPurposeFilter(v); setPage(1); }}
+          placeholder="All Purposes"
+          options={[
+            { value: 'ALL', label: 'All Purposes' },
+            ...PURPOSES.map((p) => ({ value: p.key, label: p.label })),
+          ]}
+        />
+      </SearchFilterBar>
 
-      {/* Templates Table */}
-      <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
+      {/* Templates Table Card */}
+      <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
@@ -715,40 +883,40 @@ function TemplatesTab({ canWrite, canDelete }) {
             <tbody className="divide-y divide-[#E8DFD8]">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-stone-400">
-                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8C1801]" />
+                  <td colSpan="6" className="py-12 text-center text-[#863221]">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#510601]" />
                     Loading templates...
                   </td>
                 </tr>
-              ) : templates.length === 0 ? (
+              ) : paginatedTemplates.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-stone-400">
-                    No message templates created yet.
+                  <td colSpan="6" className="py-12 text-center text-[#863221]/70">
+                    No message templates found matching criteria.
                   </td>
                 </tr>
               ) : (
-                templates.map((t) => {
+                paginatedTemplates.map((t) => {
                   const ch = CHANNELS.find((x) => x.key === t.channel) || CHANNELS[0];
                   return (
-                    <tr key={t.id} className="hover:bg-stone-50">
+                    <tr key={t.id} className="hover:bg-[#FAF7F2]/50 transition-colors">
                       <td className="py-3 px-4">
-                        <div className="font-semibold text-stone-800">{t.name}</div>
-                        <div className="text-[11px] text-stone-500 line-clamp-1 max-w-sm mt-0.5">{t.body}</div>
+                        <div className="font-semibold text-[#180200]">{t.name}</div>
+                        <div className="text-[11px] text-[#863221] line-clamp-1 max-w-sm mt-0.5">{t.body}</div>
                       </td>
-                      <td className="py-3 px-4 font-mono text-[11px] text-stone-600">{t.code}</td>
+                      <td className="py-3 px-4 font-mono font-bold text-[11px] text-[#510601]">{t.code}</td>
                       <td className="py-3 px-4">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${ch.color}`}>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${ch.color}`}>
                           {ch.label}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-stone-600">{t.purpose}</td>
+                      <td className="py-3 px-4 text-[#863221]">{t.purpose}</td>
                       <td className="py-3 px-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                           t.provider_approval_status === 'APPROVED'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            ? 'bg-emerald-50 text-[#3D705C] border border-emerald-200'
                             : t.provider_approval_status === 'REJECTED'
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                            : 'bg-stone-100 text-stone-600 border border-stone-200'
+                            ? 'bg-rose-50 text-[#8C1801] border border-rose-200'
+                            : 'bg-[#FAF7F2] text-[#863221] border border-[#E8DFD8]'
                         }`}>
                           {t.provider_approval_status || 'LOCAL'}
                         </span>
@@ -770,19 +938,19 @@ function TemplatesTab({ canWrite, canDelete }) {
                                 });
                                 setModalOpen(true);
                               }}
-                              className="p-1 text-stone-500 hover:text-[#510601] rounded transition-colors cursor-pointer"
+                              className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg transition-colors cursor-pointer"
                               title="Edit Template"
                             >
-                              <Pencil className="w-4 h-4" /><span>Edit</span>
+                              <Pencil className="w-4 h-4" />
                             </button>
                           )}
                           {canDelete && (
                             <button
                               onClick={() => handleDeleteTemplate(t.id)}
-                              className="p-1 text-stone-400 hover:text-red-700 rounded transition-colors cursor-pointer"
+                              className="p-1.5 text-[#863221]/60 hover:text-[#8C1801] hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                               title="Delete Template"
                             >
-                              <Trash2 className="w-4 h-4" /><span>Delete</span>
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           )}
                         </div>
@@ -794,6 +962,19 @@ function TemplatesTab({ canWrite, canDelete }) {
             </tbody>
           </table>
         </div>
+
+        {total > 0 && (
+          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/30">
+            <Pager
+              page={page}
+              pages={pages}
+              total={total}
+              pageSize={pageSize}
+              onPage={setPage}
+              onPageSize={(s) => { setPageSize(s); setPage(1); }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Create / Edit Template Modal */}
@@ -813,34 +994,34 @@ function TemplatesTab({ canWrite, canDelete }) {
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Template Name *</label>
+              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Template Name *</label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g. Receipt Confirmation"
-                className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+                className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Template Code *</label>
+              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Template Code *</label>
               <input
                 type="text"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                 placeholder="e.g. RECEIPT_CONFIRM"
-                className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 font-mono focus:outline-none focus:border-[#510601]"
+                className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] font-mono focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Channel</label>
+              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Channel</label>
               <select
                 value={formData.channel}
                 onChange={(e) => setFormData({ ...formData, channel: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+                className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
               >
                 <option value="WHATSAPP">WhatsApp</option>
                 <option value="SMS">SMS</option>
@@ -848,11 +1029,11 @@ function TemplatesTab({ canWrite, canDelete }) {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Purpose</label>
+              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Purpose</label>
               <select
                 value={formData.purpose}
                 onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+                className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
               >
                 {PURPOSES.map((p) => (
                   <option key={p.key} value={p.key}>{p.label}</option>
@@ -860,11 +1041,11 @@ function TemplatesTab({ canWrite, canDelete }) {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Language</label>
+              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Language</label>
               <select
                 value={formData.language}
                 onChange={(e) => setFormData({ ...formData, language: e.target.value })}
-                className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+                className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
               >
                 <option value="kn">Kannada (ಕನ್ನಡ)</option>
                 <option value="en">English</option>
@@ -874,28 +1055,28 @@ function TemplatesTab({ canWrite, canDelete }) {
 
           {formData.channel === 'EMAIL' && (
             <div>
-              <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Email Subject *</label>
+              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Email Subject *</label>
               <input
                 type="text"
                 value={formData.subject}
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                 placeholder="Important Notice from Akhila Havyaka Mahasabha"
-                className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+                className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
               />
             </div>
           )}
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-bold text-stone-700 uppercase">Message Content / Body *</label>
-              <div className="flex items-center gap-1 text-[11px] text-stone-500">
+              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider">Message Content / Body *</label>
+              <div className="flex items-center gap-1.5 text-[11px] text-[#863221]">
                 <span>Insert tag:</span>
                 {['name', 'member_code', 'mobile'].map((v) => (
                   <button
                     key={v}
                     type="button"
                     onClick={() => insertVariable(v)}
-                    className="px-1.5 py-0.5 bg-stone-100 hover:bg-[#FAF7F2] text-[#510601] font-mono text-[10px] rounded border border-stone-200 cursor-pointer"
+                    className="px-2 py-0.5 bg-[#FAF7F2] hover:bg-[#E8DFD8] text-[#510601] font-mono font-bold text-[10px] rounded-md border border-[#E8DFD8] cursor-pointer transition-colors"
                   >
                     +{v}
                   </button>
@@ -907,7 +1088,7 @@ function TemplatesTab({ canWrite, canDelete }) {
               value={formData.body}
               onChange={(e) => setFormData({ ...formData, body: e.target.value })}
               placeholder="ನಮಸ್ಕಾರ {{name}}, ಅಖಿಲ ಹವ್ಯಕ ಮಹಾಸಭಾದಿಂದ ಪ್ರಕಟಣೆ..."
-              className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+              className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
             />
           </div>
         </div>
@@ -974,66 +1155,65 @@ function QuickSendModal({ isOpen, onClose, canWrite }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Quick Send">
+    <Modal isOpen={isOpen} onClose={onClose} title="Quick Send Direct Message">
       <form onSubmit={handleSend} className="flex-1 flex flex-col justify-between">
         <div className="p-6 space-y-4 flex-1 overflow-y-auto">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Communication Channel</label>
-            <select
-              value={channel}
-              onChange={(e) => setChannel(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-            >
-              <option value="WHATSAPP">WhatsApp</option>
-              <option value="SMS">SMS</option>
-              <option value="EMAIL">Email</option>
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Communication Channel</label>
+              <select
+                value={channel}
+                onChange={(e) => setChannel(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
+              >
+                <option value="WHATSAPP">WhatsApp</option>
+                <option value="SMS">SMS</option>
+                <option value="EMAIL">Email</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Load Template (Optional)</label>
+              <select
+                value={templateId}
+                onChange={(e) => handleTemplateSelect(e.target.value)}
+                className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
+              >
+                <option value="">Draft custom message...</option>
+                {templates
+                  .filter((t) => t.channel === channel)
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+              </select>
+            </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Load Template (Optional)</label>
-            <select
-              value={templateId}
-              onChange={(e) => handleTemplateSelect(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-            >
-              <option value="">Draft custom message...</option>
-              {templates
-                .filter((t) => t.channel === channel)
-                .map((t) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-            </select>
+            <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">
+              Recipient {channel === 'EMAIL' ? 'Email Address' : 'Mobile Number'} *
+            </label>
+            <input
+              type="text"
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+              placeholder={channel === 'EMAIL' ? 'user@example.com' : '9876543210'}
+              className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Message Body *</label>
+            <textarea
+              rows={5}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Type your communication message here..."
+              className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
+            />
           </div>
         </div>
-
-        <div>
-          <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-            Recipient {channel === 'EMAIL' ? 'Email Address' : 'Mobile Number'} *
-          </label>
-          <input
-            type="text"
-            value={recipient}
-            onChange={(e) => setRecipient(e.target.value)}
-            placeholder={channel === 'EMAIL' ? 'user@example.com' : '9876543210'}
-            className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Message Body *</label>
-          <textarea
-            rows={5}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Type your communication message here..."
-            className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-          />
-        </div>
-
-        </div>
-        <ModalFooter onCancel={onClose} busy={sending} disabled={!canWrite} submitLabel="Send" />
+        <ModalFooter onCancel={onClose} busy={sending} disabled={!canWrite} submitLabel="Send Message" />
       </form>
     </Modal>
   );
@@ -1048,6 +1228,13 @@ function InboxTab({ canWrite }) {
   const [loading, setLoading] = useState(false);
   const [broadcastModalOpen, setBroadcastModalOpen] = useState(false);
   const [broadcastBody, setBroadcastBody] = useState({ title: '', body: '', priority: 'NORMAL' });
+
+  // Filters & Pagination
+  const [searchQuery, setSearchQuery] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   const loadInbox = useCallback(async () => {
     setLoading(true);
@@ -1099,82 +1286,152 @@ function InboxTab({ canWrite }) {
     }
   };
 
+  // Filtered inbox messages
+  const filteredMessages = useMemo(() => {
+    return messages.filter((m) => {
+      if (priorityFilter !== 'ALL' && (m.priority || 'NORMAL') !== priorityFilter) return false;
+      if (statusFilter === 'UNREAD' && m.is_read) return false;
+      if (statusFilter === 'READ' && !m.is_read) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const title = (m.title || '').toLowerCase();
+        const body = (m.body || m.message || '').toLowerCase();
+        if (!title.includes(q) && !body.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [messages, priorityFilter, statusFilter, searchQuery]);
+
+  const activeFiltersCount = (priorityFilter !== 'ALL' ? 1 : 0) + (statusFilter !== 'ALL' ? 1 : 0);
+
+  const resetFilters = () => {
+    setPriorityFilter('ALL');
+    setStatusFilter('ALL');
+    setSearchQuery('');
+    setPage(1);
+  };
+
+  const total = filteredMessages.length;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const paginatedMessages = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filteredMessages.slice(start, start + pageSize);
+  }, [filteredMessages, page, pageSize]);
+
   return (
     <div className="space-y-4">
-      {/* Top Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-stone-600">Internal notifications and administrative alerts</span>
-          {unreadCount > 0 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#8C1801] text-white">
-              {unreadCount} unread
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={loadInbox}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-stone-700 bg-white border border-[#E8DFD8] rounded-lg hover:bg-stone-50 cursor-pointer shadow-sm transition-colors"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span>Refresh</span>
-          </button>
-          {canWrite && (
+      {/* Search & Filter Toolbar */}
+      <SearchFilterBar
+        searchQuery={searchQuery}
+        onSearchChange={(q) => { setSearchQuery(q); setPage(1); }}
+        searchPlaceholder="Search inbox alerts and announcements..."
+        activeFiltersCount={activeFiltersCount}
+        onResetFilters={resetFilters}
+        rightSlot={
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-[#8C1801] text-white">
+                {unreadCount} unread
+              </span>
+            )}
             <button
-              onClick={() => setBroadcastModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-lg hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
+              onClick={loadInbox}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#863221] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer shadow-xs transition-colors"
             >
-              <Bell className="w-4 h-4" />
-              <span>Broadcast Announcement</span>
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Refresh</span>
             </button>
-          )}
-        </div>
-      </div>
+            {canWrite && (
+              <button
+                onClick={() => setBroadcastModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-xl hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
+              >
+                <Bell className="w-4 h-4" />
+                <span>Broadcast Announcement</span>
+              </button>
+            )}
+          </div>
+        }
+      >
+        <FilterSelect
+          value={priorityFilter}
+          onChange={(v) => { setPriorityFilter(v); setPage(1); }}
+          placeholder="All Priorities"
+          options={[
+            { value: 'ALL', label: 'All Priorities' },
+            { value: 'NORMAL', label: 'Normal Priority' },
+            { value: 'HIGH', label: 'High / Urgent' },
+          ]}
+        />
+        <FilterSelect
+          value={statusFilter}
+          onChange={(v) => { setStatusFilter(v); setPage(1); }}
+          placeholder="All Read States"
+          options={[
+            { value: 'ALL', label: 'All Messages' },
+            { value: 'UNREAD', label: 'Unread Only' },
+            { value: 'READ', label: 'Read Only' },
+          ]}
+        />
+      </SearchFilterBar>
 
-      {/* Messages List */}
-      <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm divide-y divide-[#E8DFD8]">
+      {/* Messages List Card */}
+      <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] divide-y divide-[#E8DFD8] overflow-hidden">
         {loading ? (
-          <div className="py-12 text-center text-stone-400">
-            <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#8C1801]" />
+          <div className="py-12 text-center text-[#863221]">
+            <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[#510601]" />
             Loading notifications...
           </div>
-        ) : messages.length === 0 ? (
-          <div className="py-12 text-center text-stone-400 text-xs">
-            No system notifications or alerts in your inbox.
+        ) : paginatedMessages.length === 0 ? (
+          <div className="py-12 text-center text-[#863221]/70 text-xs">
+            No system notifications or alerts match the filter.
           </div>
         ) : (
-          messages.map((m) => (
+          paginatedMessages.map((m) => (
             <div
               key={m.id}
               className={`p-4 flex items-start justify-between gap-4 transition-colors ${
-                !m.is_read ? 'bg-[#FAF7F2]' : 'hover:bg-stone-50'
+                !m.is_read ? 'bg-[#FAF7F2]/60' : 'hover:bg-[#FAF7F2]/30'
               }`}
             >
-              <div className="space-y-1">
+              <div className="space-y-1 flex-1">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-bold text-stone-900">{m.title || 'Notification'}</h3>
+                  <h3 className="text-xs font-bold text-[#180200]">{m.title || 'Notification'}</h3>
                   {!m.is_read && (
-                    <span className="w-2 h-2 rounded-full bg-[#8C1801]" />
+                    <span className="w-2 h-2 rounded-full bg-[#8C1801] shrink-0" />
                   )}
                   {m.priority === 'HIGH' && (
-                    <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-[#8C1801] border border-rose-200">
                       URGENT
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-stone-700">{m.body || m.message}</p>
-                <span className="text-[10px] text-stone-400 block">{formatDate(m.created_at)}</span>
+                <p className="text-xs text-[#863221] leading-relaxed">{m.body || m.message}</p>
+                <span className="text-[10px] text-[#863221]/60 block">{formatDate(m.created_at)}</span>
               </div>
               {!m.is_read && (
                 <button
                   onClick={() => markAsRead(m.id)}
-                  className="px-2 py-1 text-[11px] font-semibold text-[#510601] hover:bg-stone-100 rounded transition-colors cursor-pointer"
+                  className="px-2.5 py-1 text-xs font-semibold text-[#510601] hover:bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg transition-colors cursor-pointer shrink-0"
                 >
                   Mark Read
                 </button>
               )}
             </div>
           ))
+        )}
+
+        {total > 0 && (
+          <div className="p-4 bg-[#FAF7F2]/30">
+            <Pager
+              page={page}
+              pages={pages}
+              total={total}
+              pageSize={pageSize}
+              onPage={setPage}
+              onPageSize={(s) => { setPageSize(s); setPage(1); }}
+            />
+          </div>
         )}
       </div>
 
@@ -1193,34 +1450,34 @@ function InboxTab({ canWrite }) {
       >
         <div className="p-6 space-y-4">
           <div>
-            <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Title *</label>
+            <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Title *</label>
             <input
               type="text"
               value={broadcastBody.title}
               onChange={(e) => setBroadcastBody({ ...broadcastBody, title: e.target.value })}
               placeholder="e.g. System Maintenance Notice"
-              className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+              className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Priority</label>
+            <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Priority</label>
             <select
               value={broadcastBody.priority}
               onChange={(e) => setBroadcastBody({ ...broadcastBody, priority: e.target.value })}
-              className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+              className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
             >
               <option value="NORMAL">Normal</option>
               <option value="HIGH">High / Urgent</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs font-bold text-stone-700 uppercase mb-1">Announcement Body *</label>
+            <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Announcement Body *</label>
             <textarea
               rows={4}
               value={broadcastBody.body}
               onChange={(e) => setBroadcastBody({ ...broadcastBody, body: e.target.value })}
               placeholder="Enter announcement details..."
-              className="w-full px-3 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+              className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
             />
           </div>
         </div>

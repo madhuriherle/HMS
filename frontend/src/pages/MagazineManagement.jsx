@@ -10,6 +10,7 @@ import FilterToggle from '../components/FilterToggle';
 import SearchableFormSelect from '../components/SearchableFormSelect';
 import DateInput from '../components/DateInput';
 import PermissionGate from '../components/PermissionGate';
+import Pager from '../components/Pager';
 import api from '../api';
 import { notify } from '../utils/notify';
 import { confirmYesNo } from '../utils/dialogs';
@@ -74,13 +75,13 @@ const today = () => new Date().toISOString().slice(0, 10);
 function Chip({ value }) {
   if (!value) return <span className="text-gray-400">—</span>;
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${CHIP_STYLES[value] || 'bg-stone-100 text-stone-600 border-stone-200'}`}>
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${CHIP_STYLES[value] || 'bg-[#FAF7F2] text-[#863221] border-[#E8DFD8]'}`}>
       {statusLabel(value)}
     </span>
   );
 }
 
-const INPUT = 'w-full px-3.5 py-2.5 bg-white border border-[#DFD5CC] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-lg text-sm text-[#180200] focus:outline-none';
+const INPUT = 'w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-lg text-sm text-[#180200] focus:outline-none';
 const LABEL = 'block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5';
 const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#3D0400] text-white text-sm font-bold rounded-xl shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
 const BTN_OUTLINE = 'inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg border border-[#E8DFD8] transition-colors cursor-pointer';
@@ -107,52 +108,13 @@ function ModalShell({ title, children, footer }) {
   );
 }
 
-function Pager({ page, pages, total, pageSize, onPage, onPageSize }) {
-  const totalPages = pages || 1;
-  return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3 text-xs text-[#863221]">
-      <div>
-        Showing <span className="font-semibold">{total}</span> record{total === 1 ? '' : 's'}
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-gray-500">Rows per page:</span>
-        <select
-          value={pageSize}
-          onChange={(e) => onPageSize(Number(e.target.value))}
-          className="rounded border border-stone-200 bg-white px-2 py-1 text-xs focus:outline-none"
-        >
-          {[5, 10, 20, 50].map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
-        <div className="ml-2 flex items-center space-x-1">
-          <button
-            type="button"
-            disabled={page <= 1}
-            onClick={() => onPage(page - 1)}
-            className="rounded border border-stone-200 bg-white p-1 text-gray-600 hover:bg-stone-50 disabled:opacity-40"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="px-2 font-medium text-gray-800">{page} / {totalPages}</span>
-          <button
-            type="button"
-            disabled={page >= totalPages}
-            onClick={() => onPage(page + 1)}
-            className="rounded border border-stone-200 bg-white p-1 text-gray-600 hover:bg-stone-50 disabled:opacity-40"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function EmptyRow({ colSpan, icon: Icon, title, hint }) {
   return (
     <tr>
       <td colSpan={colSpan} className="py-12 text-center text-gray-500">
         <div className="flex flex-col items-center justify-center space-y-2">
-          {Icon && <Icon className="h-10 w-10 text-stone-300" />}
+          {Icon && <Icon className="h-10 w-10 text-[#863221]/30" />}
           <p className="text-base font-medium text-gray-700">{title}</p>
           {hint && <p className="text-xs text-gray-500">{hint}</p>}
         </div>
@@ -222,14 +184,41 @@ export default function MagazineManagement() {
 
         {/* Action Toolbar */}
         <div className="flex flex-wrap items-center justify-end gap-4 -mb-2">
-          <PageActions><Link
-            to="/dashboard/magazine/labels"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-stone-50 transition-colors"
-          >
-            <Printer className="h-4 w-4 text-[#8C1801]" />
-            <span>Quick Label List</span>
-          </Link></PageActions>
+          <PageActions>
+            <Link
+              to="/dashboard/magazine/labels"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#E8DFD8] bg-white px-3.5 py-2 text-xs font-semibold text-[#863221] hover:bg-[#FAF7F2] shadow-xs transition-colors"
+            >
+              <Printer className="h-4 w-4 text-[#510601]" />
+              <span>Quick Label List</span>
+            </Link>
+          </PageActions>
           <PageActionsSlot />
+        </div>
+
+        {/* Top Module Navigation Bar */}
+        <div className="bg-[#FAF7F2] p-1.5 rounded-2xl border border-[#E8DFD8] flex flex-wrap gap-1 shadow-sm">
+          {[
+            { key: 'subscriptions', label: 'Subscriptions', path: '/dashboard/magazine/subscriptions', icon: BookOpen },
+            { key: 'labels-delivery', label: 'Labels & Delivery', path: '/dashboard/magazine/labels-delivery', icon: PackageCheck },
+          ].map((t) => {
+            const Icon = t.icon;
+            const isActive = tab === t.key;
+            return (
+              <Link
+                key={t.key}
+                to={t.path}
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[#510601] text-white shadow-sm'
+                    : 'text-[#863221] hover:bg-white hover:text-[#510601]'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{t.label}</span>
+              </Link>
+            );
+          })}
         </div>
 
         {unsubscribedPaid.length > 0 && (
@@ -253,7 +242,7 @@ export default function MagazineManagement() {
         )}
 
         {loading ? (
-          <div className="rounded-xl border border-stone-200 bg-white p-12 text-center text-sm text-gray-500">Loading…</div>
+          <div className="rounded-xl border border-[#E8DFD8] bg-white p-12 text-center text-sm text-gray-500">Loading…</div>
         ) : (
           <>
             {tab === 'subscriptions' && (
@@ -484,7 +473,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
         </PageActions>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-[#E8DFD8] bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
             <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
@@ -496,7 +485,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                 <TH className="text-center">Actions</TH>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-200">
+            <tbody className="divide-y divide-[#E8DFD8]">
               {loadingRows && rows.length === 0 ? (
                 <EmptyRow colSpan={5} title="Loading…" />
               ) : rows.length === 0 ? (
@@ -513,7 +502,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                         ) : null}
                       </td>
                       <td className="px-4 py-3.5">
-                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${RECIPIENT_TYPE_CHIPS[row.recipient_type] || 'bg-stone-100 text-stone-700 border-stone-200'}`}>
+                        <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${RECIPIENT_TYPE_CHIPS[row.recipient_type] || 'bg-[#FAF7F2] text-[#863221] border-[#E8DFD8]'}`}>
                           {row.recipient_type}
                         </span>
                       </td>
@@ -655,7 +644,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
           <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200">
             <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between rounded-t-2xl">
               <h3 className="text-lg font-bold text-[#180200] truncate">Pauses & Returns — {memberName(historyFor.member_id)}</h3>
-              <button type="button" onClick={() => setHistoryFor(null)} className="rounded-lg p-1 text-gray-400 hover:bg-stone-200 hover:text-gray-700 cursor-pointer"><X className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setHistoryFor(null)} className="rounded-lg p-1 text-gray-400 hover:bg-[#FAF7F2] hover:text-gray-700 cursor-pointer"><X className="h-5 w-5" /></button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
               <section className="space-y-3">
@@ -866,7 +855,7 @@ function MonthlyModal({ sub, memberName, onClose }) {
             <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded-lg border border-[#E8DFD8] px-2 py-1 text-xs bg-white">
               {[year - 1, year, year + 1].filter((v, i, a) => a.indexOf(v) === i).sort().map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
-            <button type="button" onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-stone-200 hover:text-gray-700"><X className="h-5 w-5" /></button>
+            <button type="button" onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-[#FAF7F2] hover:text-gray-700"><X className="h-5 w-5" /></button>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-6">
@@ -886,7 +875,7 @@ function MonthlyModal({ sub, memberName, onClose }) {
                         ? 'border-amber-200 bg-amber-50 text-amber-700'
                         : m.mark === 'S'
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                        : 'border-stone-200 bg-white text-stone-400'
+                        : 'border-[#E8DFD8] bg-white text-[#863221]/50'
                     }`}
                   >
                     <div className="text-[10px] font-semibold uppercase tracking-wide">{MONTH_LABELS[m.month - 1]}</div>
@@ -900,8 +889,8 @@ function MonthlyModal({ sub, memberName, onClose }) {
                 <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm border border-emerald-200 bg-emerald-50" /> S = sent</span>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
-                <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-semibold text-stone-700">Returned in {grid.year}: {grid.returned_in_year}</span>
-                <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-xs font-semibold text-stone-700">Last 12 months: {grid.returned_last_12_months}</span>
+                <span className="rounded-full border border-[#E8DFD8] bg-stone-50 px-3 py-1 text-xs font-semibold text-[#863221]">Returned in {grid.year}: {grid.returned_in_year}</span>
+                <span className="rounded-full border border-[#E8DFD8] bg-stone-50 px-3 py-1 text-xs font-semibold text-[#863221]">Last 12 months: {grid.returned_last_12_months}</span>
                 {grid.suggest_pause && (
                   <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">Consider pausing — repeated returns</span>
                 )}
@@ -920,7 +909,7 @@ const ISSUE_RESULTS = {
   SENT: { label: 'Sent', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   RETURNED: { label: 'Returned', cls: 'bg-red-50 text-red-700 border-red-200' },
   PAUSED: { label: 'Paused', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-  LISTED: { label: 'On label list', cls: 'bg-stone-100 text-stone-600 border-stone-200' },
+  LISTED: { label: 'On label list', cls: 'bg-[#FAF7F2] text-[#863221] border-[#E8DFD8]' },
 };
 
 function IssueHistory({ subscriptionId }) {
@@ -936,12 +925,12 @@ function IssueHistory({ subscriptionId }) {
   if (!issues) return <p className="text-sm text-gray-500">Loading…</p>;
   if (issues.length === 0) return <p className="text-sm text-gray-500">No issue has been listed, sent, paused or returned yet.</p>;
   return (
-    <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+    <div className="overflow-hidden rounded-xl border border-[#E8DFD8] bg-white">
       <table className="w-full text-left text-sm text-gray-700">
         <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
           <tr><TH>Issue</TH><TH>What happened</TH><TH>Detail</TH></tr>
         </thead>
-        <tbody className="divide-y divide-stone-200">
+        <tbody className="divide-y divide-[#E8DFD8]">
           {issues.map((i) => {
             const r = ISSUE_RESULTS[i.result] || ISSUE_RESULTS.LISTED;
             return (
@@ -1040,7 +1029,7 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete, subscriptio
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-[#E8DFD8] bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
             <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
@@ -1052,7 +1041,7 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete, subscriptio
                 <TH className="text-center">Actions</TH>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-200">
+            <tbody className="divide-y divide-[#E8DFD8]">
               {loading ? (
                 <EmptyRow colSpan={5} title="Loading…" />
               ) : rows.length === 0 ? (
@@ -1184,7 +1173,7 @@ function PauseForm({ editing, subOptions, presetSubscriptionId, onClose, onSaved
                 value={form.pause_start_date}
                 onChange={(e) => setForm((f) => ({ ...f, pause_start_date: e.target.value }))}
                 placeholder="DD-MM-YYYY"
-                className="border border-[#DFD5CC] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
+                className="border border-[#E8DFD8] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
               />
             </div>
             <div>
@@ -1193,7 +1182,7 @@ function PauseForm({ editing, subOptions, presetSubscriptionId, onClose, onSaved
                 value={form.pause_end_date}
                 onChange={(e) => setForm((f) => ({ ...f, pause_end_date: e.target.value }))}
                 placeholder="Leave open"
-                className="border border-[#DFD5CC] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
+                className="border border-[#E8DFD8] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
               />
               <FieldError>{errors.pause_end_date}</FieldError>
             </div>
@@ -1290,7 +1279,7 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete, subscripti
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-[#E8DFD8] bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
             <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
@@ -1303,7 +1292,7 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete, subscripti
                 <TH className="text-center">Actions</TH>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-200">
+            <tbody className="divide-y divide-[#E8DFD8]">
               {loading ? (
                 <EmptyRow colSpan={6} title="Loading…" />
               ) : rows.length === 0 ? (
@@ -1426,7 +1415,7 @@ function ReturnForm({ subOptions, presetSubscriptionId, onClose, onSaved }) {
                 value={form.return_date}
                 onChange={(e) => setForm((f) => ({ ...f, return_date: e.target.value }))}
                 placeholder="DD-MM-YYYY"
-                className="border border-[#DFD5CC] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
+                className="border border-[#E8DFD8] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
               />
             </div>
           </div>
@@ -1467,7 +1456,7 @@ function RepeatReturnsModal({ subToMember, memberName, onClose }) {
             <h3 className="text-lg font-bold text-[#180200]">Repeat returns</h3>
             <p className="text-xs text-gray-500">Active subscriptions with 2+ returns in the last 12 months.</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-stone-200 hover:text-gray-700"><X className="h-5 w-5" /></button>
+          <button type="button" onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-[#FAF7F2] hover:text-gray-700"><X className="h-5 w-5" /></button>
         </div>
         <div className="flex-1 overflow-y-auto">
           {loading ? (
@@ -1479,7 +1468,7 @@ function RepeatReturnsModal({ subToMember, memberName, onClose }) {
               <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                 <tr><TH>Member</TH><TH>Returns</TH><TH>Last issue</TH><TH>Delivery</TH></tr>
               </thead>
-              <tbody className="divide-y divide-stone-200">
+              <tbody className="divide-y divide-[#E8DFD8]">
                 {rows.map((r) => (
                   <tr key={r.subscription_id}>
                     <td className="px-4 py-3">
@@ -1621,7 +1610,7 @@ function LabelsTab({ locations, canWrite }) {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
+      <div className="rounded-xl border border-[#E8DFD8] bg-white p-5 shadow-sm">
         <h3 className="text-sm font-bold text-[#180200] mb-4 flex items-center gap-2">
           <Printer className="h-4 w-4 text-[#8C1801]" /> Generate Labels
         </h3>
@@ -1671,7 +1660,7 @@ function LabelsTab({ locations, canWrite }) {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-[#E8DFD8] bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
             <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
@@ -1684,7 +1673,7 @@ function LabelsTab({ locations, canWrite }) {
                 <TH className="text-center">Actions</TH>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-200">
+            <tbody className="divide-y divide-[#E8DFD8]">
               {loading ? (
                 <EmptyRow colSpan={6} title="Loading…" />
               ) : batches.length === 0 ? (
@@ -1772,7 +1761,7 @@ function LabelBatchModal({ batch, onClose }) {
               <input type="checkbox" checked={returnsOnly} onChange={(e) => setReturnsOnly(e.target.checked)} className="h-4 w-4 rounded border-stone-300 text-[#8C1801]" />
               Returned only
             </label>
-            <button type="button" onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-stone-200 hover:text-gray-700"><X className="h-5 w-5" /></button>
+            <button type="button" onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-[#FAF7F2] hover:text-gray-700"><X className="h-5 w-5" /></button>
           </div>
         </div>
 
@@ -1786,7 +1775,7 @@ function LabelBatchModal({ batch, onClose }) {
               className={`px-2.5 py-1 rounded-lg font-semibold transition-colors cursor-pointer ${
                 typeFilter === t
                   ? 'bg-[#510601] text-white'
-                  : 'bg-[#FAF7F2] text-[#863221] hover:bg-stone-100'
+                  : 'bg-[#FAF7F2] text-[#863221] hover:bg-[#FAF7F2]'
               }`}
             >
               {t === 'ALL' ? 'All Recipients' : t}
@@ -1804,7 +1793,7 @@ function LabelBatchModal({ batch, onClose }) {
               <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                 <tr><TH>Recipient</TH><TH>Type</TH><TH>Address</TH></tr>
               </thead>
-              <tbody className="divide-y divide-stone-200">
+              <tbody className="divide-y divide-[#E8DFD8]">
                 {items.map((item) => (
                   <tr key={item.id} className={item.is_return ? 'bg-red-50/40' : ''}>
                     <td className="px-4 py-3 font-semibold text-gray-900">
@@ -1812,7 +1801,7 @@ function LabelBatchModal({ batch, onClose }) {
                       {item.is_return && <span className="ml-2 inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">RETURNED ISSUE</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${RECIPIENT_TYPE_CHIP[item.recipient_type] || 'bg-stone-100 text-stone-600 border-stone-200'}`}>
+                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold ${RECIPIENT_TYPE_CHIP[item.recipient_type] || 'bg-[#FAF7F2] text-[#863221] border-[#E8DFD8]'}`}>
                         {item.recipient_type}
                       </span>
                     </td>
@@ -1881,7 +1870,7 @@ function DeliveryBatchesTab({ canWrite, canDelete }) {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-[#E8DFD8] bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
             <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
@@ -1893,7 +1882,7 @@ function DeliveryBatchesTab({ canWrite, canDelete }) {
                 <TH className="text-center">Actions</TH>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-200">
+            <tbody className="divide-y divide-[#E8DFD8]">
               {loading ? (
                 <EmptyRow colSpan={5} title="Loading…" />
               ) : batches.length === 0 ? (
@@ -1995,7 +1984,7 @@ function DeliveryBatchForm({ editing, onClose, onSaved }) {
                 value={form.dispatch_date}
                 onChange={(e) => setForm((f) => ({ ...f, dispatch_date: e.target.value }))}
                 placeholder="DD-MM-YYYY"
-                className="border border-[#DFD5CC] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
+                className="border border-[#E8DFD8] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
               />
             </div>
           </div>
@@ -2218,7 +2207,7 @@ function BackfillModal({ isOpen, onClose, onBackfilled, canWrite }) {
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-stone-100 rounded-lg border border-stone-200"
+            className="px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-[#FAF7F2] rounded-lg border border-[#E8DFD8]"
           >
             Cancel
           </button>

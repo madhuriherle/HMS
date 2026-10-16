@@ -1432,7 +1432,7 @@ export default function ReceiptEntry() {
 
                   {/* Column 1: Profile Photo */}
                   <div className="md:col-span-3 flex flex-col items-center">
-                    <div className="relative w-full max-w-[200px] aspect-[3/4] bg-stone-100 rounded-lg overflow-hidden border border-stone-200 shadow-sm flex items-center justify-center">
+                    <div className="relative w-full max-w-[200px] aspect-[3/4] bg-[#FAF7F2] rounded-lg overflow-hidden border border-[#E8DFD8] shadow-sm flex items-center justify-center">
                       {viewingMember.photoUrl || viewingMember.photo || viewingMember.image || viewingMember.avatar ? (
                         <img
                           src={viewingMember.photoUrl || viewingMember.photo || viewingMember.image || viewingMember.avatar}
@@ -1440,9 +1440,9 @@ export default function ReceiptEntry() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-amber-50 to-stone-200 text-stone-400">
-                          <User className="w-16 h-16 text-stone-400/80 mb-2" />
-                          <span className="text-[11px] font-medium text-stone-500">No Photo</span>
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-b from-amber-50 to-stone-200 text-[#863221]/50">
+                          <User className="w-16 h-16 text-[#863221]/50 mb-2" />
+                          <span className="text-[11px] font-medium text-[#863221]/70">No Photo</span>
                         </div>
                       )}
                       {/* Watermark Overlay */}
@@ -1455,64 +1455,64 @@ export default function ReceiptEntry() {
                   </div>
 
                   {/* Column 2: BASIC INFORMATION */}
-                  <div className="md:col-span-5 space-y-2 text-xs sm:text-[13px] text-stone-800">
-                    <h4 className="text-sm font-bold text-[#E65100] uppercase tracking-wide pb-1 border-b border-stone-200 mb-3">
+                  <div className="md:col-span-5 space-y-2 text-xs sm:text-[13px] text-[#180200]">
+                    <h4 className="text-sm font-bold text-[#863221] uppercase tracking-wide pb-1 border-b border-[#E8DFD8] mb-3">
                       BASIC INFORMATION
                     </h4>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-stone-900 shrink-0">Name:</span>
-                      <span className="text-stone-800 font-semibold">{viewingMember.fullName || viewingMember.name || '—'}</span>
+                      <span className="font-bold text-[#863221] shrink-0">Name:</span>
+                      <span className="text-[#180200] font-semibold">{viewingMember.fullName || viewingMember.name || '—'}</span>
                     </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-stone-900 shrink-0">Registration Number:</span>
-                      <span className="text-stone-800 font-mono">{viewingMember.registrationNumber || viewingMember.id || '—'}</span>
+                      <span className="font-bold text-[#863221] shrink-0">Registration Number:</span>
+                      <span className="text-[#180200] font-mono">{viewingMember.registrationNumber || viewingMember.id || '—'}</span>
                     </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-stone-900 shrink-0">Registration Date:</span>
-                      <span className="text-stone-800 font-mono">{formattedRegDate}</span>
+                      <span className="font-bold text-[#863221] shrink-0">Registration Date:</span>
+                      <span className="text-[#180200] font-mono">{formattedRegDate}</span>
                     </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-stone-900 shrink-0">Membership Number:</span>
-                      <span className="text-stone-800 font-mono">{viewingMember.membershipNumber || 'Not assigned'}</span>
+                      <span className="font-bold text-[#863221] shrink-0">Membership Number:</span>
+                      <span className="text-[#180200] font-mono">{viewingMember.membershipNumber || 'Not assigned'}</span>
                     </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-stone-900 shrink-0">Membership Name:</span>
-                      <span className="text-stone-800">{viewingMember.membershipName || viewingMember.fullName || viewingMember.name || '—'}</span>
+                      <span className="font-bold text-[#863221] shrink-0">Membership Name:</span>
+                      <span className="text-[#180200]">{viewingMember.membershipName || viewingMember.fullName || viewingMember.name || '—'}</span>
                     </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-stone-900 shrink-0">Mobile:</span>
-                      <span className="text-stone-800 font-mono">{viewingMember.contactNumber || viewingMember.mobile || viewingMember.phone || '—'}</span>
+                      <span className="font-bold text-[#863221] shrink-0">Mobile:</span>
+                      <span className="text-[#180200] font-mono">{viewingMember.contactNumber || viewingMember.mobile || viewingMember.phone || '—'}</span>
                     </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-stone-900 shrink-0">Father Name:</span>
-                      <span className="text-stone-800">{viewingMember.fatherHusbandName || viewingMember.fatherName || viewingMember.guardianName || '—'}</span>
+                      <span className="font-bold text-[#863221] shrink-0">Father Name:</span>
+                      <span className="text-[#180200]">{viewingMember.fatherHusbandName || viewingMember.fatherName || viewingMember.guardianName || '—'}</span>
                     </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-stone-900 shrink-0">Gender:</span>
-                      <span className="text-stone-800">{viewingMember.gender || '—'}</span>
+                      <span className="font-bold text-[#863221] shrink-0">Gender:</span>
+                      <span className="text-[#180200]">{viewingMember.gender || '—'}</span>
                     </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-stone-900 shrink-0">Date Of Birth:</span>
-                      <span className="text-stone-800 font-mono">{formattedDob}</span>
+                      <span className="font-bold text-[#863221] shrink-0">Date Of Birth:</span>
+                      <span className="text-[#180200] font-mono">{formattedDob}</span>
                     </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-stone-900 shrink-0">Height:</span>
-                      <span className="text-stone-800">{viewingMember.height || '—'}</span>
+                      <span className="font-bold text-[#863221] shrink-0">Height:</span>
+                      <span className="text-[#180200]">{viewingMember.height || '—'}</span>
                     </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-stone-900 shrink-0">Expiry Date:</span>
-                      <span className="text-stone-800 font-mono">{formattedExpDate}</span>
+                      <span className="font-bold text-[#863221] shrink-0">Expiry Date:</span>
+                      <span className="text-[#180200] font-mono">{formattedExpDate}</span>
                     </div>
                   </div>
 
@@ -1521,54 +1521,54 @@ export default function ReceiptEntry() {
 
                     {/* Payment Information */}
                     <div className="space-y-2">
-                      <h4 className="text-sm font-bold text-[#E65100] uppercase tracking-wide pb-1 border-b border-stone-200 mb-3">
+                      <h4 className="text-sm font-bold text-[#863221] uppercase tracking-wide pb-1 border-b border-[#E8DFD8] mb-3">
                         PAYMENT INFORMATION
                       </h4>
 
                       <div className="flex items-baseline gap-1.5 leading-snug">
-                        <span className="font-bold text-stone-900 shrink-0">Cash Receipt/Cheque/DD No:</span>
+                        <span className="font-bold text-[#863221] shrink-0">Cash Receipt/Cheque/DD No:</span>
                         <span className="text-[#EA4335] font-bold font-mono">{receiptNo}</span>
                       </div>
 
                       <div className="flex items-baseline gap-1.5 leading-snug">
-                        <span className="font-bold text-stone-900 shrink-0">Date:</span>
+                        <span className="font-bold text-[#863221] shrink-0">Date:</span>
                         <span className="text-[#EA4335] font-bold font-mono">{receiptDate}</span>
                       </div>
 
                       <div className="flex items-baseline gap-1.5 leading-snug">
-                        <span className="font-bold text-stone-900 shrink-0">Cash Amount:</span>
+                        <span className="font-bold text-[#863221] shrink-0">Cash Amount:</span>
                         <span className="text-[#EA4335] font-bold font-mono">{amountVal}</span>
                       </div>
 
                       <div className="flex items-baseline gap-1.5 leading-snug">
-                        <span className="font-bold text-stone-900 shrink-0">Payment Description:</span>
+                        <span className="font-bold text-[#863221] shrink-0">Payment Description:</span>
                         <span className="text-[#EA4335] font-bold">{paymentDesc}</span>
                       </div>
                     </div>
 
                     {/* Receipt Information */}
                     <div className="space-y-2">
-                      <h4 className="text-sm font-bold text-[#E65100] uppercase tracking-wide pb-1 border-b border-stone-200 mb-3">
+                      <h4 className="text-sm font-bold text-[#863221] uppercase tracking-wide pb-1 border-b border-[#E8DFD8] mb-3">
                         RECIEPT INFORMATION
                       </h4>
 
                       <div className="flex items-baseline gap-1.5 leading-snug">
-                        <span className="font-bold text-stone-900 shrink-0">Cash Receipt Number:</span>
+                        <span className="font-bold text-[#863221] shrink-0">Cash Receipt Number:</span>
                         <span className="text-[#EA4335] font-bold font-mono">{receiptNo}</span>
                       </div>
 
                       <div className="flex items-baseline gap-1.5 leading-snug">
-                        <span className="font-bold text-stone-900 shrink-0">Cash Date:</span>
+                        <span className="font-bold text-[#863221] shrink-0">Cash Date:</span>
                         <span className="text-[#EA4335] font-bold font-mono">{receiptDate}</span>
                       </div>
 
                       <div className="flex items-baseline gap-1.5 leading-snug">
-                        <span className="font-bold text-stone-900 shrink-0">Cash Amount:</span>
+                        <span className="font-bold text-[#863221] shrink-0">Cash Amount:</span>
                         <span className="text-[#EA4335] font-bold font-mono">{amountVal}</span>
                       </div>
 
                       <div className="flex items-baseline gap-1.5 leading-snug">
-                        <span className="font-bold text-stone-900 shrink-0">Payment Description:</span>
+                        <span className="font-bold text-[#863221] shrink-0">Payment Description:</span>
                         <span className="text-[#EA4335] font-bold">{matchedReceipt?.description || viewingMember.paymentRemarks || viewingMember.description || '-'}</span>
                       </div>
                     </div>
@@ -2019,7 +2019,7 @@ export default function ReceiptEntry() {
                       disabled={!formData.paymentMode || formData.paymentMode.toLowerCase() === 'cash'}
                       placeholder={!formData.paymentMode || formData.paymentMode.toLowerCase() === 'cash' ? '' : 'e.g. UTR / Cheque'}
                       className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm font-mono text-[#180200] focus:outline-none focus:bg-white transition-colors ${!formData.paymentMode || formData.paymentMode.toLowerCase() === 'cash'
-                        ? 'bg-[#FAF7F2]/50 text-stone-400 cursor-not-allowed border border-[#E8DFD8]/80'
+                        ? 'bg-[#FAF7F2]/50 text-[#863221]/50 cursor-not-allowed border border-[#E8DFD8]/80'
                         : formErrors.transactionId
                           ? 'bg-[#FAF7F2] border border-[#ED4636] ring-1 ring-[#ED4636]/30'
                           : 'bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601]'
@@ -2222,7 +2222,7 @@ export default function ReceiptEntry() {
                             type="submit"
                             onClick={() => { saveMode.current = 'close'; }}
                             disabled={saving}
-                            className="disabled:opacity-50 px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#180200] text-xs sm:text-sm font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
+                            className="disabled:opacity-50 px-3.5 py-2 rounded-xl bg-white hover:bg-[#FAF7F2] border border-[#E8DFD8] text-[#180200] text-xs sm:text-sm font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
                           >
                             <Save className="w-3.5 h-3.5 text-[#863221]" />
                             <span>Save & Close</span>
@@ -2411,7 +2411,7 @@ export default function ReceiptEntry() {
                         setRightPage(1);
                         setRightSearchOpen(false);
                       }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#863221]/50 hover:text-[#863221] p-1 cursor-pointer"
                       title="Close search"
                     >
                       <X className="w-3.5 h-3.5" />
@@ -2657,7 +2657,7 @@ export default function ReceiptEntry() {
                       setUnapprovedPage(1);
                       setUnapprovedSearchOpen(false);
                     }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-0.5 cursor-pointer"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#863221]/50 hover:text-[#863221] p-0.5 cursor-pointer"
                     title="Close search"
                   >
                     <X className="w-3.5 h-3.5" />

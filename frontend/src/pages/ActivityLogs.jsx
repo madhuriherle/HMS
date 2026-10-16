@@ -471,56 +471,20 @@ export default function ActivityLogs() {
           </table>
         </div>
 
-        {/* Table Footer: Pagination controls */}
-        <div className="p-4 bg-[#FAF7F2] border-t border-[#E8DFD8] flex flex-wrap items-center justify-between gap-4 text-xs font-medium text-[#863221]">
-          <div>
-            Showing {totalCount > 0 ? (page - 1) * limit + 1 : 0} to{' '}
-            {Math.min(page * limit, totalCount)} of {totalCount.toLocaleString()} results
+        {/* Table Footer: Pager */}
+        {totalCount > 0 && (
+          <div className="p-4 bg-[#FAF7F2]/40 border-t border-[#E8DFD8]">
+            <Pager
+              page={page}
+              pages={totalPages}
+              total={totalCount}
+              pageSize={limit}
+              onPage={setPage}
+              onPageSize={(s) => { setLimit(s); setPage(1); }}
+              sizes={[20, 50, 100, 200]}
+            />
           </div>
-
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span>Rows per page:</span>
-              <select
-                value={limit}
-                onChange={(e) => {
-                  setLimit(Number(e.target.value));
-                  setPage(1);
-                }}
-                className="px-2 py-1 bg-white border border-[#E8DFD8] rounded-md text-xs font-semibold focus:outline-none cursor-pointer"
-              >
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
-
-            <div className="font-semibold">
-              Page {page} of {totalPages}
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="p-1.5 rounded-md border border-[#E8DFD8] bg-white hover:bg-[#FAF7F2] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                title="Previous page"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                className="p-1.5 rounded-md border border-[#E8DFD8] bg-white hover:bg-[#FAF7F2] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                title="Next page"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

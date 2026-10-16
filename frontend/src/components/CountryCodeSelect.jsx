@@ -83,8 +83,8 @@ export default function CountryCodeSelect({
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`w-full flex items-center justify-between gap-1.5 px-3 py-2.5 border rounded-lg text-xs sm:text-sm text-[#180200] transition-all ${
           disabled
-            ? 'bg-stone-100 text-stone-400 border-[#DFD5CC] cursor-not-allowed'
-            : 'bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border-[#DFD5CC] hover:border-[#8C1801]/60 cursor-pointer focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs'
+            ? 'bg-stone-100 text-stone-400 border-[#E8DFD8] cursor-not-allowed'
+            : 'bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border-[#E8DFD8] hover:border-[#8C1801]/60 cursor-pointer focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs'
         }`}
         title={`${selectedCountry.name} (${selectedCountry.dialCode})`}
       >
@@ -97,9 +97,9 @@ export default function CountryCodeSelect({
 
       {/* Searchable Dropdown Popup */}
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-[#DFD5CC] rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150 flex flex-col">
+        <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-[#E8DFD8] rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in-50 zoom-in-95 duration-150 flex flex-col">
           {/* Search Header */}
-          <div className="p-2 border-b border-[#DFD5CC] bg-[#FAF7F2] shrink-0">
+          <div className="p-2 border-b border-[#E8DFD8] bg-[#FAF7F2] shrink-0">
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#863221]/60" />
               <input
@@ -107,13 +107,13 @@ export default function CountryCodeSelect({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-white border border-[#DFD5CC] rounded-lg text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20"
+                className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-white border border-[#E8DFD8] rounded-lg text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20"
               />
             </div>
           </div>
 
           {/* Countries List - Inner Scrollable Container */}
-          <div className="max-h-52 overflow-y-auto overscroll-contain p-1.5 space-y-0.5 [scrollbar-width:thin] [scrollbar-color:#DFD5CC_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#DFD5CC] hover:[&::-webkit-scrollbar-thumb]:bg-[#863221]/50 [&::-webkit-scrollbar-track]:bg-transparent">
+          <div className="max-h-52 overflow-y-auto overscroll-contain p-1.5 space-y-0.5 [scrollbar-width:thin] [scrollbar-color:#E8DFD8_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#E8DFD8] hover:[&::-webkit-scrollbar-thumb]:bg-[#863221]/50 [&::-webkit-scrollbar-track]:bg-transparent">
             {filteredCountries.length === 0 ? (
               <div className="p-3 text-center text-xs text-[#863221]">
                 No country found

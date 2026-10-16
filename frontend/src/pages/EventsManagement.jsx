@@ -28,6 +28,7 @@ import ModalFooter from '../components/ModalFooter';
 import SearchFilterBar from '../components/SearchFilterBar';
 import DateInput from '../components/DateInput';
 import PermissionGate from '../components/PermissionGate';
+import Pager from '../components/Pager';
 import { formatDate, getTodayISODate } from '../utils/dateUtils';
 import { notify } from '../utils/notify';
 import Swal from 'sweetalert2';
@@ -706,32 +707,16 @@ export default function EventsManagement() {
           )}
 
           {/* Pagination bar */}
-          {total > pageSize && (
-            <div className="px-4 py-3 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between text-xs text-[#863221]">
-              <span>
-                Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)} of {total} events
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  disabled={page <= 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="px-2.5 py-1 rounded border border-[#E8DFD8] bg-white text-[#180200] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                <span className="px-2 font-bold text-[#510601]">
-                  Page {page} of {Math.ceil(total / pageSize) || 1}
-                </span>
-                <button
-                  type="button"
-                  disabled={page >= Math.ceil(total / pageSize)}
-                  onClick={() => setPage((p) => p + 1)}
-                  className="px-2.5 py-1 rounded border border-[#E8DFD8] bg-white text-[#180200] disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
+          {total > 0 && (
+            <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/40">
+              <Pager
+                page={page}
+                pages={Math.max(1, Math.ceil(total / pageSize))}
+                total={total}
+                pageSize={pageSize}
+                onPage={setPage}
+                onPageSize={(s) => { setPageSize(s); setPage(1); }}
+              />
             </div>
           )}
         </div>
@@ -1009,7 +994,7 @@ export default function EventsManagement() {
                                       <span>Havyaka Member: {h.member_name || `ID ${h.member_id}`}</span>
                                     </span>
                                   ) : (
-                                    <span className="inline-block mt-1 text-[10px] text-stone-500">
+                                    <span className="inline-block mt-1 text-[10px] text-[#863221]/70">
                                       External / Non-member
                                     </span>
                                   )}
@@ -1068,7 +1053,7 @@ export default function EventsManagement() {
                                       <span>Havyaka Member: {g.member_name || `ID ${g.member_id}`}</span>
                                     </span>
                                   ) : (
-                                    <span className="inline-block mt-1 text-[10px] text-stone-500">
+                                    <span className="inline-block mt-1 text-[10px] text-[#863221]/70">
                                       External / Non-member
                                     </span>
                                   )}

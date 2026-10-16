@@ -1,6 +1,7 @@
 import { FilterInline } from '../components/FilterToggle';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import { useSearchParams, useLocation, Link } from 'react-router-dom';
+import Pager from '../components/Pager';
 import {
   Users,
   UserCheck,
@@ -78,6 +79,33 @@ export default function EngagementsManagement() {
         {/* Action Toolbar */}
         <div className="flex justify-end -mb-2">
           <PageActionsSlot />
+        </div>
+
+        {/* Top Module Navigation Bar */}
+        <div className="bg-[#FAF7F2] p-1.5 rounded-2xl border border-[#E8DFD8] flex flex-wrap gap-1 shadow-sm">
+          {[
+            { key: 'affiliations', label: 'Affiliations', path: '/dashboard/engagements/affiliations', icon: Building },
+            { key: 'associates', label: 'Associates', path: '/dashboard/engagements/associates', icon: Users },
+            { key: 'press-media', label: 'Press & Media', path: '/dashboard/engagements/press-media', icon: Newspaper },
+            { key: 'committee', label: 'Managing Committee', path: '/dashboard/engagements/committee', icon: Shield },
+          ].map((t) => {
+            const Icon = t.icon;
+            const isActive = activeTab === t.key;
+            return (
+              <Link
+                key={t.key}
+                to={t.path}
+                className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[#510601] text-white shadow-sm'
+                    : 'text-[#863221] hover:bg-white hover:text-[#510601]'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{t.label}</span>
+              </Link>
+            );
+          })}
         </div>
 
         {/* Active Tab View */}
@@ -395,7 +423,7 @@ function AffiliationsView({ canWrite, canDelete }) {
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${
                           a.magazine_enabled
                             ? 'bg-[#3D705C]/15 text-[#3D705C] hover:bg-[#3D705C]/25'
-                            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                            : 'bg-[#FAF7F2] text-[#863221] border border-[#E8DFD8] hover:bg-[#E8DFD8]'
                         }`}
                         title={canWrite ? 'Click to toggle magazine delivery' : 'Magazine delivery status'}
                       >
@@ -440,6 +468,19 @@ function AffiliationsView({ canWrite, canDelete }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {total > 0 && (
+          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/40">
+            <Pager
+              page={page}
+              pages={Math.max(1, Math.ceil(total / 15))}
+              total={total}
+              pageSize={15}
+              onPage={setPage}
+              onPageSize={() => {}}
+            />
           </div>
         )}
       </div>
@@ -939,7 +980,7 @@ function AssociatesView({ canWrite, canDelete }) {
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${
                           a.magazine_enabled
                             ? 'bg-[#3D705C]/15 text-[#3D705C] hover:bg-[#3D705C]/25'
-                            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                            : 'bg-[#FAF7F2] text-[#863221] border border-[#E8DFD8] hover:bg-[#E8DFD8]'
                         }`}
                         title={canWrite ? 'Click to toggle magazine delivery' : 'Magazine delivery status'}
                       >
@@ -975,6 +1016,19 @@ function AssociatesView({ canWrite, canDelete }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {total > 0 && (
+          <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/40">
+            <Pager
+              page={page}
+              pages={Math.max(1, Math.ceil(total / 15))}
+              total={total}
+              pageSize={15}
+              onPage={setPage}
+              onPageSize={() => {}}
+            />
           </div>
         )}
       </div>
@@ -1312,7 +1366,7 @@ function PressMediaView({ canWrite, canDelete }) {
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold transition-colors cursor-pointer ${
                           p.magazine_enabled
                             ? 'bg-[#3D705C]/15 text-[#3D705C] hover:bg-[#3D705C]/25'
-                            : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                            : 'bg-[#FAF7F2] text-[#863221] border border-[#E8DFD8] hover:bg-[#E8DFD8]'
                         }`}
                         title={canWrite ? 'Click to toggle magazine delivery' : 'Magazine delivery status'}
                       >
@@ -1860,7 +1914,7 @@ function CommitteeView({ canWrite, canDelete }) {
                         className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
                           m.display_on_website
                             ? 'bg-emerald-100 text-emerald-800'
-                            : 'bg-stone-100 text-stone-500'
+                            : 'bg-[#FAF7F2] text-[#863221] border border-[#E8DFD8]'
                         }`}
                       >
                         {m.display_on_website ? 'Displayed' : 'Hidden'}
@@ -2152,7 +2206,7 @@ function CommitteeView({ canWrite, canDelete }) {
                       <p className="font-semibold text-[#180200]">{c.name_en}</p>
                       {c.name_kn && <p className="text-[11px] text-[#863221]">{c.name_kn}</p>}
                     </div>
-                    <span className="text-[10px] text-stone-500">
+                    <span className="text-[10px] text-[#863221]/70">
                       {c.display_on_website ? 'Website: Yes' : 'Website: No'}
                     </span>
                   </div>

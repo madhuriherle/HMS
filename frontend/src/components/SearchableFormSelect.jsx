@@ -77,7 +77,7 @@ export default function SearchableFormSelect({
             ? 'border-red-500 ring-2 ring-red-500/20'
             : isOpen
             ? 'border-[#510601] ring-2 ring-[#510601]/20 bg-white'
-            : 'border-[#DFD5CC] hover:border-[#8C1801]/60'
+            : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
         } ${disabled ? 'opacity-60 cursor-not-allowed bg-stone-100' : ''}`}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
@@ -96,12 +96,12 @@ export default function SearchableFormSelect({
       {isOpen && (
         <div
           role="listbox"
-          className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-[#DFD5CC] rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+          className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-[#E8DFD8] rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
           style={{ minWidth: '100%' }}
         >
           {/* Optional Search bar inside dropdown */}
           {showSearch && normalizedOptions.length > 7 && (
-            <div className="p-2 border-b border-[#DFD5CC]/80 bg-[#FAF7F2]/50">
+            <div className="p-2 border-b border-[#E8DFD8]/80 bg-[#FAF7F2]/50">
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#863221]/60" />
                 <input
@@ -109,7 +109,7 @@ export default function SearchableFormSelect({
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-[#DFD5CC] rounded-lg text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
+                  className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-[#E8DFD8] rounded-lg text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
                 />
                 {searchTerm && (
                   <button
@@ -125,7 +125,7 @@ export default function SearchableFormSelect({
           )}
 
           {/* Scrollable Options List (Bounded Height) */}
-          <div className={`${maxHeightClass} overflow-y-auto divide-y divide-stone-100 overscroll-contain [scrollbar-width:thin] [scrollbar-color:#DFD5CC_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#DFD5CC] hover:[&::-webkit-scrollbar-thumb]:bg-[#863221]/50 [&::-webkit-scrollbar-track]:bg-transparent`}>
+          <div className={`${maxHeightClass} overflow-y-auto divide-y divide-stone-100 overscroll-contain [scrollbar-width:thin] [scrollbar-color:#E8DFD8_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#E8DFD8] hover:[&::-webkit-scrollbar-thumb]:bg-[#863221]/50 [&::-webkit-scrollbar-track]:bg-transparent`}>
             {/* Clear / Default Option */}
             <button
               type="button"

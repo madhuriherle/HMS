@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { RotateCcw, Search, Trash2 } from 'lucide-react';
 import api from '../api';
 import PermissionGate from '../components/PermissionGate';
+import Pager from '../components/Pager';
 import { askReason } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import { apiErrorMessage } from '../utils/apiError';
@@ -187,12 +188,17 @@ export default function RecycleBin() {
           </table>
         </div>
 
-        {pages > 1 && (
-          <div className="flex items-center justify-end gap-3 text-sm">
-            <span className="text-[#863221]">{total} records</span>
-            <button type="button" disabled={page <= 1} onClick={() => setPage(page - 1)} className="px-3 py-1.5 rounded-lg border border-[#E8DFD8] bg-white disabled:opacity-40 cursor-pointer">Previous</button>
-            <span>Page {page} of {pages}</span>
-            <button type="button" disabled={page >= pages} onClick={() => setPage(page + 1)} className="px-3 py-1.5 rounded-lg border border-[#E8DFD8] bg-white disabled:opacity-40 cursor-pointer">Next</button>
+        {total > 0 && (
+          <div className="p-4 bg-[#FAF7F2]/40 border-t border-[#E8DFD8] rounded-b-2xl">
+            <Pager
+              page={page}
+              pages={pages}
+              total={total}
+              pageSize={LIMIT}
+              onPage={setPage}
+              onPageSize={() => {}}
+              sizes={[LIMIT]}
+            />
           </div>
         )}
       </div>
