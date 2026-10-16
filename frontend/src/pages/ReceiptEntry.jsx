@@ -2279,7 +2279,7 @@ export default function ReceiptEntry() {
                       Member Details
                     </h2>
                     <p className="text-xs text-[#863221] font-mono truncate">
-                      {numberTag(selectedMember)} — {selectedMember.fullName || selectedMember.name}
+                      {selectedMember.fullName || selectedMember.name}
                     </p>
                   </div>
                 </div>
@@ -2299,49 +2299,6 @@ export default function ReceiptEntry() {
 
               {/* Profile Details Content */}
               <div className="p-5 sm:p-6 space-y-5 text-xs sm:text-sm">
-
-                {/* Section 1: Profile Details */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-[#1D4ED8] tracking-wide uppercase flex items-center gap-1.5">
-                    <Award className="w-3.5 h-3.5 text-[#1D4ED8]" />
-                    <span>Profile Details:</span>
-                  </h4>
-                  <div className={`bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E8DFD8] grid grid-cols-1 gap-3 text-xs ${entrySource === 'unapproved-assignment' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}>
-                    {entrySource === 'unapproved-assignment' && (
-                      <>
-                        <div>
-                          <span className="text-[#863221] font-semibold block">Registration Number:</span>
-                          <strong className="font-mono text-[#510601]">{selectedMember.registrationNumber || selectedMember.id || '—'}</strong>
-                        </div>
-                        <div>
-                          <span className="text-[#863221] font-semibold block">Registration Date:</span>
-                          <strong className="text-[#180200] font-mono">{formatDate(selectedMember.registrationDate || selectedMember.createdDate)}</strong>
-                        </div>
-                      </>
-                    )}
-                    <div>
-                      <span className="text-[#863221] font-semibold block">Membership Number:</span>
-                      <strong className="text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mt-0.5 font-mono">
-                        {selectedMember.membershipNumber ? selectedMember.membershipNumber : 'Not Assigned'}
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-[#863221] font-semibold block">Membership Type:</span>
-                      <strong className="text-[#510601]">{selectedMember.membershipType || selectedMember.membershipTypeCategory || '—'}</strong>
-                    </div>
-                    {entrySource === 'unapproved-assignment' ? (
-                      <div>
-                        <span className="text-[#863221] font-semibold block">Registration Source:</span>
-                        <span className="font-medium text-[#180200]">{selectedMember.registrationSource || selectedMember.registrationType || 'Offline'}</span>
-                      </div>
-                    ) : (
-                      <div>
-                        <span className="text-[#863221] font-semibold block">Member Status:</span>
-                        <span className="font-medium text-[#180200]">{selectedMember.status || 'Active'}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
 
                 {/* Section 2: Basic Information */}
                 <div className="space-y-2">
@@ -2415,34 +2372,6 @@ export default function ReceiptEntry() {
                   </div>
                 </div>
 
-                {/* Section 4: Payment / Registration Remarks */}
-                {entrySource === 'unapproved-assignment' && (
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-[#1D4ED8] tracking-wide uppercase flex items-center gap-1.5">
-                    <CreditCard className="w-3.5 h-3.5 text-[#1D4ED8]" />
-                    <span>Payment / Registration Info:</span>
-                  </h4>
-                  <div className="bg-white p-3.5 rounded-xl border border-[#E8DFD8] grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div>
-                      <span className="text-[#863221] font-semibold block">Registration Amount:</span>
-                      <strong className="font-mono text-[#3D705C] text-sm">
-                        {formatMoney(selectedMember.amount || 0)}
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-[#863221] font-semibold block">Payment Mode:</span>
-                      <strong className="text-[#180200]">{selectedMember.paymentMode || '—'}</strong>
-                    </div>
-                    <div>
-                      <span className="text-[#863221] font-semibold block">Receipt Status:</span>
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${isMemberReceiptAssigned(selectedMember) ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200'}`}>
-                        ● {isMemberReceiptAssigned(selectedMember) ? 'Assigned' : 'Unassigned'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                )}
               </div>
             </div>
           ) : (
