@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Award, TrendingUp, CalendarDays, Pencil } from 'lucide-react';
+import { User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Briefcase, Award, TrendingUp, CalendarDays, Pencil } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
 import Modal from '../components/Modal';
@@ -11,6 +11,8 @@ import { apiErrorMessage } from '../utils/apiError';
 import { notify } from '../utils/notify';
 import { formatMoney } from '../utils/money';
 import { memberName } from '../utils/memberName';
+import { fetchReceiptPage } from '../utils/apiAdapters';
+import ReceiptViewModal from '../components/ReceiptViewModal';
 
 const inr = formatMoney;
 
@@ -342,103 +344,57 @@ function OverviewTab({ id }) {
   );
 }
 
-function PersonalTab({ id }) {
-  const state = useSection(id, 'personal');
-  return (
-    <Loading state={state}>
-      {(d) => (
-        <Card icon={User} title="Personal details">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <Field label="Title" value={d.name_title} />
-            <Field label="First name" value={d.first_name_en} />
-            <Field label="Middle name" value={d.middle_name_en} />
-            <Field label="Last name" value={d.last_name_en} />
-            <Field label="Name (Kannada)" value={d.full_name_kn} />
-            <Field label="Gender" value={d.gender} />
-            <Field label="Date of birth" value={d.date_of_birth ? formatDate(d.date_of_birth) : ''} />
-            <Field label="Blood group" value={d.blood_group} />
-            <Field label="Married" value={yesNo(d.is_married)} />
-            <Field label="Gotra" value={d.gotra} />
-            <Field label="Qualification" value={d.qualification} />
-            <Field label="Occupation" value={d.occupation} />
-            <Field label="Company" value={d.company} />
-            <Field label="Website" value={d.website} />
-            <Field label="Native place" value={d.native_place} />
-            <Field label="Category" value={d.category} />
-            <Field label="Aadhaar number" value={d.aadhaar_number} />
-            <Field label="Applied on behalf of" value={d.applied_on_behalf_of} />
-            <Field label="Registered through" value={d.registration_source} />
-            <Field label="Registered on" value={d.created_at ? formatDateTime(d.created_at) : ''} />
-            <div className="col-span-2 sm:col-span-3">
-              <Field label="Remarks" value={d.remarks} />
-            </div>
-          </div>
-        </Card>
-      )}
-    </Loading>
-  );
-}
+// a label / value row for the key-value panels; an empty value is not drawn
+const Row = ({ label, children }) =>
+  children ? (
+    <div className="py-2.5 flex items-start justify-between gap-4 text-xs">
+      <dt className="text-[#7D7068] font-medium shrink-0">{label}</dt>
+      <dd className="font-semibold text-[#180200] text-right min-w-0 break-words">{children}</dd>
+    </div>
+  ) : null;
 
-function ContactTab({ id }) {
-  const state = useSection(id, 'contact');
-  return (
-    <Loading state={state}>
-      {(d) => (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <Card icon={Phone} title="Contact">
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Mobile" value={phone(d.mobile_country_code, d.mobile)} />
-              <Field label="WhatsApp" value={phone(d.whatsapp_country_code, d.whatsapp_number)} />
-              <Field label="Alternate mobile" value={d.alternate_mobile} />
-              <Field label="Email" value={d.email} />
-            </div>
-          </Card>
-          <Card icon={MapPin} title="Address">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="col-span-2">
-                <Field label="Address" value={[d.address_line1, d.address_line2].filter(Boolean).join(', ')} />
-              </div>
-              <div className="col-span-2">
-                <Field label="Address (Kannada)" value={[d.address_line1_kn, d.address_line2_kn].filter(Boolean).join(', ')} />
-              </div>
-              <Field label="Locality" value={d.locality} />
-              <Field label="Locality (Kannada)" value={d.locality_kn} />
-              <Field label="Area" value={d.area} />
-              <Field label="Place" value={d.place} />
-              <Field label="Grama" value={d.grama} />
-              <Field label="Village" value={d.village} />
-              <Field label="Post" value={d.post} />
-              <Field label="City" value={d.city} />
-              <Field label="Taluk" value={d.taluk_name} />
-              <Field label="District" value={d.district_name} />
-              <Field label="State" value={d.state_name} />
-              <Field label="PIN code" value={d.pincode} />
-              <Field label="Country" value={d.country} />
-              <Field label="Landmark" value={d.label_point} />
-              <div className="col-span-2">
-                <Field label="Address remarks" value={d.address_remarks} />
-              </div>
-            </div>
-          </Card>
+const Panel = ({ icon: Icon, title, tag, children, className = '' }) => (
+  <section className={`bg-white rounded-2xl border border-[#EFE6DE] shadow-xs p-5 ${className}`}>
+    <div className="flex items-center justify-between border-b border-[#EFE6DE]/70 pb-3 mb-1">
+      <div className="flex items-center gap-2">
+        <div className="w-7 h-7 rounded-lg bg-[#F7EDE6] text-[#8D4C32] flex items-center justify-center">
+          <Icon className="w-3.5 h-3.5" />
         </div>
-      )}
-    </Loading>
-  );
-}
+        <h4 className="text-xs font-bold uppercase tracking-wider text-[#241B16]">{title}</h4>
+      </div>
+      {tag && <span className="text-[10px] text-[#A89B92] font-medium">{tag}</span>}
+    </div>
+    <dl className="divide-y divide-[#EFE6DE]/50">{children}</dl>
+  </section>
+);
 
-function FamilyTab({ id }) {
-  const state = useSection(id, 'family');
+const ageOf = (iso) => {
+  const born = iso ? new Date(iso) : null;
+  if (!born || Number.isNaN(born.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - born.getFullYear();
+  if (now.getMonth() < born.getMonth() || (now.getMonth() === born.getMonth() && now.getDate() < born.getDate())) age -= 1;
+  return age >= 0 ? age : null;
+};
+
+const groupAadhaar = (v) => (/^\d{12}$/.test(String(v || '')) ? String(v).replace(/(\d{4})(?=\d)/g, '$1 ') : v);
+
+// Personal details, contact & address and family on one screen
+function PersonalTab({ id }) {
+  const personal = useSection(id, 'personal');
+  const contact = useSection(id, 'contact');
+  const family = useSection(id, 'family');
   const [links, setLinks] = useState({}); // membership number -> member id
-  const d = state.data;
+  const fam = family.data;
 
   // resolve the membership numbers written against parents / spouse / children to real members
   useEffect(() => {
-    if (!d) return;
+    if (!fam) return;
     const numbers = [
-      d.father_membership_number,
-      d.mother_membership_number,
-      d.spouse_membership_number,
-      ...(Array.isArray(d.children) ? d.children.map((c) => c.membership_number) : [])
+      fam.father_membership_number,
+      fam.mother_membership_number,
+      fam.spouse_membership_number,
+      ...(Array.isArray(fam.children) ? fam.children.map((c) => c.membership_number) : [])
     ].filter(Boolean);
     [...new Set(numbers)].forEach((n) => {
       api
@@ -448,39 +404,128 @@ function FamilyTab({ id }) {
         })
         .catch(() => {});
     });
-  }, [d]);
+  }, [fam]);
+
+  const p = personal.data;
+  const c = contact.data;
+  const children = Array.isArray(fam?.children) ? fam.children : [];
+  const hasFamily = fam && (fam.father_name || fam.mother_name || fam.spouse_name || children.length > 0);
+  const age = p ? ageOf(p.date_of_birth) : null;
+  const chip = 'px-2 py-0.5 rounded text-[11px] bg-[#F7EDE6] text-[#8D4C32]';
 
   return (
-    <Loading state={state}>
-      {(f) => {
-        const children = Array.isArray(f.children) ? f.children : [];
-        const hasFamily = f.father_name || f.mother_name || f.spouse_name || children.length > 0;
-        return (
-          <div className="grid grid-cols-1 gap-5">
-            <Card icon={Users} title="Family">
-              {!hasFamily ? (
-                <Empty>No family details recorded.</Empty>
-              ) : (
-                <div>
-                  {f.father_name && <Relative relation="Father" name={f.father_name} number={f.father_membership_number} links={links} />}
-                  {f.mother_name && <Relative relation="Mother" name={f.mother_name} number={f.mother_membership_number} links={links} />}
-                  {f.spouse_name && <Relative relation="Spouse" name={f.spouse_name} number={f.spouse_membership_number} links={links} />}
-                  {children.map((c, i) => (
-                    <Relative
-                      key={i}
-                      relation={`Child ${i + 1}${c.gender ? ` · ${c.gender}` : ''}`}
-                      name={c.name}
-                      number={c.membership_number}
-                      links={links}
-                    />
-                  ))}
-                </div>
-              )}
-            </Card>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Panel icon={User} title="Identity & Bio" tag="Core data">
+          {personal.loading ? <Empty>Loading…</Empty> : !p ? <Empty>This section could not be loaded.</Empty> : (
+            <>
+              <Row label="Full name">{[p.name_title, p.first_name_en, p.middle_name_en, p.last_name_en].filter(Boolean).join(' ')}</Row>
+              <Row label="Name (Kannada)">{p.full_name_kn}</Row>
+              <Row label="Gender">{p.gender}</Row>
+              <Row label="Date of birth">
+                {p.date_of_birth && (
+                  <>{formatDate(p.date_of_birth)}{age !== null && <span className="ml-1 font-normal text-[#A89B92]">({age} yrs)</span>}</>
+                )}
+              </Row>
+              <Row label="Blood group">
+                {p.blood_group && <span className="px-2 py-0.5 rounded-md bg-red-50 border border-red-100 text-red-600 font-bold">{p.blood_group}</span>}
+              </Row>
+              <Row label="Marital status">{p.is_married === true ? 'Married' : p.is_married === false ? 'Unmarried' : ''}</Row>
+              <Row label="Aadhaar number">
+                {p.aadhaar_number && <span className="font-mono text-[11px] px-2 py-0.5 rounded border border-stone-200 bg-stone-50">{groupAadhaar(p.aadhaar_number)}</span>}
+              </Row>
+            </>
+          )}
+        </Panel>
+
+        <Panel icon={Briefcase} title="Community & Vocation" tag="Affiliation">
+          {personal.loading ? <Empty>Loading…</Empty> : !p ? null : (
+            <>
+              <Row label="Gotra">{p.gotra}</Row>
+              <Row label="Native place">{p.native_place}</Row>
+              <Row label="Qualification">{p.qualification}</Row>
+              <Row label="Occupation">{p.occupation}</Row>
+              <Row label="Company">{p.company}</Row>
+              <Row label="Website">{p.website}</Row>
+              <Row label="Category">{p.category}</Row>
+              <Row label="Applied on behalf of">{p.applied_on_behalf_of && <span className={chip}>{p.applied_on_behalf_of}</span>}</Row>
+            </>
+          )}
+        </Panel>
+
+        <Panel icon={Phone} title="Contact" tag="Reach">
+          {contact.loading ? <Empty>Loading…</Empty> : !c ? <Empty>This section could not be loaded.</Empty> : (
+            <>
+              <Row label="Mobile">{phone(c.mobile_country_code, c.mobile)}</Row>
+              <Row label="WhatsApp">{phone(c.whatsapp_country_code, c.whatsapp_number)}</Row>
+              <Row label="Alternate mobile">{c.alternate_mobile}</Row>
+              <Row label="Email">{c.email}</Row>
+            </>
+          )}
+        </Panel>
+
+        <Panel icon={MapPin} title="Address" tag="Location">
+          {contact.loading ? <Empty>Loading…</Empty> : !c ? null : (
+            <>
+              <Row label="Address">{[c.address_line1, c.address_line2].filter(Boolean).join(', ')}</Row>
+              <Row label="Address (Kannada)">{[c.address_line1_kn, c.address_line2_kn].filter(Boolean).join(', ')}</Row>
+              <Row label="Locality">{[c.locality, c.locality_kn].filter(Boolean).join(' / ')}</Row>
+              <Row label="Area">{c.area}</Row>
+              <Row label="Place">{c.place}</Row>
+              <Row label="Grama">{c.grama}</Row>
+              <Row label="Village">{c.village}</Row>
+              <Row label="Post">{c.post}</Row>
+              <Row label="City">{c.city}</Row>
+              <Row label="Taluk">{c.taluk_name}</Row>
+              <Row label="District">{c.district_name}</Row>
+              <Row label="State">{c.state_name}</Row>
+              <Row label="PIN code">{c.pincode}</Row>
+              <Row label="Country">{c.country}</Row>
+              <Row label="Landmark">{c.label_point}</Row>
+              <Row label="Address remarks">{c.address_remarks}</Row>
+            </>
+          )}
+        </Panel>
+      </div>
+
+      <Card icon={Users} title="Family">
+        {family.loading ? (
+          <Empty>Loading…</Empty>
+        ) : !fam ? (
+          <Empty>This section could not be loaded.</Empty>
+        ) : !hasFamily ? (
+          <Empty>No family details recorded.</Empty>
+        ) : (
+          <div>
+            {fam.father_name && <Relative relation="Father" name={fam.father_name} number={fam.father_membership_number} links={links} />}
+            {fam.mother_name && <Relative relation="Mother" name={fam.mother_name} number={fam.mother_membership_number} links={links} />}
+            {fam.spouse_name && <Relative relation="Spouse" name={fam.spouse_name} number={fam.spouse_membership_number} links={links} />}
+            {children.map((ch, i) => (
+              <Relative
+                key={i}
+                relation={`Child ${i + 1}${ch.gender ? ` · ${ch.gender}` : ''}`}
+                name={ch.name}
+                number={ch.membership_number}
+                links={links}
+              />
+            ))}
           </div>
-        );
-      }}
-    </Loading>
+        )}
+      </Card>
+
+      {p && (p.registration_source || p.created_at || p.remarks) && (
+        <div className="bg-white rounded-2xl border border-[#EFE6DE] shadow-xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-[#7D7068]">
+          <div className="flex items-center gap-3">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+            <span>
+              Registration: <strong className="text-[#241B16]">{p.registration_source || '—'}</strong>
+              {p.created_at && <> on <strong className="text-[#241B16]">{formatDateTime(p.created_at)}</strong></>}
+            </span>
+          </div>
+          {p.remarks && <span className="text-[11px] text-[#A89B92]">Remarks: {p.remarks}</span>}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -540,6 +585,22 @@ function MembershipTab({ id }) {
 function ReceiptsTab({ id }) {
   const [page, setPage] = useState(1);
   const state = useSection(id, 'receipts', { page, limit: 20 });
+  const [viewing, setViewing] = useState(null); // the receipt open in the view popup
+  const [opening, setOpening] = useState(null); // the receipt whose details are being read
+  // the popup shows the same details as Receipt Tracking: read that receipt (with its particulars) from the server
+  const openReceipt = async (r) => {
+    setOpening(r.receipt_id);
+    try {
+      const result = await fetchReceiptPage({ member_id: id, search: r.receipt_number, limit: 25 });
+      const row = result.rows.find((x) => String(x.id) === String(r.receipt_id)) || result.rows[0];
+      if (!row) throw new Error('not found');
+      setViewing(row);
+    } catch (error) {
+      notify(apiErrorMessage(error, 'Could not open this receipt.'), 'error');
+    } finally {
+      setOpening(null);
+    }
+  };
   return (
     <Loading state={state}>
       {(d) => {
@@ -559,7 +620,8 @@ function ReceiptsTab({ id }) {
                       <th className="py-2 pr-3">Mode</th>
                       <th className="py-2 pr-3">Status</th>
                       <th className="py-2 pr-3 text-right">Receipt total</th>
-                      <th className="py-2 text-right">Allocated here</th>
+                      <th className="py-2 pr-3 text-right">Allocated here</th>
+                      <th className="py-2 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -571,13 +633,26 @@ function ReceiptsTab({ id }) {
                         <td className="py-2 pr-3">{r.payment_mode}</td>
                         <td className="py-2 pr-3">{r.payment_status}</td>
                         <td className="py-2 pr-3 text-right font-mono">{inr(r.net_amount)}</td>
-                        <td className="py-2 text-right font-mono font-bold">{inr(r.allocated_amount)}</td>
+                        <td className="py-2 pr-3 text-right font-mono font-bold">{inr(r.allocated_amount)}</td>
+                        <td className="py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => openReceipt(r)}
+                            disabled={opening === r.receipt_id}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#E8DFD8] text-[#510601] font-semibold hover:bg-[#FAF7F2] disabled:opacity-50 cursor-pointer"
+                            title="View this receipt"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span>{opening === r.receipt_id ? 'Opening…' : 'View'}</span>
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
+            <ReceiptViewModal receipt={viewing} onClose={() => setViewing(null)} />
             {pages > 1 && (
               <div className="mt-4 flex items-center justify-between text-xs text-[#863221]">
                 <button
@@ -1130,9 +1205,7 @@ function ActivityTab({ id }) {
 
 const TABS = [
   { key: 'overview', label: 'Overview', icon: User, Component: OverviewTab },
-  { key: 'personal', label: 'Personal', icon: User, Component: PersonalTab },
-  { key: 'contact', label: 'Contact & Address', icon: Phone, Component: ContactTab },
-  { key: 'family', label: 'Family', icon: Users, Component: FamilyTab, count: 'family' },
+  { key: 'personal', label: 'Personal Details', icon: User, Component: PersonalTab },
   { key: 'membership', label: 'Membership', icon: CreditCard, Component: MembershipTab, count: 'membership' },
   { key: 'receipts', label: 'Receipts', icon: FileText, Component: ReceiptsTab, count: 'receipts' },
   { key: 'magazine', label: 'Magazine', icon: BookOpen, Component: MagazineTab, count: 'magazine' },
@@ -1149,7 +1222,8 @@ export default function MemberProfile() {
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState('');
 
-  const tabKey = TABS.some((t) => t.key === searchParams.get('tab')) ? searchParams.get('tab') : 'overview';
+  const requestedTab = ['contact', 'family'].includes(searchParams.get('tab')) ? 'personal' : searchParams.get('tab'); // old links
+  const tabKey = TABS.some((t) => t.key === requestedTab) ? requestedTab : 'overview';
   const ActiveTab = TABS.find((t) => t.key === tabKey).Component;
   const openTab = useCallback(
     (key) => setSearchParams({ tab: key }, { replace: true }),
