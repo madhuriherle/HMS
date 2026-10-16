@@ -257,6 +257,17 @@ RULE 10: MASTERS AND SCREENS
      data and keep their own limits. There is no "read everything" switch any more: a new list is
      built paged from the start.
 
+10.7 A LIST OR POPUP GETS EVERYTHING IT SHOWS FROM ITS OWN API CALL. A member row carries its place
+     (pincode, post_office_name, state_name, district_name, taluk_name) and its membership type and
+     credit; GET /members/{id} carries the same place names; the Receipt Tracking filters come from
+     GET /receipts/tracking-options (years, sub types, payment modes in use, active particulars,
+     configured payment modes). A page never downloads a master list just to turn ids into names, and
+     never makes a second call per row. The 15,000-row PIN table is never downloaded: the PIN lookup and
+     autocomplete ask GET /masters/postal-codes?pincode_starts=... (searchPostalCodes / lookupPin in
+     serverData.js). The small reference lists (states, districts, taluks, membership types, gothras,
+     qualifications, particulars, payment modes) are read through serverData's cached loaders - kept in
+     memory for five minutes, dropped on any write to /masters/, never put in browser storage.
+
 --------------------------------------------------------------------------------
 RULE 11: HOW WE WORK (ALL AGENTS)
 --------------------------------------------------------------------------------
