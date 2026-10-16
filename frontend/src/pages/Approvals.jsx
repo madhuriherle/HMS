@@ -395,10 +395,16 @@ export default function Approvals() {
       const action = String(raw.action || '').toUpperCase();
 
       // the request body is usually wrapped once ({ receipt_in: { ... } }): show the fields themselves, not "Receipt In ›"
+      // (an edit also carries the record's id beside the body: the id is dropped so the fields line up with the old values)
       const unwrap = (o) => {
-        const ks = Object.keys(o || {});
-        return ks.length === 1 && o[ks[0]] && typeof o[ks[0]] === 'object' && !Array.isArray(o[ks[0]]) ? o[ks[0]] : o;
+        const entries = Object.entries(o || {});
+        const bodies = entries.filter(([, v]) => v && typeof v === 'object' && !Array.isArray(v));
+        if (bodies.length !== 1) return o;
+        const [bodyKey, body] = bodies[0];
+        const rest = Object.fromEntries(entries.filter(([k, v]) => k !== bodyKey && k !== 'id' && !(v && typeof v === 'object')));
+        return { ...rest, ...body };
       };
+      const isNum = (v) => v !== '' && v !== null && typeof v !== 'boolean' && Number.isFinite(Number(v));
       const newFlat = flattenPayload(unwrap(newVals));
       const prevFlat = prev ? flattenPayload(unwrap(prev)) : null;
 
@@ -437,11 +443,13 @@ export default function Approvals() {
         const known = prevFlat && key in prevFlat;
         const prevFormatted = known ? formatValue(prevFlat[key]) : '(Current Value)';
         const nextFormatted = formatValue(newFlat[key]);
+        // 44 and "44.00" are the same amount
+        const sameNumber = known && isNum(prevFlat[key]) && isNum(newFlat[key]) && Number(prevFlat[key]) === Number(newFlat[key]);
         return {
           field: key,
           previous: prevFormatted,
           proposed: nextFormatted,
-          changed: known ? prevFormatted !== nextFormatted : true,
+          changed: known ? prevFormatted !== nextFormatted && !sameNumber : true,
         };
       });
       const changedRows = rows.filter((r) => r.changed);
