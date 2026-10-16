@@ -198,7 +198,7 @@ export default function MagazineManagement() {
     let cancelled = false;
     (async () => {
       try {
-        const locs = await loadLocations();
+        const locs = await loadLocations({ postalCodes: false });
         if (cancelled) return;
         setLocations(locs);
         await loadUnsubscribed();

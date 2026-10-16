@@ -354,11 +354,13 @@ export default function ReceiptEntry() {
       console.error(`Failed to load ${what}.`, error);
       showToast(apiErrorMessage(error, `Failed to load ${what} from the server.`), 'error');
     };
-    const loc = await loadLocations().catch((e) => {
+    const loc = await loadLocations({ postalCodes: false }).catch((e) => {
       fail('locations')(e);
       return { states: [], districts: [], taluks: [], postalCodes: [] };
     });
     setLocations(loc);
+    // the PIN list (the slow one) loads in the background and fills the area names in when it arrives
+    loadLocations().then(setLocations).catch(() => {});
     await Promise.all([
       loadParticulars().then(setParticularsMaster).catch(fail('particulars')),
       loadMembershipTypes().then(setMembershipTypes).catch(fail('membership types')),
@@ -1265,7 +1267,7 @@ export default function ReceiptEntry() {
       })
       .catch((error) => showToast(apiErrorMessage(error, 'Failed to load the Membership List from the server.'), 'error'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedRightTerm, rightPage, rightPageSize, listsVersion, dataReady]);
+  }, [debouncedRightTerm, rightPage, rightPageSize, listsVersion, dataReady, locations.postalCodes.length]);
 
   const bottomSeq = useRef(0);
   useEffect(() => {
@@ -1280,7 +1282,7 @@ export default function ReceiptEntry() {
       })
       .catch((error) => showToast(apiErrorMessage(error, 'Failed to load the unassigned members from the server.'), 'error'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedBottomTerm, unapprovedPage, unapprovedPageSize, listsVersion, dataReady]);
+  }, [debouncedBottomTerm, unapprovedPage, unapprovedPageSize, listsVersion, dataReady, locations.postalCodes.length]);
 
   const filteredRightMembers = registeredMembers; // the server already searched and paged them
   const totalRightMembers = rightTotal;

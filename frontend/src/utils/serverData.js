@@ -7,12 +7,33 @@ const rows = (res) => unwrapList(res?.data);
 const statusLabel = (flag) => (flag ? 'Active' : 'Inactive');
 
 // ── Locations (states / districts / taluks / PIN codes) ──────────────────
-export const loadLocations = async () => {
-  const [st, dt, tk, pc] = await Promise.all([
+// The PIN list is by far the biggest download (about 15,000 rows, 2-4 seconds). It is kept in memory for ten minutes
+// (never in localStorage), so only the first screen that needs it waits for it. A screen that does not use PIN codes
+// asks for loadLocations({ postalCodes: false }) and never downloads them.
+const POSTAL_TTL_MS = 10 * 60 * 1000;
+let postalCache = null; // { at, promise }
+const postalRows = () => {
+  if (postalCache && Date.now() - postalCache.at < POSTAL_TTL_MS) return postalCache.promise;
+  const promise = api.get('/masters/postal-codes', { params: { limit: 25000 } }).catch((error) => {
+    postalCache = null;
+    throw error;
+  });
+  postalCache = { at: Date.now(), promise };
+  return promise;
+};
+export const forgetPostalCodes = () => { postalCache = null; };
+// any change to the locations (a PIN added in Location Setup, say) drops the saved list, so the next screen reads it fresh
+api.interceptors.response.use((res) => {
+  const method = String(res?.config?.method || 'get').toLowerCase();
+  if (method !== 'get' && /\/masters\/(postal-codes|taluks|districts|states)/.test(String(res?.config?.url || ''))) postalCache = null;
+  return res;
+});
+
+export const loadLocations = async ({ postalCodes: withPins = true } = {}) => {
+  const [st, dt, tk] = await Promise.all([
     api.get('/masters/states', { params: { limit: 2000 } }),
     api.get('/masters/districts', { params: { limit: 2000 } }),
     api.get('/masters/taluks', { params: { limit: 25000 } }),
-    api.get('/masters/postal-codes', { params: { limit: 25000 } }),
   ]);
 
   const states = rows(st).map((s) => ({ id: s.id, name: s.name_en, status: statusLabel(s.status) }));
@@ -40,7 +61,9 @@ export const loadLocations = async () => {
     };
   });
   const talukName = new Map(taluks.map((t) => [t.id, t.name]));
+  if (!withPins) return { states, districts, taluks, postalCodes: [] };
 
+  const pc = await postalRows();
   const postalCodes = rows(pc).map((p) => ({
     id: p.id,
     postalCode: p.pincode,

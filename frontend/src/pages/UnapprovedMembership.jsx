@@ -143,7 +143,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     };
     await Promise.all([
       loadMembershipTypes().then(setMembershipTypes).catch(fail('membership types')),
-      loadLocations()
+      loadLocations({ postalCodes: false })
         .then((loc) => {
           setStates(loc.states);
           setDistricts(loc.districts);

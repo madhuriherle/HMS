@@ -75,7 +75,7 @@ export default function NotificationsManagement() {
     (async () => {
       try {
         const [locs, mtypes] = await Promise.all([
-          loadLocations(),
+          loadLocations({ postalCodes: false }),
           loadMembershipTypes()
         ]);
         setDistricts(locs.districts || []);
