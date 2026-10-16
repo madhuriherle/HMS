@@ -57,6 +57,7 @@ class CRUDReceipt(CRUDBase[Receipt, ReceiptCreate, ReceiptUpdate]):
             ))
 
         from services import receipt_status
+        db.flush()  # the session does not autoflush: the new allocations must be visible to the status check
         receipt_status.refresh(db, db_obj)
         db.commit()
         db.refresh(db_obj)

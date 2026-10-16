@@ -71,7 +71,7 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _purge_member(db: Session, member_id: int) -> None:
+def _purge_member(db: Session, member_id: int) -> list:
     """Hard-delete a member and everything that references them.
 
     Children are removed in FK dependency order inside one transaction.
@@ -116,7 +116,10 @@ def _purge_member(db: Session, member_id: int) -> None:
         ).delete(synchronize_session=False)
     _delete(MagazineSubscription)
 
-    # 3. Allocations keep the money trail — just detach the member
+    # 3. The member's receipts go back to Unassigned (a receipt mapped to nobody must not stay "assigned"); the
+    #    allocation rows keep the money trail, detached from the member
+    from services import receipt_status
+    unassigned_receipts = receipt_status.unassign_member_receipts(db, member_id)
     db.query(ReceiptAllocation).filter(
         ReceiptAllocation.member_id == member_id
     ).update({"member_id": None, "membership_id": None}, synchronize_session=False)
@@ -146,6 +149,7 @@ def _purge_member(db: Session, member_id: int) -> None:
     member = db.get(Member, member_id)
     if member is not None:
         db.delete(member)
+    return unassigned_receipts
 
 
 # ─── PROFILE CHANGE REQUESTS ────────────────────────────────
@@ -530,6 +534,8 @@ def approve_deletion(
 
     member = db.query(Member).filter(Member.id == req.member_id).first()
     if member:
+        from services import receipt_status
+        receipt_status.unassign_member_receipts(db, req.member_id, current_user.id)
         member.is_deleted = True
         member.deleted_by = current_user.id
         member.deleted_at = now

@@ -7171,6 +7171,30 @@ def test_member_list_carries_the_place_name(client, admin_headers):
     assert isinstance(opts["particulars"], list) and isinstance(opts["configured_payment_modes"], list)
 
 
+def test_deleting_a_member_sends_their_receipts_back_to_unassigned(client, admin_headers):
+    """The receipt must not stay mapped to a member nobody can open ("Member not found"): deleting the member
+    (soft or permanent) un-maps their receipts, and the receipt's status goes back to UNASSIGNED."""
+    H = admin_headers
+    soft = _create_member(client, H, "9699000051", "Zdelsoft")
+    perm = _create_member(client, H, "9699000052", "Zdelperm")
+    r1 = _make_receipt(client, H, gross_amount=500, net_amount=500, items=[{"item_type": "MEMBERSHIP", "amount": 500}],
+                       allocations=[{"member_id": soft["id"], "allocated_amount": 500}])
+    r2 = _make_receipt(client, H, gross_amount=700, net_amount=700, items=[{"item_type": "MEMBERSHIP", "amount": 700}],
+                       allocations=[{"member_id": perm["id"], "allocated_amount": 700}])
+    assert client.get(f"/api/v1/receipts/{r1['id']}", headers=H).json()["receipt_status"] == "ASSIGNED"
+
+    out = client.delete(f"/api/v1/members/{soft['id']}", headers=H, params={"reason": "duplicate"}).json()
+    assert out["unassigned_receipts"] == [r1["receipt_number"]] and "went back to Unassigned" in out["message"]
+    back = client.get(f"/api/v1/receipts/{r1['id']}", headers=H).json()
+    assert back["receipt_status"] == "UNASSIGNED"
+    waiting = client.get("/api/v1/receipts/unassigned-candidates", headers=H, params={"search": r1["receipt_number"]}).json()
+    assert [x["receipt_id"] for x in waiting["candidates"]] == [r1["id"]]  # it can be mapped to another member now
+
+    out = client.delete(f"/api/v1/members/{perm['id']}", headers=H, params={"reason": "wrong", "mode": "PERMANENT"}).json()
+    assert out["unassigned_receipts"] == [r2["receipt_number"]]
+    assert client.get(f"/api/v1/receipts/{r2['id']}", headers=H).json()["receipt_status"] == "UNASSIGNED"
+
+
 def test_seeding_privileges_leaves_a_deleted_privilege_deleted(client, admin_headers):
     """A privilege someone deleted keeps its code (the column is unique): seeding must not try to insert it again
     (that crashed migration 0081 on UAT, where system.read had been deleted)."""

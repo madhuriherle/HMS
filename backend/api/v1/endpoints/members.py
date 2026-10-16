@@ -1432,10 +1432,13 @@ def delete_member(
 
     if mode == "PERMANENT":
         from api.v1.endpoints.approvals import _purge_member
-        _purge_member(db, id)
+        unassigned = _purge_member(db, id)
         db.commit()
-        return {"message": "Member permanently deleted", "member_id": id, "reason": reason, "mode": "PERMANENT"}
+        return {"message": _deleted_message("Member permanently deleted", unassigned), "member_id": id, "reason": reason,
+                "mode": "PERMANENT", "unassigned_receipts": unassigned}
 
+    from services import receipt_status
+    unassigned = receipt_status.unassign_member_receipts(db, id, current_user.id)  # their receipts wait for another member
     member.is_deleted = True
     member.deleted_by = current_user.id
     member.deleted_at = now
@@ -1451,7 +1454,15 @@ def delete_member(
         created_by=current_user.id,
     ))
     db.commit()
-    return {"message": "Member soft-deleted", "member_id": id, "reason": reason, "mode": "SOFT"}
+    return {"message": _deleted_message("Member deleted", unassigned), "member_id": id, "reason": reason, "mode": "SOFT",
+            "unassigned_receipts": unassigned}
+
+
+def _deleted_message(base: str, unassigned: list) -> str:
+    if not unassigned:
+        return base
+    shown = ", ".join(str(n) for n in unassigned[:5]) + (" ..." if len(unassigned) > 5 else "")
+    return f"{base}. {len(unassigned)} receipt{'s' if len(unassigned) != 1 else ''} ({shown}) went back to Unassigned and can be mapped to another member."
 
 
 # ─── SERVICE OPT-INS (Magazine, Temple, Mangalya, Hall, …) ──────
