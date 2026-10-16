@@ -670,7 +670,7 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
       Rules: a repeated or existing membership number is skipped with a reason; a shared mobile is allowed and only
       flagged; mobiles are cleaned (+91, spaces, dashes) and a landline / foreign number is left blank with a note;
       blank gender stays blank; gotra is matched to the Gotra master whatever the spelling (aliases in
-      _GOTRA_ALIASES), "GENERAL" = none, an unknown one is kept as text with a note; each file is one line in the
+      _GOTRA_ALIASES), "GENERAL" = none, an unknown one is left BLANK with a note naming what the file had; each file is one line in the
       import history (who, when, counts, skipped and flagged rows). The screen asks for confirmation once per file.
 15.24 RANKS ARE NEVER SHOWN. Super Admin is rank 0 (god mode, hidden from everyone else), Admin is rank 1. No screen or
       error message names a rank number, a rank gate to a role, or "a higher rank" (rule 13.6). The Modules page

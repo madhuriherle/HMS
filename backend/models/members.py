@@ -76,6 +76,9 @@ class Member(AuditMixin, Base):
     registration_payment: Mapped[dict] = mapped_column(JSON, nullable=True)
     login_count: Mapped[int] = mapped_column(BigInteger, default=0)
     mobile: Mapped[str] = mapped_column(String(20), nullable=True)
+    # What the legacy register had in the mobile column when it was not a usable mobile (a landline, a number with a
+    # missing or extra digit...). The mobile itself stays empty; this keeps the original so the office can correct it.
+    mobile_raw: Mapped[str] = mapped_column(String(50), nullable=True)
     mobile_country_code: Mapped[str] = mapped_column(String(5), default="+91")
     alternate_mobile: Mapped[str] = mapped_column(String(20), nullable=True)
     email: Mapped[str] = mapped_column(String(191), nullable=True)

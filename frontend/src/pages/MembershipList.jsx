@@ -104,6 +104,7 @@ export default function MembershipList() {
         if (type) params.membership_type_id = type.id;
       }
       if (statusFilter !== 'ALL') params.is_active = statusFilter === 'Active';
+      if (mobileFilter !== 'ALL') params.mobile_status = mobileFilter;
       if (stateFilter !== 'ALL') {
         const st = states.find((x) => x.name.toLowerCase() === stateFilter.toLowerCase());
         if (st) params.state_id = st.id;
@@ -166,13 +167,14 @@ export default function MembershipList() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [stateFilter, setStateFilter] = useState('ALL');
   const [districtFilter, setDistrictFilter] = useState('ALL');
+  const [mobileFilter, setMobileFilter] = useState('ALL'); // ALL | MISSING | INVALID
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
   // the page is read again whenever the page, the search, a filter or the sort changes (default: newest first)
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const filterKey = [debouncedSearch, typeFilter, statusFilter, stateFilter, districtFilter, sort.by, sort.dir].join('|');
+  const filterKey = [debouncedSearch, typeFilter, statusFilter, stateFilter, districtFilter, mobileFilter, sort.by, sort.dir].join('|');
   const mastersReady = membershipTypes.length > 0 || states.length > 0;
   useEffect(() => {
     loadMembers();
@@ -320,7 +322,8 @@ export default function MembershipList() {
     (typeFilter !== 'ALL' ? 1 : 0) +
     (statusFilter !== 'ALL' ? 1 : 0) +
     (stateFilter !== 'ALL' ? 1 : 0) +
-    (districtFilter !== 'ALL' ? 1 : 0);
+    (districtFilter !== 'ALL' ? 1 : 0) +
+    (mobileFilter !== 'ALL' ? 1 : 0);
   const singleMatchMember =
     !loadingPage && total === 1 && paginatedMembers.length === 1 && (debouncedSearch.trim() || activeFilterCount > 0)
       ? paginatedMembers[0]
@@ -367,6 +370,7 @@ export default function MembershipList() {
     setStatusFilter('ALL');
     setStateFilter('ALL');
     setDistrictFilter('ALL');
+    setMobileFilter('ALL');
     setCurrentPage(1);
   };
 
@@ -704,7 +708,8 @@ export default function MembershipList() {
           (typeFilter !== 'ALL' ? 1 : 0) +
           (statusFilter !== 'ALL' ? 1 : 0) +
           (stateFilter !== 'ALL' ? 1 : 0) +
-          (districtFilter !== 'ALL' ? 1 : 0)
+          (districtFilter !== 'ALL' ? 1 : 0) +
+          (mobileFilter !== 'ALL' ? 1 : 0)
         }
         onResetFilters={handleClearFilters}
         rightSlot={
@@ -825,6 +830,21 @@ export default function MembershipList() {
             ...tableFilterDistricts.map((d) => ({ value: d.name, label: d.name }))
           ]}
           widthClass="w-full sm:w-48"
+        />
+
+        {/* 5. Mobile filter: members with no number, or whose number from the old register was unusable */}
+        <FilterSelect
+          value={mobileFilter}
+          onChange={(val) => {
+            setMobileFilter(val);
+            setCurrentPage(1);
+          }}
+          options={[
+            { value: 'ALL', label: 'Any Mobile' },
+            { value: 'MISSING', label: 'No mobile number' },
+            { value: 'INVALID', label: 'Invalid number (to correct)' },
+          ]}
+          widthClass="w-full sm:w-52"
         />
 
         {/* Single reset / clear icon for search + filters */}
@@ -954,6 +974,11 @@ export default function MembershipList() {
                       {/* Contact Info (Mobile & Email) */}
                       <td className="py-3 px-4">
                         <div className="font-mono font-medium text-xs text-[#180200]">{m.mobile || m.mobileNumber || '—'}</div>
+                        {!(m.mobile || m.mobileNumber) && m.mobileRaw && (
+                          <div className="text-[11px] font-mono text-[#ED4636]" title="The number in the old register could not be used. Edit the member to correct it.">
+                            Invalid: {m.mobileRaw}
+                          </div>
+                        )}
                       </td>
 
                       {/* Membership Type and amount paid, both from the server */}

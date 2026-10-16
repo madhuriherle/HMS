@@ -49,6 +49,7 @@ export const normalizeMember = (member) => {
     address: address || member.address || '',
     phone: firstDefined(member.alternate_mobile, member.phone, ''),
     mobile: firstDefined(member.mobile, member.mobileNumber, ''),
+    mobileRaw: member.mobile_raw || '',
     mobileNumber: firstDefined(member.mobile, member.mobileNumber, ''),
     email: member.email || '',
     stateId: firstDefined(member.state_id, member.stateId, ''),

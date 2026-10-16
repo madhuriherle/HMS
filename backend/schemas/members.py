@@ -84,6 +84,7 @@ class MemberBase(BaseModel):
     children_details: Optional[list] = None
 
     mobile: Optional[str] = None
+    mobile_raw: Optional[str] = None  # an unusable number from the legacy register, kept so it can be corrected
     mobile_country_code: str = "+91"
     alternate_mobile: Optional[str] = None
     email: Optional[str] = None

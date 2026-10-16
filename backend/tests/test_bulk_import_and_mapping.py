@@ -336,7 +336,7 @@ def test_bulk_import_maps_gotra_spellings_to_the_master(client, admin_headers):
     assert got["GOT001"]["gotra_id"] == master_id and got["GOT002"]["gotra_id"] == master_id
     assert got["GOT001"]["gotra_text"] == "Vasista"
     assert got["GOT003"]["gotra_id"] is None and got["GOT003"]["gotra_text"] is None and got["GOT004"]["gotra_text"] is None
-    assert got["GOT005"]["gotra_id"] is None and got["GOT005"]["gotra_text"] == "Zzyzx"
+    assert got["GOT005"]["gotra_id"] is None and got["GOT005"]["gotra_text"] is None  # an unknown gotra is left blank
 
 
 def test_bulk_import_splits_a_full_name_like_the_register_screen(client, admin_headers):
@@ -407,3 +407,20 @@ def test_an_excel_file_saved_as_csv_is_read(client, admin_headers):
     done = client.post("/api/v1/members/bulk-import-file", headers=admin_headers,
                        files={"file": ("members.xlsx", buf.getvalue(), "application/octet-stream")})
     assert done.status_code == 200 and done.json()["success_count"] == 2
+
+
+def test_members_with_no_or_invalid_mobile_can_be_listed(client, admin_headers):
+    rows = [{"membership_number": "MOB001", "first_name_en": "Mob One", "mobile": "98452 49580"},
+            {"membership_number": "MOB002", "first_name_en": "Mob Two", "mobile": None},
+            {"membership_number": "MOB003", "first_name_en": "Mob Three", "mobile": "080-23612047"},
+            {"membership_number": "MOB004", "first_name_en": "Mob Four", "mobile": "944887454"}]
+    assert client.post("/api/v1/members/bulk-import", headers=admin_headers, json={"members": rows}).json()["success_count"] == 4
+
+    def codes(status):
+        data = client.get("/api/v1/members/", headers=admin_headers, params={"search": "Mob ", "mobile_status": status, "limit": 50}).json()["data"]
+        return sorted(m["member_code"] for m in data if m["member_code"].startswith("MOB"))
+    assert codes("MISSING") == ["MOB002", "MOB003", "MOB004"]      # no usable number at all
+    assert codes("INVALID") == ["MOB003", "MOB004"]                # the register had something, but unusable
+    got = {m["member_code"]: m for m in client.get("/api/v1/members/", headers=admin_headers, params={"search": "Mob ", "limit": 50}).json()["data"]}
+    assert got["MOB003"]["mobile_raw"] == "080-23612047" and got["MOB003"]["mobile"] is None
+    assert got["MOB001"]["mobile"] == "9845249580" and got["MOB001"]["mobile_raw"] is None

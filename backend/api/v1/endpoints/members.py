@@ -41,6 +41,7 @@ def read_members(
     is_active: Optional[bool] = None,
     membership_type_id: Optional[int] = None,
     registration_source: Optional[str] = None,
+    mobile_status: Optional[str] = None,  # MISSING (no mobile at all) | INVALID (the register's number was unusable)
     include_deleted: bool = False,
     search: Optional[str] = None,
     sort_by: Optional[str] = None,   # id | created_at | name | member_code | mobile | approval_status | member_status
@@ -75,6 +76,12 @@ def read_members(
         query = query.filter(Member.member_status == "ACTIVE") if is_active else query.filter(Member.member_status != "ACTIVE")
     if registration_source:
         query = query.filter(Member.registration_source == registration_source)
+    if mobile_status:
+        no_mobile = or_(Member.mobile.is_(None), Member.mobile == "")
+        if mobile_status.upper() == "MISSING":
+            query = query.filter(no_mobile)
+        elif mobile_status.upper() == "INVALID":
+            query = query.filter(no_mobile, Member.mobile_raw.isnot(None), Member.mobile_raw != "")
     if membership_type_id:
         query = query.join(
             MemberMembership, MemberMembership.member_id == Member.id
@@ -2879,8 +2886,10 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
 
         # mobile: cleaned; a family may share one number, so a shared mobile is allowed and only flagged
         mobile, mobile_warning = _clean_import_mobile(item.mobile)
+        mobile_raw = None
         if mobile_warning:
             row_warnings.append(mobile_warning)
+            mobile_raw = str(item.mobile).strip()[:50]  # kept so the office can correct it later
         if mobile and mobile in holders:
             same_name = [c for c, n in holders[mobile] if n == " ".join(x for x in (first_name, middle_name, last_name) if x).upper()]
             if same_name:
@@ -2888,7 +2897,7 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
             else:
                 row_warnings.append(f"Mobile is shared with {len(holders[mobile])} other member(s)")
 
-        # gotra: matched to the master whatever the spelling; "GENERAL" / blank means none; an unknown one is kept as text
+        # gotra: matched to the master whatever the spelling; "GENERAL" / blank means none; an unknown one is left blank
         gotra_id, gotra_text = None, None
         raw_gotra = _clean_import_name(item.gotra)
         if raw_gotra.upper() not in _NO_GOTRA:
@@ -2896,9 +2905,8 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
             master = gotras.get(_GOTRA_ALIAS_KEYS.get(gkey, gkey))
             if master:
                 gotra_id, gotra_text = master.id, master.name_en
-            else:
-                gotra_text = raw_gotra[:100]
-                row_warnings.append(f"Gotra '{raw_gotra}' is not in the Gotra master, kept as text")
+            else:  # not a gotra of the master: left blank (a wrong gotra is worse than none); the note says what the file had
+                row_warnings.append(f"Gotra '{raw_gotra}' is not in the Gotra master, so it was left blank")
 
         # Resolve membership type
         mt_id = default_m_type_id
@@ -2949,6 +2957,7 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
             gender=gen,
             date_of_birth=item.date_of_birth,
             mobile=mobile,
+            mobile_raw=mobile_raw,
             gotra_id=gotra_id,
             gotra_text=gotra_text,
             email=item.email.strip() if item.email else None,

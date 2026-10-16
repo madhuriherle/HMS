@@ -244,6 +244,7 @@ export default function ReceiptEntry() {
 
   // Search and pagination state for Bottom Unassigned Members Table
   const [unapprovedSearchQuery, setUnapprovedSearchQuery] = useState('');
+  const [unapprovedSearchOpen, setUnapprovedSearchOpen] = useState(false);
   const [unapprovedPage, setUnapprovedPage] = useState(1);
   const [unapprovedPageSize, setUnapprovedPageSize] = useState(10);
 
@@ -2580,7 +2581,7 @@ export default function ReceiptEntry() {
       {entrySource !== 'membership-assignment' && (
         <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_16px_-4px_rgba(24,2,0,0.06)] overflow-hidden">
           {/* Table Header */}
-          <div className="bg-[#FAF7F2] border-b border-[#E8DFD8] px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="bg-[#FAF7F2] border-b border-[#E8DFD8] px-4 sm:px-6 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]">
                 <Users className="w-5 h-5" />
@@ -2592,38 +2593,69 @@ export default function ReceiptEntry() {
               </div>
             </div>
 
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 self-start sm:self-auto">
-              {totalBottomMembers} Unassigned Members
-            </span>
-          </div>
-
-          {/* Search Filter Bar */}
-          <div className="p-4 border-b border-[#E8DFD8] bg-[#FAF7F2]/40">
-            <div className="relative w-full max-w-md">
-              <Search className="w-4 h-4 text-[#863221]/60 absolute left-3.5 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={unapprovedSearchQuery}
-                onChange={(e) => {
-                  setUnapprovedSearchQuery(e.target.value);
-                  setUnapprovedPage(1);
-                }}
-
-                className="w-full pl-9 pr-9 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
-              />
-              {unapprovedSearchQuery && (
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              {unapprovedSearchOpen ? (
+                <div className="relative flex items-center">
+                  <Search className="w-4 h-4 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Search unapproved members..."
+                    value={unapprovedSearchQuery}
+                    onChange={(e) => {
+                      setUnapprovedSearchQuery(e.target.value);
+                      setUnapprovedPage(1);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setUnapprovedSearchQuery('');
+                        setUnapprovedPage(1);
+                        setUnapprovedSearchOpen(false);
+                      }
+                    }}
+                    className="w-48 sm:w-64 pl-9 pr-8 py-1.5 bg-white border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUnapprovedSearchQuery('');
+                      setUnapprovedPage(1);
+                      setUnapprovedSearchOpen(false);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-0.5 cursor-pointer"
+                    title="Close search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
                 <button
                   type="button"
-                  onClick={() => {
-                    setUnapprovedSearchQuery('');
-                    setUnapprovedPage(1);
-                  }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1 cursor-pointer"
-                  title="Clear search"
+                  onClick={() => setUnapprovedSearchOpen(true)}
+                  className="w-8 h-8 rounded-xl bg-white border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] flex items-center justify-center cursor-pointer transition-colors"
+                  title="Search unapproved members"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <Search className="w-4 h-4" />
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setUnapprovedSearchQuery('');
+                  setUnapprovedPage(1);
+                  setListsVersion((v) => v + 1);
+                }}
+                className="w-8 h-8 rounded-xl bg-white border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] flex items-center justify-center cursor-pointer transition-colors"
+                title="Refresh Unapproved Members"
+                aria-label="Refresh Unapproved Members"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                {totalBottomMembers} Unassigned Members
+              </span>
             </div>
           </div>
 
