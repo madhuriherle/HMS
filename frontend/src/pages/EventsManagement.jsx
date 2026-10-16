@@ -45,7 +45,7 @@ export default function EventsManagement() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(15);
+  const [pageSize, setPageSize] = useState(15);
 
   // ── Filter state ──────────────────────────────────────────────
   const [filterTab, setFilterTab] = useState('upcoming'); // 'upcoming' | 'past' | 'all'

@@ -1,3 +1,4 @@
+import Pager from '../components/Pager';
 import { FilterCard } from '../components/FilterToggle';
 import { formatDateTime } from '../utils/dateUtils';
 import React, { useState, useEffect, useCallback } from 'react';
