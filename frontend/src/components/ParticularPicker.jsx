@@ -145,7 +145,7 @@ export default function ParticularPicker({
   const isIncomplete = particular && needsSub && !subType;
 
   // one pick button (a head, or a sub type inside a card)
-  const pickButton = (btn, card) => {
+  const pickButton = (btn, card, isHead = false) => {
     const isTaken = takenKeys.has(btn.key);
     const isSelected = particular === btn.particular && (subType || '') === btn.subType;
     const dim = q && !matches(card, btn);
@@ -156,12 +156,16 @@ export default function ParticularPicker({
         disabled={isTaken}
         onClick={() => handlePick(btn.particular, btn.subType)}
         title={isTaken ? 'Already added on another line of this receipt' : `Select ${card.hasSubs ? `${card.name} › ` : ''}${btn.title}`}
-        className={`inline-flex max-w-full items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left break-words text-xs font-semibold leading-snug transition-colors ${
+        className={`inline-flex max-w-full items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left break-words leading-snug transition-colors ${
+          isHead
+            ? 'border-[#B8A89B] text-[11px] font-bold uppercase tracking-wider'
+            : 'border-[#CDBFB3] text-xs font-semibold'
+        } ${
           isTaken
-            ? 'cursor-not-allowed border-[#E8DFD8] text-[#863221]/50 line-through'
+            ? 'cursor-not-allowed text-[#863221]/50 line-through'
             : isSelected
-            ? 'cursor-pointer border-[#510601] bg-[#510601] text-white'
-            : 'cursor-pointer border-[#E8DFD8] text-[#180200] hover:border-[#510601] hover:text-[#510601]'
+            ? 'cursor-pointer !border-[#510601] bg-[#510601] text-white'
+            : `cursor-pointer hover:border-[#510601] hover:text-[#510601] ${isHead ? 'text-[#510601]' : 'text-[#180200]'}`
         } ${dim ? 'opacity-30' : ''}`}
       >
         {isSelected && <Check className="h-3 w-3 shrink-0" />}
@@ -230,7 +234,7 @@ export default function ParticularPicker({
                 {/* the particulars that have no sub types: one button each, in a plain row (no card, no heading) */}
                 {heads.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {heads.map((btn) => pickButton(btn, { name: btn.title, hasSubs: false }))}
+                    {heads.map((btn) => pickButton(btn, { name: btn.title, hasSubs: false }, true))}
                   </div>
                 )}
                 {/* the particulars that have sub types: a card each, the sub types as buttons */}
@@ -242,9 +246,9 @@ export default function ParticularPicker({
                         return (
                           <div
                             key={card.key}
-                            className={`min-w-0 rounded-xl border border-[#E8DFD8] p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
+                            className={`min-w-0 rounded-xl border border-[#B8A89B] p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
                           >
-                            <p className="mb-2 border-b border-[#E8DFD8] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.title || card.name}</p>
+                            <p className="mb-2 border-b border-[#CDBFB3] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.title || card.name}</p>
                             <div className="flex flex-wrap gap-1.5">
                               {card.buttons.map((btn) => pickButton(btn, card))}
                             </div>
