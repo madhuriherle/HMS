@@ -978,16 +978,14 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                 {assignPageRows.map((c) => (
                   <div key={c.receipt_id} className={`rounded-xl border p-2.5 bg-white flex flex-col gap-1 min-w-0 ${c.likely_score > 0 ? 'border-[#3D705C]/50' : 'border-[#E8DFD8]'}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-mono font-bold text-sm text-[#510601]">{c.receipt_number}</div>
-                        <div className="text-[10px] text-[#863221]">{formatDate(c.receipt_date)}</div>
-                      </div>
-                      <div className="text-right font-bold text-sm text-[#180200] whitespace-nowrap">{formatMoney(c.net_amount)}</div>
+                    {/* the name first and bold; the receipt number, date, mobile and amount below it, light */}
+                    <div className="text-sm font-bold text-[#180200] truncate" title={c.payer_name || ''}>{c.payer_name || '—'}</div>
+                    <div className="flex items-start justify-between gap-2 text-xs text-[#7D7068]">
+                      <span className="font-mono">{c.receipt_number} · {formatDate(c.receipt_date)}</span>
+                      <span className="font-mono whitespace-nowrap">{formatMoney(c.net_amount)}</span>
                     </div>
-                    <div className="text-xs font-semibold text-[#180200] truncate" title={c.payer_name || ''}>{c.payer_name || '—'}</div>
-                    {c.payer_mobile ? <div className="text-[11px] font-mono text-[#863221]">{c.payer_mobile}</div> : null}
-                    {c.payer_pan ? <div className="text-[10px] font-mono text-[#863221]">PAN {c.payer_pan}</div> : null}
+                    {c.payer_mobile ? <div className="text-[11px] font-mono text-[#7D7068]">{c.payer_mobile}</div> : null}
+                    {c.payer_pan ? <div className="text-[10px] font-mono text-[#7D7068]">PAN {c.payer_pan}</div> : null}
                     {assignShowAll && <div className="text-[11px] text-[#7D7068] truncate" title={assignItemsText(c)}>{assignItemsText(c)}</div>}
                     <div className="mt-1 flex items-center justify-between gap-2">
                       <span className="text-[10px] text-[#863221]">{c.likely_score > 0 ? 'likely match' : ''}</span>
