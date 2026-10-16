@@ -34,12 +34,20 @@ const Card = ({ icon: Icon, title, badge = null, children, className = '' }) => 
 );
 
 // a label on the left, the value on the right, a thin line between rows; an empty value is not drawn
-const Field = ({ label, value }) =>
+// `stack` puts a long value (an address) under its label, left-aligned and wrapping, instead of at the right
+const Field = ({ label, value, stack = false }) =>
   value ? (
-    <div className="py-2.5 flex items-start justify-between gap-4 text-xs border-b last:border-b-0 border-[#EFE6DE]/60 min-w-0">
-      <span className="text-[#7D7068] font-medium shrink-0">{label}</span>
-      <span className="font-semibold text-[#180200] text-right min-w-0 break-words">{value}</span>
-    </div>
+    stack ? (
+      <div className="py-2.5 text-xs border-b last:border-b-0 border-[#EFE6DE]/60 min-w-0">
+        <span className="block text-[#7D7068] font-medium">{label}</span>
+        <span className="block mt-1 font-semibold text-[#180200] break-words leading-snug">{value}</span>
+      </div>
+    ) : (
+      <div className="py-2.5 flex items-start justify-between gap-4 text-xs border-b last:border-b-0 border-[#EFE6DE]/60 min-w-0">
+        <span className="text-[#7D7068] font-medium shrink-0">{label}</span>
+        <span className="font-semibold text-[#180200] text-right min-w-0 break-words">{value}</span>
+      </div>
+    )
   ) : null;
 
 const Empty = ({ children }) => <p className="text-xs text-[#863221]/70">{children}</p>;
@@ -299,7 +307,7 @@ function OverviewTab({ id }) {
             </Panel>
 
             <Panel icon={MapPin} title="Address" tag="Location">
-              <Row label="Address">{c.address}</Row>
+              <Row label="Address" stack>{c.address}</Row>
             </Panel>
 
             <Panel icon={Users} title="Family" tag="Relations">
@@ -348,12 +356,19 @@ function OverviewTab({ id }) {
 }
 
 // a label / value row for the key-value panels; an empty value is not drawn
-const Row = ({ label, children }) =>
+const Row = ({ label, children, stack = false }) =>
   children ? (
-    <div className="py-2.5 flex items-start justify-between gap-4 text-xs">
-      <dt className="text-[#7D7068] font-medium shrink-0">{label}</dt>
-      <dd className="font-semibold text-[#180200] text-right min-w-0 break-words">{children}</dd>
-    </div>
+    stack ? (
+      <div className="py-2.5 text-xs">
+        <dt className="text-[#7D7068] font-medium">{label}</dt>
+        <dd className="mt-1 font-semibold text-[#180200] break-words leading-snug">{children}</dd>
+      </div>
+    ) : (
+      <div className="py-2.5 flex items-start justify-between gap-4 text-xs">
+        <dt className="text-[#7D7068] font-medium shrink-0">{label}</dt>
+        <dd className="font-semibold text-[#180200] text-right min-w-0 break-words">{children}</dd>
+      </div>
+    )
   ) : null;
 
 const Panel = ({ icon: Icon, title, tag, children, className = '' }) => (
@@ -470,7 +485,7 @@ function PersonalTab({ id }) {
         <Panel icon={MapPin} title="Address" tag="Location">
           {contact.loading ? <Empty>Loading…</Empty> : !c ? null : (
             <>
-              <Row label="Address">{[c.address_line1, c.address_line2].filter(Boolean).join(', ')}</Row>
+              <Row label="Address" stack>{[c.address_line1, c.address_line2].filter(Boolean).join(', ')}</Row>
               <Row label="Address (Kannada)">{[c.address_line1_kn, c.address_line2_kn].filter(Boolean).join(', ')}</Row>
               <Row label="Locality">{[c.locality, c.locality_kn].filter(Boolean).join(' / ')}</Row>
               <Row label="Area">{c.area}</Row>
@@ -711,7 +726,7 @@ function MagazineTab({ id }) {
                 />
               )}
               {d.magazine_email && <Field label="E-copy email" value={d.magazine_email} />}
-              {address && <div className="lg:col-span-2"><Field label="Delivery address" value={address} /></div>}
+              {address && <div className="lg:col-span-2"><Field label="Delivery address" value={address} stack /></div>}
             </div>
             {(d.issues || []).length > 0 && (
               <div className="mt-4">
