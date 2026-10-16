@@ -1343,6 +1343,9 @@ def delete_receipt(
         db.flush()
     members = removed_members
     removed = crud_receipts.receipt.remove(db, id=id, deleted_by=current_user.id)
+    if members:
+        membership_credit.recompute_members(db, members, current_user.id)
+        db.commit()
     review_msg = f"receipt {receipt.receipt_number} was deleted"
     if reason:
         review_msg += f" ({reason.strip()})"
@@ -1459,6 +1462,8 @@ def remove_allocation(
     alloc.deleted_by = current_user.id
     db.flush()
     receipt_status.refresh(db, receipt)
+    if alloc.member_id:
+        membership_credit.recompute_members(db, [alloc.member_id], current_user.id)
     db.commit()
     db.refresh(alloc)
     membership_credit.flag_for_review(db, [alloc.member_id], f"receipt {receipt.receipt_number} was un-assigned")
@@ -1490,6 +1495,9 @@ def cancel_receipt(
         created_by=current_user.id,
     )
     db.add(cancellation)
+    member_ids = _allocated_member_ids(db, id)
+    if member_ids:
+        membership_credit.recompute_members(db, member_ids, current_user.id)
     db.commit()
     membership_credit.flag_for_review(db, _allocated_member_ids(db, id), f"receipt {receipt.receipt_number} was cancelled")
     return {"message": "Receipt cancelled successfully"}
@@ -1515,6 +1523,9 @@ def create_refund(
         created_by=current_user.id,
     )
     db.add(refund)
+    refund_member_ids = _allocated_member_ids(db, id)
+    if refund_member_ids:
+        membership_credit.recompute_members(db, refund_member_ids, current_user.id)
     db.commit()
     db.refresh(refund)
     membership_credit.flag_for_review(db, _allocated_member_ids(db, id), f"receipt {receipt.receipt_number} was refunded")

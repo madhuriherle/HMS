@@ -13,9 +13,9 @@ is <= their credit:
       -> qualifies for Poshaka, remaining 500 (kept toward the next type)
     +4500 more later -> credit 6000 -> Mahaposhaka, remaining 1000
 
-Auto-upgrade only ever moves a member UP (never downgrades on a refund or
-cancellation — that stays a manual, reviewed change) and never replaces a type
-that has no price (honorary / special types are left alone). The "remaining" is not
+Auto-tier moves a member UP when payments reach a higher tier, and
+DOWN when payments are removed, deleted, or cancelled (never replaces a type
+that has no price: honorary / special types are left alone). The "remaining" is not
 stored anywhere; it is always credit minus the price of the qualified type,
 so it can never drift from the receipts.
 """
@@ -326,9 +326,12 @@ def summary(db: Session, member_id: int, receipt_types: Optional[list] = None) -
 
 
 def apply_auto_upgrade(db: Session, member_id: int, acted_by: Optional[int]) -> Optional[dict]:
-    """Move the member up to the type their credit has reached. Returns a
-    description of the change, or None when nothing changed. Does not commit."""
+    """Recompute the member's tier according to their actual credit.
+    Upgrades when payments reach a higher tier.
+    Downgrades when payments are removed, deleted, or cancelled.
+    Returns a description of the change, or None when nothing changed. Does not commit."""
     from models.members import Member, MemberMembership, MembershipTypeHistory
+    from models.masters import MembershipType
     from services.pricing import active_price
     from services.sequences import generate_next_number
 
@@ -336,19 +339,24 @@ def apply_auto_upgrade(db: Session, member_id: int, acted_by: Optional[int]) -> 
     if not member:
         return None
     total = credit_ledger(db, member_id)["total"]
+    tiers = ladder(db)
+    if not tiers:
+        return None
+
     qualified = None
-    for mt, price in ladder(db):
+    for mt, price in tiers:
         if price <= total:
             qualified = (mt, price)
-    if not qualified:
-        return None
-    target, target_price = qualified
-    price_row = active_price(db, target.id)
-    now = datetime.now(timezone.utc)
-    reason = f"Auto-upgrade: payments total {total} reached {target.name_en} ({target_price})"
 
+    now = datetime.now(timezone.utc)
     current = _current_membership(db, member_id)
+
     if current is None:
+        if not qualified:
+            return None
+        target, target_price = qualified
+        price_row = active_price(db, target.id)
+        reason = f"Auto-upgrade: payments total {total} reached {target.name_en} ({target_price})"
         membership = MemberMembership(
             member_id=member_id, membership_type_id=target.id,
             price_id=price_row.id if price_row else None,
@@ -367,25 +375,69 @@ def apply_auto_upgrade(db: Session, member_id: int, acted_by: Optional[int]) -> 
         ))
         return {"action": "CREATED", "type": target.code, "price": float(target_price), "credit_total": float(total)}
 
-    if current.membership_type_id == target.id:
-        return None
     old_price_row = active_price(db, current.membership_type_id)
     if old_price_row is None:
         return None  # an unpriced (honorary / special) type is never replaced automatically
     old_price = _d(old_price_row.amount)
-    if target_price <= old_price:
-        return None  # never auto-downgrade
+
+    if qualified is not None:
+        target, target_price = qualified
+        if current.membership_type_id == target.id:
+            return None
+        price_row = active_price(db, target.id)
+        old_type_id = current.membership_type_id
+        current.membership_type_id = target.id
+        current.price_id = price_row.id if price_row else current.price_id
+        current.updated_by = acted_by
+
+        if target_price > old_price:
+            action = "UPGRADED"
+            reason = f"Auto-upgrade: payments total {total} reached {target.name_en} ({target_price})"
+        else:
+            action = "DOWNGRADED"
+            reason = f"Auto-downgrade: payments total {total} adjusted to {target.name_en} ({target_price})"
+
+        db.add(MembershipTypeHistory(
+            member_id=member_id, membership_id=current.id, old_type_id=old_type_id,
+            new_type_id=target.id, old_price=float(old_price),
+            new_price=float(target_price), changed_by=acted_by, changed_at=now,
+            reason=reason, created_by=acted_by,
+        ))
+        return {"action": action, "type": target.code, "price": float(target_price), "credit_total": float(total)}
+
+    # qualified is None: total is 0 or less than the cheapest tier.
+    # Revert to the member's initial tier if one existed, else the base tier on the ladder.
+    first_hist = (
+        db.query(MembershipTypeHistory)
+        .filter(MembershipTypeHistory.member_id == member_id, MembershipTypeHistory.is_deleted == False)  # noqa: E712
+        .order_by(MembershipTypeHistory.id.asc())
+        .first()
+    )
+    initial_type_id = first_hist.old_type_id if (first_hist and first_hist.old_type_id) else (first_hist.new_type_id if first_hist else None)
+    initial_type = db.get(MembershipType, initial_type_id) if initial_type_id else None
+    fallback_type = (initial_type if (initial_type and not initial_type.is_deleted and initial_type.status) else None) or tiers[0][0]
+
+    target = fallback_type
+    price_row = active_price(db, target.id)
+    target_price = _d(price_row.amount) if price_row else Decimal(0)
+
+    if current.membership_type_id == target.id:
+        return None
+
     old_type_id = current.membership_type_id
     current.membership_type_id = target.id
     current.price_id = price_row.id if price_row else current.price_id
     current.updated_by = acted_by
+    action = "DOWNGRADED"
+    reason = f"Auto-downgrade: payments removed (credit {total}), reverted to {target.name_en}"
+
     db.add(MembershipTypeHistory(
         member_id=member_id, membership_id=current.id, old_type_id=old_type_id,
-        new_type_id=target.id, old_price=float(old_price) if old_price_row else None,
+        new_type_id=target.id, old_price=float(old_price),
         new_price=float(target_price), changed_by=acted_by, changed_at=now,
         reason=reason, created_by=acted_by,
     ))
-    return {"action": "UPGRADED", "type": target.code, "price": float(target_price), "credit_total": float(total)}
+    return {"action": action, "type": target.code, "price": float(target_price), "credit_total": float(total)}
 
 
 def recompute_members(db: Session, member_ids, acted_by: Optional[int]) -> list:

@@ -6865,6 +6865,32 @@ def test_losing_credit_never_lowers_the_type_but_asks_for_a_review(client, admin
     assert flagged, "approvers were not told to review the type"
 
 
+def test_deleting_or_cancelling_receipt_auto_downgrades_member(client, admin_headers):
+    H = admin_headers
+    _ladder_two_types(client, H, "DOWN")
+    mid = _create_member(client, H, "9611111105", "DowngradeMe")["id"]
+    # 1. First receipt pays for DOWN_LOW (1000)
+    r1 = _make_receipt(client, H, gross_amount=1000, net_amount=1000,
+                       items=[{"item_type": "MEMBERSHIP", "amount": 1000}],
+                       allocations=[{"member_id": mid, "allocated_amount": 1000}])
+    c1 = client.get(f"/api/v1/members/{mid}/membership-credit", headers=H).json()
+    assert c1["current_type"]["code"] == "DOWN_LOW" and c1["credit_total"] == 1000
+
+    # 2. Second receipt pays 4000 (total credit reaches 5000 -> upgrades to DOWN_HIGH)
+    r2 = _make_receipt(client, H, gross_amount=4000, net_amount=4000,
+                       items=[{"item_type": "MEMBERSHIP", "amount": 4000}],
+                       allocations=[{"member_id": mid, "allocated_amount": 4000}])
+    c2 = client.get(f"/api/v1/members/{mid}/membership-credit", headers=H).json()
+    assert c2["current_type"]["code"] == "DOWN_HIGH" and c2["credit_total"] == 5000
+
+    # 3. Second receipt is deleted -> credit drops back to 1000 -> auto-downgraded back to DOWN_LOW!
+    del_res = client.delete(f"/api/v1/receipts/{r2['id']}?force=true", headers=H)
+    assert del_res.status_code == 200
+    c3 = client.get(f"/api/v1/members/{mid}/membership-credit", headers=H).json()
+    assert c3["credit_total"] == 1000
+    assert c3["current_type"]["code"] == "DOWN_LOW"
+
+
 def test_rank_gate_is_super_admin_only(client, admin_headers):
     """Rank 0 (Super Admin) alone passes the rank gates: Modules, Settings, Data Cleanup; an Admin (rank 1)
     does not, cannot see Super Admin users or roles, and cannot mint a rank-0 role."""
