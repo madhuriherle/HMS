@@ -1499,16 +1499,6 @@ export default function ReceiptEntry() {
               {isEdit ? `Edit Receipt${formData.receiptNumber ? ` ${formData.receiptNumber}` : ''}` : 'Receipt Entry'}
             </h1>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              Active
-            </span>
-            {financialYear && (
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-stone-100 text-stone-700 border border-stone-200">
-                FY: {financialYear}
-              </span>
-            )}
-          </div>
         </div>
       </div>
 
