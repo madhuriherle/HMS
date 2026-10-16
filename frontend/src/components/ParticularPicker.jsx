@@ -50,9 +50,10 @@ export default function ParticularPicker({
     return { name: p.name, hasSubs: false, single: true, buttons: [{ id: `${p.id || p.name}-root`, title: p.name, particular: p.name, subType: '', key: lineKey(p.name, '') }] };
   }), [activeParticulars]);
 
-  // The cards flow down a column until its height is full, then the rest continues in the next column (the browser
-  // lays them out: columns of one fixed width, a card is never cut in two). If that would need more columns than fit
-  // the width, the cards are spread evenly over the columns instead and the popup scrolls up and down.
+  // The cards flow down a column until its height is full, then the rest continues at the top of the next column (the
+  // browser lays them out: columns of one fixed width). A card with sub types may break between two of its rows - the
+  // border is drawn on both pieces - so no space is left empty; a one-name card never breaks. If that would need more
+  // columns than fit the width, the cards are spread evenly over the columns instead and the popup scrolls up and down.
   const widthNow = () => (typeof window === 'undefined' ? 1400 : window.innerWidth);
   const columnsFor = (w) => (w >= 1280 ? 4 : w >= 1024 ? 3 : w >= 640 ? 2 : 1);
   const [screenWidth, setScreenWidth] = useState(widthNow);
@@ -129,6 +130,7 @@ export default function ParticularPicker({
         disabled={isTaken}
         onClick={() => handlePick(btn.particular, btn.subType)}
         title={isTaken ? 'Already added on another line of this receipt' : `Select ${card.hasSubs ? `${card.name} › ` : ''}${btn.title}`}
+        style={{ breakInside: 'avoid' }}
         className={`items-center gap-1 text-left break-words leading-snug transition-colors ${
           isHead
             ? 'flex w-full rounded-md px-1 py-0.5 text-[11px] font-bold uppercase tracking-wider'
@@ -220,14 +222,14 @@ export default function ParticularPicker({
                       <div
                         key={card.name}
                         className={`mb-3 min-w-0 rounded-xl border border-[#B8A89B] p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
-                        style={{ breakInside: 'avoid' }}
+                        style={card.single ? { breakInside: 'avoid' } : { breakInside: 'auto', boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone' }}
                       >
                         {card.single ? (
                           pickButton(card.buttons[0], card, true)
                         ) : (
                           <>
-                            <p className="mb-2 border-b border-[#CDBFB3] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.name}</p>
-                            <div className="flex flex-col gap-0.5">
+                            <p className="mb-2 border-b border-[#CDBFB3] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]" style={{ breakAfter: 'avoid' }}>{card.name}</p>
+                            <div className="space-y-0.5">
                               {card.buttons.map((btn) => pickButton(btn, card))}
                             </div>
                           </>
