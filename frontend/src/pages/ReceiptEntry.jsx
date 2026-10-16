@@ -1751,15 +1751,6 @@ export default function ReceiptEntry() {
                       ) : (
                         <span className="text-[#863221]"><b className="text-[#180200]">{totalRightMembers}</b> members match. Pick one from the Membership List.</span>
                       )}
-                      <button
-                        type="button"
-                        title="Clear name, mobile and membership no."
-                        aria-label="Clear the look-up boxes"
-                        onClick={() => { setFormData((prev) => ({ ...prev, name: '', mobile: '', membershipNo: '' })); setTypingOrder([]); }}
-                        className={`ml-2 shrink-0 rounded-lg p-1.5 cursor-pointer ${totalRightMembers === 1 ? 'text-emerald-700 hover:bg-emerald-100' : 'text-[#863221] hover:bg-white'}`}
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      </button>
                     </div>
                   )}
                 </div>
@@ -2411,6 +2402,16 @@ export default function ReceiptEntry() {
                       title="Search"
                     >
                       <Search className="w-4 h-4" />
+                    </button>
+                    {/* refresh the list only: the search box above it goes, the fields typed in the form stay */}
+                    <button
+                      type="button"
+                      onClick={() => { setRightSearchQuery(''); setRightPage(1); setListsVersion((v) => v + 1); }}
+                      className="w-8 h-8 rounded-xl bg-white border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] flex items-center justify-center cursor-pointer"
+                      title="Refresh the Membership List"
+                      aria-label="Refresh the Membership List"
+                    >
+                      <RotateCcw className="w-4 h-4" />
                     </button>
                     <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#510601]/10 text-[#510601] border border-[#510601]/20 shrink-0">
                       {totalRightMembers} Members
