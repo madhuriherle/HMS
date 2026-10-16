@@ -1479,7 +1479,7 @@ export default function RegisterNewMember() {
                   <div className="pb-2 border-b border-[#E8DFD8]"><h3 className="text-sm font-bold text-[#8C1801] uppercase tracking-wider">Address & Work</h3></div>
                 {/* the fields take two thirds, the sticker preview one third */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
-                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-5">
                   {/* Communication Address */}
                   <div className="col-span-full">
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
@@ -1503,7 +1503,7 @@ export default function RegisterNewMember() {
 
                   {/* Communication Address (Kannada) */}
                   {SHOW_KANNADA_FIELDS && (
-                  <div>
+                  <div className="col-span-full">
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
                       Communication Address (Kannada):
                     </label>
@@ -1594,6 +1594,20 @@ export default function RegisterNewMember() {
                     )}
                   </div>
 
+                  {/* Native Place */}
+                  <div>
+                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
+                      Native Place:
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.nativePlace}
+                      onChange={(e) => setFormData({ ...formData, nativePlace: e.target.value })}
+
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                    />
+                  </div>
+
                   {/* Post Office / Locality (Kannada) */}
                   {SHOW_KANNADA_FIELDS && (
                   <div>
@@ -1609,20 +1623,6 @@ export default function RegisterNewMember() {
                     />
                   </div>
                   )}
-
-                  {/* Native Place */}
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Native Place:
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.nativePlace}
-                      onChange={(e) => setFormData({ ...formData, nativePlace: e.target.value })}
-
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
-                    />
-                  </div>
 
                   {/* Qualification */}
                   <div>
