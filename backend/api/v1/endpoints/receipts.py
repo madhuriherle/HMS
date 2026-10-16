@@ -997,6 +997,7 @@ def get_unassigned_candidates(
     max_amount: Optional[float] = None,
     applicant_id: Optional[int] = None,  # rank the receipts by how likely they belong to this member
     likely_only: bool = False,           # only those that carry something of the applicant
+    membership_only: bool = False,       # only receipts with a line of a counted type (Membership): the ones that can pay for a membership
     page: int = 1,
     limit: int = 25,
 ) -> Any:
@@ -1029,6 +1030,15 @@ def get_unassigned_candidates(
         q = q.filter(Receipt.net_amount >= min_amount)
     if max_amount is not None:
         q = q.filter(Receipt.net_amount <= max_amount)
+    # only the types that count toward membership credit (Membership by default) can pay for a membership
+    from services import membership_credit
+    counted_types = membership_credit.credit_receipt_types(db)
+    if membership_only:
+        q = q.filter(or_(
+            Receipt.id.in_(db.query(ReceiptItem.receipt_id).filter(
+                ReceiptItem.is_deleted == False, func.upper(ReceiptItem.item_type).in_(counted_types))),  # noqa: E712
+            Receipt.receipt_type.in_(counted_types),
+        ))
 
     # a receipt is matched when its typed number is exactly a member's permanent membership number
     typed = func.upper(func.trim(func.coalesce(Receipt.payer_membership_no, "")))
@@ -1096,6 +1106,7 @@ def get_unassigned_candidates(
             matched_by_num.setdefault(mm.membership_number.strip().upper(), m)
 
     lines_by_receipt = {}
+    counted_by_receipt = {}  # the money on each receipt's lines of a counted type (Membership)
     if rows:
         for it in (
             db.query(ReceiptItem)
@@ -1106,6 +1117,8 @@ def get_unassigned_candidates(
             lines_by_receipt.setdefault(it.receipt_id, []).append(
                 {"particular": it.particular_name or it.item_type, "detail": it.description, "amount": float(it.amount)}
             )
+            if (it.item_type or "").upper() in counted_types:
+                counted_by_receipt[it.receipt_id] = counted_by_receipt.get(it.receipt_id, 0.0) + float(it.amount)
 
     candidates = []
     for r, likely in rows:
@@ -1123,6 +1136,8 @@ def get_unassigned_candidates(
             "payment_mode": r.payment_mode,
             "receipt_type": r.receipt_type,
             "items": lines_by_receipt.get(r.id, []),
+            # what of this receipt counts for a membership: its Membership lines (an old single-line receipt: by its type)
+            "membership_amount": counted_by_receipt.get(r.id, float(r.net_amount) if (r.receipt_type in counted_types and r.id not in lines_by_receipt) else 0.0),
             "match_type": "EXACT_NUMBER" if matched_m else "NONE",
             "matched_member": None,
             "likely_score": int(likely or 0),

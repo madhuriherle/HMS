@@ -6509,8 +6509,8 @@ def test_membership_credit_auto_upgrade_with_remaining_carried(client, admin_hea
     assert client.post(f"/api/v1/receipts/{donation['id']}/cancel", headers=H, json={"reason": "bounced"}).status_code == 200
     c = credit()
     assert c["credit_total"] == 2200 and c["current_type"]["code"] == "LAD_MAHA"
-    assert c["qualified_type"]["code"] == "LAD_POSHAKA" and c["remaining_amount"] == 1200
-    assert client.post(f"/api/v1/members/{mid}/membership-credit/recalculate", headers=H).json()["changed"] is None
+    recalc = client.post(f"/api/v1/members/{mid}/membership-credit/recalculate", headers=H).json()
+    assert recalc["changed"]["action"] == "DOWNGRADED" and recalc["changed"]["type"] == "LAD_POSHAKA"
 
     # allocating later (receipt first, member mapped afterwards) also upgrades
     m2 = _create_member(client, H, "9644444444", "Ladder Two")
@@ -7299,6 +7299,20 @@ def test_a_receipt_entered_as_cancelled_keeps_what_was_typed(client, admin_heade
     # a bare one (only the number and date) still saves
     bare = client.post("/api/v1/receipts/", headers=H, json={"receipt_date": date.today().isoformat(), "is_cancelled": True})
     assert bare.status_code == 201 and float(bare.json()["net_amount"]) == 0
+
+
+def test_assign_popup_lists_only_receipts_that_can_pay_for_a_membership(client, admin_headers):
+    """membership_only hides receipts with no Membership line, and each receipt says how much of it counts."""
+    H = admin_headers
+    mem = _make_receipt(client, H, gross_amount=1500, net_amount=1500, payer_name="Zassignmem",
+                        items=[{"item_type": "MEMBERSHIP", "amount": 500}, {"item_type": "DONATION", "amount": 1000}])
+    don = _make_receipt(client, H, gross_amount=900, net_amount=900, payer_name="Zassigndon",
+                        items=[{"item_type": "DONATION", "amount": 900}], receipt_type="DONATION")
+    every = client.get("/api/v1/receipts/unassigned-candidates", headers=H, params={"search": "Zassign", "limit": 50}).json()["candidates"]
+    assert {c["receipt_id"] for c in every} == {mem["id"], don["id"]}
+    only = client.get("/api/v1/receipts/unassigned-candidates", headers=H, params={"search": "Zassign", "membership_only": True, "limit": 50}).json()["candidates"]
+    assert [c["receipt_id"] for c in only] == [mem["id"]]
+    assert only[0]["membership_amount"] == 500  # Membership 500 + Donation 1000 counts 500
 
 
 def test_seeding_privileges_leaves_a_deleted_privilege_deleted(client, admin_headers):

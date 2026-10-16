@@ -218,6 +218,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [assignFrom, setAssignFrom] = useState('');
   const [assignTo, setAssignTo] = useState('');
   const [assignMatchOnly, setAssignMatchOnly] = useState(false);
+  const [assignShowAll, setAssignShowAll] = useState(false); // off: only receipts with a Membership line (the only ones that can pay for a membership)
   const [assignPage, setAssignPage] = useState(1);
   const [assignPageSize, setAssignPageSize] = useState(10);
   const [assignView, setAssignView] = useState('table'); // table | cards
@@ -340,6 +341,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           ...(assignFrom ? { from_date: assignFrom } : {}),
           ...(assignTo ? { to_date: assignTo } : {}),
           ...(assignMatchOnly ? { likely_only: true } : {}),
+          ...(!assignShowAll ? { membership_only: true } : {}),
         },
       });
       if (seq !== assignSeq.current) return;
@@ -419,11 +421,11 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     const timer = setTimeout(() => setAssignDebounced(assignSearch), 350);
     return () => clearTimeout(timer);
   }, [assignSearch]);
-  useEffect(() => { setAssignPage(1); }, [assignDebounced, assignFrom, assignTo, assignMatchOnly, assignPageSize]);
+  useEffect(() => { setAssignPage(1); }, [assignDebounced, assignFrom, assignTo, assignMatchOnly, assignShowAll, assignPageSize]);
   useEffect(() => {
     loadAssignCandidates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assigningMember?.id, assignPage, assignPageSize, assignDebounced, assignFrom, assignTo, assignMatchOnly]);
+  }, [assigningMember?.id, assignPage, assignPageSize, assignDebounced, assignFrom, assignTo, assignMatchOnly, assignShowAll]);
 
   // ----------------------------------------------------
   // APPROVAL TRIGGER & VALIDATION
@@ -905,6 +907,10 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                 <button type="button" onClick={() => setAssignMatchOnly(true)}
                   className={`px-3 py-1.5 rounded-lg cursor-pointer ${assignMatchOnly ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}>Likely matches</button>
               </div>
+              <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#863221] cursor-pointer select-none" title="Receipts with no Membership line cannot pay for a membership, so they are hidden">
+                <input type="checkbox" checked={assignShowAll} onChange={(e) => setAssignShowAll(e.target.checked)} className="w-4 h-4 accent-[#510601] cursor-pointer" />
+                <span>Show all receipts</span>
+              </label>
               <div className="inline-flex rounded-xl border border-[#E8DFD8] bg-white p-0.5">
                 <button type="button" title="Table" onClick={() => setAssignView('table')}
                   className={`p-1.5 rounded-lg cursor-pointer ${assignView === 'table' ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}><List className="w-4 h-4" /></button>
@@ -938,7 +944,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                       <th className="py-2 px-3">Receipt No.</th>
                       <th className="py-2 px-3">Date</th>
                       <th className="py-2 px-3">Payer</th>
-                      <th className="py-2 px-3">Particulars</th>
+                      <th className="py-2 px-3 text-right">Counts for membership</th>
                       <th className="py-2 px-3">Mode</th>
                       <th className="py-2 px-3 text-right">Amount</th>
                       <th className="py-2 px-3 text-right"></th>
@@ -956,7 +962,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           {c.payer_name || '—'}
                           {c.payer_mobile ? <span className="ml-2 font-mono text-[10px] text-[#863221]">{c.payer_mobile}</span> : null}
                         </td>
-                        <td className="py-1.5 px-3 text-[#180200]">{assignItemsText(c)}</td>
+                        <td className="py-1.5 px-3 text-right font-semibold text-[#3D705C] whitespace-nowrap">{c.membership_amount > 0 ? formatMoney(c.membership_amount) : <span className="font-normal text-[#863221]/60">—</span>}</td>
                         <td className="py-1.5 px-3 text-[#863221] whitespace-nowrap">{c.payment_mode || '—'}</td>
                         <td className="py-1.5 px-3 text-right font-bold text-[#180200] whitespace-nowrap">{formatMoney(c.net_amount)}</td>
                         <td className="py-1.5 px-3 text-right">{assignButton(c)}</td>
@@ -979,7 +985,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                     <div className="text-xs font-semibold text-[#180200] truncate" title={c.payer_name || ''}>{c.payer_name || '—'}</div>
                     {c.payer_mobile ? <div className="text-[11px] font-mono text-[#863221]">{c.payer_mobile}</div> : null}
                     {c.payer_pan ? <div className="text-[10px] font-mono text-[#863221]">PAN {c.payer_pan}</div> : null}
-                    <div className="text-[11px] text-[#7D7068] truncate" title={assignItemsText(c)}>{assignItemsText(c)}</div>
+                    <div className="text-[11px] text-[#7D7068]">Counts for membership: <b className="text-[#3D705C]">{c.membership_amount > 0 ? formatMoney(c.membership_amount) : '—'}</b></div>
                     <div className="mt-1 flex items-center justify-between gap-2">
                       <span className="text-[10px] text-[#863221]">{c.payment_mode || ''}{c.likely_score > 0 ? ' · likely match' : ''}</span>
                       {assignButton(c)}
