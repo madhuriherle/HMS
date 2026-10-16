@@ -217,11 +217,11 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [assignSearch, setAssignSearch] = useState('');
   const [assignFrom, setAssignFrom] = useState('');
   const [assignTo, setAssignTo] = useState('');
-  const [assignMatchOnly, setAssignMatchOnly] = useState(false);
+  const [assignMatchOnly, setAssignMatchOnly] = useState(true);
   const [assignShowAll, setAssignShowAll] = useState(false); // off: only receipts with a Membership line (the only ones that can pay for a membership)
   const [assignPage, setAssignPage] = useState(1);
   const [assignPageSize, setAssignPageSize] = useState(10);
-  const [assignView, setAssignView] = useState('table'); // table | cards
+  const [assignView, setAssignView] = useState('cards'); // table | cards (cards by default)
   const [mappingReceiptId, setMappingReceiptId] = useState(null);
   const [receiptView, setReceiptView] = useState(null); // { member, receipt }: the receipt already assigned to an applicant
   // the same receipt popup as Receipt Tracking: the receipt is read in full (with its particulars) before it opens
@@ -366,7 +366,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     setAssignSearch('');
     setAssignFrom('');
     setAssignTo('');
-    setAssignMatchOnly(false);
+    setAssignMatchOnly(true); // the likely matches first; All shows the rest
     setAssignPage(1);
   };
 
@@ -880,45 +880,45 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           footer={<ModalFooter kind="view" onCancel={() => setAssigningMember(null)} />}
         >
           <div className="p-5 flex flex-col gap-4 flex-1 min-h-0">
-            {/* Search and filters */}
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="relative flex-1 min-w-[220px]">
+            {/* Search and filters: one line, every control the same height */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-[230px] shrink-0">
                 <Search className="w-4 h-4 text-[#863221] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={assignSearch}
                   onChange={(e) => setAssignSearch(e.target.value)}
-                  placeholder="Receipt no., payer, mobile or amount"
+                  placeholder="Receipt no., payer, mobile"
                   disabled={!!assignError}
-                  className="w-full pl-9 pr-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601] disabled:bg-[#FAF7F2]"
+                  className="w-full h-9 pl-9 pr-3 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601] disabled:bg-[#FAF7F2]"
                 />
               </div>
-              <div className="w-[130px]">
+              <div className="w-[122px] shrink-0">
                 <DateInput value={assignFrom} onChange={(e) => setAssignFrom(e.target.value)} placeholder="From date"
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]" />
+                  className="w-full h-9 px-3 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]" />
               </div>
-              <div className="w-[130px]">
+              <div className="w-[122px] shrink-0">
                 <DateInput value={assignTo} onChange={(e) => setAssignTo(e.target.value)} placeholder="To date"
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]" />
+                  className="w-full h-9 px-3 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]" />
               </div>
-              <div className="inline-flex rounded-xl border border-[#E8DFD8] bg-white p-0.5 text-xs font-bold">
-                <button type="button" onClick={() => setAssignMatchOnly(false)}
-                  className={`px-3 py-1.5 rounded-lg cursor-pointer ${!assignMatchOnly ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}>All</button>
+              <div className="inline-flex items-center h-9 rounded-xl border border-[#E8DFD8] bg-white p-0.5 text-xs font-bold shrink-0">
                 <button type="button" onClick={() => setAssignMatchOnly(true)}
-                  className={`px-3 py-1.5 rounded-lg cursor-pointer ${assignMatchOnly ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}>Likely matches</button>
+                  className={`h-full px-3 rounded-lg cursor-pointer ${assignMatchOnly ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}>Likely matches</button>
+                <button type="button" onClick={() => setAssignMatchOnly(false)}
+                  className={`h-full px-3 rounded-lg cursor-pointer ${!assignMatchOnly ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}>All</button>
               </div>
-              <label className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#863221] cursor-pointer select-none" title="Receipts with no Membership line cannot pay for a membership, so they are hidden">
+              <label className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold text-[#863221] border border-[#E8DFD8] bg-white rounded-xl cursor-pointer select-none shrink-0" title="Receipts with no Membership line cannot pay for a membership, so they are hidden">
                 <input type="checkbox" checked={assignShowAll} onChange={(e) => setAssignShowAll(e.target.checked)} className="w-4 h-4 accent-[#510601] cursor-pointer" />
                 <span>Show all receipts</span>
               </label>
-              <div className="inline-flex rounded-xl border border-[#E8DFD8] bg-white p-0.5">
-                <button type="button" title="Table" onClick={() => setAssignView('table')}
-                  className={`p-1.5 rounded-lg cursor-pointer ${assignView === 'table' ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}><List className="w-4 h-4" /></button>
+              <div className="inline-flex items-center h-9 rounded-xl border border-[#E8DFD8] bg-white p-0.5 shrink-0">
                 <button type="button" title="Cards" onClick={() => setAssignView('cards')}
-                  className={`p-1.5 rounded-lg cursor-pointer ${assignView === 'cards' ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}><LayoutGrid className="w-4 h-4" /></button>
+                  className={`h-full px-2 rounded-lg cursor-pointer ${assignView === 'cards' ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}><LayoutGrid className="w-4 h-4" /></button>
+                <button type="button" title="Table" onClick={() => setAssignView('table')}
+                  className={`h-full px-2 rounded-lg cursor-pointer ${assignView === 'table' ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}><List className="w-4 h-4" /></button>
               </div>
               <button type="button" onClick={loadAssignCandidates} title="Reload"
-                className="p-2 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#863221] hover:text-[#510601] rounded-xl cursor-pointer">
+                className="h-9 w-9 flex items-center justify-center bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#863221] hover:text-[#510601] rounded-xl cursor-pointer shrink-0">
                 <RefreshCw className={`w-3.5 h-3.5 ${assignLoading ? 'animate-spin' : ''}`} />
               </button>
             </div>
@@ -933,8 +933,13 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
               <div className="py-12 text-center">
                 <CheckCircle2 className="w-7 h-7 text-[#3D705C]/50 mx-auto mb-1.5" />
                 <p className="font-semibold text-sm text-[#180200]">
-                  {!(assignDebounced.trim() || assignFrom || assignTo || assignMatchOnly) ? 'No receipt is waiting for a member' : 'No receipt matches these filters'}
+                  {!(assignDebounced.trim() || assignFrom || assignTo || assignMatchOnly) ? 'No receipt is waiting for a member' : assignMatchOnly && !(assignDebounced.trim() || assignFrom || assignTo) ? 'No receipt looks like this applicant's' : 'No receipt matches these filters'}
                 </p>
+                {assignMatchOnly && (
+                  <button type="button" onClick={() => setAssignMatchOnly(false)} className="mt-2 px-3 py-1.5 text-xs font-bold text-[#510601] border border-[#510601] rounded-lg hover:bg-[#FAF7F2] cursor-pointer">
+                    Show all waiting receipts
+                  </button>
+                )}
               </div>
             ) : assignView === 'table' ? (
               <div className="border border-[#E8DFD8] rounded-xl overflow-hidden">
