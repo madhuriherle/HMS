@@ -112,8 +112,8 @@ export default function ParticularPicker({
           isOpen
           onClose={() => setOpen(false)}
           title="Select Receipt Particular"
-          maxWidthClass="max-w-6xl"
-          heightClass="h-[85vh]"
+          maxWidthClass="max-w-7xl"
+          heightClass="h-[90vh]"
           footer={
             <ModalFooter
               kind="view"
@@ -145,13 +145,13 @@ export default function ParticularPicker({
             {cards.length === 0 ? (
               <p className="py-10 text-center text-sm text-[#863221]">No active particulars.</p>
             ) : (
-              <div className="flex-1 min-h-0 overflow-y-auto columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 content-start items-start">
                 {cards.map((card) => {
                   const cardHasMatch = card.buttons.some((b) => matches(card, b));
                   return (
                     <div
                       key={card.name}
-                      className={`mb-4 break-inside-avoid rounded-xl border border-[#E8DFD8] bg-white p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
+                      className={`min-w-0 rounded-xl border border-[#E8DFD8] p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
                     >
                       {/* a particular with no sub types is just its one button: no heading above it, so the name is not written twice */}
                       {card.hasSubs && (
@@ -169,12 +169,12 @@ export default function ParticularPicker({
                               disabled={isTaken}
                               onClick={() => handlePick(btn.particular, btn.subType)}
                               title={isTaken ? 'Already added on another line of this receipt' : `Select ${card.hasSubs ? `${card.name} › ` : ''}${btn.title}`}
-                              className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left text-xs font-semibold leading-snug transition-colors ${
+                              className={`inline-flex max-w-full items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left break-words text-xs font-semibold leading-snug transition-colors ${
                                 isTaken
-                                  ? 'cursor-not-allowed border-[#E8DFD8] bg-[#FAF7F2] text-[#863221]/50 line-through'
+                                  ? 'cursor-not-allowed border-[#E8DFD8] text-[#863221]/50 line-through'
                                   : isSelected
                                   ? 'cursor-pointer border-[#510601] bg-[#510601] text-white'
-                                  : 'cursor-pointer border-[#E8DFD8] bg-[#FAF7F2] text-[#180200] hover:border-[#510601] hover:bg-white hover:text-[#510601]'
+                                  : 'cursor-pointer border-[#E8DFD8] text-[#180200] hover:border-[#510601] hover:text-[#510601]'
                               } ${dim ? 'opacity-30' : ''}`}
                             >
                               {isSelected && <Check className="h-3 w-3 shrink-0" />}

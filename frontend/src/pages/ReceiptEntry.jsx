@@ -1231,7 +1231,9 @@ export default function ReceiptEntry() {
   const numberText = String(formData.membershipNo || '').trim().toLowerCase();
   const nameText = String(formData.name || '').trim().toLowerCase();
   const mobileText = String(formData.mobile || '');
-  const usable = { membershipNo: numberText.length >= 1, name: nameText.length >= 2, mobile: mobileText.length >= 3 };
+  // Payee Name and Mobile searching is switched off for now (only the Membership No. narrows the list); to bring it back,
+  // use  name: nameText.length >= 2, mobile: mobileText.length >= 3
+  const usable = { membershipNo: numberText.length >= 1, name: false /* nameText.length >= 2 */, mobile: false /* mobileText.length >= 3 */ };
   const activeBox = typingFree ? [...typingOrder].reverse().find((k) => usable[k]) : undefined;
   const typedNumber = activeBox === 'membershipNo' ? numberText : '';
   const typedName = activeBox === 'name' ? nameText : '';
@@ -1600,7 +1602,14 @@ export default function ReceiptEntry() {
                     {!formErrors.receiptNumber && numberCheck && numberCheck.number === String(formData.receiptNumber || '').trim() && (
                       numberCheck.available ? (
                         numberCheck.matches_format ? (
-                          <p className="text-[11px] text-emerald-700 mt-1 font-medium">Available in FY {numberCheck.financial_year}</p>
+                          <div className="flex justify-end mt-1">
+                            <span
+                              className="inline-flex items-center text-emerald-600"
+                              title={`Available in FY ${numberCheck.financial_year}`}
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                            </span>
+                          </div>
                         ) : (
                           <p className="text-[11px] text-amber-700 mt-1 font-medium">
                             Available, but not like the usual format (for example {numberCheck.example}). You can still save it.

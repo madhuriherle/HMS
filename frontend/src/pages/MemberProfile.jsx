@@ -197,9 +197,6 @@ function CreditBanner({ credit }) {
 // ── tabs ──
 
 // ── Overview: one neat card per section ──
-const NotProvided = ({ labels }) =>
-  labels.length > 0 ? <p className="mt-3 text-[11px] text-[#863221]/60">Not provided: {labels.join(', ')}</p> : null;
-
 const initialOf = (name) => String(name || '?').trim().charAt(0).toUpperCase();
 
 function PersonRow({ name, relation, number }) {
@@ -232,7 +229,6 @@ function OverviewTab({ id }) {
         const target = credit?.target_type;
         const pct = target?.price ? Math.min(100, Math.round((credit.credit_total / target.price) * 100)) : 100;
         const since = m.current?.activated_at || m.current?.applied_at;
-        const missing = (pairs) => pairs.filter(([, v]) => !v).map(([l]) => l);
         const personal = [
           ['Gender', b.gender],
           ['Date of birth', b.date_of_birth ? formatDate(b.date_of_birth) : ''],
@@ -286,7 +282,6 @@ function OverviewTab({ id }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {personal.map(([label, value]) => <Field key={label} label={label} value={value} />)}
               </div>
-              <NotProvided labels={missing(personal)} />
             </Card>
 
             <Card icon={Phone} title="Contact & address">
@@ -297,7 +292,6 @@ function OverviewTab({ id }) {
                   </div>
                 ))}
               </div>
-              <NotProvided labels={missing(contact)} />
             </Card>
 
             <Card icon={Users} title="Family">
