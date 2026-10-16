@@ -838,6 +838,11 @@ export default function ReceiptEntry() {
   // ----------------------------------------------------
   // FORM VALIDATION
   // ----------------------------------------------------
+  // the Membership No. message goes away as soon as the number is changed or the member is assigned
+  useEffect(() => {
+    setFormErrors((prev) => (prev.membershipNo ? { ...prev, membershipNo: '' } : prev));
+  }, [formData.membershipNo, selectedMember]);
+
   const validateForm = () => {
     const errors = {};
 
@@ -995,6 +1000,8 @@ export default function ReceiptEntry() {
 
     if (!validateForm()) {
       showToast('Please correct the validation errors before saving.', 'error');
+      // take the person to the first field that is in error, so they can see what to fix
+      setTimeout(() => document.querySelector('form p[class*="text-[#ED4636]"]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 60);
       return;
     }
 
@@ -1724,8 +1731,16 @@ export default function ReceiptEntry() {
                       value={formData.membershipNo}
                       onChange={handleInputChange}
 
-                      className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm font-mono text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors"
+                      className={`w-full px-3 py-2 bg-[#FAF7F2] border focus:ring-1 focus:bg-white rounded-xl text-xs sm:text-sm font-mono text-[#180200] placeholder-[#863221]/30 focus:outline-none transition-colors ${formErrors.membershipNo
+                        ? 'border-[#ED4636] ring-1 ring-[#ED4636]/30 focus:border-[#ED4636] focus:ring-[#ED4636]'
+                        : 'border-[#E8DFD8] focus:border-[#510601] focus:ring-[#510601]'}`}
                     />
+                    {formErrors.membershipNo && (
+                      <p className="text-[11px] text-[#ED4636] mt-1 font-medium flex items-start gap-1">
+                        <AlertCircle className="w-3 h-3 shrink-0 mt-0.5" />
+                        {formErrors.membershipNo}
+                      </p>
+                    )}
                   </div>
                   {/* what the typing found: a short note in the free half of this row */}
                   {(typedNumber || typedName || typedMobile) && (
