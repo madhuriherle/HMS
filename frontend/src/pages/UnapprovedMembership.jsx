@@ -506,8 +506,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
       {/* HEADER, SEARCH & FILTERS SECTION                     */}
       {/* ---------------------------------------------------- */}
       <SearchFilterBar
-        
-        title={<h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">{assignedOnly ? 'Assigned for Approval' : 'Unapproved Membership'}</h1>}
+        title={assignedOnly ? 'Assigned for Approval' : 'Unapproved Membership'}
         searchQuery={searchQuery}
         onSearchChange={(val) => {
           setSearchQuery(val);

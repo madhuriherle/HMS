@@ -472,29 +472,18 @@ export default function MembershipTypeManagement() {
         )}
       </Modal>
 
-      {/* Breadcrumb & Header */}
-      <div>
-<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-              Membership Types
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-          {hasPermission('masters.membership_types.delete') && <RecentlyDeleted kind="membership-types" label="membership types" onRestored={fetchMembershipTypes} />}
-          {hasPermission('masters.membership_types.write') && (
-            <button
-              onClick={openAddModal}
-
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Membership Type</span>
-            </button>
-          )}
-          </div>
-        </div>
+      {/* Action Bar */}
+      <div className="flex items-center justify-end gap-2 -mb-2">
+        {hasPermission('masters.membership_types.delete') && <RecentlyDeleted kind="membership-types" label="membership types" onRestored={fetchMembershipTypes} />}
+        {hasPermission('masters.membership_types.write') && (
+          <button
+            onClick={openAddModal}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Membership Type</span>
+          </button>
+        )}
       </div>
 
       {/* Search and Filters Toolbar Card */}

@@ -260,16 +260,8 @@ export default function LabelList() {
         </div>
       )}
 
-      {/* Header & Breadcrumb */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-<h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-            Label List
-          </h1>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-3">
+      {/* Action Buttons Toolbar */}
+      <div className="flex flex-wrap items-center justify-end gap-3 -mb-2">
           <Link
             to="/dashboard/membership/list"
             className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-stone-50 transition-colors"
@@ -305,7 +297,6 @@ export default function LabelList() {
             )}
           </button>
         </div>
-      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -361,6 +352,7 @@ export default function LabelList() {
 
       {/* Search & Filter Bar */}
       <SearchFilterBar
+        title="Label List"
         searchQuery={searchQuery}
         onSearchChange={(val) => {
           setSearchQuery(val);

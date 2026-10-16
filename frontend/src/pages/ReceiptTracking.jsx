@@ -489,7 +489,7 @@ export default function ReceiptTracking() {
       {/* Header, Filter & Search Toolbar */}
       <SearchFilterBar
         searchInHeader
-        title={<h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Receipt Tracking</h1>}
+        title="Receipt Tracking"
         searchQuery={searchQuery}
         onSearchChange={(val) => setSearchQuery(val)}
         activeFiltersCount={

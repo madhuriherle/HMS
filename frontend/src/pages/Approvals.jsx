@@ -429,16 +429,13 @@ export default function Approvals() {
   return (
     <PermissionGate required="approvals.read">
       <div className="space-y-6">
-        {/* Page Heading and Action Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Approvals</h1>
-          </div>
+        {/* Action Bar */}
+        <div className="flex justify-end -mb-2">
           <button
             type="button"
             onClick={load}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E8DFD8] hover:bg-[#FAF7F2] text-xs font-semibold text-[#510601] rounded-xl transition-colors cursor-pointer disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E8DFD8] hover:bg-[#FAF7F2] text-xs font-semibold text-[#510601] rounded-xl transition-colors cursor-pointer disabled:opacity-60 shadow-2xs"
             title="Refresh approvals"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />

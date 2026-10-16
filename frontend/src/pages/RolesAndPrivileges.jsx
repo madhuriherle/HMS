@@ -37,6 +37,7 @@ import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
+import PageTitle from '../components/PageTitle';
 
 import ModalFooter from '../components/ModalFooter';
 export default function RolesAndPrivileges() {
@@ -636,27 +637,19 @@ export default function RolesAndPrivileges() {
       </Modal>
 
       <div className={privilegeTargetRole ? 'hidden' : 'space-y-6'}>
-      {/* Breadcrumb & Header */}
-      <div>
-<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-              User Roles & Privileges
-            </h1>
-          </div>
-
-          {hasPermission('roles.write') && (
-            <button
-              onClick={openAddModal}
-              title={'Add Role'}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Role</span>
-            </button>
-          )}
+      {/* Action Bar */}
+      {hasPermission('roles.write') && (
+        <div className="flex justify-end -mb-2">
+          <button
+            onClick={openAddModal}
+            title={'Add Role'}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Role</span>
+          </button>
         </div>
-      </div>
+      )}
 
       {/* Search & Filters Toolbar Card */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-4 sm:p-5">
@@ -1057,21 +1050,23 @@ export default function RolesAndPrivileges() {
           const isReadOnly = isSysTarget || isProtectedTarget;
           return (
             <div className="space-y-6">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <h1 className="flex flex-wrap items-center gap-3 text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-                  <span>Configure Privileges – {privilegeTargetRole.name}</span>
+              {/* Dynamic Page Title in Header Bar */}
+              <PageTitle>{`Configure Privileges – ${privilegeTargetRole.name}`}</PageTitle>
+
+              {/* Action Bar */}
+              <div className="flex items-center justify-between gap-4 -mb-2">
+                <div className="flex items-center gap-2">
                   {isReadOnly && (
-                    <span className="px-2 py-0.5 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-[11px] font-bold rounded-md tracking-normal">
+                    <span className="px-2.5 py-1 bg-[#FFC107]/20 border border-[#FFC107]/40 text-[#863221] text-xs font-bold rounded-lg tracking-normal">
                       {isSysTarget ? 'System Role (Read-Only)' : 'Protected (Read-Only)'}
                     </span>
                   )}
-                </h1>
+                </div>
 
                 <button
                   type="button"
                   onClick={() => setPrivilegeTargetRole(null)}
-                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-[#E8DFD8] hover:bg-[#FAF7F2] text-[#510601] text-sm font-semibold rounded-xl transition-colors cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-white border border-[#E8DFD8] hover:bg-[#FAF7F2] text-[#510601] text-xs sm:text-sm font-semibold rounded-xl transition-colors cursor-pointer"
                 >
                   <ChevronLeft className="w-4 h-4" />
                   <span>Back to Roles</span>

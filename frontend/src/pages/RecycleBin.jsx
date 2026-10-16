@@ -99,15 +99,8 @@ export default function RecycleBin() {
   return (
     <PermissionGate required="system.recycle_bin.read" title="Access Restricted" message="You need the Recycle Bin privilege to open this screen.">
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-                Recycle Bin
-                <span className="ml-2 align-middle text-xs font-semibold px-2.5 py-1 rounded-full bg-[#FFF1E0] text-[#C2570C] border border-[#F8D9B5]">Admin tool</span>
-              </h1>
-            </div>
-          </div>
+        <div className="flex items-center justify-between gap-3 flex-wrap -mb-1">
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#FFF1E0] text-[#C2570C] border border-[#F8D9B5]">Admin tool</span>
           {canWrite && (
             <button type="button" onClick={empty} disabled={busy || total === 0}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#ED4636] text-white text-sm font-bold disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed">

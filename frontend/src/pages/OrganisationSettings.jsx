@@ -357,43 +357,32 @@ export default function OrganisationSettings() {
       )}
 
       {/* ---------------------------------------------------- */}
-      {/* BREADCRUMB & HEADER                                  */}
-      {/* ---------------------------------------------------- */}
-      <div>
-<div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-              Organisation Settings
-            </h1>
-          </div>
+      {/* Action Bar */}
+      <div className="flex items-center justify-end gap-3 -mb-2">
+        <button
+          type="button"
+          onClick={handleReset}
+          className="px-4 py-2.5 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] hover:text-[#510601] text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm hover:bg-[#FAF7F2] cursor-pointer"
+          title="Revert modifications to previously saved values"
+        >
+          <RotateCcw className="w-4 h-4" />
+          <span>Reset</span>
+        </button>
 
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleReset}
-              className="px-4 py-2.5 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] hover:text-[#510601] text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm hover:bg-[#FAF7F2] cursor-pointer"
-              title="Revert modifications to previously saved values"
-            >
-              <RotateCcw className="w-4 h-4" />
-              <span>Reset</span>
-            </button>
-
-            {hasPermission('masters.organisation.write') && (
-              <button
-                type="button"
-                onClick={handleSave}
-                title={'Save Changes'}
-                className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-2 cursor-pointer"
-              >
-                <Save className="w-4 h-4" />
-                <span>Save Changes</span>
-                {isDirty && (
-                  <span className="w-2 h-2 rounded-full bg-[#FFC107] animate-pulse" title="Unsaved changes" />
-                )}
-              </button>
+        {hasPermission('masters.organisation.write') && (
+          <button
+            type="button"
+            onClick={handleSave}
+            title={'Save Changes'}
+            className="px-5 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm hover:shadow-md transition-all flex items-center gap-2 cursor-pointer"
+          >
+            <Save className="w-4 h-4" />
+            <span>Save Changes</span>
+            {isDirty && (
+              <span className="w-2 h-2 rounded-full bg-[#FFC107] animate-pulse" title="Unsaved changes" />
             )}
-          </div>
-        </div>
+          </button>
+        )}
       </div>
 
       {/* ---------------------------------------------------- */}

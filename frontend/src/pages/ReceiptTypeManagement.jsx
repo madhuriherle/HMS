@@ -499,29 +499,18 @@ export default function ReceiptTypeManagement() {
         )}
       </Modal>
 
-      {/* Breadcrumb & Header */}
-      <div>
-<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-              Particulars Master
-            </h1>
-          </div>
-
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-          {hasPermission('masters.particulars.delete') && <RecentlyDeleted kind="particulars" label="particulars" onRestored={fetchReceiptTypes} />}
-          {hasPermission('masters.particulars.write') && (
-            <button
-              onClick={openAddTypeModal}
-
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Particular</span>
-            </button>
-          )}
-          </div>
-        </div>
+      {/* Action Bar */}
+      <div className="flex items-center justify-end gap-2 -mb-2">
+        {hasPermission('masters.particulars.delete') && <RecentlyDeleted kind="particulars" label="particulars" onRestored={fetchReceiptTypes} />}
+        {hasPermission('masters.particulars.write') && (
+          <button
+            onClick={openAddTypeModal}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] active:bg-[#180200] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm hover:shadow transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Particular</span>
+          </button>
+        )}
       </div>
 
       {/* Search and Filters Toolbar Card */}

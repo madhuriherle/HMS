@@ -38,6 +38,7 @@ import { toISODate } from '../utils/dateUtils';
 import DateInput from '../components/DateInput';
 import CountryCodeSelect from '../components/CountryCodeSelect';
 import PermissionGate from '../components/PermissionGate';
+import PageTitle from '../components/PageTitle';
 import SearchableFormSelect from '../components/SearchableFormSelect';
 import useAuth from '../hooks/useAuth';
 import useRules, { hasDigits } from '../hooks/useRules';
@@ -1020,25 +1021,27 @@ export default function RegisterNewMember() {
         {/* Left Column: Member Registration Form */}
         <div className="space-y-6">
           <div className="w-full bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden">
+            {/* Dynamic Page Title in Top Header Bar */}
+            <PageTitle>
+              {isViewMode ? 'View Member Details' : isEditMode ? 'Edit Member Details' : 'Register New Member'}
+            </PageTitle>
+
             {/* Clean Form Header */}
-            <div className="px-6 sm:px-8 py-5 border-b border-[#E8DFD8] bg-[#FAF7F2]/40">
+            <div className="px-6 sm:px-8 py-3.5 border-b border-[#E8DFD8] bg-[#FAF7F2]/40">
               <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight flex items-center gap-3">
-                    <span>{isViewMode ? 'View Member Details' : isEditMode ? 'Edit Member Details' : 'Register New Member'}</span>
-                    {(isViewMode || isEditMode) && targetMember?.registrationNumber && (
-                      <span className="font-mono text-sm font-bold bg-[#FAF7F2] text-[#510601] px-3 py-1 rounded-xl border border-[#E8DFD8]" title="Record ID">
-                        ID: {targetMember.registrationNumber}
-                      </span>
-                    )}
-                    {(isViewMode || isEditMode) && targetMember?.membershipNumber && targetMember.membershipNumber !== 'Not Assigned' && targetMember.approvalStatus === 'Approved' && (
-                      <span className="font-mono text-sm font-bold bg-emerald-50 text-emerald-800 px-3 py-1 rounded-xl border border-emerald-200" title="Membership Number">
-                        {targetMember.membershipNumber}
-                      </span>
-                    )}
-                  </h1>
+                <div className="flex items-center gap-3">
+                  {(isViewMode || isEditMode) && targetMember?.registrationNumber && (
+                    <span className="font-mono text-xs sm:text-sm font-bold bg-white text-[#510601] px-3 py-1 rounded-xl border border-[#E8DFD8] shadow-2xs" title="Record ID">
+                      ID: {targetMember.registrationNumber}
+                    </span>
+                  )}
+                  {(isViewMode || isEditMode) && targetMember?.membershipNumber && targetMember.membershipNumber !== 'Not Assigned' && targetMember.approvalStatus === 'Approved' && (
+                    <span className="font-mono text-xs sm:text-sm font-bold bg-emerald-50 text-emerald-800 px-3 py-1 rounded-xl border border-emerald-200" title="Membership Number">
+                      {targetMember.membershipNumber}
+                    </span>
+                  )}
                 </div>
-                <div className="text-xs sm:text-sm text-[#863221] font-medium shrink-0">
+                <div className="text-xs sm:text-sm text-[#863221] font-medium shrink-0 ml-auto">
                   {isViewMode ? (
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
                       targetMember?.status === 'Unapproved' || targetMember?.approvalStatus === 'Unapproved'

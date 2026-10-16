@@ -27,22 +27,7 @@ FINANCIAL_YEAR_START_MONTH = 4  # April
 GENDERS = ["MALE", "FEMALE", "OTHER"]
 NAME_TITLES = ["SRI.", "SMT.", "KUMARI", "DR.", "PROF.", "PANDIT", "MS."]
 BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
-APPLIED_ON_BEHALF_OF = [
-    "Self",
-    "Father",
-    "Mother",
-    "Husband",
-    "Wife",
-    "Son",
-    "Daughter",
-    "Brother",
-    "Sister",
-    "Grandson",
-    "Granddaughter",
-    "Family",
-    "Relative",
-    "Others",
-]
+APPLIED_ON_BEHALF_OF = ["Self", "Father", "Mother", "Husband", "Wife", "Others"]
 MEMBER_CATEGORIES = ["Individual", "Family", "Institutional", "Senior Citizen", "Corporate", "General"]
 MEMBERSHIP_TYPE_CATEGORIES = [
     "Only Havyaka Mahasabha Membership",

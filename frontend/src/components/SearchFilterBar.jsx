@@ -1,5 +1,6 @@
 import React from 'react';
 import { Search, X, RotateCcw } from 'lucide-react';
+import PageTitle from './PageTitle';
 
 export default function SearchFilterBar({
   title,
@@ -43,6 +44,9 @@ export default function SearchFilterBar({
 
   return (
     <div className={`space-y-4 w-full ${className}`}>
+      {/* Send page title to the sticky top bar header */}
+      {title && <PageTitle>{title}</PageTitle>}
+
       {/* Optional Breadcrumb */}
       {breadcrumb && (
         <div>
@@ -50,22 +54,17 @@ export default function SearchFilterBar({
         </div>
       )}
 
-      {/* Title Row: Title on Left, Action Buttons on Right */}
-      {(title || leftSlot || rightSlot || (searchInHeader && searchBox)) && (
+      {/* Action Toolbar Row: Left Slot on Left, Action Buttons / Header Search on Right */}
+      {(leftSlot || rightSlot || (searchInHeader && searchBox)) && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-          {/* Title / Left Area */}
+          {/* Left Slot Area */}
           <div className="flex items-center gap-3 min-w-0">
-            {typeof title === 'string' ? (
-              <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">{title}</h1>
-            ) : (
-              title
-            )}
             {leftSlot}
           </div>
 
           {/* Right Action Buttons Slot */}
           {(rightSlot || (searchInHeader && searchBox)) && (
-            <div className="flex items-center gap-2.5 flex-wrap justify-end">
+            <div className="flex items-center gap-2.5 flex-wrap justify-end ml-auto">
               {searchInHeader && searchBox}
               {rightSlot}
             </div>

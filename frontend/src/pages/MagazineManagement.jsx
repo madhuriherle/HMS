@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import PageActions, { PageActionsSlot } from '../components/PageActions';
+import PageTitle from '../components/PageTitle';
 import Modal from '../components/Modal';
 import ModalFooter from '../components/ModalFooter';
 import SearchFilterBar from '../components/SearchFilterBar';
@@ -215,8 +216,11 @@ export default function MagazineManagement() {
   return (
     <PermissionGate required={`${area}.read`} title="Access Restricted" message="You need the privilege for this Magazine page to open it.">
       <div className="space-y-6 pb-12">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">{sectionTitle}</h1>
+        {/* Dynamic Page Title in Header Bar */}
+        <PageTitle>{sectionTitle}</PageTitle>
+
+        {/* Action Toolbar */}
+        <div className="flex flex-wrap items-center justify-end gap-4 -mb-2">
           <PageActions><Link
             to="/dashboard/magazine/labels"
             className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3.5 py-2 text-xs font-medium text-gray-700 hover:bg-stone-50 transition-colors"

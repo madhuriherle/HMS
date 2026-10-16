@@ -284,13 +284,6 @@ export default function BulkReceiptMapping() {
   return (
     <PermissionGate required={['receipts.tracking.read', 'receipts.read']} title="Access Restricted" message="You need permission to track receipts to access Bulk Mapping.">
       <div className="space-y-6">
-        {/* Header Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-          <div className="space-y-1">
-            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Bulk Receipt Auto-Mapping</h1>
-          </div>
-
-        </div>
 
         {/* Action Bar: Filters + 1-Click Bulk Action Button */}
         <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-sm p-4 space-y-4">

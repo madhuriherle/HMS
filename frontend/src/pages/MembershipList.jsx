@@ -697,8 +697,7 @@ export default function MembershipList() {
       {/* HEADER, SEARCH & FILTERS SECTION                     */}
       {/* ---------------------------------------------------- */}
       <SearchFilterBar
-        
-        title={<h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Membership List</h1>}
+        title="Membership List"
         searchQuery={searchQuery}
         onSearchChange={(val) => {
           setSearchQuery(val);

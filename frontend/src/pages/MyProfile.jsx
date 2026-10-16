@@ -136,8 +136,6 @@ export default function MyProfile() {
   const pwErr = errors.pw || {};
   return (
     <div className="space-y-5">
-      <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">My Profile</h1>
-
       <div className="bg-white rounded-2xl border border-[#E8DFD8] p-5 flex flex-wrap items-center gap-4">
         <div className="h-14 w-14 rounded-full bg-[#510601] text-white flex items-center justify-center text-xl font-bold">
           {(me.name || me.username || '?').charAt(0).toUpperCase()}

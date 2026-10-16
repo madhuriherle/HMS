@@ -490,27 +490,19 @@ export default function BankDetailsManagement() {
         </div>
       )}
 
-      {/* Breadcrumbs & Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#E8DFD8] pb-5">
-        <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-              Payment Mode Configuration
-            </h1>
-        </div>
-
-        {/* Action Button: Add Payment Mode */}
-        {hasPermission('masters.payment_modes.write') && (
+      {/* Action Button: Add Payment Mode */}
+      {hasPermission('masters.payment_modes.write') && (
+        <div className="flex justify-end -mb-2">
           <button
             onClick={openAddModal}
             id="btn-add-payment-mode"
-
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#510601] hover:bg-[#3D0400] active:bg-[#200200] text-white text-sm font-bold rounded-xl shadow-sm hover:shadow transition-all duration-200 cursor-pointer shrink-0"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#3D0400] active:bg-[#200200] text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm hover:shadow transition-all duration-200 cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" />
             <span>Add Payment Mode</span>
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Search & Filter Card */}
       <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-4 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

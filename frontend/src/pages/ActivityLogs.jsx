@@ -148,12 +148,8 @@ export default function ActivityLogs() {
 
   return (
     <div className="space-y-6">
-      {/* Page Title & Quick Date Presets */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">User Activity Logs</h1>
-
-        {/* Quick Date Tabs */}
-        <div className="flex flex-wrap items-center gap-2 mt-3">
+      {/* Quick Date Tabs */}
+      <div className="flex flex-wrap items-center gap-2 -mb-2">
           {[
             { id: 'today', label: 'Today' },
             { id: 'yesterday', label: 'Yesterday' },
@@ -175,7 +171,6 @@ export default function ActivityLogs() {
             </button>
           ))}
         </div>
-      </div>
 
       {/* Top 4 Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

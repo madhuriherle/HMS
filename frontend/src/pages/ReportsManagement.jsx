@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import PageActions, { PageActionsSlot } from '../components/PageActions';
+import PageTitle from '../components/PageTitle';
 import {
   BarChart3,
   Users,
@@ -135,13 +136,11 @@ export default function ReportsManagement() {
 
   return (
     <div className="space-y-6 pb-16">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-            {TABS.find((t) => t.key === activeTab)?.label || 'Reports'}
-          </h1>
-        </div>
+      {/* Dynamic Page Title in Header Bar */}
+      <PageTitle>{TABS.find((t) => t.key === activeTab)?.label || 'Reports'}</PageTitle>
+
+      {/* Action Toolbar */}
+      <div className="flex justify-end -mb-2">
         <PageActionsSlot />
       </div>
 

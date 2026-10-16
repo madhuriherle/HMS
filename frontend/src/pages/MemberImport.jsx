@@ -321,13 +321,8 @@ export default function MemberImport() {
   return (
     <PermissionGate required={['members.import.read', 'members.import.write']} title="Access Restricted" message="You need the Member Import privilege to open this page.">
       <div className="space-y-6">
-        {/* Breadcrumb Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-          <div className="space-y-1">
-            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Bulk Member Import (Live Register)</h1>
-          </div>
-
-          <div className="flex items-center gap-3">
+        {/* Action Toolbar */}
+        <div className="flex items-center justify-end gap-3 -mb-2">
             <button
               type="button"
               onClick={() => setHistoryOpen(true)}
@@ -352,7 +347,6 @@ export default function MemberImport() {
               Download Template CSV
             </button>
           </div>
-        </div>
 
         {/* Upload & Progress Card */}
         <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-sm p-6 space-y-6">

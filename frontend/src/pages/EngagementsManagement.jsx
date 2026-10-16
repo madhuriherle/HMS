@@ -33,6 +33,7 @@ import ModalFooter from '../components/ModalFooter';
 import PermissionGate from '../components/PermissionGate';
 import DateInput from '../components/DateInput';
 import PageActions, { PageActionsSlot } from '../components/PageActions';
+import PageTitle from '../components/PageTitle';
 import { formatDate } from '../utils/dateUtils';
 import { notify } from '../utils/notify';
 import Swal from 'sweetalert2';
@@ -70,11 +71,11 @@ export default function EngagementsManagement() {
       message="You need the privilege for this page to view it."
     >
       <div className="space-y-6 pb-12">
-        {/* Page Heading - Rule 12.1 */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-            {section.title}
-          </h1>
+        {/* Dynamic Page Title in Header Bar */}
+        <PageTitle>{section.title}</PageTitle>
+
+        {/* Action Toolbar */}
+        <div className="flex justify-end -mb-2">
           <PageActionsSlot />
         </div>
 

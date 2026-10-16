@@ -123,8 +123,7 @@ export default function AssignedApprovals() {
   return (
     <PermissionGate required="members.assigned.read">
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Assigned for Approval</h1>
+        <div className="flex flex-wrap items-center justify-end gap-3 -mb-2">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <div className="relative flex-1 sm:w-72">
               <Search className="w-4 h-4 text-[#863221]/50 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />

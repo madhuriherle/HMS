@@ -200,14 +200,9 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-            Welcome to HMS
-          </h1>
-        </div>
-        <div className="bg-white px-4 py-2 rounded-lg border border-[#E8DFD8] shadow-sm text-sm font-medium text-[#180200]">
+      {/* Top Date Badge */}
+      <div className="flex justify-end -mb-2">
+        <div className="bg-white px-3.5 py-1.5 rounded-xl border border-[#E8DFD8] shadow-2xs text-xs font-semibold text-[#863221]">
           {currentDate}
         </div>
       </div>

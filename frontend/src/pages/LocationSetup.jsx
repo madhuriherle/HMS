@@ -1008,17 +1008,6 @@ export default function LocationSetup() {
   return (
     <PermissionGate required="masters.location.read">
     <div className="space-y-6">
-      {/* ---------------------------------------------------- */}
-      {/* BREADCRUMB & HEADER                                  */}
-      {/* ---------------------------------------------------- */}
-      <div>
-<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">Location Setup</h1>
-
-          </div>
-        </div>
-      </div>
 
       {/* ---------------------------------------------------- */}
       {/* TOP TAB SWITCHER (INTERNAL MODULE TABS)             */}
