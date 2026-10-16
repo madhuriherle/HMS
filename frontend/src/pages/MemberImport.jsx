@@ -163,20 +163,40 @@ export default function MemberImport() {
     setImportCompleted(false);
     setSkippedList([]);
 
+    const showRows = (rows) => {
+      setParsedRows(rows);
+      setPreviewRows(rows.slice(0, 10));
+      if (rows.length === 0) {
+        notify('No valid member rows found. Please check columns.', 'error');
+      } else {
+        notify(`Loaded ${rows.length.toLocaleString()} member records ready for import.`, 'success');
+      }
+    };
+
+    // An Excel file (.xlsx, or an Excel saved with a .csv name) cannot be read as text: the server reads it.
+    const readOnServer = async () => {
+      try {
+        const form = new FormData();
+        form.append('file', selected);
+        const { data } = await api.post('/members/bulk-import/preview', form);
+        showRows(data?.members || []);
+      } catch (err) {
+        setParsedRows([]);
+        setPreviewRows([]);
+        notify(err.response?.data?.detail || 'Could not read the file.', 'error');
+      }
+    };
+
     const reader = new FileReader();
     reader.onload = (evt) => {
       try {
         const text = evt.target?.result;
-        if (typeof text === 'string') {
-          const rows = parseCSV(text);
-          setParsedRows(rows);
-          setPreviewRows(rows.slice(0, 10));
-          if (rows.length === 0) {
-            notify('No valid member rows found. Please check columns.', 'error');
-          } else {
-            notify(`Loaded ${rows.length.toLocaleString()} member records ready for import.`, 'success');
-          }
+        if (typeof text !== 'string') return;
+        if (/\.xlsx?$/i.test(selected.name) || text.startsWith('PK')) {
+          readOnServer();
+          return;
         }
+        showRows(parseCSV(text));
       } catch (err) {
         console.error(err);
         notify('Could not parse file. Please use standard CSV format.', 'error');
@@ -339,7 +359,7 @@ export default function MemberImport() {
           {!importCompleted && (
             <div className="space-y-4">
               <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider">
-                Select Member Data File (.CSV)
+                Select Member Data File (.CSV or .XLSX)
               </label>
 
               <div
@@ -353,7 +373,7 @@ export default function MemberImport() {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.txt"
+                  accept=".csv,.txt,.xlsx"
                   onChange={handleFileChange}
                   className="hidden"
                 />

@@ -73,14 +73,13 @@ const ageFrom = (iso) => {
 const numberTag = (m) => (m.membershipNumber ? `${m.membershipNumber}` : `ID ${m.registrationNumber || m.id}`);
 
 const toEntryMember = (m, loc) => {
-  const nameOf = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '';
   const pin = { postalCode: m.pincode || '', area: m.post_office_name || '' }; // the server sends the place with the member
   const reg = m.registration_payment || {};
   const fullName = memberName(m, true);
   const approved = String(m.approval_status).toUpperCase() === 'APPROVED';
-  const districtName = nameOf(loc.districts, m.district_id);
-  const stateName = nameOf(loc.states, m.state_id);
-  const talukName = nameOf(loc.taluks, m.taluk_id);
+  const districtName = m.district_name || '';
+  const stateName = m.state_name || '';
+  const talukName = m.taluk_name || '';
   const created = m.created_at ? String(m.created_at) : '';
   return {
     id: m.id,

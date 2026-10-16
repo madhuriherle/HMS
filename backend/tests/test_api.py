@@ -7154,10 +7154,11 @@ def test_member_list_carries_the_place_name(client, admin_headers):
         db.add(di); db.flush()
         pc = PostalCode(pincode="576221", post_office_name="Zplace B.O", state_id=st.id, district_id=di.id, status=True)
         db.add(pc); db.flush()
-        db.query(Member).filter(Member.id == member["id"]).update({"pincode_id": pc.id})
+        db.query(Member).filter(Member.id == member["id"]).update({"pincode_id": pc.id, "state_id": st.id, "district_id": di.id})
         db.commit()
     row = client.get("/api/v1/members/", headers=admin_headers, params={"search": "Zplacename"}).json()["data"][0]
     assert row["pincode"] == "576221" and row["post_office_name"] == "Zplace B.O"
+    assert row["state_name"] == "Zplace State" and row["district_name"] == "Zplace District"
 
 
 def test_seeding_privileges_leaves_a_deleted_privilege_deleted(client, admin_headers):

@@ -222,7 +222,7 @@ def _attach_latest_receipts(db: Session, rows: list) -> None:
 def _attach_membership_types(db: Session, rows: list) -> None:
     """Each listed member carries the name of their current membership type (the latest membership record) and
     their credit total, so the lists show the real type and amount paid instead of working them out on the page."""
-    from models.masters import MembershipType, PostalCode
+    from models.masters import District, MembershipType, PostalCode, State, Taluk
     ids = [r.get("id") for r in rows if isinstance(r, dict) and r.get("id")]
     if not ids:
         return
@@ -237,14 +237,22 @@ def _attach_membership_types(db: Session, rows: list) -> None:
         latest[ms.member_id] = (t.id, t.name_en, ms.membership_number)
     from services import membership_credit
     credit = membership_credit.credit_totals(db, ids)
-    # the place name comes with the member (PIN and post office), so no screen downloads the 15,000-row PIN list for it
-    pin_ids = {r.get("pincode_id") for r in rows if isinstance(r, dict) and r.get("pincode_id")}
-    places = {}
-    if pin_ids:
-        places = {p.id: (p.pincode, p.post_office_name) for p in db.query(PostalCode).filter(PostalCode.id.in_(pin_ids)).all()}
+    # the whole place comes with the member (PIN, post office, taluk, district, state): a list never needs the master
+    # lists just to show names (REMEMBER.txt 10.7)
+    def _names(model, key):
+        wanted = {r.get(key) for r in rows if isinstance(r, dict) and r.get(key)}
+        if not wanted:
+            return {}
+        return {x.id: x for x in db.query(model).filter(model.id.in_(wanted)).all()}
+    pins, states, districts, taluks = _names(PostalCode, "pincode_id"), _names(State, "state_id"), _names(District, "district_id"), _names(Taluk, "taluk_id")
     for r in rows:
         if isinstance(r, dict):
-            r["pincode"], r["post_office_name"] = places.get(r.get("pincode_id"), (None, None))
+            pin = pins.get(r.get("pincode_id"))
+            r["pincode"] = pin.pincode if pin else None
+            r["post_office_name"] = pin.post_office_name if pin else None
+            r["state_name"] = states[r["state_id"]].name_en if r.get("state_id") in states else None
+            r["district_name"] = districts[r["district_id"]].name_en if r.get("district_id") in districts else None
+            r["taluk_name"] = taluks[r["taluk_id"]].name_en if r.get("taluk_id") in taluks else None
             tid, name, ms_number = latest.get(r.get("id"), (None, None, None))
             r["membership_type_id"] = tid
             r["membership_type"] = name
@@ -2971,32 +2979,29 @@ def bulk_import_members(
     return _run_bulk_import(db, current_user, payload)
 
 
-@router.post("/bulk-import-file")
-async def bulk_import_members_file(
-    file: UploadFile = File(...),
-    skip_duplicates: bool = True,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_any_permission("members.import.write", "members.register.write", "members.write")),
-) -> Any:
-    """Upload a CSV or Excel file containing live/legacy members to import in bulk."""
+def _member_rows_from_upload(content: bytes, filename: str) -> list:
+    """The member rows of an uploaded .csv / .txt / .xlsx file (an Excel file saved with a .csv name works too)."""
     import io
     import csv
 
-    content = await file.read()
-    filename = (file.filename or "").lower()
+    filename = (filename or "").lower()
     rows = []
+    is_excel = content[:4] == b"PK\x03\x04" or filename.endswith((".xlsx", ".xls"))  # an Excel file saved as .csv is still Excel
 
-    if filename.endswith(".csv"):
+    if not is_excel and (filename.endswith((".csv", ".txt")) or not filename):
         text_stream = io.StringIO(content.decode("utf-8", errors="replace"))
         reader = csv.DictReader(text_stream)
         for r in reader:
             rows.append(r)
-    elif filename.endswith(".xlsx") or filename.endswith(".xls"):
+    elif is_excel:
         try:
             import pandas as pd
-            df = pd.read_excel(io.BytesIO(content))
+            df = pd.read_excel(io.BytesIO(content), dtype=str)  # text as typed: 100, not 100.0
             df = df.where(pd.notnull(df), None)
-            rows = df.to_dict(orient="records")
+            rows = [
+                {k: (None if v is None or (isinstance(v, float) and v != v) else v) for k, v in r.items()}  # blank cells are None, never "nan"
+                for r in df.to_dict(orient="records")
+            ]
         except Exception as e:
             raise HTTPException(400, f"Could not parse Excel file: {str(e)}")
     else:
@@ -3074,6 +3079,29 @@ async def bulk_import_members_file(
 
     if not parsed_members:
         raise HTTPException(400, "Could not identify required columns (Membership No, Name) in the file.")
+    return parsed_members
 
+
+@router.post("/bulk-import/preview")
+async def read_import_file(
+    file: UploadFile = File(...),
+    current_user: User = Depends(deps.require_any_permission("members.import.write", "members.register.write", "members.write")),
+) -> Any:
+    """Read an uploaded file and hand back its member rows, saving nothing. The import screen uses it for Excel files,
+    which the browser cannot read; the rows then go through the same check and import as a CSV."""
+    members = _member_rows_from_upload(await file.read(), file.filename or "")
+    return {"members": [m.model_dump(mode="json") for m in members], "total": len(members)}
+
+
+@router.post("/bulk-import-file")
+async def bulk_import_members_file(
+    file: UploadFile = File(...),
+    skip_duplicates: bool = True,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_any_permission("members.import.write", "members.register.write", "members.write")),
+) -> Any:
+    """Upload a CSV or Excel file containing live/legacy members to import in bulk."""
+    content = await file.read()
+    parsed_members = _member_rows_from_upload(content, file.filename or "")
     payload = BulkMemberImportPayload(members=parsed_members, skip_duplicates=skip_duplicates, file_name=(file.filename or "")[:255], total_rows=len(parsed_members))
     return bulk_import_members(db=db, current_user=current_user, payload=payload)

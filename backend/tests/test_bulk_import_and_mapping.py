@@ -382,3 +382,28 @@ def test_bulk_import_never_guesses_a_gender(client, admin_headers):
     assert [w["membership_number"] for w in res["warnings"] if "Gender" in w["warning"]] == ["GEN005"]
     got = {m["member_code"]: m["gender"] for m in client.get("/api/v1/members/", headers=admin_headers, params={"search": "GEN00", "limit": 20}).json()["data"]}
     assert got == {"GEN001": None, "GEN002": None, "GEN003": "FEMALE", "GEN004": "FEMALE", "GEN005": None}
+
+
+def test_an_excel_file_saved_as_csv_is_read(client, admin_headers):
+    import io
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["Membership_No", "Membership_Name", "Amount", "Gothra", "Mobile_Number", "Receipt_Number", "Receipt_Date"])
+    ws.append([7001, "AKHILA  HAVYAKA MAHASABHA", None, "GENERAL", 9148459191, None, "23/05/1986"])
+    ws.append([7002, "T.S.GOPALKRISHNA", 5000, "VASHISHTA", None, 17734, "31/10/1988"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    # an Excel file with a .csv name, exactly like membership_1753246900.csv
+    res = client.post("/api/v1/members/bulk-import/preview", headers=admin_headers,
+                      files={"file": ("members.csv", buf.getvalue(), "text/csv")})
+    assert res.status_code == 200, res.text
+    rows = res.json()["members"]
+    assert [r["membership_number"] for r in rows] == ["7001", "7002"]
+    assert rows[0]["mobile"] == "9148459191" and rows[0]["gotra"] == "GENERAL" and rows[1]["mobile"] is None
+    # nothing was saved by reading it
+    assert client.get("/api/v1/members/", headers=admin_headers, params={"search": "AKHILA  HAVYAKA"}).json()["data"] == []
+    # and the real file upload takes the same file
+    done = client.post("/api/v1/members/bulk-import-file", headers=admin_headers,
+                       files={"file": ("members.xlsx", buf.getvalue(), "application/octet-stream")})
+    assert done.status_code == 200 and done.json()["success_count"] == 2
