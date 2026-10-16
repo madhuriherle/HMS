@@ -933,7 +933,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
               <div className="py-12 text-center">
                 <CheckCircle2 className="w-7 h-7 text-[#3D705C]/50 mx-auto mb-1.5" />
                 <p className="font-semibold text-sm text-[#180200]">
-                  {!(assignDebounced.trim() || assignFrom || assignTo || assignMatchOnly) ? 'No receipt is waiting for a member' : assignMatchOnly && !(assignDebounced.trim() || assignFrom || assignTo) ? 'No receipt looks like this applicant's' : 'No receipt matches these filters'}
+                  {!(assignDebounced.trim() || assignFrom || assignTo || assignMatchOnly) ? 'No receipt is waiting for a member' : assignMatchOnly && !(assignDebounced.trim() || assignFrom || assignTo) ? 'No receipt looks like this applicant’s' : 'No receipt matches these filters'}
                 </p>
                 {assignMatchOnly && (
                   <button type="button" onClick={() => setAssignMatchOnly(false)} className="mt-2 px-3 py-1.5 text-xs font-bold text-[#510601] border border-[#510601] rounded-lg hover:bg-[#FAF7F2] cursor-pointer">
