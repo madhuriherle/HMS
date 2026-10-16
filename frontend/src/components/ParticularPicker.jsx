@@ -198,6 +198,7 @@ export default function ParticularPicker({
           }
         >
           <div className="p-4 sm:p-5 space-y-4 flex flex-col flex-1 min-h-0">
+            {/* The search box is hidden for now (kept here to bring back):
             <div className="relative">
               <Search className="w-4 h-4 text-[#863221] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
@@ -215,6 +216,7 @@ export default function ParticularPicker({
                 </button>
               )}
             </div>
+            */}
 
             {cards.length === 0 ? (
               <p className="py-10 text-center text-sm text-[#863221]">No active particulars.</p>
