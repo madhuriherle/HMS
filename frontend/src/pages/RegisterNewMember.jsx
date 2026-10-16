@@ -1824,23 +1824,8 @@ export default function RegisterNewMember() {
                               </label>
                             </div>
 
-                            {/* Show current address preview if COMMUNICATION is selected */}
-                            {formData.magazineDeliveryChoice !== 'DIFFERENT' ? (
-                              <div className="p-3 bg-[#FAF7F2] rounded-lg border border-[#DFD5CC] text-xs text-stone-700">
-                                <div className="text-[11px] font-bold text-[#510601] uppercase mb-1">Current Delivery Address:</div>
-                                {(formData.address || formData.locality || formData.postalCode) ? (
-                                  <div>
-                                    {formData.address && <div className="font-medium text-[#180200] whitespace-pre-line">{formData.address}</div>}
-                                    <div className="text-xs text-stone-700">
-                                      {[formData.locality, formData.taluk, formData.district, formData.state].filter(Boolean).join(', ')}
-                                      {formData.postalCode ? ` - ${formData.postalCode}` : ''}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="text-stone-400 italic">Not entered yet. It shows here as you type the communication address above.</div>
-                                )}
-                              </div>
-                            ) : (
+                            {/* delivering to the communication address needs nothing more; the fields below are only for a different postal address */}
+                            {formData.magazineDeliveryChoice !== 'DIFFERENT' ? null : (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div className="sm:col-span-2">
                                   <label className="block text-xs text-[#3D140C] mb-1 font-semibold">Postal Address (House / Door No, Street) <span className="text-red-600">*</span></label>
