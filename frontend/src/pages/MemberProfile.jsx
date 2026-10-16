@@ -16,25 +16,29 @@ import ReceiptViewModal from '../components/ReceiptViewModal';
 
 const inr = formatMoney;
 
+// every card on the profile has the same look: an icon chip and an uppercase title on the left, a small tag (or a
+// status chip) on the right, a thin line under the header
 const Card = ({ icon: Icon, title, badge = null, children, className = '' }) => (
-  <section className={`bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 sm:p-6 ${className}`}>
-    <div className="flex items-center justify-between gap-3 border-b border-[#F1E9E2] pb-3 mb-4">
-      <h3 className="flex items-center gap-2 text-sm font-bold text-[#180200] uppercase tracking-wide">
-        <Icon className="w-4 h-4 text-[#863221]" />
-        {title}
-      </h3>
+  <section className={`bg-white rounded-2xl border border-[#EFE6DE] shadow-xs p-5 ${className}`}>
+    <div className="flex items-center justify-between gap-3 border-b border-[#EFE6DE]/70 pb-3 mb-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="w-7 h-7 rounded-lg bg-[#F7EDE6] text-[#8D4C32] flex items-center justify-center shrink-0">
+          <Icon className="w-3.5 h-3.5" />
+        </div>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-[#241B16] truncate">{title}</h3>
+      </div>
       {badge}
     </div>
     {children}
   </section>
 );
 
-// a field box: tiny label over a bold value; an empty value is not drawn
+// a label on the left, the value on the right, a thin line between rows; an empty value is not drawn
 const Field = ({ label, value }) =>
   value ? (
-    <div className="p-3 rounded-lg bg-[#FAF7F2] border border-[#E8DFD8] min-w-0">
-      <span className="block text-[10px] uppercase font-bold text-[#863221]/80 tracking-wider">{label}</span>
-      <span className="block mt-0.5 text-sm font-semibold text-[#180200] break-words">{value}</span>
+    <div className="py-2.5 flex items-start justify-between gap-4 text-xs border-b last:border-b-0 border-[#EFE6DE]/60 min-w-0">
+      <span className="text-[#7D7068] font-medium shrink-0">{label}</span>
+      <span className="font-semibold text-[#180200] text-right min-w-0 break-words">{value}</span>
     </div>
   ) : null;
 
@@ -259,14 +263,14 @@ function OverviewTab({ id }) {
               {!m.current ? (
                 <Empty>No membership yet.</Empty>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
                   <Field label="Type" value={m.current.type_name_en} />
                   <Field label="Membership number" value={m.current.membership_number || 'Given on approval'} />
                   <Field label="Member since" value={since ? formatDate(since) : ''} />
                   <Field label="Valid till" value={m.current.expires_at ? formatDate(m.current.expires_at) : ''} />
                   <Field label="Receipts" value={d.receipts.total ? `${d.receipts.total} · last ${formatDate(d.receipts.latest[0]?.receipt_date)}` : 'None yet'} />
-                  <div className="p-3 rounded-lg bg-[#FAF7F2] border border-[#E8DFD8] min-w-0">
-                    <span className="block text-[10px] uppercase font-bold text-[#863221]/80 tracking-wider">Credit</span>
+                  <div className="py-2.5 min-w-0 text-xs lg:col-span-2">
+                    <span className="block text-[#7D7068] font-medium">Credit</span>
                     <span className="block mt-0.5 text-sm font-semibold font-mono text-[#180200]">
                       {inr(credit?.credit_total || 0)}
                       {target && <span className="font-normal text-[#863221]"> / {inr(target.price)}</span>}
@@ -281,15 +285,15 @@ function OverviewTab({ id }) {
             </Card>
 
             <Card icon={User} title="Personal">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
                 {personal.map(([label, value]) => <Field key={label} label={label} value={value} />)}
               </div>
             </Card>
 
             <Card icon={Phone} title="Contact & address">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
                 {contact.map(([label, value]) => (
-                  <div key={label} className={label === 'Address' ? 'sm:col-span-2' : ''}>
+                  <div key={label} className={label === 'Address' ? 'lg:col-span-2' : ''}>
                     <Field label={label} value={value} />
                   </div>
                 ))}
@@ -690,7 +694,7 @@ function MagazineTab({ id }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <KycUpdateCard id={id} kyc={d.kyc} reload={section.reload} canSend={hasPermission('magazines.write')} />
           <Card icon={BookOpen} title="Magazine" className="lg:col-span-2">
-            <div className="grid grid-cols-2 gap-4 mb-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 mb-3">
               <Field label="Magazine needed" value={d.magazine_needed} />
               {d.magazine_kind && (
                 <Field
@@ -872,16 +876,6 @@ function ServiceOptinsCard({ id, data, reload, canWrite }) {
           )}
         </div>
       )}
-      {canWrite && data.available.length > 0 && (
-        <button
-          type="button"
-          onClick={() => { setServiceTypeId(''); setNotes(''); setModalOpen(true); }}
-          className="mt-3 px-4 py-2 text-xs font-semibold rounded-xl bg-[#510601] hover:bg-[#863221] text-white transition-colors"
-        >
-          Opt into a Service
-        </button>
-      )}
-
       <Modal isOpen={modalOpen} onClose={() => !busy && setModalOpen(false)}>
         <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
           <div className="h-14 shrink-0 flex items-center justify-between px-6 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
