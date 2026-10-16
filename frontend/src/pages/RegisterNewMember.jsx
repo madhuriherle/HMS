@@ -982,7 +982,9 @@ export default function RegisterNewMember() {
       formData.magazineKind !== 'EMAIL' &&
       formData.magazineDeliveryChoice === 'DIFFERENT' &&
       formData.magazineDeliveryAddress;
-    const addressLine = isDifferent ? formData.magazineDeliveryAddress : (formData.address || '');
+    // a different delivery address is typed in full (street, place, district, PIN), so none of the communication address is mixed in
+    if (isDifferent) return { line: formData.magazineDeliveryAddress, locality: '', taluk: '', district: '', state: '', pin: '', custom: true };
+    const addressLine = formData.address || '';
     return {
       line: addressLine,
       locality: formData.locality || '',
@@ -1660,9 +1662,9 @@ export default function RegisterNewMember() {
                           </label>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {[
-                              ['PHYSICAL', 'Physical Copy', 'Posted monthly to postal address'],
-                              ['EMAIL', 'E-Magazine', 'Read online on website (No email needed)']
-                            ].map(([code, title, desc]) => (
+                              ['PHYSICAL', 'Physical Copy'],
+                              ['EMAIL', 'E-Magazine']
+                            ].map(([code, title]) => (
                               <label
                                 key={code}
                                 className={`flex flex-col p-3 rounded-lg border cursor-pointer transition-all ${
@@ -1682,7 +1684,6 @@ export default function RegisterNewMember() {
                                   />
                                   <span className="text-xs font-bold text-[#180200]">{title}</span>
                                 </div>
-                                <span className="text-[11px] text-stone-500 pl-6 leading-tight">{desc}</span>
                               </label>
                             ))}
                           </div>
@@ -1784,10 +1785,14 @@ export default function RegisterNewMember() {
                 </div>
                 <div className="mt-1 text-[14px] leading-snug whitespace-pre-line">
                   {previewAddress.line || <span className="italic text-stone-400">Door no., street / cross, locality</span>}
-                  <br />
-                  {[previewAddress.locality, previewAddress.taluk, previewAddress.district].filter(Boolean).join(', ') || <span className="italic text-stone-400">Post office / taluk, district</span>}
-                  <br />
-                  {previewAddress.state || ''}{previewAddress.state ? ' - ' : ''}<span className="font-semibold">{previewAddress.pin || <span className="italic font-normal text-stone-400">Pin code</span>}</span>
+                  {!previewAddress.custom && (
+                    <>
+                      <br />
+                      {[previewAddress.locality, previewAddress.taluk, previewAddress.district].filter(Boolean).join(', ') || <span className="italic text-stone-400">Post office / taluk, district</span>}
+                      <br />
+                      {previewAddress.state || ''}{previewAddress.state ? ' - ' : ''}<span className="font-semibold">{previewAddress.pin || <span className="italic font-normal text-stone-400">Pin code</span>}</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

@@ -219,6 +219,7 @@ export const receiptToApiPayload = (formData, selectedMember = null) => {
   const creditLines = lines.filter((l) => ['MEMBERSHIP', 'DONATION', 'SCHOLARSHIP'].includes(l.type));
   const allocatedAmount = creditLines.length ? creditLines.reduce((sum, l) => sum + l.amount, 0) : amount;
   const headType = (creditLines[0] || lines[0]).type;
+  const allocationMemberId = Number(selectedMember?.memberId || selectedMember?.member_id || selectedMember?.id);
   const desc = (formData.description || '').trim();
   const paymentDetails = (formData.paymentReceivedDetails || '').trim();
   const baseNotes = [desc, paymentDetails ? `Payment details: ${paymentDetails}` : null].filter(Boolean).join(' | ');
