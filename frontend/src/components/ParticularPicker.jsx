@@ -69,7 +69,7 @@ export default function ParticularPicker({
   }, []);
   const columnCount = columnsFor(screenWidth);
   const columns = useMemo(() => {
-    const colWidth = Math.max(160, (Math.min(screenWidth * 0.95, 1280) - 80 - (columnCount - 1) * 20) / columnCount - 4);
+    const colWidth = Math.max(160, (Math.min(screenWidth * 0.95, 1280) - 80 - (columnCount - 1) * 12) / columnCount - 28);
     // how tall the buttons come out when they wrap inside a column (each ~6.5px a letter, 20px padding, 6px gap)
     const heightOf = (buttons) => {
       let rows = 1;
@@ -78,7 +78,7 @@ export default function ParticularPicker({
         const w = Math.min(colWidth, b.title.length * 6.5 + 20);
         if (used && used + 6 + w > colWidth) { rows += 1; used = w; } else { used += (used ? 6 : 0) + w; }
       });
-      return 30 + rows * 40; // the heading, then the rows
+      return 52 + rows * 40; // heading and padding, then the rows
     };
     let pieces = [];
     cards.forEach((card) => {
@@ -95,7 +95,7 @@ export default function ParticularPicker({
     pieces.forEach((piece) => {
       const shortest = cols.reduce((best, col) => (col.height < best.height ? col : best), cols[0]);
       shortest.items.push(piece);
-      shortest.height += piece.weight + 20;
+      shortest.height += piece.weight + 12;
     });
     return cols;
   }, [cards, columnCount, screenWidth]);
@@ -238,17 +238,17 @@ export default function ParticularPicker({
                   </div>
                 )}
                 {/* the particulars that have sub types: a card each, the sub types as buttons */}
-                <div className="flex items-start gap-5">
+                <div className="flex items-start gap-3">
                   {columns.map((col, colIndex) => (
-                    <div key={colIndex} className="flex min-w-0 flex-1 flex-col gap-5">
+                    <div key={colIndex} className="flex min-w-0 flex-1 flex-col gap-3">
                       {col.items.map((card) => {
                         const cardHasMatch = card.buttons.some((b) => matches(card, b));
                         return (
                           <div
                             key={card.key}
-                            className={`min-w-0 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
+                            className={`min-w-0 rounded-xl border border-[#B8A89B] p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
                           >
-                            <p className="mb-2 border-b border-[#B8A89B] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.title || card.name}</p>
+                            <p className="mb-2 border-b border-[#CDBFB3] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.title || card.name}</p>
                             <div className="flex flex-wrap gap-1.5">
                               {card.buttons.map((btn) => pickButton(btn, card))}
                             </div>
