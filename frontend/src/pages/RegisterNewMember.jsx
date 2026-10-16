@@ -1134,7 +1134,7 @@ export default function RegisterNewMember() {
                     {/* Row 1: Name (Title + Full Name), DOB, and Age in a SINGLE LINE */}
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-x-4 gap-y-5 items-start">
                       {/* Member Name */}
-                      <div className="sm:col-span-7">
+                      <div className="sm:col-span-5">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           Member Name: <span className="text-red-600">*</span>
                         </label>
@@ -1173,7 +1173,7 @@ export default function RegisterNewMember() {
                       </div>
 
                       {/* Date of Birth */}
-                      <div className="sm:col-span-5">
+                      <div className="sm:col-span-3">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           Date of Birth: <span className="text-red-600">*</span>
                         </label>
@@ -1191,12 +1191,26 @@ export default function RegisterNewMember() {
                           <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.birthDate}</p>
                         )}
                       </div>
+
+                      {/* Age (worked out from the Date of Birth) */}
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">Age:</label>
+                        <input
+                          type="text"
+                          readOnly
+                          tabIndex={-1}
+                          value={formData.birthDate ? calculateAge(formData.birthDate) : ''}
+                          placeholder="-"
+                          title="Worked out from the Date of Birth"
+                          className="w-full px-3 py-2 bg-[#F3EEE8] border border-[#DFD5CC] rounded-lg text-xs sm:text-sm font-semibold text-[#510601] focus:outline-none shadow-2xs cursor-default"
+                        />
+                      </div>
                     </div>
 
                     {/* Row 2: Mobile Number & Relationship & WhatsApp */}
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-x-4 gap-y-5 items-start">
                       {/* Mobile Number */}
-                      <div className="sm:col-span-5">
+                      <div className="sm:col-span-4">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           Mobile Number: <span className="text-red-600">*</span>
                         </label>
@@ -1258,17 +1272,19 @@ export default function RegisterNewMember() {
                       </div>
 
                       {/* Membership Belongs To / Relationship */}
-                      <div className="sm:col-span-3">
+                      <div className="sm:col-span-4">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold truncate" title="Membership Belongs To / Relationship">
                           Belongs To / Relation:
                         </label>
+                        {/* the relation and, for Others, its text box sit side by side so the row never grows taller */}
+                        <div className="flex gap-1.5">
                         <select
                           value={formData.appliedOnBehalfOf}
                           onChange={(e) => {
                             setFormData({ ...formData, appliedOnBehalfOf: e.target.value });
                             if (formErrors.appliedOnBehalfOf) setFormErrors({ ...formErrors, appliedOnBehalfOf: '' });
                           }}
-                          className="w-full px-2.5 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer"
+                          className={`${formData.appliedOnBehalfOf === 'Others' ? 'w-28 shrink-0' : 'w-full'} px-2.5 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer`}
                         >
                           {BEHALF_OPTIONS.map((opt) => (
                             <option key={opt} value={opt}>
@@ -1280,12 +1296,13 @@ export default function RegisterNewMember() {
                           <input
                             type="text"
                             maxLength={30}
-                            placeholder="Specify the relation"
+                            placeholder="Specify relation"
                             value={formData.behalfOtherText}
                             onChange={(e) => setFormData({ ...formData, behalfOtherText: e.target.value })}
-                            className="mt-2 w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                            className="flex-1 min-w-0 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                           />
                         )}
+                        </div>
                       </div>
 
                       {/* WhatsApp Number */}
@@ -1460,7 +1477,9 @@ export default function RegisterNewMember() {
                 {/* Address & work */}
                 <div className="pt-4 border-t border-[#DFD5CC] space-y-3">
                   <div className="pb-2 border-b border-[#E8DFD8]"><h3 className="text-sm font-bold text-[#8C1801] uppercase tracking-wider">Address & Work</h3></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {/* the fields take three quarters, the sticker preview one quarter */}
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 items-start">
+                <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Communication Address */}
                   <div className="col-span-full">
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
@@ -1642,6 +1661,56 @@ export default function RegisterNewMember() {
                   </div>
 
                 </div>
+                <aside className="lg:col-span-1 lg:sticky lg:top-4">
+            <div className="bg-white rounded-xl border border-[#E8DFD8] p-4">
+              {/* Card Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-[#E8DFD8]">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-[#510601] text-white rounded-lg shadow-xs">
+                    <Printer className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-[#180200]">Postal Label Preview</h2>
+                    <p className="text-[11px] text-stone-500">As it prints on the sticker</p>
+                  </div>
+                </div>
+                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
+                  isLabelReady
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>
+                  {isLabelReady ? 'Ready for Dispatch' : 'Awaiting Details'}
+                </span>
+              </div>
+
+              {/* The sticker as it prints: membership number, name in bold, address (the sticker sheet's own format) */}
+              <div
+                className="mt-4 rounded-md border border-stone-300 bg-white px-5 py-4 min-h-[170px] text-black"
+                style={{ fontFamily: '"Times New Roman", Times, serif' }}
+              >
+                <div className="text-[13px] leading-tight">
+                  {targetMember?.membershipNumber && targetMember.membershipNumber !== 'Not Assigned'
+                    ? targetMember.membershipNumber
+                    : <span className="italic text-stone-400">Membership no. is given on approval</span>}
+                </div>
+                <div className="mt-1 font-bold text-[14px] uppercase leading-tight">
+                  {[formData.nameTitle, formData.name?.trim()].filter(Boolean).join(' ') || <span className="font-normal normal-case italic text-stone-400">Name</span>}
+                </div>
+                <div className="mt-1 text-[14px] leading-snug whitespace-pre-line">
+                  {previewAddress.line || <span className="italic text-stone-400">Door no., street / cross, locality</span>}
+                  {!previewAddress.custom && (
+                    <>
+                      <br />
+                      {[previewAddress.locality, previewAddress.taluk, previewAddress.district].filter(Boolean).join(', ') || <span className="italic text-stone-400">Post office / taluk, district</span>}
+                      <br />
+                      {previewAddress.state || ''}{previewAddress.state ? ' - ' : ''}<span className="font-semibold">{previewAddress.pin || <span className="italic font-normal text-stone-400">Pin code</span>}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+                </aside>
+                </div>
                 </div>
 
                 {/* Magazine subscription */}
@@ -1812,53 +1881,7 @@ export default function RegisterNewMember() {
                               </div>
                             )}
                           </div>
-            <div className="bg-white rounded-xl border border-[#E8DFD8] p-5">
-              {/* Card Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-[#E8DFD8]">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 bg-[#510601] text-white rounded-lg shadow-xs">
-                    <Printer className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold text-[#180200]">Postal Label Preview</h2>
-                    <p className="text-[11px] text-stone-500">As it prints on the sticker</p>
-                  </div>
-                </div>
-                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
-                  isLabelReady
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-amber-50 text-amber-700 border-amber-200'
-                }`}>
-                  {isLabelReady ? 'Ready for Dispatch' : 'Awaiting Details'}
-                </span>
-              </div>
 
-              {/* The sticker as it prints: membership number, name in bold, address (the sticker sheet's own format) */}
-              <div
-                className="mt-4 rounded-md border border-stone-300 bg-white px-5 py-4 min-h-[170px] text-black"
-                style={{ fontFamily: '"Times New Roman", Times, serif' }}
-              >
-                <div className="text-[13px] leading-tight">
-                  {targetMember?.membershipNumber && targetMember.membershipNumber !== 'Not Assigned'
-                    ? targetMember.membershipNumber
-                    : <span className="italic text-stone-400">Membership no. is given on approval</span>}
-                </div>
-                <div className="mt-1 font-bold text-[14px] uppercase leading-tight">
-                  {[formData.nameTitle, formData.name?.trim()].filter(Boolean).join(' ') || <span className="font-normal normal-case italic text-stone-400">Name</span>}
-                </div>
-                <div className="mt-1 text-[14px] leading-snug whitespace-pre-line">
-                  {previewAddress.line || <span className="italic text-stone-400">Door no., street / cross, locality</span>}
-                  {!previewAddress.custom && (
-                    <>
-                      <br />
-                      {[previewAddress.locality, previewAddress.taluk, previewAddress.district].filter(Boolean).join(', ') || <span className="italic text-stone-400">Post office / taluk, district</span>}
-                      <br />
-                      {previewAddress.state || ''}{previewAddress.state ? ' - ' : ''}<span className="font-semibold">{previewAddress.pin || <span className="italic font-normal text-stone-400">Pin code</span>}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
                           </div>
                         )}
                       </div>
