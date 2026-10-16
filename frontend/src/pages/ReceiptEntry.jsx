@@ -47,7 +47,7 @@ import {
   loadMembershipTypes,
   loadPaymentModeConfigs,
   loadLocations,
-  findLocationByPin
+  // (no PIN list on this screen: members arrive with their place)
 } from '../utils/serverData';
 import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
 import { formatMoney } from '../utils/money';
@@ -74,7 +74,7 @@ const numberTag = (m) => (m.membershipNumber ? `${m.membershipNumber}` : `ID ${m
 
 const toEntryMember = (m, loc) => {
   const nameOf = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '';
-  const pin = loc.postalCodes.find((p) => String(p.id) === String(m.pincode_id));
+  const pin = { postalCode: m.pincode || '', area: m.post_office_name || '' }; // the server sends the place with the member
   const reg = m.registration_payment || {};
   const fullName = memberName(m, true);
   const approved = String(m.approval_status).toUpperCase() === 'APPROVED';
@@ -188,7 +188,7 @@ export default function ReceiptEntry() {
   const [saving, setSaving] = useState(false);
   const saveMode = useRef('new'); // Save stays on this screen, ready for the next receipt
 
-  const lookupLocationByPin = (pin) => findLocationByPin(locations.postalCodes, pin);
+  const lookupLocationByPin = () => ({ found: false }); // members arrive with their place already; no PIN list is needed here
 
   // Whether the picked member already has a receipt linked (the server's receipt links, read for that one member)
   const isMemberReceiptAssigned = (m) => Boolean(m) && Boolean(selectedMember) && String(m.id) === String(selectedMember.id) && selectedMemberReceipts.length > 0;
@@ -359,8 +359,6 @@ export default function ReceiptEntry() {
       return { states: [], districts: [], taluks: [], postalCodes: [] };
     });
     setLocations(loc);
-    // the PIN list (the slow one) loads in the background and fills the area names in when it arrives
-    loadLocations().then(setLocations).catch(() => {});
     await Promise.all([
       loadParticulars().then(setParticularsMaster).catch(fail('particulars')),
       loadMembershipTypes().then(setMembershipTypes).catch(fail('membership types')),
@@ -1267,7 +1265,7 @@ export default function ReceiptEntry() {
       })
       .catch((error) => showToast(apiErrorMessage(error, 'Failed to load the Membership List from the server.'), 'error'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedRightTerm, rightPage, rightPageSize, listsVersion, dataReady, locations.postalCodes.length]);
+  }, [debouncedRightTerm, rightPage, rightPageSize, listsVersion, dataReady]);
 
   const bottomSeq = useRef(0);
   useEffect(() => {
@@ -1282,7 +1280,7 @@ export default function ReceiptEntry() {
       })
       .catch((error) => showToast(apiErrorMessage(error, 'Failed to load the unassigned members from the server.'), 'error'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedBottomTerm, unapprovedPage, unapprovedPageSize, listsVersion, dataReady, locations.postalCodes.length]);
+  }, [debouncedBottomTerm, unapprovedPage, unapprovedPageSize, listsVersion, dataReady]);
 
   const filteredRightMembers = registeredMembers; // the server already searched and paged them
   const totalRightMembers = rightTotal;

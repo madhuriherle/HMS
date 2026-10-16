@@ -222,7 +222,7 @@ def _attach_latest_receipts(db: Session, rows: list) -> None:
 def _attach_membership_types(db: Session, rows: list) -> None:
     """Each listed member carries the name of their current membership type (the latest membership record) and
     their credit total, so the lists show the real type and amount paid instead of working them out on the page."""
-    from models.masters import MembershipType
+    from models.masters import MembershipType, PostalCode
     ids = [r.get("id") for r in rows if isinstance(r, dict) and r.get("id")]
     if not ids:
         return
@@ -237,8 +237,14 @@ def _attach_membership_types(db: Session, rows: list) -> None:
         latest[ms.member_id] = (t.id, t.name_en, ms.membership_number)
     from services import membership_credit
     credit = membership_credit.credit_totals(db, ids)
+    # the place name comes with the member (PIN and post office), so no screen downloads the 15,000-row PIN list for it
+    pin_ids = {r.get("pincode_id") for r in rows if isinstance(r, dict) and r.get("pincode_id")}
+    places = {}
+    if pin_ids:
+        places = {p.id: (p.pincode, p.post_office_name) for p in db.query(PostalCode).filter(PostalCode.id.in_(pin_ids)).all()}
     for r in rows:
         if isinstance(r, dict):
+            r["pincode"], r["post_office_name"] = places.get(r.get("pincode_id"), (None, None))
             tid, name, ms_number = latest.get(r.get("id"), (None, None, None))
             r["membership_type_id"] = tid
             r["membership_type"] = name

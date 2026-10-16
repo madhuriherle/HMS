@@ -7140,6 +7140,26 @@ def test_unapproved_list_carries_receipts_and_label_list_pages(client, admin_hea
     assert client.get("/api/v1/members/label-list", headers=H, params={"limit": 5000}).json()["limit"] == 200
 
 
+def test_member_list_carries_the_place_name(client, admin_headers):
+    """The list sends each member's PIN and post office itself, so Receipt Entry never downloads the PIN table."""
+    from db.session import SessionLocal
+    from models.masters import District, PostalCode, State
+    from models.members import Member
+
+    member = _create_member(client, admin_headers, "9699000044", "Zplacename")
+    with SessionLocal() as db:
+        st = State(name_en="Zplace State", code="ZPS", status=True)
+        db.add(st); db.flush()
+        di = District(name_en="Zplace District", state_id=st.id, status=True)
+        db.add(di); db.flush()
+        pc = PostalCode(pincode="576221", post_office_name="Zplace B.O", state_id=st.id, district_id=di.id, status=True)
+        db.add(pc); db.flush()
+        db.query(Member).filter(Member.id == member["id"]).update({"pincode_id": pc.id})
+        db.commit()
+    row = client.get("/api/v1/members/", headers=admin_headers, params={"search": "Zplacename"}).json()["data"][0]
+    assert row["pincode"] == "576221" and row["post_office_name"] == "Zplace B.O"
+
+
 def test_seeding_privileges_leaves_a_deleted_privilege_deleted(client, admin_headers):
     """A privilege someone deleted keeps its code (the column is unique): seeding must not try to insert it again
     (that crashed migration 0081 on UAT, where system.read had been deleted)."""
