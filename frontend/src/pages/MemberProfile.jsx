@@ -395,6 +395,9 @@ const ageOf = (iso) => {
   return age >= 0 ? age : null;
 };
 
+// who the mobile number belongs to (the form's "Belongs To / Relation"); nothing is shown for Self
+const belongsTo = (v) => (v && String(v).trim().toLowerCase() !== 'self' ? v : '');
+
 const groupAadhaar = (v) => (/^\d{12}$/.test(String(v || '')) ? String(v).replace(/(\d{4})(?=\d)/g, '$1 ') : v);
 
 // Personal details, contact & address and family on one screen
@@ -466,8 +469,6 @@ function PersonalTab({ id }) {
               <Row label="Company">{p.company}</Row>
               <Row label="Website">{p.website}</Row>
               <Row label="Category">{p.category}</Row>
-              {/* "Self" is the normal case and says nothing: the row shows only when someone else applied for the member */}
-              <Row label="Applied on behalf of">{p.applied_on_behalf_of && String(p.applied_on_behalf_of).trim().toLowerCase() !== 'self' && <span className={chip}>{p.applied_on_behalf_of}</span>}</Row>
             </>
           )}
         </Panel>
@@ -476,6 +477,8 @@ function PersonalTab({ id }) {
           {contact.loading ? <Empty>Loading…</Empty> : !c ? <Empty>This section could not be loaded.</Empty> : (
             <>
               <Row label="Mobile">{phone(c.mobile_country_code, c.mobile)}</Row>
+              {/* whose number it is ("Belongs To / Relation" on the form); "Self" is the normal case and says nothing */}
+              <Row label="Mobile belongs to">{belongsTo(p?.applied_on_behalf_of)}</Row>
               <Row label="WhatsApp">{phone(c.whatsapp_country_code, c.whatsapp_number)}</Row>
               <Row label="Alternate mobile">{c.alternate_mobile}</Row>
               <Row label="Email">{c.email}</Row>
@@ -1260,7 +1263,6 @@ export function UnapprovedPopup({ id, s, name, onClose }) {
               <Row label="Gotra">{p.gotra}</Row>
               <Row label="Qualification">{p.qualification}</Row>
               <Row label="Occupation">{p.occupation}</Row>
-              <Row label="Applied on behalf of">{String(p.applied_on_behalf_of || '').trim().toLowerCase() === 'self' ? '' : p.applied_on_behalf_of}</Row>
               <Row label="Registered through">{p.registration_source}</Row>
               <Row label="Registered on">{p.created_at ? formatDateTime(p.created_at) : ''}</Row>
             </>
@@ -1270,6 +1272,7 @@ export function UnapprovedPopup({ id, s, name, onClose }) {
           {contact.loading ? <Empty>Loading…</Empty> : !c ? <Empty>Could not be loaded.</Empty> : (
             <>
               <Row label="Mobile">{phone(c.mobile_country_code, c.mobile)}</Row>
+              <Row label="Mobile belongs to">{belongsTo(p?.applied_on_behalf_of)}</Row>
               <Row label="WhatsApp">{phone(c.whatsapp_country_code, c.whatsapp_number)}</Row>
               <Row label="Email">{c.email}</Row>
               <Row label="Address">{[c.address_line1, c.address_line2].filter(Boolean).join(', ')}</Row>
