@@ -36,6 +36,7 @@ import PageTitle from '../components/PageTitle';
 import DateInput from '../components/DateInput';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
+import { UnapprovedPopup } from './MemberProfile';
 import { notify } from '../utils/notify';
 import { apiErrorMessage } from '../utils/apiError';
 import { confirmYesNo } from '../utils/dialogs';
@@ -247,6 +248,7 @@ export default function ReceiptEntry() {
   // Search and pagination state for Bottom Unassigned Members Table
   const [unapprovedSearchQuery, setUnapprovedSearchQuery] = useState('');
   const [unapprovedSearchOpen, setUnapprovedSearchOpen] = useState(false);
+  const [viewApplicant, setViewApplicant] = useState(null); // the applicant shown in the read-only popup
   const [unapprovedPage, setUnapprovedPage] = useState(1);
   const [unapprovedPageSize, setUnapprovedPageSize] = useState(10);
 
@@ -1382,6 +1384,14 @@ export default function ReceiptEntry() {
     <div className="space-y-6 pb-16 font-sans">
 
       {/* Member Profile is viewed on dedicated full-screen page /dashboard/membership/profile/:id */}
+      {viewApplicant && (
+        <UnapprovedPopup
+          id={viewApplicant.id}
+          s={{ id: viewApplicant.id, approval_status: 'UNAPPROVED', member_code: viewApplicant.membershipNumber || '' }}
+          name={viewApplicant.name || viewApplicant.fullName || ''}
+          onClose={() => setViewApplicant(null)}
+        />
+      )}
       {false && viewingMember && (() => {
           const matchedReceipt = findMatchingReceiptForMember(viewingMember);
           const receiptNo = matchedReceipt?.receiptNumber || viewingMember.assignedReceiptNumber || viewingMember.receiptNumber || viewingMember.transactionId || '—';
@@ -2772,18 +2782,15 @@ export default function ReceiptEntry() {
                               </button>
                             )}
 
-                            {/* View button hidden for now as requested (commented out, not removed) */}
-                            {/* {(hasPermission('members.unapproved.read') || hasPermission('members.list.read')) && (
-                              <button
-                                type="button"
-                                onClick={() => navigate(`/dashboard/membership/profile/${member.id}`)}
-                                className="btn-act"
-                                title="View full applicant registration profile"
-                              >
-                                <Eye className="w-3.5 h-3.5 shrink-0 text-[#863221]" />
-                                <span>View</span>
-                              </button>
-                            )} */}
+                            <button
+                              type="button"
+                              onClick={() => setViewApplicant(member)}
+                              className="btn-act"
+                              title="View the details entered on this application"
+                            >
+                              <Eye className="w-3.5 h-3.5 shrink-0 text-[#863221]" />
+                              <span>View</span>
+                            </button>
                           </div>
                         </td>
                       </tr>

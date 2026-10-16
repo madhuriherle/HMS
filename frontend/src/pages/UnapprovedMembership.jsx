@@ -56,6 +56,7 @@ import useSwalConfirm from '../hooks/useSwalConfirm';
 import { formatMoney } from '../utils/money';
 
 import ModalFooter from '../components/ModalFooter';
+import ReceiptViewModal from '../components/ReceiptViewModal';
 // ----------------------------------------------------
 // A receipt carries no member link of its own: one entered before the member existed only holds what
 // the clerk wrote on it — the payer name, the mobile, and the number typed into the Membership No.
@@ -222,9 +223,13 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [assignPageSize, setAssignPageSize] = useState(10);
   const [assignView, setAssignView] = useState('table'); // table | cards
   const [mappingReceiptId, setMappingReceiptId] = useState(null);
+  const [receiptView, setReceiptView] = useState(null); // { member, receipt }: the receipt already assigned to an applicant
+  const [replacingReceipt, setReplacingReceipt] = useState(null); // the assigned receipt the picked one will replace
+  useEffect(() => { if (!assigningMember) setReplacingReceipt(null); }, [assigningMember]);
   // the API behind Map enforces receipts.write; the sibling Bulk Mapping screen uses the page privilege,
   // so either one is enough to press it
   const canMapReceipts = hasPermission('receipts.bulk_mapping.write') || hasPermission('receipts.write');
+  const canChangeReceipt = canMapReceipts && hasPermission('receipts.delete'); // un-mapping the old one needs delete
 
   // Districts for dropdown filter
   const filterDistricts = useMemo(() => {
@@ -356,7 +361,21 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
       if (data?.failed_count) {
         showToast(data.failed?.[0]?.reason || 'That receipt could not be mapped.', 'error');
       } else {
-        showToast(`Receipt ${candidate.receipt_number} mapped to ${who}. Approval is no longer blocked.`, 'success');
+        let note = `Receipt ${candidate.receipt_number} mapped to ${who}. Approval is no longer blocked.`;
+        let tone = 'success';
+        if (replacingReceipt) {
+          // the new receipt is mapped first, so the applicant is never left without one; now un-map the old one
+          try {
+            const { data: allocs } = await api.get(`/receipts/${replacingReceipt.id}/allocations`);
+            const old = (Array.isArray(allocs) ? allocs : allocs?.data || []).find((a) => Number(a.member_id) === Number(assigningMember.id));
+            if (old) await api.delete(`/receipts/${replacingReceipt.id}/allocations/${old.id}`);
+            note = `Receipt ${replacingReceipt.receiptNumber} replaced by ${candidate.receipt_number} for ${who}.`;
+          } catch (err) {
+            tone = 'error';
+            note = `Receipt ${candidate.receipt_number} is mapped, but the old receipt ${replacingReceipt.receiptNumber} could not be un-mapped: ${err.response?.data?.detail || 'try again from Receipt Tracking'}.`;
+          }
+        }
+        showToast(note, tone);
         setAssigningMember(null);
       }
       await reloadData();
@@ -712,11 +731,11 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           {/* 1. Assign to Receipt Action */}
                           <button
                             type="button"
-                            onClick={() => openAssignReceipt(m)}
+                            onClick={() => (isAssigned && m.receipt ? setReceiptView({ member: m, receipt: m.receipt }) : openAssignReceipt(m))}
                             className="btn-act"
                             title={
                               isAssigned
-                                ? `Receipt ${m.assignedReceiptNumber} is already mapped. Click to map another receipt entered earlier.`
+                                ? `View receipt ${m.assignedReceiptNumber}`
                                 : 'List the receipts already entered and map one to this applicant'
                             }
                           >
@@ -799,6 +818,22 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
       {/* ---------------------------------------------------- */}
       {/* ASSIGN A RECEIPT: map a receipt that was entered BEFORE this member existed */}
       {/* ---------------------------------------------------- */}
+      <ReceiptViewModal
+        receipt={receiptView?.receipt || null}
+        onClose={() => setReceiptView(null)}
+        onChange={
+          canChangeReceipt
+            ? () => {
+                const { member, receipt } = receiptView;
+                setReceiptView(null);
+                setReplacingReceipt(receipt);
+                openAssignReceipt(member);
+              }
+            : null
+        }
+        changeTitle="Pick another receipt for this applicant; the current one is un-mapped"
+      />
+
       {assigningMember && (
         <Modal
           isOpen
@@ -820,7 +855,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                 </div>
               </div>
               <span className={`chip ${assigningMember.receiptStatus === 'Assigned' ? 'chip-on' : 'chip-warn'}`}>
-                {assigningMember.receiptStatus === 'Assigned' ? `Receipt ${assigningMember.assignedReceiptNumber}` : 'No receipt yet'}
+                {replacingReceipt ? `Replacing receipt ${replacingReceipt.receiptNumber}` : assigningMember.receiptStatus === 'Assigned' ? `Receipt ${assigningMember.assignedReceiptNumber}` : 'No receipt yet'}
               </span>
             </div>
 

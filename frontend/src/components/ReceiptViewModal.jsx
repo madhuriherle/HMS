@@ -36,7 +36,7 @@ const fullLabel = (i) => (lineLabel(i) !== i.particular ? `${i.particular} › $
  * The receipt view popup: payee, particulars with the total, payment details, period and remarks. `receipt` is a
  * receipt row as the Receipt Tracking list returns it (normalised); the popup is closed with `onClose`.
  */
-export default function ReceiptViewModal({ receipt, onClose }) {
+export default function ReceiptViewModal({ receipt, onClose, onChange = null, changeTitle = '' }) {
   return (
     <Modal isOpen={Boolean(receipt)} onClose={onClose}>
       {receipt && (
@@ -180,7 +180,22 @@ export default function ReceiptViewModal({ receipt, onClose }) {
           </div>
 
           {/* Read-only footer */}
-          <ModalFooter kind="view" onCancel={() => onClose()} />
+          <ModalFooter
+            kind="view"
+            onCancel={() => onClose()}
+            left={
+              onChange ? (
+                <button
+                  type="button"
+                  onClick={onChange}
+                  title={changeTitle || 'Replace this with another receipt'}
+                  className="h-10 px-4 rounded-xl border border-[#510601] text-[#510601] hover:bg-white text-sm font-semibold transition-colors cursor-pointer"
+                >
+                  Change receipt
+                </button>
+              ) : null
+            }
+          />
         </div>
       )}
     </Modal>

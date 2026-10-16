@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Briefcase, Award, TrendingUp, CalendarDays, Pencil } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
@@ -1215,8 +1215,80 @@ const TABS = [
   { key: 'activity', label: 'Activity & History', icon: History, Component: ActivityTab }
 ];
 
+// An application that is not approved yet opens as a read-only popup with the basic details entered.
+export function UnapprovedPopup({ id, s, name, onClose }) {
+  const personal = useSection(id, 'personal');
+  const contact = useSection(id, 'contact');
+  const p = personal.data;
+  const c = contact.data;
+  const age = p ? ageOf(p.date_of_birth) : null;
+  const status = String(s.approval_status || '').toUpperCase();
+  const statusChip = status === 'REJECTED' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200';
+  return (
+    <Modal
+      isOpen
+      onClose={onClose}
+      maxWidthClass="max-w-3xl"
+      title={
+        <span className="flex items-center gap-2.5">
+          <span className="truncate">{name || 'Application'}</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${statusChip}`}>{status || 'UNAPPROVED'}</span>
+        </span>
+      }
+      footer={
+        <div className="h-14 shrink-0 px-6 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
+          <span className="text-[11px] text-[#863221]">Read-only view of the details entered</span>
+          <button type="button" onClick={onClose} className="px-5 py-2 rounded-xl bg-[#510601] hover:bg-[#863221] text-white text-xs font-semibold transition-colors">
+            Close
+          </button>
+        </div>
+      }
+    >
+      <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Panel icon={User} title="Basic details" tag={s.member_code || `ID ${s.id}`}>
+          {personal.loading ? <Empty>Loading…</Empty> : !p ? <Empty>Could not be loaded.</Empty> : (
+            <>
+              <Row label="Full name">{[p.name_title, p.first_name_en, p.middle_name_en, p.last_name_en].filter(Boolean).join(' ')}</Row>
+              <Row label="Name (Kannada)">{p.full_name_kn}</Row>
+              <Row label="Gender">{p.gender}</Row>
+              <Row label="Date of birth">
+                {p.date_of_birth && <>{formatDate(p.date_of_birth)}{age !== null && <span className="ml-1 font-normal text-[#A89B92]">({age} yrs)</span>}</>}
+              </Row>
+              <Row label="Blood group">{p.blood_group}</Row>
+              <Row label="Marital status">{p.is_married === true ? 'Married' : p.is_married === false ? 'Unmarried' : ''}</Row>
+              <Row label="Gotra">{p.gotra}</Row>
+              <Row label="Qualification">{p.qualification}</Row>
+              <Row label="Occupation">{p.occupation}</Row>
+              <Row label="Applied on behalf of">{p.applied_on_behalf_of}</Row>
+              <Row label="Registered through">{p.registration_source}</Row>
+              <Row label="Registered on">{p.created_at ? formatDateTime(p.created_at) : ''}</Row>
+            </>
+          )}
+        </Panel>
+        <Panel icon={Phone} title="Contact & address" tag="Entered">
+          {contact.loading ? <Empty>Loading…</Empty> : !c ? <Empty>Could not be loaded.</Empty> : (
+            <>
+              <Row label="Mobile">{phone(c.mobile_country_code, c.mobile)}</Row>
+              <Row label="WhatsApp">{phone(c.whatsapp_country_code, c.whatsapp_number)}</Row>
+              <Row label="Email">{c.email}</Row>
+              <Row label="Address">{[c.address_line1, c.address_line2].filter(Boolean).join(', ')}</Row>
+              <Row label="Locality">{c.locality}</Row>
+              <Row label="City">{c.city}</Row>
+              <Row label="Taluk">{c.taluk_name}</Row>
+              <Row label="District">{c.district_name}</Row>
+              <Row label="State">{c.state_name}</Row>
+              <Row label="PIN code">{c.pincode}</Row>
+            </>
+          )}
+        </Panel>
+      </div>
+    </Modal>
+  );
+}
+
 export default function MemberProfile() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { hasPermission } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [summary, setSummary] = useState(null);
@@ -1270,7 +1342,16 @@ export default function MemberProfile() {
         {loading && <Empty>Loading profile…</Empty>}
         {!loading && !s && <Empty>This member could not be loaded.</Empty>}
 
-        {s && (
+        {s && String(s.approval_status).toUpperCase() !== 'APPROVED' && (
+          <UnapprovedPopup
+            id={id}
+            s={s}
+            name={fullName}
+            onClose={() => (window.history.length > 1 ? navigate(-1) : navigate('/dashboard/membership/unapproved'))}
+          />
+        )}
+
+        {s && String(s.approval_status).toUpperCase() === 'APPROVED' && (
           <>
             {/* Header strip */}
             <div className="bg-white border border-[#E8DFD8] text-[#180200] rounded-2xl shadow-sm p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
