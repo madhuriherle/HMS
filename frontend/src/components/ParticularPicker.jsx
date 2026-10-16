@@ -69,7 +69,7 @@ export default function ParticularPicker({
   }, []);
   const columnCount = columnsFor(screenWidth);
   const columns = useMemo(() => {
-    const colWidth = Math.max(160, (Math.min(screenWidth * 0.95, 1280) - 80 - (columnCount - 1) * 12) / columnCount - 28);
+    const colWidth = Math.max(160, (Math.min(screenWidth * 0.95, 1500) - 80 - (columnCount - 1) * 12) / columnCount - 28);
     // how tall the buttons come out when they wrap inside a column (each ~6.5px a letter, 20px padding, 6px gap)
     const heightOf = (buttons) => {
       const lines = buttons.reduce((sum, b) => sum + Math.max(1, Math.ceil((b.title.length * 6.5 + 16) / colWidth)), 0);
@@ -192,8 +192,9 @@ export default function ParticularPicker({
           isOpen
           onClose={() => setOpen(false)}
           title="Select Receipt Particular"
-          maxWidthClass="max-w-7xl"
-          heightClass="h-[90vh]"
+          maxWidthClass="max-w-[1500px]"
+          heightClass="h-[95vh]"
+          maxHeightClass="max-h-[95vh]"
           footer={
             <ModalFooter
               kind="view"
