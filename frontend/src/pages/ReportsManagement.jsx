@@ -3,6 +3,10 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import PageActions, { PageActionsSlot } from '../components/PageActions';
 import PageTitle from '../components/PageTitle';
+import SearchFilterBar from '../components/SearchFilterBar';
+import FilterSelect from '../components/FilterSelect';
+import Pager from '../components/Pager';
+import { formatMoney } from '../utils/money';
 import {
   BarChart3,
   Users,
@@ -140,8 +144,29 @@ export default function ReportsManagement() {
       {/* Dynamic Page Title in Header Bar */}
       <PageTitle>{TABS.find((t) => t.key === activeTab)?.label || 'Reports'}</PageTitle>
 
-      {/* Action Toolbar */}
-      <div className="flex justify-end -mb-2">
+      {/* TOP TAB SWITCHER (INTERNAL MODULE TABS) */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="bg-white rounded-2xl p-1.5 border border-[#E8DFD8] shadow-sm inline-flex flex-wrap gap-1.5">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            const isActive = activeTab === t.key;
+            return (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setTab(t.key)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[#510601] text-white shadow-sm'
+                    : 'text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2]'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
         <PageActionsSlot />
       </div>
 
@@ -288,7 +313,7 @@ function SummaryTab({ onNavigate, onDownload }) {
         <button
           type="button"
           onClick={loadSummary}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-stone-50 cursor-pointer shadow-sm transition-colors"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer shadow-2xs transition-colors"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Refresh</span>
@@ -296,7 +321,7 @@ function SummaryTab({ onNavigate, onDownload }) {
         <button
           type="button"
           onClick={() => onDownload('/reports/members', { export: 'csv' }, `members-summary-${new Date().toISOString().slice(0, 10)}.csv`)}
-          className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-[#510601] rounded-lg hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-xl hover:bg-[#3D0400] cursor-pointer shadow-2xs transition-colors"
         >
           <Download className="w-3.5 h-3.5" />
           <span>Download All Members CSV</span>
@@ -304,14 +329,14 @@ function SummaryTab({ onNavigate, onDownload }) {
       </PageActions>
 
       {/* Headline cards: each one opens its report */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Kpi to="members" label="Approved Members" icon={UserCheck} tone="bg-emerald-50 text-emerald-800"
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <Kpi to="members" label="Approved Members" icon={UserCheck} tone="bg-[#3D705C]/15 text-[#3D705C]"
           value={approved.toLocaleString()} detail={`${(mem.total || 0).toLocaleString()} registered in all`} linkLabel="View members" />
-        <Kpi to="members" label="Pending Approval" icon={UserX} tone="bg-amber-50 text-amber-700"
+        <Kpi to="members" label="Pending Approval" icon={UserX} tone="bg-[#EE6A00]/15 text-[#EE6A00]"
           value={pending.toLocaleString()} detail={`${mem.by_approval_status?.REJECTED || 0} rejected`} linkLabel="View unapproved" />
-        <Kpi to="receipts" label="Collections" icon={CreditCard} tone="bg-emerald-50 text-emerald-800"
-          value={`₹${(rec.total_amount || 0).toLocaleString('en-IN')}`} detail={`${(rec.count || 0).toLocaleString()} receipts`} linkLabel="View receipts" />
-        <Kpi to="magazines" label="Magazine Circulation" icon={BookOpen} tone="bg-[#510601]/10 text-[#510601]"
+        <Kpi to="receipts" label="Collections" icon={CreditCard} tone="bg-[#510601]/10 text-[#510601]"
+          value={formatMoney(rec.total_amount || 0)} detail={`${(rec.count || 0).toLocaleString()} receipts`} linkLabel="View receipts" />
+        <Kpi to="magazines" label="Magazine Circulation" icon={BookOpen} tone="bg-[#8C1801]/15 text-[#8C1801]"
           value={(mag.subscriptions_by_status?.ACTIVE || 0).toLocaleString()}
           detail={`${mag.active_pauses || 0} paused · ${mag.returns_total || 0} returned`} linkLabel="View circulation" />
       </div>
@@ -320,7 +345,7 @@ function SummaryTab({ onNavigate, onDownload }) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Section icon={Award} title="Membership Types" to="members" linkLabel="View details">
           {mtypes.length === 0 ? (
-            <p className="text-xs text-stone-400">No membership type data recorded.</p>
+            <p className="text-xs text-[#863221]/60">No membership type data recorded.</p>
           ) : (
             mtypes.map((t) => (
               <Bar key={t.membership_type} label={t.membership_type} count={t.member_count} of={mem.total || 0} color="bg-[#8C1801]" />
@@ -329,9 +354,9 @@ function SummaryTab({ onNavigate, onDownload }) {
         </Section>
 
         <Section icon={Users} title="Gender" to="members" linkLabel="View details">
-          <Bar label="Male" count={male} of={mem.total || 0} color="bg-sky-700" />
-          <Bar label="Female" count={female} of={mem.total || 0} color="bg-emerald-700" />
-          <Bar label="Other / not given" count={otherGender} of={mem.total || 0} color="bg-stone-400" />
+          <Bar label="Male" count={male} of={mem.total || 0} color="bg-[#510601]" />
+          <Bar label="Female" count={female} of={mem.total || 0} color="bg-[#8C1801]" />
+          <Bar label="Other / not given" count={otherGender} of={mem.total || 0} color="bg-[#863221]/40" />
         </Section>
 
         <Section icon={MapPin} title="Top Districts" to="members" linkLabel="View details">
@@ -359,6 +384,7 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
   const [approvalStatus, setApprovalStatus] = useState('');
   const [membershipTypeId, setMembershipTypeId] = useState('');
   const [language, setLanguage] = useState('en');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedColumns, setSelectedColumns] = useState(MEMBER_COLUMNS.map((c) => c.key));
   const [columnModalOpen, setColumnModalOpen] = useState(false);
 
@@ -366,7 +392,7 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const pageSize = 15;
+  const [pageSize, setPageSize] = useState(25);
 
   // Filtered taluks by selected district
   const availableTaluks = useMemo(() => {
@@ -408,6 +434,22 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
     loadData();
   }, [loadData]);
 
+  // Client-side search filtering across list rows
+  const filteredRows = useMemo(() => {
+    if (!searchQuery.trim()) return rows;
+    const q = searchQuery.toLowerCase().trim();
+    return rows.filter((r) =>
+      String(r.member_code || '').toLowerCase().includes(q) ||
+      String(r.first_name_en || '').toLowerCase().includes(q) ||
+      String(r.last_name_en || '').toLowerCase().includes(q) ||
+      String(r.full_name_kn || '').toLowerCase().includes(q) ||
+      String(r.mobile || '').toLowerCase().includes(q) ||
+      String(r.email || '').toLowerCase().includes(q) ||
+      String(r.district_name || '').toLowerCase().includes(q) ||
+      String(r.taluk_name || '').toLowerCase().includes(q)
+    );
+  }, [rows, searchQuery]);
+
   // Export handlers
   const handleExport = (format) => {
     let endpoint = '/reports/members';
@@ -430,209 +472,258 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
     onDownload(endpoint, params, filename);
   };
 
+  const activeFiltersCount = [
+    districtId,
+    talukId,
+    gender,
+    approvalStatus,
+    membershipTypeId,
+    language !== 'en' ? language : '',
+  ].filter(Boolean).length;
+
+  const handleResetFilters = () => {
+    setDistrictId('');
+    setTalukId('');
+    setGender('');
+    setApprovalStatus('');
+    setMembershipTypeId('');
+    setLanguage('en');
+    setSearchQuery('');
+  };
+
   // Pagination slice
   const paginatedRows = useMemo(() => {
+    const list = subView === 'list' ? filteredRows : rows;
     const start = (page - 1) * pageSize;
-    return rows.slice(start, start + pageSize);
-  }, [rows, page]);
+    return list.slice(start, start + pageSize);
+  }, [subView, filteredRows, rows, page, pageSize]);
 
-  const totalPages = Math.ceil(rows.length / pageSize) || 1;
+  const totalPages = Math.ceil((subView === 'list' ? filteredRows.length : rows.length) / pageSize) || 1;
+
+  // Sub-view Switcher component
+  const subViewSwitcher = (
+    <div className="inline-flex rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] p-1 shadow-2xs">
+      {[
+        { id: 'list', label: 'All Members List' },
+        { id: 'geography', label: 'By Geography' },
+        { id: 'gender', label: 'By Gender' },
+        { id: 'unapproved', label: 'Unapproved Aging' },
+      ].map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => {
+            setSubView(tab.id);
+            setPage(1);
+          }}
+          className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+            subView === tab.id
+              ? 'bg-[#510601] text-white shadow-2xs'
+              : 'text-[#863221] hover:text-[#510601] hover:bg-white/60'
+          }`}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
-    <div className="space-y-4">
-      {/* Sub-view Switcher & Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="inline-flex rounded-lg border border-[#E8DFD8] bg-white p-1 shadow-sm">
-          <button
-            onClick={() => setSubView('list')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-              subView === 'list' ? 'bg-[#510601] text-white' : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            All Members List
-          </button>
-          <button
-            onClick={() => setSubView('geography')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-              subView === 'geography' ? 'bg-[#510601] text-white' : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            By Geography
-          </button>
-          <button
-            onClick={() => setSubView('gender')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-              subView === 'gender' ? 'bg-[#510601] text-white' : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            By Gender
-          </button>
-          <button
-            onClick={() => setSubView('unapproved')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-              subView === 'unapproved' ? 'bg-[#510601] text-white' : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            Unapproved Aging
-          </button>
-        </div>
+    <div className="space-y-6">
+      {/* Standard SearchFilterBar Toolbar matching ReceiptTracking */}
+      <SearchFilterBar
+        searchQuery={subView === 'list' ? searchQuery : undefined}
+        onSearchChange={subView === 'list' ? setSearchQuery : undefined}
+        searchPlaceholder="Search member name, code, mobile, email..."
+        activeFiltersCount={activeFiltersCount}
+        onResetFilters={handleResetFilters}
+        leftSlot={subViewSwitcher}
+        rightSlot={
+          <>
+            {subView === 'list' && (
+              <button
+                type="button"
+                onClick={() => setColumnModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#863221] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer shadow-2xs transition-colors"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-[#510601]" />
+                <span>Columns ({selectedColumns.length})</span>
+              </button>
+            )}
 
-        {/* Export Buttons */}
-        <PageActions>
-          {subView === 'list' && (
             <button
-              onClick={() => setColumnModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-stone-700 bg-white border border-[#E8DFD8] rounded-lg hover:bg-stone-50 cursor-pointer shadow-sm transition-colors"
+              type="button"
+              onClick={() => handleExport('csv')}
+              disabled={rows.length === 0}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Columns ({selectedColumns.length})</span>
+              <Download className="w-4 h-4" />
+              <span>Export CSV</span>
             </button>
-          )}
 
-          <button
-            onClick={() => handleExport('csv')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-[#FAF7F2] cursor-pointer shadow-sm transition-colors"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export CSV</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => handleExport('excel')}
+              disabled={rows.length === 0}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-xl hover:bg-[#3D0400] cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Export Excel</span>
+            </button>
+          </>
+        }
+      >
+        <FilterSelect
+          value={districtId}
+          onChange={(val) => {
+            setDistrictId(val);
+            setTalukId('');
+          }}
+          options={[
+            { value: '', label: 'All Districts' },
+            ...districts.map((d) => ({ value: String(d.id), label: d.name_en || d.name })),
+          ]}
+          widthClass="w-full sm:w-48"
+        />
 
-          <button
-            onClick={() => handleExport('excel')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-[#510601] rounded-lg hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>Export Excel</span>
-          </button>
-        </PageActions>
-      </div>
+        <FilterSelect
+          value={talukId}
+          onChange={setTalukId}
+          options={[
+            { value: '', label: 'All Taluks' },
+            ...availableTaluks.map((t) => ({ value: String(t.id), label: t.name_en || t.name })),
+          ]}
+          widthClass="w-full sm:w-48"
+        />
 
-      {/* Filter Toolbar */}
-      <FilterCard className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        <div>
-          <label className="block text-xs font-bold text-stone-600 uppercase mb-1">District</label>
-          <select
-            value={districtId}
-            onChange={(e) => {
-              setDistrictId(e.target.value);
-              setTalukId('');
-            }}
-            className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-          >
-            <option value="">All Districts</option>
-            {districts.map((d) => (
-              <option key={d.id} value={d.id}>{d.name_en || d.name}</option>
-            ))}
-          </select>
-        </div>
+        <FilterSelect
+          value={gender}
+          onChange={setGender}
+          options={[
+            { value: '', label: 'All Genders' },
+            { value: 'Male', label: 'Male' },
+            { value: 'Female', label: 'Female' },
+            { value: 'Other', label: 'Other' },
+          ]}
+          widthClass="w-full sm:w-40"
+        />
 
-        <div>
-          <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Taluk</label>
-          <select
-            value={talukId}
-            onChange={(e) => setTalukId(e.target.value)}
-            disabled={!districtId}
-            className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601] disabled:opacity-50"
-          >
-            <option value="">All Taluks</option>
-            {availableTaluks.map((t) => (
-              <option key={t.id} value={t.id}>{t.name_en || t.name}</option>
-            ))}
-          </select>
-        </div>
+        <FilterSelect
+          value={approvalStatus}
+          onChange={setApprovalStatus}
+          options={[
+            { value: '', label: 'All Approval Statuses' },
+            { value: 'APPROVED', label: 'Approved' },
+            { value: 'UNAPPROVED', label: 'Unapproved' },
+            { value: 'REJECTED', label: 'Rejected' },
+          ]}
+          widthClass="w-full sm:w-48"
+        />
 
-        <div>
-          <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Gender</label>
-          <select
-            value={gender}
-            onChange={(e) => setGender(e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-          >
-            <option value="">All Genders</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
+        <FilterSelect
+          value={membershipTypeId}
+          onChange={setMembershipTypeId}
+          options={[
+            { value: '', label: 'All Membership Types' },
+            ...membershipTypes.map((mt) => ({ value: String(mt.id), label: mt.name_en || mt.name })),
+          ]}
+          widthClass="w-full sm:w-52"
+        />
 
-        <div>
-          <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Approval Status</label>
-          <select
-            value={approvalStatus}
-            onChange={(e) => setApprovalStatus(e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-          >
-            <option value="">All Statuses</option>
-            <option value="APPROVED">Approved</option>
-            <option value="UNAPPROVED">Unapproved</option>
-            <option value="REJECTED">Rejected</option>
-          </select>
-        </div>
+        <FilterSelect
+          value={language}
+          onChange={setLanguage}
+          options={[
+            { value: 'en', label: 'English Headers' },
+            { value: 'kn', label: 'ಕನ್ನಡ ಹೆಡರ್ಸ್' },
+          ]}
+          widthClass="w-full sm:w-44"
+        />
+      </SearchFilterBar>
 
-        <div>
-          <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Membership Type</label>
-          <select
-            value={membershipTypeId}
-            onChange={(e) => setMembershipTypeId(e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-          >
-            <option value="">All Types</option>
-            {membershipTypes.map((mt) => (
-              <option key={mt.id} value={mt.id}>{mt.name_en || mt.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Header Language</label>
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-          >
-            <option value="en">English (English Headers)</option>
-            <option value="kn">Kannada (ಕನ್ನಡ ಹೆಡರ್ಸ್)</option>
-          </select>
-        </div>
-            </FilterCard>
-
-      {/* Results Table */}
-      <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
-        <div className="p-3 bg-[#FAF7F2] border-b border-[#E8DFD8] flex items-center justify-between text-xs font-semibold text-stone-600">
-          <span>Found {rows.length.toLocaleString()} matching records</span>
-          {loading && <span className="inline-flex items-center gap-1.5 text-[#510601]"><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Loading data...</span>}
-        </div>
-
-        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+      {/* Standard HMS Table matching ReceiptTracking */}
+      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
+        <div className="overflow-x-auto">
           {subView === 'list' && (
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                <tr>
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead>
+                <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
                   {selectedColumns.map((colKey) => {
                     const col = MEMBER_COLUMNS.find((c) => c.key === colKey);
                     return (
-                      <th key={colKey} className="py-3 px-4 whitespace-nowrap">
+                      <th key={colKey} className="py-3.5 px-4 whitespace-nowrap">
                         {language === 'kn' ? (col?.labelKn || colKey) : (col?.labelEn || colKey)}
                       </th>
                     );
                   })}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E8DFD8]">
-                {paginatedRows.length === 0 ? (
+              <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
+                {loading ? (
                   <tr>
-                    <td colSpan={selectedColumns.length} className="py-12 text-center text-stone-400">
-                      No records match the selected filters.
+                    <td colSpan={selectedColumns.length} className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <RefreshCw className="w-8 h-8 animate-spin text-[#8C1801]" />
+                        <p className="text-sm font-semibold text-[#180200]">Loading members...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : paginatedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={selectedColumns.length} className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <Users className="w-10 h-10 text-[#863221]/40" />
+                        <p className="text-base font-bold text-[#180200]">No member records match the selected filters</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
                   paginatedRows.map((r, i) => (
-                    <tr key={i} className="hover:bg-stone-50">
-                      {selectedColumns.map((colKey) => (
-                        <td key={colKey} className="py-3 px-4 text-stone-700 whitespace-nowrap">
-                          {r[colKey] !== null && r[colKey] !== undefined ? String(r[colKey]) : '—'}
-                        </td>
-                      ))}
+                    <tr key={i} className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]">
+                      {selectedColumns.map((colKey) => {
+                        const val = r[colKey];
+                        if (colKey === 'member_code') {
+                          return (
+                            <td key={colKey} className="py-3.5 px-4 font-mono font-bold text-xs text-[#510601] whitespace-nowrap">
+                              {val || '—'}
+                            </td>
+                          );
+                        }
+                        if (colKey === 'mobile') {
+                          return (
+                            <td key={colKey} className="py-3.5 px-4 font-mono text-xs text-[#863221] whitespace-nowrap">
+                              {val || '—'}
+                            </td>
+                          );
+                        }
+                        if (colKey === 'approval_status') {
+                          return (
+                            <td key={colKey} className="py-3.5 px-4 whitespace-nowrap">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                val === 'APPROVED'
+                                  ? 'bg-[#3D705C]/15 text-[#3D705C] border border-[#3D705C]/30'
+                                  : val === 'UNAPPROVED'
+                                  ? 'bg-[#EE6A00]/15 text-[#EE6A00] border border-[#EE6A00]/30'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}>
+                                {val || '—'}
+                              </span>
+                            </td>
+                          );
+                        }
+                        if (colKey === 'first_name_en' || colKey === 'full_name_kn') {
+                          return (
+                            <td key={colKey} className="py-3.5 px-4 font-bold text-[#180200] whitespace-nowrap">
+                              {val || '—'}
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={colKey} className="py-3.5 px-4 whitespace-nowrap">
+                            {val !== null && val !== undefined ? String(val) : '—'}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))
                 )}
@@ -641,27 +732,38 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
           )}
 
           {subView === 'geography' && (
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                <tr>
-                  <th className="py-3 px-4">District</th>
-                  <th className="py-3 px-4">Taluk</th>
-                  <th className="py-3 px-4 text-right">Member Count</th>
+            <table className="w-full text-left border-collapse min-w-[600px]">
+              <thead>
+                <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
+                  <th className="py-3.5 px-4">District</th>
+                  <th className="py-3.5 px-4">Taluk</th>
+                  <th className="py-3.5 px-4 text-right">Member Count</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E8DFD8]">
-                {paginatedRows.length === 0 ? (
+              <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
+                {loading ? (
                   <tr>
-                    <td colSpan="3" className="py-12 text-center text-stone-400">
-                      No geography records match the filter.
+                    <td colSpan="3" className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <RefreshCw className="w-8 h-8 animate-spin text-[#8C1801]" />
+                        <p className="text-sm font-semibold text-[#180200]">Loading geographic breakdown...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : paginatedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan="3" className="py-14 text-center text-[#863221]">
+                      <p className="text-sm font-semibold text-[#180200]">No geographic records found</p>
                     </td>
                   </tr>
                 ) : (
                   paginatedRows.map((r, i) => (
-                    <tr key={i} className="hover:bg-stone-50">
-                      <td className="py-3 px-4 font-semibold text-stone-800">{r.district_name || 'Unassigned'}</td>
-                      <td className="py-3 px-4 text-stone-600">{r.taluk_name || 'All Taluks'}</td>
-                      <td className="py-3 px-4 text-right font-bold text-[#510601]">{Number(r.count || r.member_count || 0).toLocaleString()}</td>
+                    <tr key={i} className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]">
+                      <td className="py-3.5 px-4 font-bold text-[#180200]">{r.district_name || 'Unassigned'}</td>
+                      <td className="py-3.5 px-4 text-[#863221]">{r.taluk_name || 'All Taluks'}</td>
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-xs sm:text-sm text-[#510601]">
+                        {Number(r.count || r.member_count || 0).toLocaleString()}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -670,27 +772,38 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
           )}
 
           {subView === 'gender' && (
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                <tr>
-                  <th className="py-3 px-4">Gender</th>
-                  <th className="py-3 px-4">Membership Type</th>
-                  <th className="py-3 px-4 text-right">Count</th>
+            <table className="w-full text-left border-collapse min-w-[600px]">
+              <thead>
+                <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
+                  <th className="py-3.5 px-4">Gender</th>
+                  <th className="py-3.5 px-4">Membership Type</th>
+                  <th className="py-3.5 px-4 text-right">Count</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E8DFD8]">
-                {paginatedRows.length === 0 ? (
+              <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
+                {loading ? (
                   <tr>
-                    <td colSpan="3" className="py-12 text-center text-stone-400">
-                      No gender demographics records match the filter.
+                    <td colSpan="3" className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <RefreshCw className="w-8 h-8 animate-spin text-[#8C1801]" />
+                        <p className="text-sm font-semibold text-[#180200]">Loading demographic breakdown...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : paginatedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan="3" className="py-14 text-center text-[#863221]">
+                      <p className="text-sm font-semibold text-[#180200]">No gender records found</p>
                     </td>
                   </tr>
                 ) : (
                   paginatedRows.map((r, i) => (
-                    <tr key={i} className="hover:bg-stone-50">
-                      <td className="py-3 px-4 font-semibold text-stone-800">{r.gender || 'Unspecified'}</td>
-                      <td className="py-3 px-4 text-stone-600">{r.membership_type || 'All Types'}</td>
-                      <td className="py-3 px-4 text-right font-bold text-[#510601]">{Number(r.count || 0).toLocaleString()}</td>
+                    <tr key={i} className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]">
+                      <td className="py-3.5 px-4 font-bold text-[#180200]">{r.gender || 'Unspecified'}</td>
+                      <td className="py-3.5 px-4 text-[#863221]">{r.membership_type || 'All Types'}</td>
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-xs sm:text-sm text-[#510601]">
+                        {Number(r.count || 0).toLocaleString()}
+                      </td>
                     </tr>
                   ))
                 )}
@@ -699,33 +812,44 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
           )}
 
           {subView === 'unapproved' && (
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                <tr>
-                  <th className="py-3 px-4">Applicant Name</th>
-                  <th className="py-3 px-4">Mobile</th>
-                  <th className="py-3 px-4">District</th>
-                  <th className="py-3 px-4">Taluk</th>
-                  <th className="py-3 px-4">Applied Date</th>
-                  <th className="py-3 px-4 text-right">Days Pending</th>
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead>
+                <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
+                  <th className="py-3.5 px-4">Applicant Name</th>
+                  <th className="py-3.5 px-4">Mobile</th>
+                  <th className="py-3.5 px-4">District</th>
+                  <th className="py-3.5 px-4">Taluk</th>
+                  <th className="py-3.5 px-4">Applied Date</th>
+                  <th className="py-3.5 px-4 text-right">Days Pending</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E8DFD8]">
-                {paginatedRows.length === 0 ? (
+              <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
+                {loading ? (
                   <tr>
-                    <td colSpan="6" className="py-12 text-center text-stone-400">
-                      No unapproved members pending review.
+                    <td colSpan="6" className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <RefreshCw className="w-8 h-8 animate-spin text-[#8C1801]" />
+                        <p className="text-sm font-semibold text-[#180200]">Loading unapproved members...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : paginatedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="py-14 text-center text-[#863221]">
+                      <p className="text-sm font-semibold text-[#180200]">No unapproved members pending review</p>
                     </td>
                   </tr>
                 ) : (
                   paginatedRows.map((r, i) => (
-                    <tr key={i} className="hover:bg-stone-50">
-                      <td className="py-3 px-4 font-semibold text-stone-800">{r.name || memberName(r) || '—'}</td>
-                      <td className="py-3 px-4 text-stone-600">{r.mobile || '—'}</td>
-                      <td className="py-3 px-4 text-stone-600">{r.district_name || '—'}</td>
-                      <td className="py-3 px-4 text-stone-600">{r.taluk_name || '—'}</td>
-                      <td className="py-3 px-4 text-stone-600">{formatDate(r.created_at) || '—'}</td>
-                      <td className="py-3 px-4 text-right font-bold text-amber-700">{r.days_pending ?? '—'}</td>
+                    <tr key={i} className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]">
+                      <td className="py-3.5 px-4 font-bold text-[#180200]">{r.name || memberName(r) || '—'}</td>
+                      <td className="py-3.5 px-4 font-mono text-xs text-[#863221]">{r.mobile || '—'}</td>
+                      <td className="py-3.5 px-4">{r.district_name || '—'}</td>
+                      <td className="py-3.5 px-4 text-[#863221]">{r.taluk_name || '—'}</td>
+                      <td className="py-3.5 px-4 font-mono text-xs">{formatDate(r.created_at) || '—'}</td>
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-xs sm:text-sm text-[#EE6A00]">
+                        {r.days_pending ?? '—'} days
+                      </td>
                     </tr>
                   ))
                 )}
@@ -734,25 +858,16 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
           )}
         </div>
 
-        {/* Pagination Controls */}
-        <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8] flex items-center justify-between text-xs text-[#863221]">
-          <span>Page {page} of {totalPages}</span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+        {/* Standard Pager Component */}
+        <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8]">
+          <Pager
+            page={page}
+            pages={totalPages}
+            total={subView === 'list' ? filteredRows.length : rows.length}
+            pageSize={pageSize}
+            onPage={setPage}
+            onPageSize={setPageSize}
+          />
         </div>
       </div>
 
@@ -771,14 +886,14 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
         }
       >
         <div className="p-6 space-y-4">
-          <p className="text-xs text-stone-600">
+          <p className="text-xs text-[#863221]">
             Choose which data fields to include in the screen table and CSV/Excel export:
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pt-2">
             {MEMBER_COLUMNS.map((col) => {
               const isChecked = selectedColumns.includes(col.key);
               return (
-                <label key={col.key} className="flex items-center gap-2 p-2 rounded-lg border border-stone-200 hover:bg-stone-50 cursor-pointer text-xs">
+                <label key={col.key} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-[#E8DFD8] hover:bg-[#FAF7F2] cursor-pointer text-xs transition-colors">
                   <input
                     type="checkbox"
                     checked={isChecked}
@@ -795,7 +910,7 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
                     }}
                     className="rounded text-[#510601] focus:ring-[#510601]"
                   />
-                  <span className="font-medium text-stone-800">{col.labelEn}</span>
+                  <span className="font-semibold text-[#180200]">{col.labelEn}</span>
                 </label>
               );
             })}
@@ -830,7 +945,7 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
   const [fySummary, setFySummary] = useState({});
   const [fyLoading, setFyLoading] = useState(false);
   const [fyPage, setFyPage] = useState(1);
-  const fyPageSize = 15;
+  const [fyPageSize, setFyPageSize] = useState(25);
 
   // Debounce search
   useEffect(() => {
@@ -884,20 +999,20 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
   const paginatedFYRows = useMemo(() => {
     const start = (fyPage - 1) * fyPageSize;
     return fyRows.slice(start, start + fyPageSize);
-  }, [fyRows, fyPage]);
+  }, [fyRows, fyPage, fyPageSize]);
 
   const totalFYPages = Math.ceil(fyRows.length / fyPageSize) || 1;
 
   // ── State for General Receipts Register ──
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [paymentMode, setPaymentMode] = useState('');
-  const [particularId, setParticularId] = useState('');
+  const [paymentMode, setPaymentMode] = useState('ALL');
+  const [particularId, setParticularId] = useState('ALL');
   const [particulars, setParticulars] = useState([]);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const pageSize = 15;
+  const [pageSize, setPageSize] = useState(25);
 
   useEffect(() => {
     (async () => {
@@ -914,8 +1029,8 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
       const params = {};
       if (fromDate) params.from_date = fromDate;
       if (toDate) params.to_date = toDate;
-      if (paymentMode) params.payment_mode = paymentMode;
-      if (particularId) params.particular_id = particularId;
+      if (paymentMode !== 'ALL') params.payment_mode = paymentMode;
+      if (particularId !== 'ALL') params.particular_id = particularId;
 
       const res = await api.get('/reports/receipts', { params });
       setRows(Array.isArray(res.data) ? res.data : (res.data?.data || []));
@@ -938,8 +1053,8 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
     const params = { export: format };
     if (fromDate) params.from_date = fromDate;
     if (toDate) params.to_date = toDate;
-    if (paymentMode) params.payment_mode = paymentMode;
-    if (particularId) params.particular_id = particularId;
+    if (paymentMode !== 'ALL') params.payment_mode = paymentMode;
+    if (particularId !== 'ALL') params.particular_id = particularId;
 
     const filename = `receipts-register-${new Date().toISOString().slice(0, 10)}.${format === 'csv' ? 'csv' : 'xlsx'}`;
     onDownload('/reports/receipts', params, filename);
@@ -952,243 +1067,289 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
   const paginatedRegisterRows = useMemo(() => {
     const start = (page - 1) * pageSize;
     return rows.slice(start, start + pageSize);
-  }, [rows, page]);
+  }, [rows, page, pageSize]);
 
   const totalRegisterPages = Math.ceil(rows.length / pageSize) || 1;
 
+  // View switcher component
+  const subViewSwitcher = (
+    <div className="inline-flex rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] p-1 shadow-2xs">
+      <button
+        type="button"
+        onClick={() => setSubView('fy_breakdown')}
+        className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+          subView === 'fy_breakdown'
+            ? 'bg-[#510601] text-white shadow-2xs'
+            : 'text-[#863221] hover:text-[#510601] hover:bg-white/60'
+        }`}
+      >
+        FY Member Collections
+      </button>
+      <button
+        type="button"
+        onClick={() => setSubView('register')}
+        className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+          subView === 'register'
+            ? 'bg-[#510601] text-white shadow-2xs'
+            : 'text-[#863221] hover:text-[#510601] hover:bg-white/60'
+        }`}
+      >
+        All Receipts Register
+      </button>
+    </div>
+  );
+
   return (
-    <div className="space-y-4">
-      {/* Sub-view Switcher & Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="inline-flex rounded-lg border border-[#E8DFD8] bg-white p-1 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setSubView('fy_breakdown')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-              subView === 'fy_breakdown' ? 'bg-[#510601] text-white' : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            FY Member Collections (New vs. Existing)
-          </button>
-          <button
-            type="button"
-            onClick={() => setSubView('register')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-              subView === 'register' ? 'bg-[#510601] text-white' : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            All Receipts Register
-          </button>
-        </div>
-
-        {/* Export Buttons */}
-        <PageActions>
-          <button
-            type="button"
-            onClick={() => (subView === 'fy_breakdown' ? handleExportFY('csv') : handleExportRegister('csv'))}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-[#FAF7F2] cursor-pointer shadow-sm transition-colors"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export CSV</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => (subView === 'fy_breakdown' ? handleExportFY('excel') : handleExportRegister('excel'))}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-[#510601] rounded-lg hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>Export Excel</span>
-          </button>
-        </PageActions>
-      </div>
-
+    <div className="space-y-6">
       {/* ──────────────────────────────────────────────────────────── */}
       {/* SUBVIEW 1: FY MEMBER COLLECTIONS (NEW VS EXISTING)          */}
       {/* ──────────────────────────────────────────────────────────── */}
       {subView === 'fy_breakdown' && (
-        <div className="space-y-4">
-          {/* KPI Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <>
+          {/* KPI Summary Cards matching Dashboard StatCard design */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {/* 1. New Member Admissions */}
-            <div className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">New Member Admissions</span>
-                <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs">
-                  <Users className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="text-xl font-bold text-emerald-800">
-                ₹{Number(fySummary.new_members_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-xs text-stone-500 mt-1">
-                <strong>{fySummary.new_members_count || 0}</strong> new member accounts this FY
+            <div className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] hover:shadow-md transition-all flex flex-col justify-between">
+              <div className="flex justify-between items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-[#863221] uppercase tracking-wider mb-1 truncate" title="New Member Admissions">
+                    New Member Admissions
+                  </p>
+                  <h3 className="text-2xl font-bold font-mono text-[#180200] tracking-tight">
+                    {formatMoney(fySummary.new_members_amount || 0)}
+                  </h3>
+                  <p className="text-xs text-[#863221] mt-1">
+                    <strong className="text-[#180200]">{fySummary.new_members_count || 0}</strong> new member accounts this FY
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-xl shrink-0 flex items-center justify-center bg-[#3D705C]/15 text-[#3D705C]">
+                  <Users className="h-5 w-5" />
+                </div>
               </div>
             </div>
 
             {/* 2. Existing Member Collections */}
-            <div className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Existing Member Collections</span>
-                <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs">
-                  <RefreshCw className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="text-xl font-bold text-blue-800">
-                ₹{Number(fySummary.existing_members_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-xs text-stone-500 mt-1">
-                <strong>{fySummary.existing_members_count || 0}</strong> existing members renewed / paid
+            <div className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] hover:shadow-md transition-all flex flex-col justify-between">
+              <div className="flex justify-between items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-[#863221] uppercase tracking-wider mb-1 truncate" title="Existing Member Collections">
+                    Existing Member Collections
+                  </p>
+                  <h3 className="text-2xl font-bold font-mono text-[#180200] tracking-tight">
+                    {formatMoney(fySummary.existing_members_amount || 0)}
+                  </h3>
+                  <p className="text-xs text-[#863221] mt-1">
+                    <strong className="text-[#180200]">{fySummary.existing_members_count || 0}</strong> existing members paid
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-xl shrink-0 flex items-center justify-center bg-[#8C1801]/15 text-[#8C1801]">
+                  <RefreshCw className="h-5 w-5" />
+                </div>
               </div>
             </div>
 
             {/* 3. Unassigned Receipts */}
-            <div className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Unassigned Receipts</span>
-                <span className="w-7 h-7 rounded-lg bg-stone-100 text-stone-700 flex items-center justify-center font-bold text-xs">
-                  <CreditCard className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="text-xl font-bold text-stone-800">
-                ₹{Number(fySummary.unassigned_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-xs text-stone-500 mt-1">
-                <strong>{fySummary.unassigned_count || 0}</strong> counter / unassigned receipts
+            <div className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] hover:shadow-md transition-all flex flex-col justify-between">
+              <div className="flex justify-between items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-[#863221] uppercase tracking-wider mb-1 truncate" title="Unassigned Receipts">
+                    Unassigned Receipts
+                  </p>
+                  <h3 className="text-2xl font-bold font-mono text-[#180200] tracking-tight">
+                    {formatMoney(fySummary.unassigned_amount || 0)}
+                  </h3>
+                  <p className="text-xs text-[#863221] mt-1">
+                    <strong className="text-[#180200]">{fySummary.unassigned_count || 0}</strong> counter / unassigned receipts
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-xl shrink-0 flex items-center justify-center bg-[#EE6A00]/15 text-[#EE6A00]">
+                  <CreditCard className="h-5 w-5" />
+                </div>
               </div>
             </div>
 
-            {/* 4. Grand Total */}
-            <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold text-[#863221] uppercase tracking-wider">Total FY Collections</span>
-                <span className="w-7 h-7 rounded-lg bg-[#510601] text-white flex items-center justify-center font-bold text-xs">
-                  <Receipt className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="text-xl font-bold text-[#510601]">
-                ₹{Number(fySummary.total_collections || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-xs text-stone-500 mt-1">
-                <strong>{fySummary.total_receipts_count || 0}</strong> total receipts in FY {selectedFY}
+            {/* 4. Total FY Collections */}
+            <div className="bg-[#FAF7F2] rounded-2xl p-5 border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] hover:shadow-md transition-all flex flex-col justify-between">
+              <div className="flex justify-between items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-[#863221] uppercase tracking-wider mb-1 truncate" title="Total FY Collections">
+                    Total Collections (FY {selectedFY})
+                  </p>
+                  <h3 className="text-2xl font-bold font-mono text-[#510601] tracking-tight">
+                    {formatMoney(fySummary.total_collections || 0)}
+                  </h3>
+                  <p className="text-xs text-[#863221] mt-1">
+                    <strong className="text-[#180200]">{fySummary.total_receipts_count || 0}</strong> total receipts in FY {selectedFY}
+                  </p>
+                </div>
+                <div className="p-2.5 rounded-xl shrink-0 flex items-center justify-center bg-[#510601] text-white">
+                  <Receipt className="h-5 w-5" />
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Filter Toolbar */}
-          <FilterCard className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Financial Year</label>
-              <select
-                value={selectedFY}
-                onChange={(e) => setSelectedFY(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-              >
-                {availableFYs.map((fy) => (
-                  <option key={fy} value={fy}>FY {fy}</option>
-                ))}
-              </select>
-            </div>
+          {/* Standard SearchFilterBar Toolbar matching ReceiptTracking */}
+          <SearchFilterBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Search member name, number, receipt, mobile..."
+            activeFiltersCount={
+              (selectedFY !== getCurrentFY() ? 1 : 0) +
+              (selectedCategory !== 'ALL' ? 1 : 0)
+            }
+            onResetFilters={() => {
+              setSelectedFY(getCurrentFY());
+              setSelectedCategory('ALL');
+              setSearchQuery('');
+            }}
+            leftSlot={subViewSwitcher}
+            rightSlot={
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleExportFY('csv')}
+                  disabled={fyRows.length === 0}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Export CSV</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportFY('excel')}
+                  disabled={fyRows.length === 0}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-xl hover:bg-[#3D0400] cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Export Excel</span>
+                </button>
+              </>
+            }
+          >
+            {/* Financial Year Filter */}
+            <FilterSelect
+              value={selectedFY}
+              onChange={setSelectedFY}
+              options={availableFYs.map((fy) => ({ value: fy, label: `FY ${fy}` }))}
+              widthClass="w-full sm:w-44"
+            />
 
-            <div>
-              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Collection Category</label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-              >
-                <option value="ALL">All Categories</option>
-                <option value="NEW_MEMBER">New Member Admissions Only</option>
-                <option value="EXISTING_MEMBER">Existing Member Collections Only</option>
-                <option value="UNASSIGNED">Unassigned Receipts Only</option>
-              </select>
-            </div>
+            {/* Collection Category Filter */}
+            <FilterSelect
+              value={selectedCategory}
+              onChange={setSelectedCategory}
+              options={[
+                { value: 'ALL', label: 'All Collections' },
+                { value: 'NEW_MEMBER', label: 'New Member Admissions' },
+                { value: 'EXISTING_MEMBER', label: 'Existing Member Collections' },
+                { value: 'UNASSIGNED', label: 'Unassigned Receipts' },
+              ]}
+              widthClass="w-full sm:w-60"
+            />
+          </SearchFilterBar>
 
-            <div>
-              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Search</label>
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search member, receipt, mobile..."
-                  className="w-full pl-8 pr-3 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-                />
-              </div>
-            </div>
-          </FilterCard>
-
-          {/* FY Breakdown Table */}
-          <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                  <tr>
-                    <th className="py-3 px-4">Receipt</th>
-                    <th className="py-3 px-4">Category</th>
-                    <th className="py-3 px-4">Member Name & Number</th>
-                    <th className="py-3 px-4">Contact</th>
-                    <th className="py-3 px-4">Particulars / Purpose</th>
-                    <th className="py-3 px-4">Payment Mode</th>
-                    <th className="py-3 px-4 text-right">Amount</th>
+          {/* Standard HMS Table matching ReceiptTracking */}
+          <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[800px]">
+                <thead>
+                  <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
+                    <th className="py-3.5 px-4 whitespace-nowrap">Receipt No.</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Date</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Category</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Member Details</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Particulars</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Mode</th>
+                    <th className="py-3.5 px-4 text-right whitespace-nowrap">Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E8DFD8]">
+                <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
                   {fyLoading ? (
                     <tr>
-                      <td colSpan="7" className="py-12 text-center text-stone-400">
-                        Loading financial year collections...
+                      <td colSpan="7" className="py-14 text-center text-[#863221]">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <RefreshCw className="w-8 h-8 animate-spin text-[#8C1801]" />
+                          <p className="text-sm font-semibold text-[#180200]">Loading financial year collections...</p>
+                        </div>
                       </td>
                     </tr>
                   ) : paginatedFYRows.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="py-12 text-center text-stone-400">
-                        No member collection records found for FY {selectedFY}.
+                      <td colSpan="7" className="py-14 text-center text-[#863221]">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <FileSpreadsheet className="w-10 h-10 text-[#863221]/40" />
+                          <p className="text-base font-bold text-[#180200]">No collection records found</p>
+                          <p className="text-xs text-[#863221] max-w-sm mx-auto">
+                            No receipts match the selected financial year or category filter.
+                          </p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    paginatedFYRows.map((r, i) => (
-                      <tr key={i} className="hover:bg-stone-50">
-                        <td className="py-3 px-4">
-                          <div className="font-semibold text-stone-800">{r.receipt_number || '—'}</div>
-                          <div className="text-[11px] text-stone-500">{formatDate(r.receipt_date)}</div>
+                    paginatedFYRows.map((r) => (
+                      <tr
+                        key={`${r.receipt_id}-${r.member_id || 'unassigned'}`}
+                        className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]"
+                      >
+                        {/* Column 1: Receipt Number */}
+                        <td className="py-3.5 px-4 font-mono font-bold text-xs">
+                          <span className="text-[#510601] tracking-wider">{r.receipt_number || '—'}</span>
                         </td>
-                        <td className="py-3 px-4">
+
+                        {/* Column 2: Date */}
+                        <td className="py-3.5 px-4 font-mono text-xs whitespace-nowrap text-[#180200]">
+                          {formatDate(r.receipt_date)}
+                        </td>
+
+                        {/* Column 3: Category Badge */}
+                        <td className="py-3.5 px-4 whitespace-nowrap">
                           {r.category === 'NEW_MEMBER' ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#3D705C]/15 text-[#3D705C] border border-[#3D705C]/30">
                               New Admission
                             </span>
                           ) : r.category === 'EXISTING_MEMBER' ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#510601]/10 text-[#510601] border border-[#510601]/25">
                               Existing Member
                             </span>
                           ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-600 border border-stone-200">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#EE6A00]/15 text-[#EE6A00] border border-[#EE6A00]/30">
                               Unassigned
                             </span>
                           )}
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="font-semibold text-stone-800">{r.member_name || '—'}</div>
-                          {r.full_name_kn && <div className="text-[11px] text-stone-500">{r.full_name_kn}</div>}
-                          {r.membership_number && r.membership_number !== '—' && (
-                            <div className="text-[10px] font-mono font-semibold text-[#510601]">No: {r.membership_number}</div>
-                          )}
+
+                        {/* Column 4: Member Details */}
+                        <td className="py-3.5 px-4">
+                          <div>
+                            <span className="font-bold text-[#180200]">{r.member_name || '—'}</span>
+                            {r.full_name_kn && (
+                              <span className="text-[11px] text-[#863221] ml-1.5 font-medium">({r.full_name_kn})</span>
+                            )}
+                            {(r.membership_number !== '—' || r.mobile !== '—') && (
+                              <div className="text-[11px] font-mono text-[#863221] mt-0.5">
+                                {[r.membership_number !== '—' ? r.membership_number : '', r.mobile !== '—' ? r.mobile : ''].filter(Boolean).join(' · ')}
+                              </div>
+                            )}
+                          </div>
                         </td>
-                        <td className="py-3 px-4 text-stone-600 font-mono text-[11px]">
-                          {r.mobile || '—'}
-                        </td>
-                        <td className="py-3 px-4 text-stone-700 max-w-[220px] truncate" title={r.particulars}>
+
+                        {/* Column 5: Particulars */}
+                        <td className="py-3.5 px-4 text-xs font-semibold text-[#510601] max-w-[240px] truncate" title={r.particulars}>
                           {r.particulars || '—'}
                         </td>
-                        <td className="py-3 px-4 text-stone-600">
-                          <div>{r.payment_mode || '—'}</div>
+
+                        {/* Column 6: Payment Mode & Ref */}
+                        <td className="py-3.5 px-4 text-xs">
+                          <div className="font-medium text-[#180200]">{r.payment_mode || '—'}</div>
                           {r.transaction_reference && r.transaction_reference !== '—' && (
-                            <div className="text-[10px] text-stone-400 font-mono">Ref: {r.transaction_reference}</div>
+                            <div className="text-[10px] text-[#863221] font-mono">Ref: {r.transaction_reference}</div>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-right font-bold text-stone-900">
-                          ₹{Number(r.allocated_amount || r.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+
+                        {/* Column 7: Amount */}
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-xs sm:text-sm text-[#180200] whitespace-nowrap">
+                          {formatMoney(r.allocated_amount || r.amount || 0)}
                         </td>
                       </tr>
                     ))
@@ -1197,140 +1358,168 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
               </table>
             </div>
 
-            {/* Pagination Controls */}
-            <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8] flex items-center justify-between text-xs text-[#863221]">
-              <span>Page {fyPage} of {totalFYPages} ({fyRows.length} total)</span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setFyPage((p) => Math.max(1, p - 1))}
-                  disabled={fyPage <= 1}
-                  className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFyPage((p) => Math.min(totalFYPages, p + 1))}
-                  disabled={fyPage >= totalFYPages}
-                  className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+            {/* Standard Pager Component */}
+            <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8]">
+              <Pager
+                page={fyPage}
+                pages={totalFYPages}
+                total={fyRows.length}
+                pageSize={fyPageSize}
+                onPage={setFyPage}
+                onPageSize={setFyPageSize}
+              />
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* ──────────────────────────────────────────────────────────── */}
       {/* SUBVIEW 2: GENERAL RECEIPTS REGISTER (ORIGINAL VIEW)         */}
       {/* ──────────────────────────────────────────────────────────── */}
       {subView === 'register' && (
-        <div className="space-y-4">
+        <>
           {/* Summary Strip */}
           <div className="flex items-center gap-4 text-xs">
-            <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg px-3 py-2">
-              <span className="text-stone-500">Total Count: </span>
-              <strong className="text-[#180200]">{rows.length}</strong>
+            <div className="bg-white border border-[#E8DFD8] rounded-xl px-4 py-2.5 shadow-2xs">
+              <span className="text-[#863221]">Total Count: </span>
+              <strong className="text-[#180200] font-mono font-bold ml-1">{rows.length}</strong>
             </div>
-            <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg px-3 py-2">
-              <span className="text-stone-500">Total Collections: </span>
-              <strong className="text-emerald-700">₹{totalRegisterAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+            <div className="bg-white border border-[#E8DFD8] rounded-xl px-4 py-2.5 shadow-2xs">
+              <span className="text-[#863221]">Total Collections: </span>
+              <strong className="text-[#510601] font-mono font-bold ml-1">{formatMoney(totalRegisterAmount)}</strong>
             </div>
           </div>
 
-          {/* Filter Toolbar */}
-          <FilterCard className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Standard SearchFilterBar for Register */}
+          <SearchFilterBar
+            activeFiltersCount={
+              (fromDate || toDate ? 1 : 0) +
+              (paymentMode !== 'ALL' ? 1 : 0) +
+              (particularId !== 'ALL' ? 1 : 0)
+            }
+            onResetFilters={() => {
+              setFromDate('');
+              setToDate('');
+              setPaymentMode('ALL');
+              setParticularId('ALL');
+            }}
+            leftSlot={subViewSwitcher}
+            rightSlot={
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleExportRegister('csv')}
+                  disabled={rows.length === 0}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Export CSV</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportRegister('excel')}
+                  disabled={rows.length === 0}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-xl hover:bg-[#3D0400] cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Export Excel</span>
+                </button>
+              </>
+            }
+          >
             <div>
-              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">From Date</label>
-              <DateInput
+              <input
+                type="date"
                 value={fromDate}
-                onChange={(val) => setFromDate(val)}
-                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+                onChange={(e) => setFromDate(e.target.value)}
+                title="From date"
+                placeholder="From Date"
+                className="px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601]"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">To Date</label>
-              <DateInput
+              <input
+                type="date"
                 value={toDate}
-                onChange={(val) => setToDate(val)}
-                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+                onChange={(e) => setToDate(e.target.value)}
+                title="To date"
+                placeholder="To Date"
+                className="px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601]"
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Payment Mode</label>
-              <select
-                value={paymentMode}
-                onChange={(e) => setPaymentMode(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-              >
-                <option value="">All Payment Modes</option>
-                <option value="CASH">Cash</option>
-                <option value="CHEQUE">Cheque</option>
-                <option value="DD">Demand Draft (D.D.)</option>
-                <option value="UPI">UPI</option>
-                <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Particular</label>
-              <select
-                value={particularId}
-                onChange={(e) => setParticularId(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-              >
-                <option value="">All Particulars</option>
-                {particulars.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name_en || p.name}</option>
-                ))}
-              </select>
-            </div>
-          </FilterCard>
+            <FilterSelect
+              value={paymentMode}
+              onChange={setPaymentMode}
+              options={[
+                { value: 'ALL', label: 'All Payment Modes' },
+                { value: 'CASH', label: 'Cash' },
+                { value: 'CHEQUE', label: 'Cheque' },
+                { value: 'DD', label: 'Demand Draft (D.D.)' },
+                { value: 'UPI', label: 'UPI' },
+                { value: 'BANK_TRANSFER', label: 'Bank Transfer (NEFT/RTGS)' },
+              ]}
+              widthClass="w-full sm:w-48"
+            />
+            <FilterSelect
+              value={particularId}
+              onChange={setParticularId}
+              options={[
+                { value: 'ALL', label: 'All Particulars' },
+                ...particulars.map((p) => ({ value: String(p.id), label: p.name_en || p.name })),
+              ]}
+              widthClass="w-full sm:w-52"
+            />
+          </SearchFilterBar>
 
-          {/* Receipts Table */}
-          <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                  <tr>
-                    <th className="py-3 px-4">Receipt Number</th>
-                    <th className="py-3 px-4">Date</th>
-                    <th className="py-3 px-4">Payee / Member</th>
-                    <th className="py-3 px-4">Payment Mode</th>
-                    <th className="py-3 px-4">Bank Account</th>
-                    <th className="py-3 px-4 text-right">Net Amount</th>
-                    <th className="py-3 px-4">Status</th>
+          {/* Standard Table matching ReceiptTracking */}
+          <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[800px]">
+                <thead>
+                  <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
+                    <th className="py-3.5 px-4 whitespace-nowrap">Receipt No.</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Date</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Payee / Member</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Payment Mode</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Bank Account</th>
+                    <th className="py-3.5 px-4 text-right whitespace-nowrap">Net Amount</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E8DFD8]">
+                <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
                   {loading ? (
                     <tr>
-                      <td colSpan="7" className="py-12 text-center text-stone-400">
-                        Loading receipts...
+                      <td colSpan="7" className="py-14 text-center text-[#863221]">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <RefreshCw className="w-8 h-8 animate-spin text-[#8C1801]" />
+                          <p className="text-sm font-semibold text-[#180200]">Loading receipts...</p>
+                        </div>
                       </td>
                     </tr>
                   ) : paginatedRegisterRows.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="py-12 text-center text-stone-400">
-                        No receipt transactions match the selected filters.
+                      <td colSpan="7" className="py-14 text-center text-[#863221]">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <FileSpreadsheet className="w-10 h-10 text-[#863221]/40" />
+                          <p className="text-base font-bold text-[#180200]">No receipt transactions match the selected filters</p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
                     paginatedRegisterRows.map((r, i) => (
-                      <tr key={i} className="hover:bg-stone-50">
-                        <td className="py-3 px-4 font-semibold text-stone-800">{r.receipt_number || '—'}</td>
-                        <td className="py-3 px-4 text-stone-600">{formatDate(r.receipt_date) || '—'}</td>
-                        <td className="py-3 px-4 text-stone-800">{r.received_from || r.member_name || '—'}</td>
-                        <td className="py-3 px-4 text-stone-600">{r.payment_mode || '—'}</td>
-                        <td className="py-3 px-4 text-stone-600">{r.bank_account || '—'}</td>
-                        <td className="py-3 px-4 text-right font-bold text-stone-900">
-                          ₹{Number(r.net_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      <tr key={i} className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]">
+                        <td className="py-3.5 px-4 font-mono font-bold text-xs text-[#510601]">{r.receipt_number || '—'}</td>
+                        <td className="py-3.5 px-4 font-mono text-xs whitespace-nowrap text-[#180200]">{formatDate(r.receipt_date) || '—'}</td>
+                        <td className="py-3.5 px-4 font-bold text-[#180200]">{r.received_from || r.member_name || '—'}</td>
+                        <td className="py-3.5 px-4 text-xs text-[#180200]">{r.payment_mode || '—'}</td>
+                        <td className="py-3.5 px-4 text-xs text-[#863221]">{r.bank_account || '—'}</td>
+                        <td className="py-3.5 px-4 text-right font-mono font-bold text-xs sm:text-sm text-[#180200]">
+                          {formatMoney(r.net_amount || 0)}
                         </td>
-                        <td className="py-3 px-4">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                             r.status === 'ACTIVE' || r.status === 'PAID'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              ? 'bg-[#3D705C]/15 text-[#3D705C] border border-[#3D705C]/30'
                               : 'bg-stone-100 text-stone-600 border border-stone-200'
                           }`}>
                             {r.status || 'ACTIVE'}
@@ -1343,30 +1532,19 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
               </table>
             </div>
 
-            {/* Pagination */}
-            <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8] flex items-center justify-between text-xs text-[#863221]">
-              <span>Page {page} of {totalRegisterPages}</span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                  className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.min(totalRegisterPages, p + 1))}
-                  disabled={page >= totalRegisterPages}
-                  className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+            {/* Standard Pager Component */}
+            <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8]">
+              <Pager
+                page={page}
+                pages={totalRegisterPages}
+                total={rows.length}
+                pageSize={pageSize}
+                onPage={setPage}
+                onPageSize={setPageSize}
+              />
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -1384,7 +1562,7 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const pageSize = 15;
+  const [pageSize, setPageSize] = useState(25);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -1431,170 +1609,226 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
   const paginatedRows = useMemo(() => {
     const start = (page - 1) * pageSize;
     return rows.slice(start, start + pageSize);
-  }, [rows, page]);
+  }, [rows, page, pageSize]);
 
   const totalPages = Math.ceil(rows.length / pageSize) || 1;
 
+  const activeFiltersCount = [
+    issueMonth,
+    subType === 'returns' ? returnReason : '',
+    subType === 'returns' ? followUpStatus : '',
+  ].filter(Boolean).length;
+
+  const handleResetFilters = () => {
+    setIssueMonth('');
+    setReturnReason('');
+    setFollowUpStatus('');
+  };
+
+  // Sub-type Switcher component
+  const subTypeSwitcher = (
+    <div className="inline-flex rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] p-1 shadow-2xs">
+      <button
+        type="button"
+        onClick={() => {
+          setSubType('returns');
+          setPage(1);
+        }}
+        className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+          subType === 'returns'
+            ? 'bg-[#510601] text-white shadow-2xs'
+            : 'text-[#863221] hover:text-[#510601] hover:bg-white/60'
+        }`}
+      >
+        Magazine Returns
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setSubType('labels');
+          setPage(1);
+        }}
+        className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+          subType === 'labels'
+            ? 'bg-[#510601] text-white shadow-2xs'
+            : 'text-[#863221] hover:text-[#510601] hover:bg-white/60'
+        }`}
+      >
+        Label Batches
+      </button>
+    </div>
+  );
+
   return (
-    <div className="space-y-4">
-      {/* Switcher & Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="inline-flex rounded-lg border border-[#E8DFD8] bg-white p-1 shadow-sm">
-          <button
-            onClick={() => setSubType('returns')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-              subType === 'returns' ? 'bg-[#510601] text-white' : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            Magazine Returns
-          </button>
-          <button
-            onClick={() => setSubType('labels')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-              subType === 'labels' ? 'bg-[#510601] text-white' : 'text-stone-600 hover:text-stone-900'
-            }`}
-          >
-            Label Batches
-          </button>
-        </div>
-
-        <PageActions>
-          <button
-            onClick={() => handleExport('csv')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-[#FAF7F2] cursor-pointer shadow-sm transition-colors"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export CSV</span>
-          </button>
-          <button
-            onClick={() => handleExport('excel')}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-[#510601] rounded-lg hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>Export Excel</span>
-          </button>
-        </PageActions>
-      </div>
-
-      {/* Filter toolbar */}
-      <FilterCard className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Issue Month (YYYY-MM)</label>
+    <div className="space-y-6">
+      {/* Standard SearchFilterBar Toolbar matching ReceiptTracking */}
+      <SearchFilterBar
+        activeFiltersCount={activeFiltersCount}
+        onResetFilters={handleResetFilters}
+        leftSlot={subTypeSwitcher}
+        rightSlot={
+          <>
+            <button
+              type="button"
+              onClick={() => handleExport('csv')}
+              disabled={rows.length === 0}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Download className="w-4 h-4" />
+              <span>Export CSV</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport('excel')}
+              disabled={rows.length === 0}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-[#510601] rounded-xl hover:bg-[#3D0400] cursor-pointer shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Export Excel</span>
+            </button>
+          </>
+        }
+      >
+        {/* Issue Month */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-[#863221] uppercase">Month:</span>
           <input
             type="month"
             value={issueMonth}
             onChange={(e) => setIssueMonth(e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+            className="px-3 py-1.5 text-xs bg-[#FAF7F2]/60 hover:bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601] transition-colors"
           />
         </div>
 
         {subType === 'returns' && (
           <>
-            <div>
-              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Return Reason</label>
-              <select
-                value={returnReason}
-                onChange={(e) => setReturnReason(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-              >
-                <option value="">All Reasons</option>
-                <option value="ADDRESS_NOT_FOUND">Address Not Found</option>
-                <option value="MOVED">Recipient Moved</option>
-                <option value="REFUSED">Delivery Refused</option>
-                <option value="DECEASED">Deceased</option>
-                <option value="UNCLAIMED">Unclaimed / Other</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Follow-up Status</label>
-              <select
-                value={followUpStatus}
-                onChange={(e) => setFollowUpStatus(e.target.value)}
-                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-              >
-                <option value="">All Follow-up States</option>
-                <option value="PENDING">Pending Action</option>
-                <option value="CONTACTED">Contacted Recipient</option>
-                <option value="RESOLVED">Resolved / Address Updated</option>
-              </select>
-            </div>
+            <FilterSelect
+              value={returnReason}
+              onChange={setReturnReason}
+              options={[
+                { value: '', label: 'All Return Reasons' },
+                { value: 'ADDRESS_NOT_FOUND', label: 'Address Not Found' },
+                { value: 'MOVED', label: 'Recipient Moved' },
+                { value: 'REFUSED', label: 'Delivery Refused' },
+                { value: 'DECEASED', label: 'Deceased' },
+                { value: 'UNCLAIMED', label: 'Unclaimed / Other' },
+              ]}
+              widthClass="w-full sm:w-52"
+            />
+            <FilterSelect
+              value={followUpStatus}
+              onChange={setFollowUpStatus}
+              options={[
+                { value: '', label: 'All Follow-up States' },
+                { value: 'PENDING', label: 'Pending Action' },
+                { value: 'CONTACTED', label: 'Contacted Recipient' },
+                { value: 'RESOLVED', label: 'Resolved / Updated' },
+              ]}
+              widthClass="w-full sm:w-48"
+            />
           </>
         )}
-            </FilterCard>
+      </SearchFilterBar>
 
-      {/* Results Table */}
-      <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+      {/* Standard HMS Table matching ReceiptTracking */}
+      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
+        <div className="overflow-x-auto">
           {subType === 'returns' ? (
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                <tr>
-                  <th className="py-3 px-4">Issue Month</th>
-                  <th className="py-3 px-4">Member / Recipient</th>
-                  <th className="py-3 px-4">Return Reason</th>
-                  <th className="py-3 px-4">Return Date</th>
-                  <th className="py-3 px-4">Follow-up Status</th>
-                  <th className="py-3 px-4">Action Notes</th>
+            <table className="w-full text-left border-collapse min-w-[800px]">
+              <thead>
+                <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
+                  <th className="py-3.5 px-4 whitespace-nowrap">Issue Month</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Member / Recipient</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Return Reason</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Return Date</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Follow-up Status</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Action Notes</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E8DFD8]">
-                {paginatedRows.length === 0 ? (
+              <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
+                {loading ? (
                   <tr>
-                    <td colSpan="6" className="py-12 text-center text-stone-400">
-                      No magazine returns recorded matching the criteria.
+                    <td colSpan="6" className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <RefreshCw className="w-8 h-8 animate-spin text-[#8C1801]" />
+                        <p className="text-sm font-semibold text-[#180200]">Loading magazine returns...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : paginatedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <BookOpen className="w-10 h-10 text-[#863221]/40" />
+                        <p className="text-base font-bold text-[#180200]">No magazine returns recorded matching the criteria</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
                   paginatedRows.map((r, i) => (
-                    <tr key={i} className="hover:bg-stone-50">
-                      <td className="py-3 px-4 font-semibold text-stone-800">{r.issue_month_year || '—'}</td>
-                      <td className="py-3 px-4 text-stone-800">{r.member_name || r.name || '—'}</td>
-                      <td className="py-3 px-4 text-rose-700 font-medium">{r.reason || '—'}</td>
-                      <td className="py-3 px-4 text-stone-600">{formatDate(r.return_date) || '—'}</td>
-                      <td className="py-3 px-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                    <tr key={i} className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]">
+                      <td className="py-3.5 px-4 font-mono font-bold text-xs text-[#510601]">{r.issue_month_year || '—'}</td>
+                      <td className="py-3.5 px-4 font-bold text-[#180200]">{r.member_name || r.name || '—'}</td>
+                      <td className="py-3.5 px-4 font-semibold text-[#8C1801]">{r.reason || '—'}</td>
+                      <td className="py-3.5 px-4 font-mono text-xs">{formatDate(r.return_date) || '—'}</td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                           r.follow_up_status === 'RESOLVED'
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            ? 'bg-[#3D705C]/15 text-[#3D705C] border border-[#3D705C]/30'
                             : r.follow_up_status === 'CONTACTED'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            ? 'bg-[#510601]/10 text-[#510601] border border-[#510601]/25'
+                            : 'bg-[#EE6A00]/15 text-[#EE6A00] border border-[#EE6A00]/30'
                         }`}>
                           {r.follow_up_status || 'PENDING'}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-stone-600">{r.action_notes || '—'}</td>
+                      <td className="py-3.5 px-4 text-[#863221]">{r.action_notes || '—'}</td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           ) : (
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                <tr>
-                  <th className="py-3 px-4">Batch Name</th>
-                  <th className="py-3 px-4">Issue Month</th>
-                  <th className="py-3 px-4">Generated Date</th>
-                  <th className="py-3 px-4 text-right">Total Labels</th>
-                  <th className="py-3 px-4">Status</th>
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead>
+                <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
+                  <th className="py-3.5 px-4 whitespace-nowrap">Batch Name</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Issue Month</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Generated Date</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Total Labels</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#E8DFD8]">
-                {paginatedRows.length === 0 ? (
+              <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
+                {loading ? (
                   <tr>
-                    <td colSpan="5" className="py-12 text-center text-stone-400">
-                      No label batches recorded matching the criteria.
+                    <td colSpan="5" className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <RefreshCw className="w-8 h-8 animate-spin text-[#8C1801]" />
+                        <p className="text-sm font-semibold text-[#180200]">Loading label batches...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : paginatedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <BookOpen className="w-10 h-10 text-[#863221]/40" />
+                        <p className="text-base font-bold text-[#180200]">No label batches recorded matching the criteria</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
                   paginatedRows.map((r, i) => (
-                    <tr key={i} className="hover:bg-stone-50">
-                      <td className="py-3 px-4 font-semibold text-stone-800">{r.batch_name || `Batch ${r.id}`}</td>
-                      <td className="py-3 px-4 text-stone-600">{r.issue_month_year || '—'}</td>
-                      <td className="py-3 px-4 text-stone-600">{formatDate(r.generation_date || r.created_at) || '—'}</td>
-                      <td className="py-3 px-4 text-right font-bold text-stone-900">{r.total_labels || r.count || 0}</td>
-                      <td className="py-3 px-4">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    <tr key={i} className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]">
+                      <td className="py-3.5 px-4 font-bold text-[#180200]">{r.batch_name || `Batch ${r.id}`}</td>
+                      <td className="py-3.5 px-4 font-mono text-xs text-[#863221]">{r.issue_month_year || '—'}</td>
+                      <td className="py-3.5 px-4 font-mono text-xs">{formatDate(r.generation_date || r.created_at) || '—'}</td>
+                      <td className="py-3.5 px-4 text-right font-mono font-bold text-xs sm:text-sm text-[#510601]">
+                        {Number(r.total_labels || r.count || 0).toLocaleString()}
+                      </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#3D705C]/15 text-[#3D705C] border border-[#3D705C]/30">
                           {r.status || 'COMPLETED'}
                         </span>
                       </td>
@@ -1606,25 +1840,16 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
           )}
         </div>
 
-        {/* Pagination */}
-        <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8] flex items-center justify-between text-xs text-[#863221]">
-          <span>Page {page} of {totalPages}</span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+        {/* Standard Pager Component */}
+        <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8]">
+          <Pager
+            page={page}
+            pages={totalPages}
+            total={rows.length}
+            pageSize={pageSize}
+            onPage={setPage}
+            onPageSize={setPageSize}
+          />
         </div>
       </div>
     </div>
@@ -1673,22 +1898,28 @@ function SavedReportsAndLogsTab({ onDownload, canSave }) {
   };
 
   return (
-    <div className="space-y-4">
-      {/* Subtab selection */}
-      <div className="flex items-center justify-between">
-        <div className="inline-flex rounded-lg border border-[#E8DFD8] bg-white p-1 shadow-sm">
+    <div className="space-y-6">
+      {/* Subtab selection & Refresh */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="inline-flex rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] p-1 shadow-2xs">
           <button
+            type="button"
             onClick={() => setSubTab('saved')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-              subTab === 'saved' ? 'bg-[#510601] text-white' : 'text-stone-600 hover:text-stone-900'
+            className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              subTab === 'saved'
+                ? 'bg-[#510601] text-white shadow-2xs'
+                : 'text-[#863221] hover:text-[#510601] hover:bg-white/60'
             }`}
           >
             Saved Report Presets
           </button>
           <button
+            type="button"
             onClick={() => setSubTab('logs')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-              subTab === 'logs' ? 'bg-[#510601] text-white' : 'text-stone-600 hover:text-stone-900'
+            className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              subTab === 'logs'
+                ? 'bg-[#510601] text-white shadow-2xs'
+                : 'text-[#863221] hover:text-[#510601] hover:bg-white/60'
             }`}
           >
             Export Audit Trail
@@ -1696,8 +1927,9 @@ function SavedReportsAndLogsTab({ onDownload, canSave }) {
         </div>
 
         <button
+          type="button"
           onClick={loadData}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-stone-700 bg-white border border-[#E8DFD8] rounded-lg hover:bg-stone-50 cursor-pointer shadow-sm transition-colors"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer shadow-2xs transition-colors"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Refresh</span>
@@ -1705,90 +1937,119 @@ function SavedReportsAndLogsTab({ onDownload, canSave }) {
       </div>
 
       {subTab === 'saved' ? (
-        <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="py-3 px-4">Report Name</th>
-                <th className="py-3 px-4">Module / Type</th>
-                <th className="py-3 px-4">Saved Filters</th>
-                <th className="py-3 px-4">Created At</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E8DFD8]">
-              {savedReports.length === 0 ? (
-                <tr>
-                  <td colSpan="5" className="py-12 text-center text-stone-400">
-                    No saved report presets found.
-                  </td>
+        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead>
+                <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
+                  <th className="py-3.5 px-4 whitespace-nowrap">Report Name</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Module / Type</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Saved Filters</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Created At</th>
+                  <th className="py-3.5 px-4 text-right whitespace-nowrap">Actions</th>
                 </tr>
-              ) : (
-                savedReports.map((r) => (
-                  <tr key={r.id} className="hover:bg-stone-50">
-                    <td className="py-3 px-4 font-semibold text-stone-800">{r.report_name}</td>
-                    <td className="py-3 px-4 text-stone-600 uppercase">{r.report_key}</td>
-                    <td className="py-3 px-4 text-stone-500 font-mono text-[11px]">
-                      {JSON.stringify(r.filters || {})}
-                    </td>
-                    <td className="py-3 px-4 text-stone-600">{formatDate(r.created_at)}</td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {canSave && (
-                          <button
-                            onClick={() => handleDeleteSaved(r.id)}
-                            className="p-1 text-stone-400 hover:text-red-700 rounded transition-colors cursor-pointer"
-                            title="Delete Saved Report"
-                          >
-                            <Trash2 className="w-4 h-4" /><span>Delete</span>
-                          </button>
-                        )}
+              </thead>
+              <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
+                {loading ? (
+                  <tr>
+                    <td colSpan="5" className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <RefreshCw className="w-8 h-8 animate-spin text-[#8C1801]" />
+                        <p className="text-sm font-semibold text-[#180200]">Loading saved reports...</p>
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="py-3 px-4">Export Timestamp</th>
-                <th className="py-3 px-4">Report Type</th>
-                <th className="py-3 px-4">Format</th>
-                <th className="py-3 px-4">Exported By</th>
-                <th className="py-3 px-4">Filters Applied</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E8DFD8]">
-              {exportLogs.length === 0 ? (
-                <tr>
-                  <td colSpan="5" className="py-12 text-center text-stone-400">
-                    No export audit logs recorded yet.
-                  </td>
-                </tr>
-              ) : (
-                exportLogs.map((l) => (
-                  <tr key={l.id} className="hover:bg-stone-50">
-                    <td className="py-3 px-4 text-stone-800 font-semibold">{formatDate(l.exported_at)}</td>
-                    <td className="py-3 px-4 text-stone-700 font-medium uppercase">{l.report_key}</td>
-                    <td className="py-3 px-4">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-stone-100 text-stone-700 uppercase">
-                        {l.format}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-stone-600">{l.user_name || l.exported_by || 'Staff'}</td>
-                    <td className="py-3 px-4 text-stone-500 font-mono text-[11px]">
-                      {JSON.stringify(l.filters || {})}
+                ) : savedReports.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <History className="w-10 h-10 text-[#863221]/40" />
+                        <p className="text-base font-bold text-[#180200]">No saved report presets found</p>
+                      </div>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  savedReports.map((r) => (
+                    <tr key={r.id} className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]">
+                      <td className="py-3.5 px-4 font-bold text-[#180200]">{r.report_name}</td>
+                      <td className="py-3.5 px-4 font-mono text-xs text-[#510601] uppercase">{r.report_key}</td>
+                      <td className="py-3.5 px-4 text-[#863221] font-mono text-[11px]">
+                        {JSON.stringify(r.filters || {})}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-xs">{formatDate(r.created_at)}</td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {canSave && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSaved(r.id)}
+                              className="p-1.5 text-[#863221] hover:text-red-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Delete Saved Report"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+              <thead>
+                <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-bold text-[#863221] uppercase tracking-wider">
+                  <th className="py-3.5 px-4 whitespace-nowrap">Export Timestamp</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Report Type</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Format</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Exported By</th>
+                  <th className="py-3.5 px-4 whitespace-nowrap">Filters Applied</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
+                {loading ? (
+                  <tr>
+                    <td colSpan="5" className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <RefreshCw className="w-8 h-8 animate-spin text-[#8C1801]" />
+                        <p className="text-sm font-semibold text-[#180200]">Loading export logs...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : exportLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="py-14 text-center text-[#863221]">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <History className="w-10 h-10 text-[#863221]/40" />
+                        <p className="text-base font-bold text-[#180200]">No export audit logs recorded yet</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  exportLogs.map((l) => (
+                    <tr key={l.id} className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]">
+                      <td className="py-3.5 px-4 font-mono text-xs">{formatDate(l.exported_at)}</td>
+                      <td className="py-3.5 px-4 font-bold text-[#510601] uppercase">{l.report_key}</td>
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-[#FAF7F2] border border-[#E8DFD8] text-[#863221] uppercase font-mono">
+                          {l.format}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-[#180200] font-medium">{l.user_name || l.exported_by || 'Staff'}</td>
+                      <td className="py-3.5 px-4 text-[#863221] font-mono text-[11px]">
+                        {JSON.stringify(l.filters || {})}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
