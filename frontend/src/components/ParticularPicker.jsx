@@ -72,13 +72,8 @@ export default function ParticularPicker({
     const colWidth = Math.max(160, (Math.min(screenWidth * 0.95, 1280) - 80 - (columnCount - 1) * 12) / columnCount - 28);
     // how tall the buttons come out when they wrap inside a column (each ~6.5px a letter, 20px padding, 6px gap)
     const heightOf = (buttons) => {
-      let rows = 1;
-      let used = 0;
-      buttons.forEach((b) => {
-        const w = Math.min(colWidth, b.title.length * 6.5 + 20);
-        if (used && used + 6 + w > colWidth) { rows += 1; used = w; } else { used += (used ? 6 : 0) + w; }
-      });
-      return 52 + rows * 40; // heading and padding, then the rows
+      const lines = buttons.reduce((sum, b) => sum + Math.max(1, Math.ceil((b.title.length * 6.5 + 16) / colWidth)), 0);
+      return 52 + lines * 24 + buttons.length * 2; // heading and padding, then a row for each sub type
     };
     let pieces = [];
     cards.forEach((card) => {
@@ -156,15 +151,15 @@ export default function ParticularPicker({
         disabled={isTaken}
         onClick={() => handlePick(btn.particular, btn.subType)}
         title={isTaken ? 'Already added on another line of this receipt' : `Select ${card.hasSubs ? `${card.name} › ` : ''}${btn.title}`}
-        className={`inline-flex max-w-full items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left break-words leading-snug transition-colors ${
+        className={`items-center gap-1 text-left break-words leading-snug transition-colors ${
           isHead
-            ? 'border-[#B8A89B] text-[11px] font-bold uppercase tracking-wider'
-            : 'border-[#CDBFB3] text-xs font-semibold'
+            ? 'inline-flex max-w-full rounded-lg border border-[#B8A89B] px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider'
+            : 'flex w-full rounded-md px-2 py-1 text-xs font-semibold hover:bg-[#FAF7F2]'
         } ${
           isTaken
             ? 'cursor-not-allowed text-[#863221]/50 line-through'
             : isSelected
-            ? 'cursor-pointer !border-[#510601] bg-[#510601] text-white'
+            ? 'cursor-pointer !border-[#510601] bg-[#510601] text-white hover:!bg-[#510601]'
             : `cursor-pointer hover:border-[#510601] hover:text-[#510601] ${isHead ? 'text-[#510601]' : 'text-[#180200]'}`
         } ${dim ? 'opacity-30' : ''}`}
       >
@@ -249,7 +244,7 @@ export default function ParticularPicker({
                             className={`min-w-0 rounded-xl border border-[#B8A89B] p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
                           >
                             <p className="mb-2 border-b border-[#CDBFB3] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.title || card.name}</p>
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="flex flex-col gap-0.5">
                               {card.buttons.map((btn) => pickButton(btn, card))}
                             </div>
                           </div>
