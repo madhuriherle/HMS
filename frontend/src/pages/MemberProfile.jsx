@@ -258,84 +258,88 @@ function OverviewTab({ id }) {
         const hasMagazine = d.magazine.magazine_needed || d.magazine.subscriptions.length > 0 || d.magazine.services.length > 0;
 
         return (
-          <div className="space-y-4">
-            <Card icon={CreditCard} title="Membership" badge={m.current && <span className={`chip ${m.current.status === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>{m.current.status}</span>}>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            <Panel
+              icon={CreditCard}
+              title="Membership"
+              tag={m.current ? <span className={`chip ${m.current.status === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>{m.current.status}</span> : 'Plan'}
+            >
               {!m.current ? (
-                <Empty>No membership yet.</Empty>
+                <Row label="Status">No membership yet</Row>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
-                  <Field label="Type" value={m.current.type_name_en} />
-                  <Field label="Membership number" value={m.current.membership_number || 'Given on approval'} />
-                  <Field label="Member since" value={since ? formatDate(since) : ''} />
-                  <Field label="Valid till" value={m.current.expires_at ? formatDate(m.current.expires_at) : ''} />
-                  <Field label="Receipts" value={d.receipts.total ? `${d.receipts.total} · last ${formatDate(d.receipts.latest[0]?.receipt_date)}` : 'None yet'} />
-                  <div className="py-2.5 min-w-0 text-xs lg:col-span-2">
-                    <span className="block text-[#7D7068] font-medium">Credit</span>
-                    <span className="block mt-0.5 text-sm font-semibold font-mono text-[#180200]">
-                      {inr(credit?.credit_total || 0)}
-                      {target && <span className="font-normal text-[#863221]"> / {inr(target.price)}</span>}
-                    </span>
+                <>
+                  <Row label="Type">{m.current.type_name_en}</Row>
+                  <Row label="Membership number">{m.current.membership_number || 'Given on approval'}</Row>
+                  <Row label="Member since">{since ? formatDate(since) : ''}</Row>
+                  <Row label="Valid till">{m.current.expires_at ? formatDate(m.current.expires_at) : ''}</Row>
+                  <Row label="Receipts">{d.receipts.total ? `${d.receipts.total} · last ${formatDate(d.receipts.latest[0]?.receipt_date)}` : 'None yet'}</Row>
+                  <div className="py-2.5 text-xs">
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="text-[#7D7068] font-medium">Credit</span>
+                      <span className="font-semibold font-mono text-[#180200]">
+                        {inr(credit?.credit_total || 0)}
+                        {target && <span className="font-normal text-[#863221]"> / {inr(target.price)}</span>}
+                      </span>
+                    </div>
                     <div className="mt-1.5 w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
                       <div className="bg-[#510601] h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
                     </div>
                     <span className="block mt-1 text-[11px] text-[#863221]">{target ? `${pct}% to ${target.name_en}` : 'Highest tier reached'}</span>
                   </div>
-                </div>
+                </>
               )}
-            </Card>
+            </Panel>
 
-            <Card icon={User} title="Personal">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
-                {personal.map(([label, value]) => <Field key={label} label={label} value={value} />)}
-              </div>
-            </Card>
+            <Panel icon={User} title="Personal" tag="Core data">
+              {personal.map(([label, value]) => <Row key={label} label={label}>{value}</Row>)}
+            </Panel>
 
-            <Card icon={Phone} title="Contact & address">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8">
-                {contact.map(([label, value]) => (
-                  <div key={label} className={label === 'Address' ? 'lg:col-span-2' : ''}>
-                    <Field label={label} value={value} />
-                  </div>
-                ))}
-              </div>
-            </Card>
+            <Panel icon={Phone} title="Contact" tag="Reach">
+              {contact.filter(([label]) => label !== 'Address').map(([label, value]) => <Row key={label} label={label}>{value}</Row>)}
+            </Panel>
 
-            <Card icon={Users} title="Family">
+            <Panel icon={MapPin} title="Address" tag="Location">
+              <Row label="Address">{c.address}</Row>
+            </Panel>
+
+            <Panel icon={Users} title="Family" tag="Relations">
               {relatives.length === 0 && f.children_count === 0 ? (
-                <Empty>Not provided yet.</Empty>
+                <Row label="Family">Not provided yet</Row>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {relatives.map(([relation, name, number]) => <PersonRow key={relation} name={name} relation={relation} number={number} />)}
-                  {f.children_count > 0 && <PersonRow name={`${f.children_count} ${f.children_count === 1 ? 'child' : 'children'}`} relation="Children" />}
-                </div>
+                <>
+                  {relatives.map(([relation, name, number]) => (
+                    <Row key={relation} label={relation}>{[name, number].filter(Boolean).join(' · ')}</Row>
+                  ))}
+                  {f.children_count > 0 && <Row label="Children">{`${f.children_count} ${f.children_count === 1 ? 'child' : 'children'}`}</Row>}
+                </>
               )}
-            </Card>
+            </Panel>
 
             {hasMagazine && (
-              <Card icon={BookOpen} title="Magazine & services">
-                <div className="flex flex-wrap gap-2">
-                  {d.magazine.subscriptions.map((st, i) => <span key={`s${i}`} className={`chip ${String(st).toUpperCase() === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>Magazine: {st}</span>)}
-                  {d.magazine.services.map((sv, i) => <span key={`v${i}`} className="chip chip-off">{sv}</span>)}
-                </div>
-              </Card>
+              <Panel icon={BookOpen} title="Magazine & services" tag="Subscriptions">
+                {d.magazine.subscriptions.map((st, i) => (
+                  <Row key={`s${i}`} label="Magazine">
+                    <span className={`chip ${String(st).toUpperCase() === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>{st}</span>
+                  </Row>
+                ))}
+                {d.magazine.services.map((sv, i) => <Row key={`v${i}`} label="Service">{sv}</Row>)}
+              </Panel>
             )}
 
-            <Card icon={History} title="Recent activity">
+            <Panel icon={History} title="Recent activity" tag="Latest" className="lg:col-span-2">
               {d.activity.length === 0 ? (
-                <Empty>No activity recorded yet.</Empty>
+                <Row label="Activity">No activity recorded yet</Row>
               ) : (
-                <div className="space-y-2">
-                  {d.activity.map((e) => (
-                    <div key={e.id} className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg bg-[#FAF7F2] border border-[#E8DFD8]">
-                      <span className="text-sm font-semibold text-[#180200]">{e.description}</span>
-                      <span className="text-[11px] text-[#863221] font-mono">
-                        {e.acted_by_name || 'System'} · {e.created_at ? formatDateTime(e.created_at) : ''}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                d.activity.map((e) => (
+                  <div key={e.id} className="py-2.5 flex items-start justify-between gap-4 text-xs">
+                    <span className="font-semibold text-[#180200] min-w-0 break-words">{e.description}</span>
+                    <span className="text-[#7D7068] font-mono shrink-0 text-right">
+                      {e.acted_by_name || 'System'} · {e.created_at ? formatDateTime(e.created_at) : ''}
+                    </span>
+                  </div>
+                ))
               )}
-            </Card>
+            </Panel>
           </div>
         );
       }}
