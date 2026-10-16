@@ -43,12 +43,19 @@ import { formatMoney } from '../utils/money';
 
 import ModalFooter from '../components/ModalFooter';
 // Financial year (April-March) of an ISO date: 2026-10-12 -> 2026-27
+const getCurrentFY = (date = new Date()) => {
+  const y = date.getFullYear();
+  const m = date.getMonth() + 1;
+  const startMonth = currentRules()?.financial_year?.start_month || 4;
+  const start = m >= startMonth ? y : y - 1;
+  return `${start}-${String(start + 1).slice(-2)}`;
+};
+
 const fyOf = (iso) => {
   if (!iso || String(iso).length < 7) return '';
   const y = Number(String(iso).slice(0, 4));
   const m = Number(String(iso).slice(5, 7));
-  const startMonth = currentRules()?.financial_year?.start_month;
-  if (!startMonth) return '';
+  const startMonth = currentRules()?.financial_year?.start_month || 4;
   const start = m >= startMonth ? y : y - 1;
   return `${start}-${String(start + 1).slice(-2)}`;
 };
@@ -157,11 +164,11 @@ export default function ReceiptTracking() {
   const [particularsFilter, setParticularsFilter] = useState('ALL');
   const [subTypeFilter, setSubTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, Assigned, Unassigned
-  const [fyFilter, setFyFilter] = useState('ALL');
+  const [fyFilter, setFyFilter] = useState(() => getCurrentFY());
   const [modeFilter, setModeFilter] = useState('ALL');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [periodMode, setPeriodMode] = useState('ALL'); // ALL, TODAY, MONTH, FY, CUSTOM
+  const [periodMode, setPeriodMode] = useState('FY'); // ALL, TODAY, MONTH, FY, CUSTOM
   const [dayBook, setDayBook] = useState(null); // { date, data }
 
   // Modals State
@@ -304,7 +311,12 @@ export default function ReceiptTracking() {
     }
   };
 
-  const fyOptions = filterOptions.financial_years || [];
+  const fyOptions = useMemo(() => {
+    const years = new Set(filterOptions.financial_years || []);
+    const currentFY = getCurrentFY();
+    if (currentFY) years.add(currentFY);
+    return Array.from(years).sort().reverse();
+  }, [filterOptions.financial_years]);
   // every active mode from Payment Mode Setup, plus any mode a receipt already carries that the master lacks
   const modeOptions = useMemo(() => {
     const out = [...paymentModeOptions];
@@ -496,20 +508,20 @@ export default function ReceiptTracking() {
           (particularsFilter !== 'ALL' ? 1 : 0) +
           (subTypeFilter !== 'ALL' ? 1 : 0) +
           (statusFilter !== 'ALL' ? 1 : 0) +
-          (fyFilter !== 'ALL' ? 1 : 0) +
-          (modeFilter !== 'ALL' ? 1 : 0) +
-          (fromDate || toDate ? 1 : 0)
+          (periodMode !== 'FY' || fyFilter !== getCurrentFY() ? 1 : 0) +
+          (modeFilter !== 'ALL' ? 1 : 0)
         }
         onResetFilters={() => {
+          const currentFY = getCurrentFY();
           setSearchQuery('');
           setParticularsFilter('ALL');
           setSubTypeFilter('ALL');
           setStatusFilter('ALL');
-          setFyFilter('ALL');
+          setFyFilter(currentFY);
           setModeFilter('ALL');
           setFromDate('');
           setToDate('');
-          setPeriodMode('ALL');
+          setPeriodMode('FY');
         }}
         rightSlot={
           <>
