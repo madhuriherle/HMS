@@ -36,11 +36,11 @@ export default function ParticularPicker({
     [particulars]
   );
 
-  // One card per particular that has sub types (its sub types as buttons). The particulars with no sub types are not a
-  // card each: they are gathered into one card of single buttons, so a lone button never takes a whole box.
-  const cards = useMemo(() => {
+  // A particular with no sub types is a head by itself: it is one button in a plain row above the cards (no card, no
+  // heading). A particular with sub types is a card, headed by its own name, holding its sub types as buttons.
+  const { heads, cards } = useMemo(() => {
+    const headButtons = [];
     const withSubs = [];
-    const singles = [];
     activeParticulars.forEach((p) => {
       const subs = activeSubs(p);
       if (subs.length) {
@@ -50,43 +50,69 @@ export default function ParticularPicker({
           buttons: subs.map((st) => ({ id: `${p.id || p.name}-${st.id || st.name}`, title: st.name, particular: p.name, subType: st.name, key: lineKey(p.name, st.name) })),
         });
       } else {
-        singles.push({ id: `${p.id || p.name}-root`, title: p.name, particular: p.name, subType: '', key: lineKey(p.name, '') });
+        headButtons.push({ id: `${p.id || p.name}-root`, title: p.name, particular: p.name, subType: '', key: lineKey(p.name, '') });
       }
     });
-    const gathered = singles.length ? [{ name: 'Other particulars', hasSubs: true, gathered: true, buttons: singles }] : [];
-    return [...gathered, ...withSubs];
+    return { heads: headButtons, cards: withSubs };
   }, [activeParticulars]);
 
-  // The cards are stacked in columns like bricks: each goes to the column that is shortest so far, so a short card is
-  // followed by the next one at once and no row is as tall as its tallest card. The column count follows the screen.
-  const [columnCount, setColumnCount] = useState(() => (typeof window === 'undefined' ? 4 : window.innerWidth >= 1280 ? 4 : window.innerWidth >= 1024 ? 3 : window.innerWidth >= 640 ? 2 : 1));
+  // The cards are packed so the popup needs the least scrolling: the column count follows the screen, a very tall card
+  // is split over two columns, and the cards go in tallest first, each into the shortest column so far (so the small
+  // cards end up last and the column bottoms come out level).
+  const widthNow = () => (typeof window === 'undefined' ? 1400 : window.innerWidth);
+  const columnsFor = (w) => (w >= 1280 ? 4 : w >= 1024 ? 3 : w >= 640 ? 2 : 1);
+  const [screenWidth, setScreenWidth] = useState(widthNow);
   useEffect(() => {
-    const onResize = () => setColumnCount(window.innerWidth >= 1280 ? 4 : window.innerWidth >= 1024 ? 3 : window.innerWidth >= 640 ? 2 : 1);
+    const onResize = () => setScreenWidth(widthNow());
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+  const columnCount = columnsFor(screenWidth);
   const columns = useMemo(() => {
-    const cols = Array.from({ length: columnCount }, () => ({ height: 0, items: [] }));
+    const colWidth = Math.max(160, (Math.min(screenWidth * 0.95, 1280) - 80 - (columnCount - 1) * 12) / columnCount - 28);
+    // how tall the buttons come out when they wrap inside a column (each ~6.5px a letter, 20px padding, 6px gap)
+    const heightOf = (buttons) => {
+      let rows = 1;
+      let used = 0;
+      buttons.forEach((b) => {
+        const w = Math.min(colWidth, b.title.length * 6.5 + 20);
+        if (used && used + 6 + w > colWidth) { rows += 1; used = w; } else { used += (used ? 6 : 0) + w; }
+      });
+      return 52 + rows * 40; // heading and padding, then the rows
+    };
+    let pieces = [];
     cards.forEach((card) => {
-      const chars = card.buttons.reduce((sum, b) => sum + b.title.length + 6, 0);
-      const weight = 2 + Math.ceil(chars / 26) * 1.2; // a heading plus the rows its buttons wrap into
+      if (columnCount >= 2 && card.buttons.length >= 8) {
+        const half = Math.ceil(card.buttons.length / 2);
+        pieces.push({ ...card, key: `${card.name}-1`, buttons: card.buttons.slice(0, half) });
+        pieces.push({ ...card, key: `${card.name}-2`, title: `${card.name} (continued)`, buttons: card.buttons.slice(half) });
+      } else {
+        pieces.push({ ...card, key: card.name });
+      }
+    });
+    pieces = pieces.map((piece) => ({ ...piece, weight: heightOf(piece.buttons) })).sort((x, y) => y.weight - x.weight);
+    const cols = Array.from({ length: columnCount }, () => ({ height: 0, items: [] }));
+    pieces.forEach((piece) => {
       const shortest = cols.reduce((best, col) => (col.height < best.height ? col : best), cols[0]);
-      shortest.items.push(card);
-      shortest.height += weight;
+      shortest.items.push(piece);
+      shortest.height += piece.weight + 12;
     });
     return cols;
-  }, [cards, columnCount]);
+  }, [cards, columnCount, screenWidth]);
 
   const q = searchQuery.trim().toLowerCase();
   const matches = (card, btn) => !q || btn.title.toLowerCase().includes(q) || card.name.toLowerCase().includes(q);
   const firstMatch = useMemo(() => {
+    for (const btn of heads) {
+      if (!takenKeys.has(btn.key) && (!q || btn.title.toLowerCase().includes(q))) return btn;
+    }
     for (const card of cards) {
       for (const btn of card.buttons) {
         if (!takenKeys.has(btn.key) && (!q || btn.title.toLowerCase().includes(q) || card.name.toLowerCase().includes(q))) return btn;
       }
     }
     return null;
-  }, [cards, q, takenKeys]);
+  }, [heads, cards, q, takenKeys]);
 
   const handlePick = (pickedParticular, pickedSubType = '') => {
     if (takenKeys.has(lineKey(pickedParticular, pickedSubType))) return;
@@ -117,6 +143,32 @@ export default function ParticularPicker({
     ? `${particular}${needsSub ? ` › ${subType || 'choose sub-type'}` : ''}`
     : placeholder;
   const isIncomplete = particular && needsSub && !subType;
+
+  // one pick button (a head, or a sub type inside a card)
+  const pickButton = (btn, card) => {
+    const isTaken = takenKeys.has(btn.key);
+    const isSelected = particular === btn.particular && (subType || '') === btn.subType;
+    const dim = q && !matches(card, btn);
+    return (
+      <button
+        key={btn.id}
+        type="button"
+        disabled={isTaken}
+        onClick={() => handlePick(btn.particular, btn.subType)}
+        title={isTaken ? 'Already added on another line of this receipt' : `Select ${card.hasSubs ? `${card.name} › ` : ''}${btn.title}`}
+        className={`inline-flex max-w-full items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left break-words text-xs font-semibold leading-snug transition-colors ${
+          isTaken
+            ? 'cursor-not-allowed border-[#E8DFD8] text-[#863221]/50 line-through'
+            : isSelected
+            ? 'cursor-pointer border-[#510601] bg-[#510601] text-white'
+            : 'cursor-pointer border-[#E8DFD8] text-[#180200] hover:border-[#510601] hover:text-[#510601]'
+        } ${dim ? 'opacity-30' : ''}`}
+      >
+        {isSelected && <Check className="h-3 w-3 shrink-0" />}
+        <span>{btn.title}</span>
+      </button>
+    );
+  };
 
   return (
     <div className={spread ? 'w-full' : 'relative w-full'}>
@@ -171,56 +223,37 @@ export default function ParticularPicker({
               )}
             </div>
 
-            {cards.length === 0 ? (
+            {cards.length === 0 && heads.length === 0 ? (
               <p className="py-10 text-center text-sm text-[#863221]">No active particulars.</p>
             ) : (
-              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-              <div className="flex items-start gap-3">
-              {columns.map((col, colIndex) => (
-              <div key={colIndex} className="flex min-w-0 flex-1 flex-col gap-3">
-                {col.items.map((card) => {
-                  const cardHasMatch = card.buttons.some((b) => matches(card, b));
-                  return (
-                    <div
-                      key={card.name}
-                      className={`min-w-0 rounded-xl border border-[#E8DFD8] p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
-                    >
-                      {/* a particular with no sub types is just its one button: no heading above it, so the name is not written twice */}
-                      {card.hasSubs && (
-                        <p className="mb-2 border-b border-[#E8DFD8] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.name}</p>
-                      )}
-                      <div className="flex flex-wrap gap-1.5">
-                        {card.buttons.map((btn) => {
-                          const isTaken = takenKeys.has(btn.key);
-                          const isSelected = particular === btn.particular && (subType || '') === btn.subType;
-                          const dim = q && !matches(card, btn);
-                          return (
-                            <button
-                              key={btn.id}
-                              type="button"
-                              disabled={isTaken}
-                              onClick={() => handlePick(btn.particular, btn.subType)}
-                              title={isTaken ? 'Already added on another line of this receipt' : `Select ${card.hasSubs && !card.gathered ? `${card.name} › ` : ''}${btn.title}`}
-                              className={`inline-flex max-w-full items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left break-words text-xs font-semibold leading-snug transition-colors ${
-                                isTaken
-                                  ? 'cursor-not-allowed border-[#E8DFD8] text-[#863221]/50 line-through'
-                                  : isSelected
-                                  ? 'cursor-pointer border-[#510601] bg-[#510601] text-white'
-                                  : 'cursor-pointer border-[#E8DFD8] text-[#180200] hover:border-[#510601] hover:text-[#510601]'
-                              } ${dim ? 'opacity-30' : ''}`}
-                            >
-                              {isSelected && <Check className="h-3 w-3 shrink-0" />}
-                              <span>{btn.title}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-3">
+                {/* the particulars that have no sub types: one button each, in a plain row (no card, no heading) */}
+                {heads.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {heads.map((btn) => pickButton(btn, { name: btn.title, hasSubs: false }))}
+                  </div>
+                )}
+                {/* the particulars that have sub types: a card each, the sub types as buttons */}
+                <div className="flex items-start gap-3">
+                  {columns.map((col, colIndex) => (
+                    <div key={colIndex} className="flex min-w-0 flex-1 flex-col gap-3">
+                      {col.items.map((card) => {
+                        const cardHasMatch = card.buttons.some((b) => matches(card, b));
+                        return (
+                          <div
+                            key={card.key}
+                            className={`min-w-0 rounded-xl border border-[#E8DFD8] p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
+                          >
+                            <p className="mb-2 border-b border-[#E8DFD8] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.title || card.name}</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {card.buttons.map((btn) => pickButton(btn, card))}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-              ))}
-              </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
