@@ -466,7 +466,8 @@ function PersonalTab({ id }) {
               <Row label="Company">{p.company}</Row>
               <Row label="Website">{p.website}</Row>
               <Row label="Category">{p.category}</Row>
-              <Row label="Applied on behalf of">{p.applied_on_behalf_of && <span className={chip}>{p.applied_on_behalf_of}</span>}</Row>
+              {/* "Self" is the normal case and says nothing: the row shows only when someone else applied for the member */}
+              <Row label="Applied on behalf of">{p.applied_on_behalf_of && String(p.applied_on_behalf_of).trim().toLowerCase() !== 'self' && <span className={chip}>{p.applied_on_behalf_of}</span>}</Row>
             </>
           )}
         </Panel>
@@ -1259,7 +1260,7 @@ export function UnapprovedPopup({ id, s, name, onClose }) {
               <Row label="Gotra">{p.gotra}</Row>
               <Row label="Qualification">{p.qualification}</Row>
               <Row label="Occupation">{p.occupation}</Row>
-              <Row label="Applied on behalf of">{p.applied_on_behalf_of}</Row>
+              <Row label="Applied on behalf of">{String(p.applied_on_behalf_of || '').trim().toLowerCase() === 'self' ? '' : p.applied_on_behalf_of}</Row>
               <Row label="Registered through">{p.registration_source}</Row>
               <Row label="Registered on">{p.created_at ? formatDateTime(p.created_at) : ''}</Row>
             </>
