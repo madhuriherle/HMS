@@ -1,3 +1,4 @@
+import { PageTitleSlot } from '../components/PageTitle';
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Menu, User, LogOut, ChevronDown } from 'lucide-react';
@@ -97,7 +98,7 @@ export default function MainLayout() {
         {/* Main Application Top Header with Logged-in User Profile */}
         <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b border-[#E8DFD8] bg-[#FAF7F2]/95 backdrop-blur-sm px-4 sm:px-6 lg:px-8">
           {/* Mobile menu button */}
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden p-2 rounded-lg bg-white border border-[#E8DFD8] shadow-sm text-[#180200] hover:text-[#510601] focus:outline-none"
@@ -105,6 +106,7 @@ export default function MainLayout() {
             >
               <Menu className="h-5 w-5" />
             </button>
+            <PageTitleSlot />
           </div>
 
           {/* Admin Profile Section (Top-Right aligned): hover (or click on touch screens) for Profile and Log Out */}

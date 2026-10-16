@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import PermissionGate from '../components/PermissionGate';
+import PageTitle from '../components/PageTitle';
 import DateInput from '../components/DateInput';
 import useAuth from '../hooks/useAuth';
 import api from '../api';
@@ -1492,15 +1493,12 @@ export default function ReceiptEntry() {
       {/* ------------------------------------------------------------ */}
       {/* PAGE HEADER                                    */}
       {/* ------------------------------------------------------------ */}
-      <div>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#180200] tracking-tight">
-              {isEdit ? `Edit Receipt${formData.receiptNumber ? ` ${formData.receiptNumber}` : ''}` : 'Receipt Entry'}
-            </h1>
-          </div>
-        </div>
-      </div>
+      {/* the title sits in the top bar, so the form starts at the top of the page */}
+      <PageTitle>
+        <h1 className="truncate text-lg sm:text-xl font-bold text-[#180200] tracking-tight">
+          {isEdit ? `Edit Receipt${formData.receiptNumber ? ` ${formData.receiptNumber}` : ''}` : 'Receipt Entry'}
+        </h1>
+      </PageTitle>
 
       {/* ------------------------------------------------------------ */}
       {/* MAIN TWO-COLUMN SPLIT VIEW: FORM ON LEFT, MEMBER LIST / DETAILS ON RIGHT */}
