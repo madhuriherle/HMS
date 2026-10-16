@@ -356,7 +356,7 @@ export default function RegisterNewMember() {
           qualification: m.qualification_text || '',
           employment: m.occupation || '',
           magazineNeeded: m.magazine_needed === false ? 'NO' : 'YES',
-          magazineDeliveryChoice: m.magazine_delivery_address ? 'DIFFERENT' : 'COMMUNICATION',
+          magazineDeliveryChoice: 'COMMUNICATION',
           magazineDeliveryAddress: m.magazine_delivery_address || '',
           magLine: m.magazine_delivery_address || '', // a saved address is one text: it shows whole in the first box
           magazineKind: m.magazine_kind === 'EMAIL' ? 'EMAIL' : 'PHYSICAL',
@@ -1792,83 +1792,7 @@ export default function RegisterNewMember() {
                           </div>
                         </div>
 
-                        {/* Delivery Destination (when physical copy is required) */}
-                        {formData.magazineKind !== 'EMAIL' && (
-                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pt-2">
-                          <div className="space-y-2.5">
-                            <label className="block text-xs font-bold text-[#510601] uppercase tracking-wider">
-                              Postal Delivery Address:
-                            </label>
-                            <div className="flex flex-wrap gap-5 text-xs font-semibold text-[#863221]">
-                              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                                <input
-                                  type="radio"
-                                  name="magazineDeliveryChoice"
-                                  value="COMMUNICATION"
-                                  checked={formData.magazineDeliveryChoice !== 'DIFFERENT'}
-                                  onChange={() => setFormData({ ...formData, magazineDeliveryChoice: 'COMMUNICATION' })}
-                                  className="w-4 h-4 text-[#510601] focus:ring-[#510601] accent-[#510601] cursor-pointer"
-                                />
-                                <span>Deliver to Current Communication Address</span>
-                              </label>
-                              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                                <input
-                                  type="radio"
-                                  name="magazineDeliveryChoice"
-                                  value="DIFFERENT"
-                                  checked={formData.magazineDeliveryChoice === 'DIFFERENT'}
-                                  onChange={() => setFormData({ ...formData, magazineDeliveryChoice: 'DIFFERENT' })}
-                                  className="w-4 h-4 text-[#510601] focus:ring-[#510601] accent-[#510601] cursor-pointer"
-                                />
-                                <span>Deliver to Different Postal Address</span>
-                              </label>
-                            </div>
-
-                            {/* delivering to the communication address needs nothing more; the fields below are only for a different postal address */}
-                            {formData.magazineDeliveryChoice !== 'DIFFERENT' ? null : (
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div className="sm:col-span-2">
-                                  <label className="block text-xs text-[#3D140C] mb-1 font-semibold">Postal Address (House / Door No, Street) <span className="text-red-600">*</span></label>
-                                  <textarea
-                                    rows={2}
-                                    value={formData.magLine}
-                                    onChange={(e) => setFormData({ ...formData, magLine: e.target.value })}
-                                    placeholder="House / Door No, Street, Cross, Locality..."
-                                    className={`w-full px-3.5 py-2 bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:ring-1 ${formErrors.magLine ? 'border-red-500 focus:ring-red-500' : 'border-[#DFD5CC] focus:border-[#510601] focus:ring-[#510601]'}`}
-                                  />
-                                  {formErrors.magLine && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.magLine}</p>}
-                                </div>
-                                <div>
-                                  <label className="block text-xs text-[#3D140C] mb-1 font-semibold">PIN Code</label>
-                                  <input type="text" inputMode="numeric" maxLength={6} value={formData.magPin} onChange={(e) => handleMagPinChange(e.target.value)} placeholder="6 digits"
-                                    className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg font-mono text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs text-[#3D140C] mb-1 font-semibold">Post Office / Locality</label>
-                                  <input type="text" value={formData.magLocality} onChange={(e) => setFormData({ ...formData, magLocality: e.target.value })}
-                                    className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs text-[#3D140C] mb-1 font-semibold">Taluk</label>
-                                  <input type="text" value={formData.magTaluk} onChange={(e) => setFormData({ ...formData, magTaluk: e.target.value })}
-                                    className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs text-[#3D140C] mb-1 font-semibold">District</label>
-                                  <input type="text" value={formData.magDistrict} onChange={(e) => setFormData({ ...formData, magDistrict: e.target.value })}
-                                    className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
-                                </div>
-                                <div>
-                                  <label className="block text-xs text-[#3D140C] mb-1 font-semibold">State</label>
-                                  <input type="text" value={formData.magState} onChange={(e) => setFormData({ ...formData, magState: e.target.value })}
-                                    className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          </div>
-                        )}
+                        {/* A posted magazine always goes to the communication address; there is no other delivery address to choose */}
                       </div>
                     )}
                   </div>
