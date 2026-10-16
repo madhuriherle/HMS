@@ -1590,44 +1590,7 @@ export default function ReceiptEntry() {
               className="p-4 sm:p-5 space-y-3.5"
             >
 
-              {/* FLOW 2 MEMBERSHIP DETAILS SECTION INSIDE FORM (When selected from Right Membership List) */}
-              {entrySource === 'membership-assignment' && selectedMember && (
-                <div className="p-3.5 bg-amber-50/80 rounded-xl border border-amber-200/80 space-y-2 animate-in fade-in duration-150">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <User className="w-4 h-4 text-[#510601] shrink-0" />
-                      <span className="text-xs font-bold text-[#180200] truncate">
-                        Assigned Member: {selectedMember.fullName || selectedMember.name}
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#510601]/10 text-[#510601] shrink-0">
-                        {numberTag(selectedMember)}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleResetMember}
-                      className="px-2 py-0.5 text-[11px] font-semibold text-[#510601] hover:bg-white rounded border border-[#E8DFD8] transition-colors cursor-pointer shrink-0 ml-2"
-                      title="Clear member from form"
-                    >
-                      Unassign
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-[#863221]">
-                    <div>
-                      <span className="font-semibold text-[#863221]/70 block">Contact:</span>
-                      <span className="text-[#180200] font-mono">{selectedMember.mobile || selectedMember.contactNumber || '—'}</span>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-[#863221]/70 block">Type:</span>
-                      <span className="text-[#180200]">{selectedMember.membershipType || selectedMember.membershipTypeCategory || '—'}</span>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-[#863221]/70 block">District:</span>
-                      <span className="text-[#180200]">{selectedMember.districtName || selectedMember.district || '—'}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* the assigned member's details show in the Member Details panel on the right (same as for an unapproved applicant) */}
 
               <div className="space-y-3">
 
@@ -2263,7 +2226,7 @@ export default function ReceiptEntry() {
         {/* ------------------------------------------------------------ */}
         <div className="col-span-12 lg:col-span-6 w-full space-y-4">
 
-          {entrySource === 'unapproved-assignment' && selectedMember ? (
+          {(entrySource === 'unapproved-assignment' || entrySource === 'membership-assignment') && selectedMember ? (
             /* ========================================================== */
             /* FLOW 1 STATE: MEMBER DETAILS PANEL (UNAPPROVED ASSIGNMENT)*/
             /* ========================================================== */
