@@ -1,3 +1,4 @@
+import FilterToggle from '../components/FilterToggle';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
@@ -145,6 +146,7 @@ export default function MembershipTypeManagement() {
   };
 
   const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL';
+  const [filtersOpen, setFiltersOpen] = useState(false); // the filters show only when the filter icon is clicked
 
   const filteredData = useMemo(() => {
     return membershipTypes.filter((item) => {
@@ -512,6 +514,9 @@ export default function MembershipTypeManagement() {
 
             {/* Filter Controls */}
             <div className="flex items-center gap-2.5 flex-wrap">
+              <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'ALL' ? 1 : 0} />
+              {filtersOpen && (
+                <>
               <select
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
@@ -531,6 +536,8 @@ export default function MembershipTypeManagement() {
                   <RefreshCw className="w-3.5 h-3.5" />
                   <span>Clear Filters</span>
                 </button>
+              )}
+                </>
               )}
             </div>
 

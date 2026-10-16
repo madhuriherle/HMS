@@ -1,3 +1,4 @@
+import { FilterCard } from '../components/FilterToggle';
 import { formatDateTime } from '../utils/dateUtils';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -228,7 +229,10 @@ export default function ActivityLogs() {
       </div>
 
       {/* Advanced Filter Card */}
-      <div className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-2xs space-y-4">
+      <FilterCard
+        count={(selectedUser ? 1 : 0) + (selectedActivityType !== 'All' ? 1 : 0) + (selectedStatus !== 'All Status' ? 1 : 0) + (selectedClient !== 'All Clients' ? 1 : 0)}
+        className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-2xs space-y-4"
+      >
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
           {/* FROM DATE */}
           <div>
@@ -368,7 +372,7 @@ export default function ActivityLogs() {
             <span>Refresh</span>
           </button>
         </div>
-      </div>
+      </FilterCard>
 
       {/* Main Table Card */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-2xs overflow-hidden">

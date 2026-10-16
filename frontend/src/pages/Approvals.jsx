@@ -1,3 +1,4 @@
+import FilterToggle from '../components/FilterToggle';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   CheckCircle2,
@@ -97,6 +98,7 @@ export default function Approvals() {
   // Filters
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('PENDING'); // Default to PENDING
+  const [filtersOpen, setFiltersOpen] = useState(false); // the status filter shows only when the filter icon is clicked
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modal View / Comparison State
@@ -476,16 +478,19 @@ export default function Approvals() {
 
             {/* Status Filter & Search */}
             <div className="flex items-center gap-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-2.5 py-1.5 bg-white border border-[#E8DFD8] rounded-xl text-xs font-semibold text-[#510601] focus:outline-none focus:border-[#510601] cursor-pointer"
-              >
-                <option value="PENDING">Status: Pending</option>
-                <option value="ALL">Status: All</option>
-                <option value="APPROVED">Status: Approved</option>
-                <option value="REJECTED">Status: Rejected</option>
-              </select>
+              {filtersOpen && (
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-2.5 py-1.5 bg-white border border-[#E8DFD8] rounded-xl text-xs font-semibold text-[#510601] focus:outline-none focus:border-[#510601] cursor-pointer"
+                >
+                  <option value="PENDING">Status: Pending</option>
+                  <option value="ALL">Status: All</option>
+                  <option value="APPROVED">Status: Approved</option>
+                  <option value="REJECTED">Status: Rejected</option>
+                </select>
+              )}
+              <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'PENDING' ? 1 : 0} />
 
               <div className="relative min-w-[180px] max-w-xs">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#863221]/50" />

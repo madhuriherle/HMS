@@ -1,3 +1,4 @@
+import FilterToggle from '../components/FilterToggle';
 import React, { useCallback, useEffect, useState } from 'react';
 import { RotateCcw, Search, Trash2 } from 'lucide-react';
 import api from '../api';
@@ -95,6 +96,7 @@ export default function RecycleBin() {
   });
 
   const all = types.reduce((n, t) => n + t.count, 0);
+  const [filtersOpen, setFiltersOpen] = useState(false); // the type filter shows only when the filter icon is clicked
 
   return (
     <PermissionGate required="system.recycle_bin.read" title="Access Restricted" message="You need the Recycle Bin privilege to open this screen.">
@@ -115,16 +117,21 @@ export default function RecycleBin() {
             <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="Search by name..."
               className="w-full pl-9 pr-3 py-2 text-sm bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg focus:outline-none focus:border-[#510601]" />
           </div>
-          <label className="ml-auto flex items-center gap-2 text-sm font-semibold text-[#180200]">
-            Filter by Type:
-            <select value={entity} onChange={(e) => { setPage(1); setEntity(e.target.value); setPicked(new Set()); }}
-              className="px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-lg">
-              <option value="">All Deleted Records ({all})</option>
-              {types.filter((t) => t.count > 0 || t.value === entity).map((t) => (
-                <option key={t.value} value={t.value}>{t.label} ({t.count})</option>
-              ))}
-            </select>
-          </label>
+          <div className="ml-auto flex items-center gap-3">
+            {filtersOpen && (
+              <label className="flex items-center gap-2 text-sm font-semibold text-[#180200]">
+                Filter by Type:
+                <select value={entity} onChange={(e) => { setPage(1); setEntity(e.target.value); setPicked(new Set()); }}
+                  className="px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-lg">
+                  <option value="">All Deleted Records ({all})</option>
+                  {types.filter((t) => t.count > 0 || t.value === entity).map((t) => (
+                    <option key={t.value} value={t.value}>{t.label} ({t.count})</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={entity ? 1 : 0} />
+          </div>
         </div>
 
         {canWrite && picked.size > 0 && (

@@ -1,3 +1,4 @@
+import FilterToggle from '../components/FilterToggle';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
@@ -140,6 +141,7 @@ export default function BankDetailsManagement() {
   };
 
   const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL';
+  const [filtersOpen, setFiltersOpen] = useState(false); // the filters show only when the filter icon is clicked
 
   const filteredData = useMemo(() => {
     return paymentConfigs.filter((item) => {
@@ -529,6 +531,9 @@ export default function BankDetailsManagement() {
               )}
             </div>
 
+            <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'ALL' ? 1 : 0} />
+            {filtersOpen && (
+              <>
             {/* Status Filter */}
             <div className="flex items-center gap-2 shrink-0">
               <label className="text-xs font-bold text-[#863221] whitespace-nowrap">
@@ -557,6 +562,8 @@ export default function BankDetailsManagement() {
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Reset</span>
               </button>
+            )}
+              </>
             )}
           </div>
 

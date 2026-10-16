@@ -6,6 +6,7 @@ import Modal from '../components/Modal';
 import ModalFooter from '../components/ModalFooter';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
+import FilterToggle from '../components/FilterToggle';
 import SearchableFormSelect from '../components/SearchableFormSelect';
 import DateInput from '../components/DateInput';
 import PermissionGate from '../components/PermissionGate';
@@ -298,6 +299,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
   const [summary, setSummary] = useState({ total: 0, active: 0, paused: 0, stopped: 0 });
   const [loadingRows, setLoadingRows] = useState(true);
   const [search, setSearch] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false); // the filters are shown only when the filter icon is clicked
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -435,6 +437,13 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
               className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]"
             />
           </div>
+          <FilterToggle
+            open={filtersOpen}
+            onToggle={() => setFiltersOpen((o) => !o)}
+            count={(typeFilter !== 'ALL' ? 1 : 0) + (statusFilter !== 'ALL' ? 1 : 0) + (returnsFilter !== 'ALL' ? 1 : 0)}
+          />
+          {filtersOpen && (
+            <>
           <FilterSelect
             value={typeFilter}
             onChange={(v) => { setTypeFilter(v); setPage(1); }}
@@ -459,6 +468,8 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
             options={[{ value: 'ALL', label: 'All Returns' }, { value: 'WITH', label: 'With Returns' }]}
             widthClass="w-40"
           />
+            </>
+          )}
         </div>
         <PageActions>
           <button type="button" onClick={() => setRepeatOpen(true)} className={BTN_OUTLINE} title="Subscriptions with repeated returns">

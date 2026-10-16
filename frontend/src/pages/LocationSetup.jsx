@@ -1,3 +1,4 @@
+import FilterToggle from '../components/FilterToggle';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
@@ -101,6 +102,7 @@ export default function LocationSetup() {
   const [pinPrefixes, setPinPrefixes] = useState([]); // the first two digits that exist in the PIN master
   const [postalPincodeFilter, setPostalPincodeFilter] = useState('');
   const [postalStatusFilter, setPostalStatusFilter] = useState('ALL');
+  const [postalFiltersOpen, setPostalFiltersOpen] = useState(false); // the PIN filters show only when the filter icon is clicked
 
   // Pagination for PIN Directory Table
   const [postalCurrentPage, setPostalCurrentPage] = useState(1);
@@ -1484,6 +1486,11 @@ export default function LocationSetup() {
 
               {/* Action Buttons: Add, Bulk Import, Export */}
               <div className="flex items-center flex-wrap gap-2">
+                <FilterToggle
+                  open={postalFiltersOpen}
+                  onToggle={() => setPostalFiltersOpen((o) => !o)}
+                  count={(postalStateFilter !== 'ALL' ? 1 : 0) + (postalDistrictFilter !== 'ALL' ? 1 : 0) + (postalPrefixFilter !== 'ALL' ? 1 : 0) + (postalStatusFilter !== 'ALL' ? 1 : 0)}
+                />
                 {hasPermission('masters.location.write') && (
                   <button
                     type="button"
@@ -1523,7 +1530,8 @@ export default function LocationSetup() {
               </div>
             </div>
 
-            {/* Filter Controls Row */}
+            {/* Filter Controls Row (shown when the filter icon is clicked) */}
+            {postalFiltersOpen && (
             <div className="pt-3 border-t border-[#E8DFD8] grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {/* State Filter */}
               <div>
@@ -1632,6 +1640,7 @@ export default function LocationSetup() {
                 </button>
               </div>
             </div>
+            )}
           </div>
 
           {/* Postal Directory Data Table */}

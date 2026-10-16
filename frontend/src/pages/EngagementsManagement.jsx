@@ -1,3 +1,4 @@
+import { FilterInline } from '../components/FilterToggle';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import {
@@ -329,6 +330,7 @@ function AffiliationsView({ canWrite, canDelete }) {
             />
           </div>
 
+          <FilterInline count={(magFilter !== 'ALL' ? 1 : 0)}>
           <select
             value={magFilter}
             onChange={(e) => setMagFilter(e.target.value)}
@@ -338,6 +340,7 @@ function AffiliationsView({ canWrite, canDelete }) {
             <option value="ENABLED">Magazine Delivery Enabled</option>
             <option value="DISABLED">Magazine Delivery Disabled</option>
           </select>
+          </FilterInline>
         </div>
 
         {canWrite && (
@@ -866,6 +869,7 @@ function AssociatesView({ canWrite, canDelete }) {
             />
           </div>
 
+          <FilterInline count={(magFilter !== 'ALL' ? 1 : 0)}>
           <select
             value={magFilter}
             onChange={(e) => setMagFilter(e.target.value)}
@@ -875,6 +879,7 @@ function AssociatesView({ canWrite, canDelete }) {
             <option value="ENABLED">Magazine Delivery Enabled</option>
             <option value="DISABLED">Magazine Delivery Disabled</option>
           </select>
+          </FilterInline>
         </div>
 
         {canWrite && (
@@ -1239,6 +1244,7 @@ function PressMediaView({ canWrite, canDelete }) {
             />
           </div>
 
+          <FilterInline count={(magFilter !== 'ALL' ? 1 : 0)}>
           <select
             value={magFilter}
             onChange={(e) => setMagFilter(e.target.value)}
@@ -1248,6 +1254,7 @@ function PressMediaView({ canWrite, canDelete }) {
             <option value="ENABLED">Magazine Delivery Enabled</option>
             <option value="DISABLED">Magazine Delivery Disabled</option>
           </select>
+          </FilterInline>
         </div>
 
         {canWrite && (
@@ -1728,6 +1735,7 @@ function CommitteeView({ canWrite, canDelete }) {
       {/* Controls & Filter Bar */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
+          <FilterInline count={(selectedCategoryFilter !== 'ALL' ? 1 : 0) + (selectedTermFilter !== 'ALL' ? 1 : 0)}>
           <select
             value={selectedCategoryFilter}
             onChange={(e) => setSelectedCategoryFilter(e.target.value)}
@@ -1753,6 +1761,7 @@ function CommitteeView({ canWrite, canDelete }) {
               </option>
             ))}
           </select>
+          </FilterInline>
         </div>
 
         <div className="flex items-center gap-2">

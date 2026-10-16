@@ -1,3 +1,4 @@
+import { FilterCard } from '../components/FilterToggle';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import PageActions, { PageActionsSlot } from '../components/PageActions';
@@ -507,7 +508,7 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <FilterCard className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
         <div>
           <label className="block text-xs font-bold text-stone-600 uppercase mb-1">District</label>
           <select
@@ -593,7 +594,7 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
             <option value="kn">Kannada (ಕನ್ನಡ ಹೆಡರ್ಸ್)</option>
           </select>
         </div>
-      </div>
+            </FilterCard>
 
       {/* Results Table */}
       <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
@@ -909,7 +910,7 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+      <FilterCard className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
         <div>
           <label className="block text-xs font-bold text-stone-600 uppercase mb-1">From Date</label>
           <DateInput
@@ -954,7 +955,7 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
             ))}
           </select>
         </div>
-      </div>
+            </FilterCard>
 
       {/* Receipts Table */}
       <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
@@ -1135,7 +1136,7 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
       </div>
 
       {/* Filter toolbar */}
-      <div className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <FilterCard className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Issue Month (YYYY-MM)</label>
           <input
@@ -1178,7 +1179,7 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
             </div>
           </>
         )}
-      </div>
+            </FilterCard>
 
       {/* Results Table */}
       <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
