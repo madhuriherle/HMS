@@ -24,7 +24,10 @@ class CRUDReceipt(CRUDBase[Receipt, ReceiptCreate, ReceiptUpdate]):
         # drop any client-supplied value so it can't collide as a duplicate kwarg.
         receipt_data = obj_in.model_dump(exclude={"items", "allocations", "receipt_number", "is_cancelled"})
         db_obj = self.model(**receipt_data, receipt_number=receipt_number, created_by=created_by)
-        db_obj.receipt_status = "CANCELLED" if getattr(obj_in, "is_cancelled", False) else "UNASSIGNED"
+        cancelled = bool(getattr(obj_in, "is_cancelled", False))
+        db_obj.receipt_status = "CANCELLED" if cancelled else "UNASSIGNED"
+        if cancelled:
+            db_obj.payment_status = "CANCELLED"  # as when a receipt is cancelled later: every total leaves it out
 
         db.add(db_obj)
         db.flush()  # mint the receipt id before dependants reference it

@@ -1005,11 +1005,40 @@ export default function ReceiptEntry() {
     if (formData.isCancelled) {
       setSaving(true);
       try {
-        const { data } = await api.post('/receipts/', {
-          receipt_number: formData.receiptNumber.trim(),
-          receipt_date: formData.receiptDate,
-          is_cancelled: true
-        });
+        // everything entered is kept on the cancelled receipt (it is only never mapped to a member)
+        const entered = [
+          { particular: formData.particulars, particularId: currentParticularObj?.id || null, detail: formData.donationSubType || (isOthersName(formData.particulars) ? formData.othersDescription.trim() : '') || formData.particulars, amount: Number(formData.amount) },
+          ...extraLines.map((l) => ({ particular: l.particular, particularId: particularObj(l.particular)?.id || null, detail: l.subType || l.description.trim() || l.particular, amount: Number(l.amount) })),
+        ].filter((l) => l.particular && Number.isFinite(l.amount) && l.amount > 0);
+        const isCashCancelled = String(formData.paymentMode || '').trim().toLowerCase() === 'cash';
+        const body = receiptToApiPayload({
+          receiptNumber: formData.receiptNumber.trim(),
+          receiptDate: formData.receiptDate,
+          name: formData.name.trim(),
+          panNo: formData.panNo.trim(),
+          membershipNo: formData.membershipNo.trim(),
+          mobile: formData.mobile.trim(),
+          particulars: formData.particulars,
+          lines: entered,
+          paymentMode: formData.paymentMode,
+          bankAccount: isCashCancelled ? '' : formData.bankAccount || formData.paymentMode,
+          transactionId: isCashCancelled ? '' : formData.transactionId.trim(),
+          transactionDate: formData.transactionDate || '',
+          paymentReceivedDetails: formData.paymentReceivedDetails.trim(),
+          description: formData.description.trim(),
+          periodFromDate: formData.periodFromDate,
+          periodToDate: formData.periodToDate,
+          periodFromTime: formData.periodFromTime,
+          periodToTime: formData.periodToTime,
+          isCancelled: true,
+        }, null);
+        if (!entered.length) {
+          body.items = [];
+          body.gross_amount = 0;
+          body.net_amount = 0;
+        }
+        body.allocations = [];
+        const { data } = await api.post('/receipts/', body);
         showToast(`Receipt ${data?.receipt_number || formData.receiptNumber.trim()} saved as Cancelled.`, 'success');
         const keepDate = formData.receiptDate;
         handleClearForm();
@@ -1621,16 +1650,8 @@ export default function ReceiptEntry() {
                     )}
                     {!formErrors.receiptNumber && numberCheck && numberCheck.number === String(formData.receiptNumber || '').trim() && (
                       numberCheck.available ? (
-                        numberCheck.matches_format ? (
-                          <div className="flex justify-end mt-1">
-                            <span
-                              className="inline-flex items-center text-emerald-600"
-                              title={`Available in FY ${numberCheck.financial_year}`}
-                            >
-                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                            </span>
-                          </div>
-                        ) : (
+                        // an available number in the usual format shows nothing; only a problem is shown
+                        numberCheck.matches_format ? null : (
                           <p className="text-[11px] text-amber-700 mt-1 font-medium">
                             Available, but not like the usual format (for example {numberCheck.example}). You can still save it.
                           </p>

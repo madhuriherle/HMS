@@ -134,19 +134,27 @@ class ReceiptBase(BaseModel):
 
 class ReceiptCreate(ReceiptBase):
     receipt_number: Optional[str] = None
-    # Spoiled / void paper receipt: saved under its number with status CANCELLED, no money.
+    # Spoiled / void paper receipt: saved under its number with status CANCELLED. Only the number and date are needed;
+    # whatever else was entered (payee, particulars, amounts, payment details) is kept on it, as with a receipt cancelled
+    # later. It is never mapped to a member, and a cancelled receipt adds nothing to any total.
     is_cancelled: bool = False
 
     @model_validator(mode="before")
     @classmethod
     def cancelled_needs_only_number_and_date(cls, data):
         if isinstance(data, dict) and data.get("is_cancelled"):
+            items = [i for i in (data.get("items") or []) if i]
+            gross = data.get("gross_amount")
+            if gross is None:
+                gross = sum(float((i.get("amount") if isinstance(i, dict) else getattr(i, "amount", 0)) or 0) for i in items)
+            discount = data.get("discount_amount") or 0
             data = {
                 **data,
                 "receipt_type": data.get("receipt_type") or "OTHER",
                 "payment_mode": data.get("payment_mode") or "CASH",
-                "gross_amount": 0, "discount_amount": 0, "net_amount": 0,
-                "items": [], "allocations": [],
+                "items": items,
+                "gross_amount": gross, "discount_amount": discount, "net_amount": gross - discount,
+                "allocations": [],
             }
         return data
 

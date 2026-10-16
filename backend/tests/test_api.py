@@ -7224,6 +7224,33 @@ def test_restoring_a_member_links_back_the_receipts_their_deletion_unmapped(clie
     assert [r["receipt_number"] for r in mine] == [back["receipt_number"]]
 
 
+def test_a_receipt_entered_as_cancelled_keeps_what_was_typed(client, admin_headers):
+    """Ticking 'Cancelled Receipt' saves the receipt under its number as CANCELLED and keeps the payee, particulars, amount
+    and payment details that were typed. It is never mapped to a member and no total counts it."""
+    H = admin_headers
+    before = client.get("/api/v1/receipts/tracking", headers=H).json()["summary"]["total_amount"]
+    member = _create_member(client, H, "9699000071", "Zcancelkeep")
+    out = client.post("/api/v1/receipts/", headers=H, json={
+        "receipt_date": date.today().isoformat(), "is_cancelled": True,
+        "payer_name": "Zcancelled Payee", "payer_mobile": "9876543210", "payment_mode": "CASH", "receipt_type": "MEMBERSHIP",
+        "gross_amount": 700, "net_amount": 700, "notes": "spoiled while writing",
+        "items": [{"item_type": "MEMBERSHIP", "particular_name": "Membership", "description": "Poshaka", "amount": 700}],
+        "allocations": [{"member_id": member["id"], "allocated_amount": 700}],
+    })
+    assert out.status_code == 201, out.text
+    rid = out.json()["id"]
+    got = client.get(f"/api/v1/receipts/{rid}", headers=H).json()
+    assert got["receipt_status"] == "CANCELLED" and got["payment_status"] == "CANCELLED"
+    assert got["payer_name"] == "Zcancelled Payee" and float(got["net_amount"]) == 700 and got["notes"] == "spoiled while writing"
+    row = client.get("/api/v1/receipts/tracking", headers=H, params={"search": got["receipt_number"]}).json()["data"][0]
+    assert len(row["items"]) == 1 and row["items"][0]["description"] == "Poshaka"
+    assert client.get(f"/api/v1/receipts/{rid}/allocations", headers=H).json() == []  # never mapped to a member
+    assert client.get("/api/v1/receipts/tracking", headers=H).json()["summary"]["total_amount"] == before  # adds nothing
+    # a bare one (only the number and date) still saves
+    bare = client.post("/api/v1/receipts/", headers=H, json={"receipt_date": date.today().isoformat(), "is_cancelled": True})
+    assert bare.status_code == 201 and float(bare.json()["net_amount"]) == 0
+
+
 def test_seeding_privileges_leaves_a_deleted_privilege_deleted(client, admin_headers):
     """A privilege someone deleted keeps its code (the column is unique): seeding must not try to insert it again
     (that crashed migration 0081 on UAT, where system.read had been deleted)."""
