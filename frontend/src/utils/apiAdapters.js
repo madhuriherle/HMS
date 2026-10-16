@@ -272,6 +272,13 @@ export const fetchLabelPage = async (params = {}) => {
   return { rows: unwrapList(data).map(normalizeMember), total: data?.total ?? 0, pages: data?.pages ?? 1 };
 };
 
+// One receipt, in the same shape Receipt Tracking uses (with its particulars), found by its number: so every screen that
+// opens a receipt shows the same popup with the same details.
+export const fetchReceiptRow = async ({ id, number, memberId } = {}) => {
+  const { rows } = await fetchReceiptPage({ search: number, ...(memberId ? { member_id: memberId } : {}), limit: 25 });
+  return rows.find((r) => String(r.id) === String(id)) || rows.find((r) => r.receiptNumber === number) || null;
+};
+
 // One page of the receipt register (at most 200 rows): the rows, the whole filtered set's total and counts.
 export const fetchReceiptPage = async (params = {}) => {
   const { data } = await api.get('/receipts/tracking', { params: { limit: 25, ...params } });

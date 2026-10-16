@@ -11,7 +11,7 @@ import { apiErrorMessage } from '../utils/apiError';
 import { notify } from '../utils/notify';
 import { formatMoney } from '../utils/money';
 import { memberName } from '../utils/memberName';
-import { fetchReceiptPage } from '../utils/apiAdapters';
+import { fetchReceiptRow } from '../utils/apiAdapters';
 import ReceiptViewModal from '../components/ReceiptViewModal';
 
 const inr = formatMoney;
@@ -613,8 +613,7 @@ function ReceiptsTab({ id }) {
   const openReceipt = async (r) => {
     setOpening(r.receipt_id);
     try {
-      const result = await fetchReceiptPage({ member_id: id, search: r.receipt_number, limit: 25 });
-      const row = result.rows.find((x) => String(x.id) === String(r.receipt_id)) || result.rows[0];
+      const row = await fetchReceiptRow({ id: r.receipt_id, number: r.receipt_number, memberId: id });
       if (!row) throw new Error('not found');
       setViewing(row);
     } catch (error) {

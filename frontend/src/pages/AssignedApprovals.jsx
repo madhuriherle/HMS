@@ -5,6 +5,8 @@ import api from '../api';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import { loadUnapprovedPage } from '../utils/serverData';
+import { fetchReceiptRow } from '../utils/apiAdapters';
+import ReceiptViewModal from '../components/ReceiptViewModal';
 import Pager from '../components/Pager';
 import { confirmYesNo } from '../utils/dialogs';
 import { notify } from '../utils/notify';
@@ -17,6 +19,14 @@ const inr = formatMoney;
 // Approving gives the permanent membership number.
 export default function AssignedApprovals() {
   const navigate = useNavigate();
+  const [viewingReceipt, setViewingReceipt] = useState(null); // the receipt open in the shared receipt popup
+  const openReceipt = async (m) => {
+    try {
+      setViewingReceipt((await fetchReceiptRow({ id: m.receipt?.id, number: m.assignedReceiptNumber, memberId: m.id })) || m.receipt || null);
+    } catch (error) {
+      notify('Could not open this receipt.', 'error');
+    }
+  };
   const { hasPermission } = useAuth();
   const canApprove = hasPermission('members.assigned.write');
 
@@ -193,7 +203,14 @@ export default function AssignedApprovals() {
                       </td>
                       <td className="py-3.5 px-4 text-xs font-semibold text-[#510601]">{m.membershipType || '—'}</td>
                       <td className="py-3.5 px-4">
-                        <span className="font-mono font-bold text-xs text-[#510601]">{m.assignedReceiptNumber}</span>
+                        <button
+                          type="button"
+                          onClick={() => openReceipt(m)}
+                          className="font-mono font-bold text-xs text-[#510601] underline decoration-dotted underline-offset-2 hover:text-[#8C1801] cursor-pointer"
+                          title="View this receipt"
+                        >
+                          {m.assignedReceiptNumber}
+                        </button>
                         <div className="text-[11px] text-[#863221] mt-0.5">{formatDate(m.receipt?.receiptDate)}</div>
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono font-bold text-xs whitespace-nowrap">{inr(m.receipt?.amount)}</td>
@@ -246,6 +263,7 @@ export default function AssignedApprovals() {
           )}
         </div>
       </div>
+      <ReceiptViewModal receipt={viewingReceipt} onClose={() => setViewingReceipt(null)} />
     </PermissionGate>
   );
 }

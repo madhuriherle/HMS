@@ -57,6 +57,7 @@ import { formatMoney } from '../utils/money';
 
 import ModalFooter from '../components/ModalFooter';
 import ReceiptViewModal from '../components/ReceiptViewModal';
+import { fetchReceiptRow } from '../utils/apiAdapters';
 // ----------------------------------------------------
 // A receipt carries no member link of its own: one entered before the member existed only holds what
 // the clerk wrote on it — the payer name, the mobile, and the number typed into the Membership No.
@@ -224,6 +225,16 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [assignView, setAssignView] = useState('table'); // table | cards
   const [mappingReceiptId, setMappingReceiptId] = useState(null);
   const [receiptView, setReceiptView] = useState(null); // { member, receipt }: the receipt already assigned to an applicant
+  // the same receipt popup as Receipt Tracking: the receipt is read in full (with its particulars) before it opens
+  const openAssignedReceipt = async (m) => {
+    let full = null;
+    try {
+      full = await fetchReceiptRow({ id: m.receipt?.id, number: m.assignedReceiptNumber, memberId: m.id });
+    } catch (_) {
+      full = null;
+    }
+    setReceiptView({ member: m, receipt: full || m.receipt });
+  };
   const [replacingReceipt, setReplacingReceipt] = useState(null); // the assigned receipt the picked one will replace
   useEffect(() => { if (!assigningMember) setReplacingReceipt(null); }, [assigningMember]);
   // the API behind Map enforces receipts.write; the sibling Bulk Mapping screen uses the page privilege,
@@ -731,7 +742,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           {/* 1. Assign to Receipt Action */}
                           <button
                             type="button"
-                            onClick={() => (isAssigned && m.receipt ? setReceiptView({ member: m, receipt: m.receipt }) : openAssignReceipt(m))}
+                            onClick={() => (isAssigned && m.receipt ? openAssignedReceipt(m) : openAssignReceipt(m))}
                             className="btn-act"
                             title={
                               isAssigned
