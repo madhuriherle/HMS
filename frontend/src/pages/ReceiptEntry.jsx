@@ -2170,7 +2170,7 @@ export default function ReceiptEntry() {
                       onChange={(e) => setFormData((prev) => ({ ...prev, isCancelled: e.target.checked }))}
                       className="w-4 h-4 accent-[#510601] cursor-pointer"
                     />
-                    Cancelled
+                    Cancelled Receipt
                   </label>
                 ) : <div />}
 
@@ -2213,14 +2213,15 @@ export default function ReceiptEntry() {
                     </>
                   ) : (
                     <>
-                      {/* Reset button with text */}
+                      {/* Reset icon only (no text) */}
                       <button
                         type="button"
                         onClick={handleClearForm}
-                        className="px-3.5 py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] text-xs sm:text-sm font-semibold hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
+                        title="Reset the form"
+                        aria-label="Reset the form"
+                        className="p-2 sm:px-2.5 sm:py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center justify-center shadow-2xs"
                       >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Reset</span>
+                        <RotateCcw className="w-4 h-4" />
                       </button>
 
                       {hasPermission('receipts.entry.write') && (
