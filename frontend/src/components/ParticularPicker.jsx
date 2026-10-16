@@ -55,7 +55,7 @@ export default function ParticularPicker({
   // needed - no empty column on the right. A card with sub types may break between two of its rows (its border is drawn
   // on both pieces); a one-name card never breaks. When more columns are needed than the screen holds, the popup is as
   // wide as the screen and scrolls sideways.
-  const COL_W = 420;
+  const COL_W = 350;
   const GAP = 12;
   const [screenWidth, setScreenWidth] = useState(() => (typeof window === 'undefined' ? 1400 : window.innerWidth));
   useEffect(() => {
@@ -145,8 +145,8 @@ export default function ParticularPicker({
         style={{ breakInside: 'avoid' }}
         className={`items-center gap-1 text-left break-words leading-snug transition-colors ${
           isHead
-            ? 'flex w-full rounded-md px-1 py-0.5 text-[11px] font-bold uppercase tracking-wider'
-            : 'flex w-full rounded-md px-2 py-1 text-xs font-semibold hover:bg-[#FAF7F2]'
+            ? 'flex w-full rounded-md px-1 py-0.5 text-xs font-bold uppercase tracking-wider'
+            : 'flex w-full rounded-md px-2 py-1 text-sm font-semibold hover:bg-[#FAF7F2]'
         } ${
           isTaken
             ? 'cursor-not-allowed text-[#863221]/50 line-through'
@@ -244,7 +244,7 @@ export default function ParticularPicker({
                           pickButton(card.buttons[0], card, true)
                         ) : (
                           <>
-                            <p className="mb-2 border-b border-[#CDBFB3] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]" style={{ breakAfter: 'avoid' }}>{card.name}</p>
+                            <p className="mb-2 border-b border-[#CDBFB3] pb-1.5 text-xs font-bold uppercase tracking-wider text-[#510601]" style={{ breakAfter: 'avoid' }}>{card.name}</p>
                             <div className="space-y-0.5">
                               {card.buttons.map((btn) => pickButton(btn, card))}
                             </div>
