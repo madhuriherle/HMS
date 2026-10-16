@@ -36,29 +36,23 @@ export default function ParticularPicker({
     [particulars]
   );
 
-  // A particular with no sub types is a head by itself: it is one button in a plain row above the cards (no card, no
-  // heading). A particular with sub types is a card, headed by its own name, holding its sub types as buttons.
-  const { heads, cards } = useMemo(() => {
-    const headButtons = [];
-    const withSubs = [];
-    activeParticulars.forEach((p) => {
-      const subs = activeSubs(p);
-      if (subs.length) {
-        withSubs.push({
-          name: p.name,
-          hasSubs: true,
-          buttons: subs.map((st) => ({ id: `${p.id || p.name}-${st.id || st.name}`, title: st.name, particular: p.name, subType: st.name, key: lineKey(p.name, st.name) })),
-        });
-      } else {
-        headButtons.push({ id: `${p.id || p.name}-root`, title: p.name, particular: p.name, subType: '', key: lineKey(p.name, '') });
-      }
-    });
-    return { heads: headButtons, cards: withSubs };
-  }, [activeParticulars]);
+  // Every particular is a card of the same width, in the order given. One with sub types is headed by its name and holds
+  // its sub types as rows; one without sub types is a small card that is just its name, clickable.
+  const cards = useMemo(() => activeParticulars.map((p) => {
+    const subs = activeSubs(p);
+    if (subs.length) {
+      return {
+        name: p.name,
+        hasSubs: true,
+        buttons: subs.map((st) => ({ id: `${p.id || p.name}-${st.id || st.name}`, title: st.name, particular: p.name, subType: st.name, key: lineKey(p.name, st.name) })),
+      };
+    }
+    return { name: p.name, hasSubs: false, single: true, buttons: [{ id: `${p.id || p.name}-root`, title: p.name, particular: p.name, subType: '', key: lineKey(p.name, '') }] };
+  }), [activeParticulars]);
 
-  // The cards are packed so the popup needs the least scrolling: the column count follows the screen, a very tall card
-  // is split over two columns, and the cards go in tallest first, each into the shortest column so far (so the small
-  // cards end up last and the column bottoms come out level).
+  // The cards are packed so no space is wasted: the column count follows the screen, a very tall card is split over two
+  // columns, and each card (in order) goes into the shortest column so far, so a card that does not fit under the
+  // others moves to the next column. The height of a card is whatever it needs; the width is the same for all.
   const widthNow = () => (typeof window === 'undefined' ? 1400 : window.innerWidth);
   const columnsFor = (w) => (w >= 1280 ? 4 : w >= 1024 ? 3 : w >= 640 ? 2 : 1);
   const [screenWidth, setScreenWidth] = useState(widthNow);
@@ -71,7 +65,8 @@ export default function ParticularPicker({
   const columns = useMemo(() => {
     const colWidth = Math.max(160, (Math.min(screenWidth * 0.95, 1500) - 80 - (columnCount - 1) * 12) / columnCount - 28);
     // how tall the buttons come out when they wrap inside a column (each ~6.5px a letter, 20px padding, 6px gap)
-    const heightOf = (buttons) => {
+    const heightOf = (buttons, single) => {
+      if (single) return 46; // a small card: just the name
       const lines = buttons.reduce((sum, b) => sum + Math.max(1, Math.ceil((b.title.length * 6.5 + 16) / colWidth)), 0);
       return 52 + lines * 24 + buttons.length * 2; // heading and padding, then a row for each sub type
     };
@@ -85,7 +80,7 @@ export default function ParticularPicker({
         pieces.push({ ...card, key: card.name });
       }
     });
-    pieces = pieces.map((piece) => ({ ...piece, weight: heightOf(piece.buttons) })).sort((x, y) => y.weight - x.weight);
+    pieces = pieces.map((piece) => ({ ...piece, weight: heightOf(piece.buttons, piece.single) }));
     const cols = Array.from({ length: columnCount }, () => ({ height: 0, items: [] }));
     pieces.forEach((piece) => {
       const shortest = cols.reduce((best, col) => (col.height < best.height ? col : best), cols[0]);
@@ -98,16 +93,13 @@ export default function ParticularPicker({
   const q = searchQuery.trim().toLowerCase();
   const matches = (card, btn) => !q || btn.title.toLowerCase().includes(q) || card.name.toLowerCase().includes(q);
   const firstMatch = useMemo(() => {
-    for (const btn of heads) {
-      if (!takenKeys.has(btn.key) && (!q || btn.title.toLowerCase().includes(q))) return btn;
-    }
     for (const card of cards) {
       for (const btn of card.buttons) {
         if (!takenKeys.has(btn.key) && (!q || btn.title.toLowerCase().includes(q) || card.name.toLowerCase().includes(q))) return btn;
       }
     }
     return null;
-  }, [heads, cards, q, takenKeys]);
+  }, [cards, q, takenKeys]);
 
   const handlePick = (pickedParticular, pickedSubType = '') => {
     if (takenKeys.has(lineKey(pickedParticular, pickedSubType))) return;
@@ -153,7 +145,7 @@ export default function ParticularPicker({
         title={isTaken ? 'Already added on another line of this receipt' : `Select ${card.hasSubs ? `${card.name} › ` : ''}${btn.title}`}
         className={`items-center gap-1 text-left break-words leading-snug transition-colors ${
           isHead
-            ? 'inline-flex max-w-full rounded-lg border border-[#B8A89B] px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider'
+            ? 'flex w-full rounded-md px-1 py-0.5 text-[11px] font-bold uppercase tracking-wider'
             : 'flex w-full rounded-md px-2 py-1 text-xs font-semibold hover:bg-[#FAF7F2]'
         } ${
           isTaken
@@ -223,17 +215,11 @@ export default function ParticularPicker({
               )}
             </div>
 
-            {cards.length === 0 && heads.length === 0 ? (
+            {cards.length === 0 ? (
               <p className="py-10 text-center text-sm text-[#863221]">No active particulars.</p>
             ) : (
               <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-3">
-                {/* the particulars that have no sub types: one button each, in a plain row (no card, no heading) */}
-                {heads.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {heads.map((btn) => pickButton(btn, { name: btn.title, hasSubs: false }, true))}
-                  </div>
-                )}
-                {/* the particulars that have sub types: a card each, the sub types as buttons */}
+                {/* a card each: the sub types as rows, or just the name for a particular without sub types */}
                 <div className="flex items-start gap-3">
                   {columns.map((col, colIndex) => (
                     <div key={colIndex} className="flex min-w-0 flex-1 flex-col gap-3">
@@ -244,10 +230,16 @@ export default function ParticularPicker({
                             key={card.key}
                             className={`min-w-0 rounded-xl border border-[#B8A89B] p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
                           >
-                            <p className="mb-2 border-b border-[#CDBFB3] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.title || card.name}</p>
-                            <div className="flex flex-col gap-0.5">
-                              {card.buttons.map((btn) => pickButton(btn, card))}
-                            </div>
+                            {card.single ? (
+                              pickButton(card.buttons[0], card, true)
+                            ) : (
+                              <>
+                                <p className="mb-2 border-b border-[#CDBFB3] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.title || card.name}</p>
+                                <div className="flex flex-col gap-0.5">
+                                  {card.buttons.map((btn) => pickButton(btn, card))}
+                                </div>
+                              </>
+                            )}
                           </div>
                         );
                       })}
