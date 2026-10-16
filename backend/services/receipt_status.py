@@ -43,9 +43,11 @@ def refresh(db: Session, receipt: Receipt) -> str:
     return status
 
 
-def unassign_member_receipts(db: Session, member_id: int, deleted_by: Optional[int] = None) -> list:
+def unassign_member_receipts(db: Session, member_id: int, deleted_by: Optional[int] = None, at=None) -> list:
     """A member is being deleted: their receipts go back to UNASSIGNED so they can be mapped to someone else (the money
-    and the receipts stay). Returns the receipt numbers that were un-mapped. Does not commit."""
+    and the receipts stay). Returns the receipt numbers that were un-mapped. Does not commit. ``at`` is the moment the
+    member is deleted: it is stamped on each un-mapped link, so restoring the member from the Recycle Bin can tell
+    these links from ones someone un-mapped by hand."""
     receipts = (
         db.query(Receipt)
         .join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id)
@@ -56,12 +58,38 @@ def unassign_member_receipts(db: Session, member_id: int, deleted_by: Optional[i
     )
     db.query(ReceiptAllocation).filter(
         ReceiptAllocation.member_id == member_id, ReceiptAllocation.is_deleted == False  # noqa: E712
-    ).update({"is_deleted": True, "deleted_by": deleted_by}, synchronize_session=False)
+    ).update({"is_deleted": True, "deleted_by": deleted_by, "deleted_at": at}, synchronize_session=False)
     db.flush()
     for r in receipts:
         db.refresh(r)
         refresh(db, r)
     return [r.receipt_number for r in receipts]
+
+
+def relink_member_receipts(db: Session, member_id: int, deleted_at, acted_by: Optional[int] = None) -> list:
+    """A deleted member is restored: the receipts that went back to Unassigned *because of that deletion* are linked to
+    them again. A receipt that was meanwhile mapped to someone else, cancelled or deleted is left alone, and so is a link
+    someone removed by hand (it carries a different time). Returns the receipt numbers. Does not commit."""
+    if deleted_at is None:
+        return []
+    links = (
+        db.query(ReceiptAllocation)
+        .filter(ReceiptAllocation.member_id == member_id, ReceiptAllocation.is_deleted == True,  # noqa: E712
+                ReceiptAllocation.deleted_at == deleted_at)
+        .all()
+    )
+    numbers = []
+    for link in links:
+        receipt = db.get(Receipt, link.receipt_id)
+        if receipt is None or receipt.is_deleted or is_cancelled(receipt) or compute(db, receipt) != UNASSIGNED:
+            continue
+        link.is_deleted = False
+        link.deleted_at = None
+        link.deleted_by = None
+        db.flush()
+        refresh(db, receipt)
+        numbers.append(receipt.receipt_number)
+    return numbers
 
 
 def refresh_for_members(db: Session, member_ids: Iterable[int]) -> None:

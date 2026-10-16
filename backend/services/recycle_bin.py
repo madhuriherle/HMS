@@ -154,7 +154,7 @@ def _get(db: Session, entity: str, entity_id: int, hidden: set = frozenset()):
 
 
 def restore(db: Session, user_id: int, items: list, viewer=None) -> dict:
-    done, failed = [], []
+    done, failed, relinked = [], [], 0
     hidden = _hidden(db, viewer)
     for it in items:
         e, row = _get(db, it["entity"], it["id"], hidden)
@@ -164,6 +164,7 @@ def restore(db: Session, user_id: int, items: list, viewer=None) -> dict:
         label = e.name(row)
         try:
             with db.begin_nested():
+                was_deleted_at = row.deleted_at
                 row.is_deleted = False
                 row.deleted_at = None
                 row.deleted_by = None
@@ -173,12 +174,19 @@ def restore(db: Session, user_id: int, items: list, viewer=None) -> dict:
                     from services import receipt_status
                     receipt_status.refresh(db, row)
                 db.flush()
+                if isinstance(row, Member):
+                    # the receipts that went back to Unassigned when this member was deleted are linked to them again
+                    from services import membership_credit, receipt_status
+                    back = receipt_status.relink_member_receipts(db, row.id, was_deleted_at, user_id)
+                    if back:
+                        membership_credit.recompute_members(db, [row.id], user_id)
+                        relinked += len(back)
             done.append(label)
         except IntegrityError:
             failed.append({"key": f"{it['entity']}:{it['id']}", "name": label,
                            "error": "Another active record already uses the same code or number. Rename or delete that one first."})
     db.commit()
-    return {"restored": len(done), "failed": failed}
+    return {"restored": len(done), "failed": failed, "relinked_receipts": relinked}
 
 
 def _purge_row(db: Session, e: Entity, row) -> None:

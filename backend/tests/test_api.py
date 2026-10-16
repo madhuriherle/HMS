@@ -7195,6 +7195,35 @@ def test_deleting_a_member_sends_their_receipts_back_to_unassigned(client, admin
     assert client.get(f"/api/v1/receipts/{r2['id']}", headers=H).json()["receipt_status"] == "UNASSIGNED"
 
 
+def test_restoring_a_member_links_back_the_receipts_their_deletion_unmapped(client, admin_headers):
+    """Recycle Bin: deleting a member un-maps their receipts; restoring the member links back exactly those - not a
+    receipt someone un-mapped by hand, and not one that was meanwhile mapped to another member."""
+    H = admin_headers
+    keep = _create_member(client, H, "9699000061", "Zrestorekeep")
+    other = _create_member(client, H, "9699000062", "Zrestoreother")
+    mk = lambda amt, who: _make_receipt(client, H, gross_amount=amt, net_amount=amt, items=[{"item_type": "MEMBERSHIP", "amount": amt}],
+                                        allocations=[{"member_id": who["id"], "allocated_amount": amt}])
+    back, by_hand, moved = mk(500, keep), mk(600, keep), mk(700, keep)
+    # one link removed by hand before the deletion
+    alloc = client.get(f"/api/v1/receipts/{by_hand['id']}/allocations", headers=H).json()[0]
+    assert client.delete(f"/api/v1/receipts/{by_hand['id']}/allocations/{alloc['id']}", headers=H).status_code == 200
+
+    client.delete(f"/api/v1/members/{keep['id']}", headers=H, params={"reason": "mistake"})
+    # while the member is in the bin, one of the receipts is mapped to somebody else
+    assert client.post("/api/v1/receipts/bulk-allocate", headers=H, json={"allocations": [
+        {"receipt_id": moved["id"], "member_id": other["id"], "allocated_amount": 700}]}).status_code == 200
+
+    out = client.post("/api/v1/system/recycle-bin/restore", headers=H, json={"items": [{"entity": "member", "id": keep["id"]}], "reason": "oops"})
+    assert out.status_code == 200, out.text
+    assert out.json()["restored"] == 1 and out.json()["relinked_receipts"] == 1
+    status = lambda r: client.get(f"/api/v1/receipts/{r['id']}", headers=H).json()["receipt_status"]
+    assert status(back) == "ASSIGNED"      # linked back
+    assert status(by_hand) == "UNASSIGNED"  # un-mapped by hand earlier: stays that way
+    assert status(moved) == "ASSIGNED"      # mapped to someone else meanwhile: stays with them
+    mine = client.get("/api/v1/receipts/tracking", headers=H, params={"member_id": keep["id"]}).json()["data"]
+    assert [r["receipt_number"] for r in mine] == [back["receipt_number"]]
+
+
 def test_seeding_privileges_leaves_a_deleted_privilege_deleted(client, admin_headers):
     """A privilege someone deleted keeps its code (the column is unique): seeding must not try to insert it again
     (that crashed migration 0081 on UAT, where system.read had been deleted)."""

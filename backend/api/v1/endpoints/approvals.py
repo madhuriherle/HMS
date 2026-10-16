@@ -535,7 +535,7 @@ def approve_deletion(
     member = db.query(Member).filter(Member.id == req.member_id).first()
     if member:
         from services import receipt_status
-        receipt_status.unassign_member_receipts(db, req.member_id, current_user.id)
+        receipt_status.unassign_member_receipts(db, req.member_id, current_user.id, at=now)
         member.is_deleted = True
         member.deleted_by = current_user.id
         member.deleted_at = now

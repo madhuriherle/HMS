@@ -1438,7 +1438,7 @@ def delete_member(
                 "mode": "PERMANENT", "unassigned_receipts": unassigned}
 
     from services import receipt_status
-    unassigned = receipt_status.unassign_member_receipts(db, id, current_user.id)  # their receipts wait for another member
+    unassigned = receipt_status.unassign_member_receipts(db, id, current_user.id, at=now)  # their receipts wait for another member
     member.is_deleted = True
     member.deleted_by = current_user.id
     member.deleted_at = now

@@ -58,7 +58,7 @@ export default function RecycleBin() {
       const why = failed.slice(0, 3).map((f) => `${f.name || f.key} - ${f.error}`).join(' | ');
       notify(`${count} ${doneWord}. ${failed.length} could not be done: ${why}`, count ? 'success' : 'error');
     } else {
-      notify(`${count} ${doneWord}.`);
+      notify(`${count} ${doneWord}.${res.relinked_receipts ? ` ${res.relinked_receipts} receipt${res.relinked_receipts === 1 ? ' was' : 's were'} linked back to the restored member.` : ''}`);
     }
   };
 
