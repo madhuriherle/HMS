@@ -944,8 +944,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                       <th className="py-2 px-3">Receipt No.</th>
                       <th className="py-2 px-3">Date</th>
                       <th className="py-2 px-3">Payer</th>
-                      <th className="py-2 px-3 text-right">Counts for membership</th>
-                      <th className="py-2 px-3">Mode</th>
                       <th className="py-2 px-3 text-right">Amount</th>
                       <th className="py-2 px-3 text-right"></th>
                     </tr>
@@ -962,8 +960,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           {c.payer_name || '—'}
                           {c.payer_mobile ? <span className="ml-2 font-mono text-[10px] text-[#863221]">{c.payer_mobile}</span> : null}
                         </td>
-                        <td className="py-1.5 px-3 text-right font-semibold text-[#3D705C] whitespace-nowrap">{c.membership_amount > 0 ? formatMoney(c.membership_amount) : <span className="font-normal text-[#863221]/60">—</span>}</td>
-                        <td className="py-1.5 px-3 text-[#863221] whitespace-nowrap">{c.payment_mode || '—'}</td>
                         <td className="py-1.5 px-3 text-right font-bold text-[#180200] whitespace-nowrap">{formatMoney(c.net_amount)}</td>
                         <td className="py-1.5 px-3 text-right">{assignButton(c)}</td>
                       </tr>
@@ -985,9 +981,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                     <div className="text-xs font-semibold text-[#180200] truncate" title={c.payer_name || ''}>{c.payer_name || '—'}</div>
                     {c.payer_mobile ? <div className="text-[11px] font-mono text-[#863221]">{c.payer_mobile}</div> : null}
                     {c.payer_pan ? <div className="text-[10px] font-mono text-[#863221]">PAN {c.payer_pan}</div> : null}
-                    <div className="text-[11px] text-[#7D7068]">Counts for membership: <b className="text-[#3D705C]">{c.membership_amount > 0 ? formatMoney(c.membership_amount) : '—'}</b></div>
                     <div className="mt-1 flex items-center justify-between gap-2">
-                      <span className="text-[10px] text-[#863221]">{c.payment_mode || ''}{c.likely_score > 0 ? ' · likely match' : ''}</span>
+                      <span className="text-[10px] text-[#863221]">{c.likely_score > 0 ? 'likely match' : ''}</span>
                       {assignButton(c)}
                     </div>
                   </div>

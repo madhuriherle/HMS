@@ -435,8 +435,8 @@ export default function ReceiptEntry() {
     const memNo = member.membershipNumber || member.membership_number || '';
     const memType = member.membershipType || member.membershipTypeCategory || '';
 
-    // Only who is paying is filled in: name, membership no., mobile and PAN (members hold no PAN, so it is the
-    // one on their latest receipt that has one). The particulars, amount, payment mode and the rest are what THIS
+    // Only who is paying is filled in: name, membership no. and mobile. The PAN is never filled in (it is typed for
+    // each receipt; carrying one over from an earlier receipt put a wrong PAN on later ones). The particulars, amount, payment mode and the rest are what THIS
     // payment is for (a member may give a different donation each time), so they are left to the person
     // entering the receipt. The receipt number and date are never taken from the member.
     setMatchedExistingReceipt(null);
@@ -447,8 +447,6 @@ export default function ReceiptEntry() {
         .then(({ data }) => {
           const rows = data?.data || [];
           setSelectedMemberReceipts(rows);
-          const lastPan = [...rows].filter((r) => r.payer_pan).sort((x, y) => y.id - x.id)[0]?.payer_pan;
-          if (lastPan) setFormData((prev) => (prev.panNo ? prev : { ...prev, panNo: lastPan }));
         })
         .catch(() => {});
     }
