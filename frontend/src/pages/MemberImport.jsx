@@ -332,12 +332,6 @@ export default function MemberImport() {
             >
               <History className="w-4 h-4" />
             </button>
-            <Link
-              to="/dashboard/membership/list"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-[#E8DFD8] text-[#863221] hover:text-[#180200] hover:bg-[#FAF7F2] transition-colors"
-            >
-              Member Directory
-            </Link>
             <button
               type="button"
               onClick={handleDownloadTemplate}
