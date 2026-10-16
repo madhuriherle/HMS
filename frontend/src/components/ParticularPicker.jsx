@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Search, X } from 'lucide-react';
 import Modal from './Modal';
 import ModalFooter from './ModalFooter';
@@ -36,17 +36,46 @@ export default function ParticularPicker({
     [particulars]
   );
 
-  // One card per particular: its sub types as buttons, or a single button when it has none
-  const cards = useMemo(
-    () => activeParticulars.map((p) => {
+  // One card per particular that has sub types (its sub types as buttons). The particulars with no sub types are not a
+  // card each: they are gathered into one card of single buttons, so a lone button never takes a whole box.
+  const cards = useMemo(() => {
+    const withSubs = [];
+    const singles = [];
+    activeParticulars.forEach((p) => {
       const subs = activeSubs(p);
-      const buttons = subs.length
-        ? subs.map((st) => ({ id: `${p.id || p.name}-${st.id || st.name}`, title: st.name, particular: p.name, subType: st.name, key: lineKey(p.name, st.name) }))
-        : [{ id: `${p.id || p.name}-root`, title: p.name, particular: p.name, subType: '', key: lineKey(p.name, '') }];
-      return { name: p.name, hasSubs: subs.length > 0, buttons };
-    }),
-    [activeParticulars]
-  );
+      if (subs.length) {
+        withSubs.push({
+          name: p.name,
+          hasSubs: true,
+          buttons: subs.map((st) => ({ id: `${p.id || p.name}-${st.id || st.name}`, title: st.name, particular: p.name, subType: st.name, key: lineKey(p.name, st.name) })),
+        });
+      } else {
+        singles.push({ id: `${p.id || p.name}-root`, title: p.name, particular: p.name, subType: '', key: lineKey(p.name, '') });
+      }
+    });
+    const gathered = singles.length ? [{ name: 'Other particulars', hasSubs: true, gathered: true, buttons: singles }] : [];
+    return [...gathered, ...withSubs];
+  }, [activeParticulars]);
+
+  // The cards are stacked in columns like bricks: each goes to the column that is shortest so far, so a short card is
+  // followed by the next one at once and no row is as tall as its tallest card. The column count follows the screen.
+  const [columnCount, setColumnCount] = useState(() => (typeof window === 'undefined' ? 4 : window.innerWidth >= 1280 ? 4 : window.innerWidth >= 1024 ? 3 : window.innerWidth >= 640 ? 2 : 1));
+  useEffect(() => {
+    const onResize = () => setColumnCount(window.innerWidth >= 1280 ? 4 : window.innerWidth >= 1024 ? 3 : window.innerWidth >= 640 ? 2 : 1);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const columns = useMemo(() => {
+    const cols = Array.from({ length: columnCount }, () => ({ height: 0, items: [] }));
+    cards.forEach((card) => {
+      const chars = card.buttons.reduce((sum, b) => sum + b.title.length + 6, 0);
+      const weight = 2 + Math.ceil(chars / 26) * 1.2; // a heading plus the rows its buttons wrap into
+      const shortest = cols.reduce((best, col) => (col.height < best.height ? col : best), cols[0]);
+      shortest.items.push(card);
+      shortest.height += weight;
+    });
+    return cols;
+  }, [cards, columnCount]);
 
   const q = searchQuery.trim().toLowerCase();
   const matches = (card, btn) => !q || btn.title.toLowerCase().includes(q) || card.name.toLowerCase().includes(q);
@@ -145,8 +174,11 @@ export default function ParticularPicker({
             {cards.length === 0 ? (
               <p className="py-10 text-center text-sm text-[#863221]">No active particulars.</p>
             ) : (
-              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 content-start items-start">
-                {cards.map((card) => {
+              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+              <div className="flex items-start gap-3">
+              {columns.map((col, colIndex) => (
+              <div key={colIndex} className="flex min-w-0 flex-1 flex-col gap-3">
+                {col.items.map((card) => {
                   const cardHasMatch = card.buttons.some((b) => matches(card, b));
                   return (
                     <div
@@ -168,7 +200,7 @@ export default function ParticularPicker({
                               type="button"
                               disabled={isTaken}
                               onClick={() => handlePick(btn.particular, btn.subType)}
-                              title={isTaken ? 'Already added on another line of this receipt' : `Select ${card.hasSubs ? `${card.name} › ` : ''}${btn.title}`}
+                              title={isTaken ? 'Already added on another line of this receipt' : `Select ${card.hasSubs && !card.gathered ? `${card.name} › ` : ''}${btn.title}`}
                               className={`inline-flex max-w-full items-center gap-1 rounded-lg border px-2.5 py-1.5 text-left break-words text-xs font-semibold leading-snug transition-colors ${
                                 isTaken
                                   ? 'cursor-not-allowed border-[#E8DFD8] text-[#863221]/50 line-through'
@@ -186,6 +218,9 @@ export default function ParticularPicker({
                     </div>
                   );
                 })}
+              </div>
+              ))}
+              </div>
               </div>
             )}
           </div>
