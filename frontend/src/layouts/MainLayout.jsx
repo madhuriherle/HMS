@@ -97,12 +97,12 @@ export default function MainLayout() {
 
         <div className="flex flex-col flex-1 w-full overflow-hidden relative min-w-0">
           {/* Main Application Top Header with Logged-in User Profile */}
-          <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b border-[#E8DFD8] bg-[#FAF7F2]/95 backdrop-blur-sm px-4 sm:px-6 lg:px-8">
+          <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center justify-between border-b border-[#E8DFD8] bg-white shadow-2xs px-4 sm:px-6 lg:px-8">
             {/* Mobile menu button */}
             <div className="flex min-w-0 items-center gap-3">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden p-2 rounded-lg bg-white border border-[#E8DFD8] shadow-sm text-[#180200] hover:text-[#510601] focus:outline-none"
+                className="lg:hidden p-2 rounded-lg bg-stone-50 border border-[#E8DFD8] shadow-2xs text-[#180200] hover:text-[#510601] hover:bg-stone-100 focus:outline-none"
                 aria-label="Open navigation menu"
               >
                 <Menu className="h-5 w-5" />
@@ -112,7 +112,7 @@ export default function MainLayout() {
 
             {/* Admin Profile Section (Top-Right aligned): hover (or click on touch screens) for Profile and Log Out */}
             <div className="relative ml-auto group" tabIndex={0}>
-              <div className="flex items-center gap-2.5 rounded-xl bg-white border border-[#E8DFD8] p-1.5 sm:px-3 sm:py-1.5 shadow-sm group-hover:border-[#510601]/30 group-focus-within:border-[#510601]/30 transition-all cursor-pointer">
+              <div className="flex items-center gap-2.5 rounded-xl bg-[#FAF7F2]/80 hover:bg-[#FAF7F2] border border-[#E8DFD8] p-1.5 sm:px-3 sm:py-1.5 shadow-2xs group-hover:border-[#510601]/30 group-focus-within:border-[#510601]/30 transition-all cursor-pointer">
                 <div className="h-7 w-7 sm:h-8 sm:w-8 shrink-0 rounded-full bg-[#510601] flex items-center justify-center text-white font-bold text-xs sm:text-sm shadow-xs">
                   {(displayName || '?').charAt(0).toUpperCase()}
                 </div>

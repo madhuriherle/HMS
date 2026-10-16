@@ -1217,7 +1217,7 @@ export default function ReceiptEntry() {
     }
   };
 
-  // Reset Form
+  // Reset Form (New Entry Mode)
   const handleClearForm = () => {
     setEntrySource('normal');
     setSelectedMember(null);
@@ -1228,6 +1228,55 @@ export default function ReceiptEntry() {
     numberTouched.current = false;
     setExtraLines([]);
     loadReceiptDefaults();
+  };
+
+  // Reset Form (Edit Mode: restores original loaded receipt values)
+  const handleResetEdit = () => {
+    if (!editOriginal?.receipt) return;
+    const raw = editOriginal.receipt;
+    const subsOf = (name) => (particularObj(name)?.subTypes || []).filter((st) => (st.status || 'Active') === 'Active');
+    const toLine = (it) => {
+      const name = it.particular || '';
+      const desc = it.description && it.description !== name ? it.description : '';
+      const subs = subsOf(name);
+      return {
+        particular: name,
+        subType: subs.some((st) => st.name === desc) ? desc : '',
+        description: isOthersName(name) && !subs.length ? desc : '',
+        amount: String(it.amount ?? ''),
+      };
+    };
+    const lines = (raw.items || []).map(toLine);
+    const first = lines[0] || { particular: titleCase(raw.receipt_type), subType: '', description: '', amount: String(raw.amount ?? '') };
+    const mode = raw.bank_account && activePaymentModes.includes(raw.bank_account)
+      ? raw.bank_account
+      : titleCase(raw.payment_mode);
+    const isCash = mode.trim().toLowerCase() === 'cash';
+    const detail = {
+      receiptNumber: raw.receipt_number || '',
+      receiptDate: raw.receipt_date || '',
+      name: raw.payer_name || '',
+      panNo: raw.payer_pan || '',
+      membershipNo: raw.payer_membership_no || '',
+      mobile: raw.payer_mobile || '',
+      particulars: first.particular,
+      donationSubType: first.subType,
+      othersDescription: first.description,
+      amount: first.amount,
+      paymentMode: mode,
+      bankAccount: isCash ? '' : raw.bank_account || mode,
+      transactionId: raw.transaction_reference || raw.cheque_number || '',
+      transactionDate: raw.transaction_date || '',
+      description: raw.notes || '',
+      periodFromDate: raw.period_from_date || '',
+      periodToDate: raw.period_to_date || '',
+      periodFromTime: raw.period_from_time || '',
+      periodToTime: raw.period_to_time || '',
+    };
+    setFormData((prev) => ({ ...prev, ...detail }));
+    setExtraLines(lines.slice(1).map((l) => ({ ...emptyLine(), ...l })));
+    setFormErrors({});
+    showToast('Receipt details restored to original values.', 'info');
   };
 
   // ----------------------------------------------------
@@ -2126,36 +2175,77 @@ export default function ReceiptEntry() {
                 ) : <div />}
 
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={isEdit ? () => navigate('/dashboard/receipts/tracking') : handleClearForm}
-                    className="px-3.5 py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] text-xs sm:text-sm font-semibold hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                  >
-                    {isEdit ? <X className="w-3.5 h-3.5" /> : <RotateCcw className="w-3.5 h-3.5" />}
-                    <span>{isEdit ? 'Cancel' : 'Reset'}</span>
-                  </button>
-
-                  {hasPermission(isEdit ? 'receipts.tracking.write' : 'receipts.entry.write') && (
+                  {isEdit ? (
                     <>
-                    <button
-                      type="submit"
-                      onClick={() => { saveMode.current = 'close'; }}
-                      disabled={saving || (isEdit ? !editOriginal : false)}
-                      className="disabled:opacity-50 px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#180200] text-xs sm:text-sm font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <Save className="w-3.5 h-3.5 text-[#863221]" />
-                      <span>{isEdit ? 'Save Changes' : 'Save & Close'}</span>
-                    </button>
+                      {/* Reset icon only (no text) */}
+                      <button
+                        type="button"
+                        onClick={handleResetEdit}
+                        title="Reset to original receipt details"
+                        aria-label="Reset changes"
+                        className="p-2 sm:px-2.5 sm:py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center justify-center shadow-2xs"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </button>
 
-                    <button
-                      type="submit"
-                      onClick={() => { saveMode.current = 'new'; }}
-                      disabled={saving || (isEdit ? !editOriginal : false)}
-                      className="disabled:opacity-50 px-4 py-2 rounded-xl bg-[#510601] hover:bg-[#680801] text-white text-xs sm:text-sm font-bold shadow-2xs hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
-                    >
-                      <Save className="w-3.5 h-3.5 text-white" />
-                      <span>Save & New</span>
-                    </button>
+                      {/* Cancel button */}
+                      <button
+                        type="button"
+                        onClick={() => navigate('/dashboard/receipts/tracking')}
+                        className="px-3.5 py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] text-xs sm:text-sm font-semibold hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Cancel</span>
+                      </button>
+
+                      {/* Update button */}
+                      {hasPermission('receipts.tracking.write') && (
+                        <button
+                          type="submit"
+                          onClick={() => { saveMode.current = 'close'; }}
+                          disabled={saving || !editOriginal}
+                          className="disabled:opacity-50 px-5 py-2 rounded-xl bg-[#510601] hover:bg-[#680801] text-white text-xs sm:text-sm font-bold shadow-2xs hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
+                        >
+                          <Save className="w-3.5 h-3.5 text-white" />
+                          <span>Update</span>
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* Reset button with text */}
+                      <button
+                        type="button"
+                        onClick={handleClearForm}
+                        className="px-3.5 py-2 rounded-xl border border-[#E8DFD8] hover:border-[#863221] bg-white text-[#863221] text-xs sm:text-sm font-semibold hover:bg-[#FAF7F2] transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Reset</span>
+                      </button>
+
+                      {hasPermission('receipts.entry.write') && (
+                        <>
+                          <button
+                            type="submit"
+                            onClick={() => { saveMode.current = 'close'; }}
+                            disabled={saving}
+                            className="disabled:opacity-50 px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 border border-[#E8DFD8] text-[#180200] text-xs sm:text-sm font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-2xs"
+                          >
+                            <Save className="w-3.5 h-3.5 text-[#863221]" />
+                            <span>Save & Close</span>
+                          </button>
+
+                          <button
+                            type="submit"
+                            onClick={() => { saveMode.current = 'new'; }}
+                            disabled={saving}
+                            className="disabled:opacity-50 px-4 py-2 rounded-xl bg-[#510601] hover:bg-[#680801] text-white text-xs sm:text-sm font-bold shadow-2xs hover:shadow transition-all cursor-pointer inline-flex items-center gap-1.5"
+                          >
+                            <Save className="w-3.5 h-3.5 text-white" />
+                            <span>Save & New</span>
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
