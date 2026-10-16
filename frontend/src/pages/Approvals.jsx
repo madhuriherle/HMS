@@ -394,8 +394,13 @@ export default function Approvals() {
       const { _warning: _, _previous: __, ...newVals } = payload;
       const action = String(raw.action || '').toUpperCase();
 
-      const newFlat = flattenPayload(newVals);
-      const prevFlat = prev ? flattenPayload(prev) : null;
+      // the request body is usually wrapped once ({ receipt_in: { ... } }): show the fields themselves, not "Receipt In ›"
+      const unwrap = (o) => {
+        const ks = Object.keys(o || {});
+        return ks.length === 1 && o[ks[0]] && typeof o[ks[0]] === 'object' && !Array.isArray(o[ks[0]]) ? o[ks[0]] : o;
+      };
+      const newFlat = flattenPayload(unwrap(newVals));
+      const prevFlat = prev ? flattenPayload(unwrap(prev)) : null;
 
       if (action === 'CREATE') {
         const keys = Object.keys(newFlat).filter((k) => !isEmptyVal(newFlat[k]));
@@ -445,6 +450,8 @@ export default function Approvals() {
 
     return [];
   }, [viewItem]);
+  // a request that creates a record has nothing before it: show the fields and their values only
+  const isNewRecord = comparisonRows.length > 0 && comparisonRows.every((r) => r.previous === '—');
 
   return (
     <PermissionGate required="approvals.read">
@@ -765,11 +772,13 @@ export default function Approvals() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-[#863221]">
-                    Comparison (Previous vs. Proposed)
+                    {isNewRecord ? 'New record' : 'Comparison (Previous vs. Proposed)'}
                   </h3>
-                  <span className="text-[10px] font-medium text-[#863221]/70">
-                    Highlighted rows indicate changes
-                  </span>
+                  {!isNewRecord && (
+                    <span className="text-[10px] font-medium text-[#863221]/70">
+                      Highlighted rows indicate changes
+                    </span>
+                  )}
                 </div>
 
                 {comparisonRows.length === 0 ? (
@@ -781,12 +790,14 @@ export default function Approvals() {
                     <table className="w-full text-left border-collapse text-xs">
                       <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[11px] font-bold uppercase tracking-wider">
                         <tr>
-                          <th className="py-2.5 px-4 w-[28%] text-[#863221]">Field / Property</th>
-                          <th className="py-2.5 px-4 w-[36%] bg-rose-50/50 text-rose-800 border-r border-[#E8DFD8]">
-                            Previous / Current Value
-                          </th>
-                          <th className="py-2.5 px-4 w-[36%] bg-emerald-50/50 text-emerald-800">
-                            Proposed / New Value
+                          <th className={`py-2.5 px-4 text-[#863221] ${isNewRecord ? 'w-[40%]' : 'w-[28%]'}`}>Field / Property</th>
+                          {!isNewRecord && (
+                            <th className="py-2.5 px-4 w-[36%] bg-rose-50/50 text-rose-800 border-r border-[#E8DFD8]">
+                              Previous / Current Value
+                            </th>
+                          )}
+                          <th className="py-2.5 px-4 bg-emerald-50/50 text-emerald-800">
+                            {isNewRecord ? 'Value' : 'Proposed / New Value'}
                           </th>
                         </tr>
                       </thead>
@@ -803,13 +814,14 @@ export default function Approvals() {
                             <td className="py-2.5 px-4 font-medium text-[#180200] align-top">
                               <div className="flex items-center gap-1.5">
                                 <span>{row.field}</span>
-                                {row.changed && (
+                                {row.changed && !isNewRecord && (
                                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200">
                                     Diff
                                   </span>
                                 )}
                               </div>
                             </td>
+                            {!isNewRecord && (
                             <td className="py-2.5 px-4 text-[#863221] border-r border-[#E8DFD8] bg-rose-50/15 align-top">
                               <div
                                 className={
@@ -821,6 +833,7 @@ export default function Approvals() {
                                 {row.previous}
                               </div>
                             </td>
+                            )}
                             <td className="py-2.5 px-4 text-[#180200] bg-emerald-50/15 align-top">
                               <div
                                 className={
