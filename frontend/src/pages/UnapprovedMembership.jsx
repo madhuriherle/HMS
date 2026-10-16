@@ -217,8 +217,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [assignSearch, setAssignSearch] = useState('');
   const [assignFrom, setAssignFrom] = useState('');
   const [assignTo, setAssignTo] = useState('');
-  const [assignMin, setAssignMin] = useState('');
-  const [assignMax, setAssignMax] = useState('');
   const [assignMatchOnly, setAssignMatchOnly] = useState(false);
   const [assignPage, setAssignPage] = useState(1);
   const [assignPageSize, setAssignPageSize] = useState(10);
@@ -240,6 +238,25 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   // the API behind Map enforces receipts.write; the sibling Bulk Mapping screen uses the page privilege,
   // so either one is enough to press it
   const canMapReceipts = hasPermission('receipts.bulk_mapping.write') || hasPermission('receipts.write');
+  // what a receipt was for: the first line, and +N when there are more
+  const assignItemsText = (c) => {
+    const lines = c.items || [];
+    if (lines.length === 0) return String(c.receipt_type || '').replace(/_/g, ' ') || '—';
+    const first = lines[0].detail && lines[0].detail !== lines[0].particular ? `${lines[0].particular} › ${lines[0].detail}` : lines[0].particular;
+    return lines.length > 1 ? `${first} +${lines.length - 1}` : first;
+  };
+  const assignButton = (c) => (
+    <button
+      type="button"
+      onClick={() => handleMapReceipt(c)}
+      disabled={!canMapReceipts || mappingReceiptId === c.receipt_id}
+      className={`btn-act btn-act-ok ${canMapReceipts ? '' : 'opacity-40 cursor-not-allowed'}`}
+      title={canMapReceipts ? `Assign receipt ${c.receipt_number}` : 'Requires the receipts write privilege'}
+    >
+      {mappingReceiptId === c.receipt_id ? <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" /> : <Link2 className="w-3.5 h-3.5 shrink-0" />}
+      <span>Assign</span>
+    </button>
+  );
   const canChangeReceipt = canMapReceipts && hasPermission('receipts.delete'); // un-mapping the old one needs delete
 
   // Districts for dropdown filter
@@ -322,8 +339,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           ...(assignDebounced.trim() ? { search: assignDebounced.trim() } : {}),
           ...(assignFrom ? { from_date: assignFrom } : {}),
           ...(assignTo ? { to_date: assignTo } : {}),
-          ...(assignMin !== '' ? { min_amount: assignMin } : {}),
-          ...(assignMax !== '' ? { max_amount: assignMax } : {}),
           ...(assignMatchOnly ? { likely_only: true } : {}),
         },
       });
@@ -349,8 +364,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     setAssignSearch('');
     setAssignFrom('');
     setAssignTo('');
-    setAssignMin('');
-    setAssignMax('');
     setAssignMatchOnly(false);
     setAssignPage(1);
   };
@@ -406,11 +419,11 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     const timer = setTimeout(() => setAssignDebounced(assignSearch), 350);
     return () => clearTimeout(timer);
   }, [assignSearch]);
-  useEffect(() => { setAssignPage(1); }, [assignDebounced, assignFrom, assignTo, assignMin, assignMax, assignMatchOnly, assignPageSize]);
+  useEffect(() => { setAssignPage(1); }, [assignDebounced, assignFrom, assignTo, assignMatchOnly, assignPageSize]);
   useEffect(() => {
     loadAssignCandidates();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assigningMember?.id, assignPage, assignPageSize, assignDebounced, assignFrom, assignTo, assignMin, assignMax, assignMatchOnly]);
+  }, [assigningMember?.id, assignPage, assignPageSize, assignDebounced, assignFrom, assignTo, assignMatchOnly]);
 
   // ----------------------------------------------------
   // APPROVAL TRIGGER & VALIDATION
@@ -849,27 +862,22 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
         <Modal
           isOpen
           onClose={() => setAssigningMember(null)}
-          title={`Assign a receipt to ${assigningMember.fullName || assigningMember.name}`}
+          title={
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="truncate">Assign a receipt to {assigningMember.fullName || assigningMember.name}</span>
+              <span className="text-[11px] font-mono font-normal text-[#863221]">
+                ID {assigningMember.id}{assigningMember.mobile ? ` · ${assigningMember.mobile}` : ''}
+              </span>
+              <span className={`chip ${replacingReceipt || assigningMember.receiptStatus === 'Assigned' ? 'chip-on' : 'chip-warn'}`}>
+                {replacingReceipt ? `Replacing receipt ${replacingReceipt.receiptNumber}` : assigningMember.receiptStatus === 'Assigned' ? `Receipt ${assigningMember.assignedReceiptNumber}` : 'Not assigned'}
+              </span>
+            </span>
+          }
           maxWidthClass="max-w-6xl"
           heightClass="h-[90vh]"
           footer={<ModalFooter kind="view" onCancel={() => setAssigningMember(null)} />}
         >
           <div className="p-5 flex flex-col gap-4 flex-1 min-h-0">
-            {/* Who the money will be mapped to */}
-            <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-sm font-bold text-[#180200]">{assigningMember.fullName || assigningMember.name}</div>
-                <div className="text-[11px] text-[#863221] font-mono mt-0.5">
-                  ID {assigningMember.id}
-                  {assigningMember.mobile ? ` · ${assigningMember.mobile}` : ''}
-                  {assigningMember.membershipType ? ` · ${assigningMember.membershipType}` : ''}
-                </div>
-              </div>
-              <span className={`chip ${assigningMember.receiptStatus === 'Assigned' ? 'chip-on' : 'chip-warn'}`}>
-                {replacingReceipt ? `Replacing receipt ${replacingReceipt.receiptNumber}` : assigningMember.receiptStatus === 'Assigned' ? `Receipt ${assigningMember.assignedReceiptNumber}` : 'No receipt yet'}
-              </span>
-            </div>
-
             {/* Search and filters */}
             <div className="flex flex-wrap items-end gap-2">
               <div className="relative flex-1 min-w-[220px]">
@@ -891,10 +899,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                 <DateInput value={assignTo} onChange={(e) => setAssignTo(e.target.value)} placeholder="To date"
                   className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]" />
               </div>
-              <input type="number" min="0" value={assignMin} onChange={(e) => setAssignMin(e.target.value)} placeholder="Min ₹"
-                className="w-[90px] px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]" />
-              <input type="number" min="0" value={assignMax} onChange={(e) => setAssignMax(e.target.value)} placeholder="Max ₹"
-                className="w-[90px] px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]" />
               <div className="inline-flex rounded-xl border border-[#E8DFD8] bg-white p-0.5 text-xs font-bold">
                 <button type="button" onClick={() => setAssignMatchOnly(false)}
                   className={`px-3 py-1.5 rounded-lg cursor-pointer ${!assignMatchOnly ? 'bg-[#510601] text-white' : 'text-[#863221]'}`}>All</button>
@@ -923,7 +927,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
               <div className="py-12 text-center">
                 <CheckCircle2 className="w-7 h-7 text-[#3D705C]/50 mx-auto mb-1.5" />
                 <p className="font-semibold text-sm text-[#180200]">
-                  {!(assignDebounced.trim() || assignFrom || assignTo || assignMin !== '' || assignMax !== '' || assignMatchOnly) ? 'No receipt is waiting for a member' : 'No receipt matches these filters'}
+                  {!(assignDebounced.trim() || assignFrom || assignTo || assignMatchOnly) ? 'No receipt is waiting for a member' : 'No receipt matches these filters'}
                 </p>
               </div>
             ) : assignView === 'table' ? (
@@ -931,81 +935,57 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                 <table className="w-full text-left border-collapse text-xs">
                   <thead className="bg-[#FAF7F2] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
                     <tr>
-                      <th className="py-2.5 px-3">Receipt No.</th>
-                      <th className="py-2.5 px-3">Date</th>
-                      <th className="py-2.5 px-3 text-right">Amount</th>
-                      <th className="py-2.5 px-3">Payer</th>
-                      <th className="py-2.5 px-3">No. on Receipt</th>
-                      <th className="py-2.5 px-3 text-right">Map</th>
+                      <th className="py-2 px-3">Receipt No.</th>
+                      <th className="py-2 px-3">Date</th>
+                      <th className="py-2 px-3">Payer</th>
+                      <th className="py-2 px-3">Particulars</th>
+                      <th className="py-2 px-3">Mode</th>
+                      <th className="py-2 px-3 text-right">Amount</th>
+                      <th className="py-2 px-3 text-right"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E8DFD8]">
-                    {assignPageRows.map((c) => {
-                      const hinted = c.likely_score > 0;
-                      return (
-                        <tr key={c.receipt_id} className="bg-white hover:bg-[#FAF7F2] transition-colors">
-                          <td className="py-2.5 px-3 align-top">
-                            <div className="font-mono font-bold text-[#510601]">{c.receipt_number}</div>
-                            {hinted && <span className="chip chip-on mt-1">likely match</span>}
-                          </td>
-                          <td className="py-2.5 px-3 align-top text-[#180200] whitespace-nowrap">{formatDate(c.receipt_date)}</td>
-                          <td className="py-2.5 px-3 align-top text-right font-bold text-[#180200] whitespace-nowrap">{formatMoney(c.net_amount)}</td>
-                          <td className="py-2.5 px-3 align-top text-[#180200]">
-                            {c.payer_name || '—'}
-                            {c.payer_mobile ? <div className="text-[10px] font-mono text-[#863221]">{c.payer_mobile}</div> : null}
-                          </td>
-                          <td className="py-2.5 px-3 align-top font-mono text-[#863221]">{c.payer_membership_no || '—'}</td>
-                          <td className="py-2.5 px-3 align-top text-right">
-                            <button
-                              type="button"
-                              onClick={() => handleMapReceipt(c)}
-                              disabled={!canMapReceipts || mappingReceiptId === c.receipt_id}
-                              className={`btn-act btn-act-ok ${canMapReceipts ? '' : 'opacity-40 cursor-not-allowed'}`}
-                              title={canMapReceipts ? `Map receipt ${c.receipt_number}` : 'Requires the receipts write privilege'}
-                            >
-                              {mappingReceiptId === c.receipt_id ? <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" /> : <Link2 className="w-3.5 h-3.5 shrink-0" />}
-                              <span>Map</span>
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                    {assignPageRows.map((c) => (
+                      <tr key={c.receipt_id} className="bg-white hover:bg-[#FAF7F2] transition-colors">
+                        <td className="py-1.5 px-3 whitespace-nowrap">
+                          <span className="font-mono font-bold text-[#510601]">{c.receipt_number}</span>
+                          {c.likely_score > 0 && <span className="chip chip-on ml-2">likely</span>}
+                        </td>
+                        <td className="py-1.5 px-3 text-[#180200] whitespace-nowrap">{formatDate(c.receipt_date)}</td>
+                        <td className="py-1.5 px-3 text-[#180200]">
+                          {c.payer_name || '—'}
+                          {c.payer_mobile ? <span className="ml-2 font-mono text-[10px] text-[#863221]">{c.payer_mobile}</span> : null}
+                        </td>
+                        <td className="py-1.5 px-3 text-[#180200]">{assignItemsText(c)}</td>
+                        <td className="py-1.5 px-3 text-[#863221] whitespace-nowrap">{c.payment_mode || '—'}</td>
+                        <td className="py-1.5 px-3 text-right font-bold text-[#180200] whitespace-nowrap">{formatMoney(c.net_amount)}</td>
+                        <td className="py-1.5 px-3 text-right">{assignButton(c)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                {assignPageRows.map((c) => {
-                  const hinted = c.likely_score > 0;
-                  return (
-                    <div key={c.receipt_id} className={`rounded-xl border p-3 bg-white ${hinted ? 'border-[#3D705C]/50' : 'border-[#E8DFD8]'}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="font-mono font-bold text-sm text-[#510601]">{c.receipt_number}</div>
-                          <div className="text-[11px] text-[#863221]">{formatDate(c.receipt_date)}</div>
-                        </div>
-                        <div className="text-right font-bold text-sm text-[#180200]">{formatMoney(c.net_amount)}</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {assignPageRows.map((c) => (
+                  <div key={c.receipt_id} className={`rounded-xl border p-2.5 bg-white flex flex-col gap-1 min-w-0 ${c.likely_score > 0 ? 'border-[#3D705C]/50' : 'border-[#E8DFD8]'}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-mono font-bold text-sm text-[#510601]">{c.receipt_number}</div>
+                        <div className="text-[10px] text-[#863221]">{formatDate(c.receipt_date)}</div>
                       </div>
-                      <div className="mt-2 text-xs text-[#180200]">
-                        {c.payer_name || '—'}
-                        {c.payer_mobile ? <span className="ml-2 font-mono text-[11px] text-[#863221]">{c.payer_mobile}</span> : null}
-                      </div>
-                      {c.payer_membership_no ? <div className="text-[11px] font-mono text-[#863221]">No. {c.payer_membership_no}</div> : null}
-                      <div className="mt-2 flex items-center justify-between">
-                        {hinted ? <span className="chip chip-on">likely match</span> : <span />}
-                        <button
-                          type="button"
-                          onClick={() => handleMapReceipt(c)}
-                          disabled={!canMapReceipts || mappingReceiptId === c.receipt_id}
-                          className={`btn-act btn-act-ok ${canMapReceipts ? '' : 'opacity-40 cursor-not-allowed'}`}
-                        >
-                          {mappingReceiptId === c.receipt_id ? <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" /> : <Link2 className="w-3.5 h-3.5 shrink-0" />}
-                          <span>Map</span>
-                        </button>
-                      </div>
+                      <div className="text-right font-bold text-sm text-[#180200] whitespace-nowrap">{formatMoney(c.net_amount)}</div>
                     </div>
-                  );
-                })}
+                    <div className="text-xs font-semibold text-[#180200] truncate" title={c.payer_name || ''}>{c.payer_name || '—'}</div>
+                    {c.payer_mobile ? <div className="text-[11px] font-mono text-[#863221]">{c.payer_mobile}</div> : null}
+                    {c.payer_pan ? <div className="text-[10px] font-mono text-[#863221]">PAN {c.payer_pan}</div> : null}
+                    <div className="text-[11px] text-[#7D7068] truncate" title={assignItemsText(c)}>{assignItemsText(c)}</div>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span className="text-[10px] text-[#863221]">{c.payment_mode || ''}{c.likely_score > 0 ? ' · likely match' : ''}</span>
+                      {assignButton(c)}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 

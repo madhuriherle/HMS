@@ -1095,6 +1095,18 @@ def get_unassigned_candidates(
         ):
             matched_by_num.setdefault(mm.membership_number.strip().upper(), m)
 
+    lines_by_receipt = {}
+    if rows:
+        for it in (
+            db.query(ReceiptItem)
+            .filter(ReceiptItem.receipt_id.in_([r.id for r, _ in rows]), ReceiptItem.is_deleted == False)  # noqa: E712
+            .order_by(ReceiptItem.receipt_id, ReceiptItem.line_no, ReceiptItem.id)
+            .all()
+        ):
+            lines_by_receipt.setdefault(it.receipt_id, []).append(
+                {"particular": it.particular_name or it.item_type, "detail": it.description, "amount": float(it.amount)}
+            )
+
     candidates = []
     for r, likely in rows:
         key = (r.payer_membership_no or "").strip().upper()
@@ -1107,6 +1119,10 @@ def get_unassigned_candidates(
             "payer_name": r.payer_name,
             "payer_membership_no": r.payer_membership_no,
             "payer_mobile": r.payer_mobile,
+            "payer_pan": r.payer_pan,
+            "payment_mode": r.payment_mode,
+            "receipt_type": r.receipt_type,
+            "items": lines_by_receipt.get(r.id, []),
             "match_type": "EXACT_NUMBER" if matched_m else "NONE",
             "matched_member": None,
             "likely_score": int(likely or 0),
