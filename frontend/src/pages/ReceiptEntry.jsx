@@ -180,6 +180,8 @@ export default function ReceiptEntry() {
   const [bottomTotal, setBottomTotal] = useState(0);
   const [bottomPages, setBottomPages] = useState(1);
   const [listsVersion, setListsVersion] = useState(0); // bumped to read both lists again
+  const [rightLoading, setRightLoading] = useState(false);
+  const [bottomLoading, setBottomLoading] = useState(false);
   const [selectedMemberReceipts, setSelectedMemberReceipts] = useState([]); // receipts of the member picked
   const [membershipTypes, setMembershipTypes] = useState([]);
   const [paymentModeConfigs, setPaymentModeConfigs] = useState([]);
@@ -1304,6 +1306,7 @@ export default function ReceiptEntry() {
   useEffect(() => {
     if (!locations.districts.length && !dataReady) return;
     const seq = (rightSeq.current += 1);
+    setRightLoading(true);
     fetchMemberPage({ approval_status: 'APPROVED', page: rightPage, limit: rightPageSize, ...(debouncedRightTerm ? { search: debouncedRightTerm } : {}) })
       .then((res) => {
         if (seq !== rightSeq.current) return;
@@ -1311,7 +1314,10 @@ export default function ReceiptEntry() {
         setRightTotal(res.total);
         setRightPages(Math.max(1, res.pages));
       })
-      .catch((error) => showToast(apiErrorMessage(error, 'Failed to load the Membership List from the server.'), 'error'));
+      .catch((error) => showToast(apiErrorMessage(error, 'Failed to load the Membership List from the server.'), 'error'))
+      .finally(() => {
+        if (seq === rightSeq.current) setRightLoading(false);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedRightTerm, rightPage, rightPageSize, listsVersion, dataReady]);
 
@@ -1319,6 +1325,7 @@ export default function ReceiptEntry() {
   useEffect(() => {
     if (!locations.districts.length && !dataReady) return;
     const seq = (bottomSeq.current += 1);
+    setBottomLoading(true);
     fetchMemberPage({ approval_status: 'UNAPPROVED', receipt_assigned: false, page: unapprovedPage, limit: unapprovedPageSize, ...(debouncedBottomTerm ? { search: debouncedBottomTerm } : {}) })
       .then((res) => {
         if (seq !== bottomSeq.current) return;
@@ -1326,7 +1333,10 @@ export default function ReceiptEntry() {
         setBottomTotal(res.total);
         setBottomPages(Math.max(1, res.pages));
       })
-      .catch((error) => showToast(apiErrorMessage(error, 'Failed to load the unassigned members from the server.'), 'error'));
+      .catch((error) => showToast(apiErrorMessage(error, 'Failed to load the unassigned members from the server.'), 'error'))
+      .finally(() => {
+        if (seq === bottomSeq.current) setBottomLoading(false);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedBottomTerm, unapprovedPage, unapprovedPageSize, listsVersion, dataReady]);
 
@@ -2388,15 +2398,23 @@ export default function ReceiptEntry() {
                     >
                       <Search className="w-4 h-4" />
                     </button>
-                    {/* refresh the list only: the search box above it goes, the fields typed in the form stay */}
+                    {/* refresh the list: clears right search and unconstrains the list to show all members without clearing form inputs */}
                     <button
                       type="button"
-                      onClick={() => { setRightSearchQuery(''); setRightPage(1); setListsVersion((v) => v + 1); }}
-                      className="w-8 h-8 rounded-xl bg-white border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] flex items-center justify-center cursor-pointer"
+                      disabled={rightLoading}
+                      onClick={() => {
+                        setRightSearchQuery('');
+                        setTypingOrder([]);
+                        setDebouncedRightTerm('');
+                        setRightPage(1);
+                        setListsVersion((v) => v + 1);
+                        showToast('Membership list refreshed', 'info');
+                      }}
+                      className="w-8 h-8 rounded-xl bg-white border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] disabled:opacity-50 flex items-center justify-center cursor-pointer transition-colors"
                       title="Refresh the Membership List"
                       aria-label="Refresh the Membership List"
                     >
-                      <RotateCcw className="w-4 h-4" />
+                      <RotateCcw className={`w-4 h-4 ${rightLoading ? 'animate-spin' : ''}`} />
                     </button>
                     <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#510601]/10 text-[#510601] border border-[#510601]/20 shrink-0">
                       {totalRightMembers} Members
@@ -2406,7 +2424,7 @@ export default function ReceiptEntry() {
               </div>
 
               {/* Membership Cards Directory */}
-              <div className="p-3 sm:p-4 space-y-2.5 max-h-[540px] min-h-[460px] overflow-y-auto custom-scrollbar bg-[#FAF7F2]/30">
+              <div className={`p-3 sm:p-4 space-y-2.5 max-h-[540px] min-h-[460px] overflow-y-auto custom-scrollbar bg-[#FAF7F2]/30 transition-opacity ${rightLoading ? 'opacity-50 pointer-events-none' : ''}`}>
                 {paginatedRightMembers.length === 0 ? (
                   <div className="py-12 text-center text-[#863221]">
                     <div className="w-10 h-10 rounded-2xl bg-[#510601]/5 text-[#510601] flex items-center justify-center mx-auto mb-2 border border-[#510601]/10">
@@ -2629,16 +2647,19 @@ export default function ReceiptEntry() {
 
               <button
                 type="button"
+                disabled={bottomLoading}
                 onClick={() => {
                   setUnapprovedSearchQuery('');
+                  setDebouncedBottomTerm('');
                   setUnapprovedPage(1);
                   setListsVersion((v) => v + 1);
+                  showToast('Unassigned members refreshed', 'info');
                 }}
-                className="w-8 h-8 rounded-xl bg-white border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] flex items-center justify-center cursor-pointer transition-colors"
+                className="w-8 h-8 rounded-xl bg-white border border-[#E8DFD8] text-[#863221] hover:bg-[#FAF7F2] disabled:opacity-50 flex items-center justify-center cursor-pointer transition-colors"
                 title="Refresh Unapproved Members"
                 aria-label="Refresh Unapproved Members"
               >
-                <RotateCcw className="w-4 h-4" />
+                <RotateCcw className={`w-4 h-4 ${bottomLoading ? 'animate-spin' : ''}`} />
               </button>
 
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
@@ -2648,7 +2669,7 @@ export default function ReceiptEntry() {
           </div>
 
           {/* Table Content */}
-          <div className="overflow-x-auto min-h-[200px]">
+          <div className={`overflow-x-auto min-h-[200px] transition-opacity ${bottomLoading ? 'opacity-50 pointer-events-none' : ''}`}>
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-[#E8DFD8] bg-[#FAF7F2] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
