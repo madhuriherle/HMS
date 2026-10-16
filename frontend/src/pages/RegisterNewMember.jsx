@@ -1026,7 +1026,8 @@ export default function RegisterNewMember() {
               {isViewMode ? 'View Member Details' : isEditMode ? 'Edit Member Details' : 'Register New Member'}
             </PageTitle>
 
-            {/* Clean Form Header */}
+            {/* Header strip: only when viewing / editing a member (their ID, membership number and status). A new registration has none, so the form starts at Personal Details. */}
+            {(isViewMode || isEditMode) && (
             <div className="px-6 sm:px-8 py-3.5 border-b border-[#E8DFD8] bg-[#FAF7F2]/40">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -1042,7 +1043,7 @@ export default function RegisterNewMember() {
                   )}
                 </div>
                 <div className="text-xs sm:text-sm text-[#863221] font-medium shrink-0 ml-auto">
-                  {isViewMode ? (
+                  {isViewMode && (
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${
                       targetMember?.status === 'Unapproved' || targetMember?.approvalStatus === 'Unapproved'
                         ? 'bg-amber-50 text-amber-800 border-amber-200'
@@ -1050,14 +1051,11 @@ export default function RegisterNewMember() {
                     }`}>
                       {targetMember?.status === 'Unapproved' || targetMember?.approvalStatus === 'Unapproved' ? 'Unapproved' : (targetMember?.status || targetMember?.approvalStatus || 'Active Member')}
                     </span>
-                  ) : (
-                    <span className="flex items-center gap-1">
-                      <span className="text-red-600 font-bold">*</span> All fields required unless noted
-                    </span>
                   )}
                 </div>
               </div>
             </div>
+            )}
 
             {/* Form Body */}
             <form onSubmit={handleSaveMember}>
