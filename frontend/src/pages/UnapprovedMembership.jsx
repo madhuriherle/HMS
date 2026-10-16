@@ -944,6 +944,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                       <th className="py-2 px-3">Receipt No.</th>
                       <th className="py-2 px-3">Date</th>
                       <th className="py-2 px-3">Payer</th>
+                      {assignShowAll && <th className="py-2 px-3">Particulars</th>}
                       <th className="py-2 px-3 text-right">Amount</th>
                       <th className="py-2 px-3 text-right"></th>
                     </tr>
@@ -960,6 +961,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           {c.payer_name || '—'}
                           {c.payer_mobile ? <span className="ml-2 font-mono text-[10px] text-[#863221]">{c.payer_mobile}</span> : null}
                         </td>
+                        {assignShowAll && <td className="py-1.5 px-3 text-[#180200]">{assignItemsText(c)}</td>}
                         <td className="py-1.5 px-3 text-right font-bold text-[#180200] whitespace-nowrap">{formatMoney(c.net_amount)}</td>
                         <td className="py-1.5 px-3 text-right">{assignButton(c)}</td>
                       </tr>
@@ -981,6 +983,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                     <div className="text-xs font-semibold text-[#180200] truncate" title={c.payer_name || ''}>{c.payer_name || '—'}</div>
                     {c.payer_mobile ? <div className="text-[11px] font-mono text-[#863221]">{c.payer_mobile}</div> : null}
                     {c.payer_pan ? <div className="text-[10px] font-mono text-[#863221]">PAN {c.payer_pan}</div> : null}
+                    {assignShowAll && <div className="text-[11px] text-[#7D7068] truncate" title={assignItemsText(c)}>{assignItemsText(c)}</div>}
                     <div className="mt-1 flex items-center justify-between gap-2">
                       <span className="text-[10px] text-[#863221]">{c.likely_score > 0 ? 'likely match' : ''}</span>
                       {assignButton(c)}
