@@ -819,31 +819,6 @@ export default function ReceiptTracking() {
 
             {/* Modal Body */}
             <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
-              {/* Status Header Chip */}
-              <div className="p-3 bg-[#FAF7F2]/60 rounded-xl border border-[#E8DFD8] flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221] block">Status</span>
-                  {isReceiptUnmapped(viewingReceipt) ? (
-                    <span className="inline-flex items-center gap-1 mt-0.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-700" />
-                      <span>Unassigned</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 mt-0.5 px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
-                      <span>Assigned to Member {viewingReceipt.membershipNo || viewingReceipt.memberId}</span>
-                    </span>
-                  )}
-                </div>
-
-                <div className="text-right">
-                  <span className="text-[10px] uppercase font-bold text-[#863221] block">Amount Paid</span>
-                  <span className="text-base font-extrabold text-[#510601]">
-                    {formatMoney(viewingReceipt.amount)}
-                  </span>
-                </div>
-              </div>
-
               {/* Member Details */}
               <div className="bg-white rounded-xl p-4 border border-[#E8DFD8] space-y-2.5">
                 <span className="text-[11px] font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
@@ -891,7 +866,8 @@ export default function ReceiptTracking() {
                       <p className="font-bold text-[#510601] mt-0.5">{viewingReceipt.particulars || 'Membership'}</p>
                     )}
                   </div>
-                  {viewingReceipt.items?.length > 1 && (
+                  {/* the same Particulars list with its Total for every receipt, even one with a single particular */}
+                  {viewingReceipt.items?.length > 0 && (
                     <div className="col-span-2 sm:col-span-3">
                       <span className="text-[10px] uppercase font-bold text-[#863221]">Particulars</span>
                       <div className="mt-1 rounded-xl border border-[#E8DFD8] overflow-hidden">
