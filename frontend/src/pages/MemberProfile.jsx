@@ -461,9 +461,8 @@ function FamilyTab({ id }) {
       {(f) => {
         const children = Array.isArray(f.children) ? f.children : [];
         const hasFamily = f.father_name || f.mother_name || f.spouse_name || children.length > 0;
-        const hasOther = f.family_membership_number || f.family_membership_name || f.referred_by_name || f.referred_by_number || f.referred_by;
         return (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 gap-5">
             <Card icon={Users} title="Family">
               {!hasFamily ? (
                 <Empty>No family details recorded.</Empty>
@@ -481,18 +480,6 @@ function FamilyTab({ id }) {
                       links={links}
                     />
                   ))}
-                </div>
-              )}
-            </Card>
-            <Card icon={Users} title="Family membership & referral">
-              {!hasOther ? (
-                <Empty>No family membership or referral recorded.</Empty>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Family membership name" value={f.family_membership_name} />
-                  <Field label="Family membership no." value={f.family_membership_number} />
-                  <Field label="Referred by" value={f.referred_by?.name || f.referred_by_name} />
-                  <Field label="Referrer's number" value={f.referred_by?.member_code || f.referred_by_number} />
                 </div>
               )}
             </Card>
