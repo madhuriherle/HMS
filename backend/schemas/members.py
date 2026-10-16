@@ -22,6 +22,7 @@ EDITABLE_MEMBER_FIELDS: Set[str] = {
 
     "aadhaar_number", "referred_by_member_id",
     "name_title", "whatsapp_country_code", "applied_on_behalf_of", "magazine_needed",
+    "magazine_delivery_address", "magazine_kind", "magazine_email",
     "membership_type_category", "referred_by_number", "referred_by_name",
     "family_membership_number", "family_membership_name", "registration_payment",
     "state_id", "district_id", "taluk_id", "pincode_id",

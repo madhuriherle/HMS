@@ -426,6 +426,7 @@ def read_postal_codes(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
     pincode: Optional[str] = None,
+    pincode_starts: Optional[str] = None,  # PIN autocomplete / lookup: the PINs that begin with these digits
     state_id: Optional[int] = None,
     district_id: Optional[int] = None,
     taluk_id: Optional[int] = None,
@@ -447,6 +448,8 @@ def read_postal_codes(
     )
     if pincode:
         q = q.filter(PostalCode.pincode.ilike(f"%{pincode}%"))
+    if pincode_starts:
+        q = q.filter(PostalCode.pincode.like(f"{pincode_starts.strip()}%")).order_by(PostalCode.pincode, PostalCode.id)
     if state_id:
         q = q.filter(PostalCode.state_id == state_id)
     if district_id:

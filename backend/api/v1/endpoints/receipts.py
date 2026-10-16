@@ -26,7 +26,7 @@ from services import approval_gate
 from services.exports import render_export
 from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import func, or_
-from models.masters import MembershipType, Particular
+from models.masters import MembershipType, Particular, PaymentMode
 
 from services import membership_credit, receipt_status
 
@@ -595,6 +595,11 @@ def read_receipt_tracking_options(
         "financial_years": [f"{y}-{str(y + 1)[-2:]}" for y in years],
         "sub_types": {k: sorted(v) for k, v in sub_types.items()},
         "payment_modes": sorted(m for m in modes if m),
+        # the active particulars and configured payment modes too, so the page needs no master-list calls for its filters
+        "particulars": sorted(n for (n,) in db.query(Particular.name_en).filter(
+            Particular.is_deleted == False, Particular.status == True, Particular.parent_id.is_(None)).all() if n),  # noqa: E712
+        "configured_payment_modes": sorted({m for (m,) in db.query(PaymentMode.payment_mode).filter(
+            PaymentMode.is_deleted == False, PaymentMode.status == True).all() if m}),  # noqa: E712
     }
 
 
@@ -657,7 +662,10 @@ def activate_member_from_receipt(
         raise HTTPException(409, "Linked member is already approved/active")
 
     from services.member_activation import activate_member
-    member = activate_member(db, member, activated_by=current_user.id)
+    member = activate_member(
+        db, member, activated_by=current_user.id,
+        reason=f"Activated from receipt {receipt.receipt_number or receipt.id}"
+    )
     db.commit()
     db.refresh(member)
 
@@ -1308,6 +1316,7 @@ def delete_receipt(
     current_user: User = Depends(deps.require_permission("receipts.delete")),
     id: int,
     force: bool = False,
+    reason: Optional[str] = Query(None, description="Reason for receipt deletion"),
     dry_run: bool = Query(False, include_in_schema=False),
 ) -> Any:
     receipt = crud_receipts.receipt.get(db, id)
@@ -1328,9 +1337,16 @@ def delete_receipt(
         receipt_status.refresh(db, receipt)
     if dry_run is True:
         return None
+    if reason:
+        reason_note = f"[Deleted: {reason.strip()}]"
+        receipt.notes = f"{receipt.notes} {reason_note}".strip() if receipt.notes else reason_note
+        db.flush()
     members = removed_members
     removed = crud_receipts.receipt.remove(db, id=id, deleted_by=current_user.id)
-    membership_credit.flag_for_review(db, members, f"receipt {receipt.receipt_number} was deleted")
+    review_msg = f"receipt {receipt.receipt_number} was deleted"
+    if reason:
+        review_msg += f" ({reason.strip()})"
+    membership_credit.flag_for_review(db, members, review_msg)
     return removed
 
 

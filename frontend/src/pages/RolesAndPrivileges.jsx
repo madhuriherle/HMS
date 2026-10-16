@@ -71,7 +71,7 @@ export default function RolesAndPrivileges() {
   });
 
   const fetchRoles = async () => {
-    const rolesRes = await api.get('/users/roles', { params: { limit: 500 } });
+    const rolesRes = await api.get('/users/roles', { params: { limit: 200 } });
     const rows = Array.isArray(rolesRes.data)
       ? rolesRes.data
       : (rolesRes.data?.data || rolesRes.data?.items || []);

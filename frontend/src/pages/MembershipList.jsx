@@ -42,9 +42,9 @@ import {
 import { calculateMemberMembershipStatus } from '../utils/displayHelpers';
 import {
   loadLocations,
+  lookupPin,
   loadMembershipTypes,
   loadGothras,
-  findLocationByPin
 } from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
@@ -85,7 +85,6 @@ export default function MembershipList() {
   const [states, setStates] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [taluks, setTaluks] = useState([]);
-  const [postalCodes, setPostalCodes] = useState([]);
   const [gothras, setGothras] = useState([]);
 
   const { sort, toggle: toggleSort, params: sortParams } = useSort();
@@ -138,7 +137,6 @@ export default function MembershipList() {
       setStates(loc.states);
       setDistricts(loc.districts);
       setTaluks(loc.taluks);
-      setPostalCodes(loc.postalCodes);
       setMembershipTypes(types);
       setGothras(goth);
     } catch (error) {
@@ -378,7 +376,7 @@ export default function MembershipList() {
   const handlePinCodeLookup = async (pin) => {
     if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) return;
 
-    const lookup = findLocationByPin(postalCodes, pin);
+    const lookup = await lookupPin(pin).catch(() => ({ found: false }));
     if (lookup.found) {
       // Cascading match against master states & districts
       const matchState = states.find(

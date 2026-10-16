@@ -7159,6 +7159,16 @@ def test_member_list_carries_the_place_name(client, admin_headers):
     row = client.get("/api/v1/members/", headers=admin_headers, params={"search": "Zplacename"}).json()["data"][0]
     assert row["pincode"] == "576221" and row["post_office_name"] == "Zplace B.O"
     assert row["state_name"] == "Zplace State" and row["district_name"] == "Zplace District"
+    # the single member (the Dashboard popup) carries the same names in the same call
+    one = client.get(f"/api/v1/members/{member['id']}", headers=admin_headers).json()
+    assert one["state_name"] == "Zplace State" and one["district_name"] == "Zplace District" and one["pincode"] == "576221"
+    # the PIN directory answers one PIN at a time, with the names, so no screen downloads all 15,000
+    pins = client.get("/api/v1/masters/postal-codes", headers=admin_headers, params={"pincode_starts": "5762", "limit": 100}).json()["data"]
+    assert any(p["pincode"] == "576221" and p["state_name"] == "Zplace State" for p in pins)
+    assert all(str(p["pincode"]).startswith("5762") for p in pins)
+    # the receipt filters come in one call
+    opts = client.get("/api/v1/receipts/tracking-options", headers=admin_headers).json()
+    assert isinstance(opts["particulars"], list) and isinstance(opts["configured_payment_modes"], list)
 
 
 def test_seeding_privileges_leaves_a_deleted_privilege_deleted(client, admin_headers):

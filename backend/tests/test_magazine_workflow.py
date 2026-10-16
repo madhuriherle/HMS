@@ -167,9 +167,12 @@ def test_unsubscribed_paid_members_and_backfill(client, admin_headers):
     client.delete(f"{API}/magazines/subscriptions/{subs[0]['id']}", headers=h)
 
     # Now verify GET /magazines/unsubscribed-paid-members finds this member
-    unsub = client.get(f"{API}/magazines/unsubscribed-paid-members", headers=h).json()
-    unsub_mids = [u["member_id"] for u in unsub]
-    assert m["id"] in unsub_mids
+    unsub = client.get(f"{API}/magazines/unsubscribed-paid-members", headers=h, params={"limit": 200}).json()
+    unsub_mids = [u["member_id"] for u in unsub["data"]]
+    assert m["id"] in unsub_mids and unsub["total"] >= 1 and unsub["limit"] == 200
+    # the list is paged and searchable on the server: a page of one still reports the whole total
+    one = client.get(f"{API}/magazines/unsubscribed-paid-members", headers=h, params={"limit": 1}).json()
+    assert len(one["data"]) == 1 and one["total"] == unsub["total"]
 
     # Run backfill
     bf_res = client.post(f"{API}/magazines/backfill-subscriptions", headers=h, json={

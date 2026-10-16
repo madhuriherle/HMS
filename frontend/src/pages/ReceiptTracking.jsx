@@ -27,7 +27,6 @@ import {
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import { isReceiptUnmapped } from '../utils/displayHelpers';
-import { loadParticulars, loadPaymentModeConfigs } from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
@@ -227,13 +226,14 @@ export default function ReceiptTracking() {
     };
     await Promise.all([
       loadPage(),
-      api.get('/receipts/tracking-options').then(({ data }) => setFilterOptions(data)).catch(fail('filter options')),
-      loadParticulars()
-        .then((all) => setParticularOptions(all.filter((p) => p.status === 'Active').map((p) => p.name)))
-        .catch(fail('particulars')),
-      loadPaymentModeConfigs()
-        .then((all) => setPaymentModeOptions([...new Set(all.filter((c) => c.status === 'Active').map((c) => c.paymentMode))]))
-        .catch(fail('payment modes'))
+      // one call gives every filter: the years, sub types, payment modes in use, and the active particulars / payment modes
+      api.get('/receipts/tracking-options')
+        .then(({ data }) => {
+          setFilterOptions(data);
+          setParticularOptions(data.particulars || []);
+          setPaymentModeOptions(data.configured_payment_modes || []);
+        })
+        .catch(fail('filter options')),
     ]);
   };
 

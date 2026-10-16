@@ -187,8 +187,9 @@ export default function MagazineManagement() {
 
   const loadUnsubscribed = useCallback(async () => {
     try {
-      const { data } = await api.get('/magazines/unsubscribed-paid-members');
-      setUnsubscribedPaid(Array.isArray(data) ? data : []);
+      // only the number is needed for the banner; the Backfill window reads the rows itself
+      const { data } = await api.get('/magazines/unsubscribed-paid-members', { params: { limit: 1 } });
+      setUnsubscribedPaid({ length: data?.total || 0 });
     } catch {
       // Non-critical
     }
@@ -2070,6 +2071,7 @@ function NonMemberSettingModal({ recipient, onClose, onSaved }) {
 
 function BackfillModal({ isOpen, onClose, onBackfilled, canWrite }) {
   const [candidates, setCandidates] = useState([]);
+  const [candidatesTotal, setCandidatesTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -2077,9 +2079,10 @@ function BackfillModal({ isOpen, onClose, onBackfilled, canWrite }) {
   const loadCandidates = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/magazines/unsubscribed-paid-members');
-      const list = Array.isArray(data) ? data : [];
+      const { data } = await api.get('/magazines/unsubscribed-paid-members', { params: { limit: 200 } });
+      const list = Array.isArray(data?.data) ? data.data : [];
       setCandidates(list);
+      setCandidatesTotal(data?.total || list.length);
       setSelectedIds(list.map((c) => c.member_id));
     } catch (error) {
       notify(error.response?.data?.detail || 'Could not load candidates.', 'error');
@@ -2158,7 +2161,7 @@ function BackfillModal({ isOpen, onClose, onBackfilled, canWrite }) {
                 >
                   {selectedIds.length === candidates.length ? 'Deselect All' : 'Select All'}
                 </button>
-                <span>{selectedIds.length} of {candidates.length} selected</span>
+                <span>{selectedIds.length} of {candidates.length} selected{candidatesTotal > candidates.length ? ` (the first ${candidates.length} of ${candidatesTotal}; run it again for the rest)` : ''}</span>
               </div>
 
               <div className="border border-[#E8DFD8] rounded-xl overflow-hidden divide-y divide-[#E8DFD8]">

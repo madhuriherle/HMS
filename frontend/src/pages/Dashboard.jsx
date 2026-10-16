@@ -166,19 +166,12 @@ export default function Dashboard() {
     try {
       const { data } = await api.get(`/members/${item.id}`);
       const m = normalizeMember(data);
-      const nameOf = (path, id) =>
-        id
-          ? api.get(`/masters/${path}/${id}`).then((r) => r.data?.name_en || '').catch(() => '')
-          : Promise.resolve('');
-      const [stateName, districtName, talukName, receipts] = await Promise.all([
-        nameOf('states', data.state_id),
-        nameOf('districts', data.district_id),
-        nameOf('taluks', data.taluk_id),
-        api
-          .get('/receipts/tracking', { params: { member_id: item.id, limit: 1 } })
-          .then((r) => unwrapList(r.data))
-          .catch(() => [])
-      ]);
+      // the member comes with its state / district / taluk names; only the latest receipt is a second call
+      const { state_name: stateName = '', district_name: districtName = '', taluk_name: talukName = '' } = data;
+      const receipts = await api
+        .get('/receipts/tracking', { params: { member_id: item.id, limit: 1 } })
+        .then((r) => unwrapList(r.data))
+        .catch(() => []);
       const latest = receipts[0];
       setViewingMember({
         ...item,

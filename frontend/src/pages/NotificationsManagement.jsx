@@ -200,6 +200,7 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
         campaign_name: formData.campaign_name.trim(),
         channel: formData.channel,
         template_id: Number(formData.template_id),
+        member_filters: filters,
         filters,
       };
 

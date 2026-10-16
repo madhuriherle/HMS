@@ -219,6 +219,26 @@ def _attach_latest_receipts(db: Session, rows: list) -> None:
             r["receipt"] = latest.get(r.get("id"))
 
 
+def _attach_places(db: Session, rows: list) -> None:
+    """Each member row carries its whole place - PIN, post office, taluk, district, state - so a list or a popup never
+    needs the master lists (or extra calls) just to show names (REMEMBER.txt 10.7)."""
+    from models.masters import District, PostalCode, State, Taluk
+    def _names(model, key):
+        wanted = {r.get(key) for r in rows if isinstance(r, dict) and r.get(key)}
+        if not wanted:
+            return {}
+        return {x.id: x for x in db.query(model).filter(model.id.in_(wanted)).all()}
+    pins, states, districts, taluks = _names(PostalCode, "pincode_id"), _names(State, "state_id"), _names(District, "district_id"), _names(Taluk, "taluk_id")
+    for r in rows:
+        if isinstance(r, dict):
+            pin = pins.get(r.get("pincode_id"))
+            r["pincode"] = pin.pincode if pin else None
+            r["post_office_name"] = pin.post_office_name if pin else None
+            r["state_name"] = states[r["state_id"]].name_en if r.get("state_id") in states else None
+            r["district_name"] = districts[r["district_id"]].name_en if r.get("district_id") in districts else None
+            r["taluk_name"] = taluks[r["taluk_id"]].name_en if r.get("taluk_id") in taluks else None
+
+
 def _attach_membership_types(db: Session, rows: list) -> None:
     """Each listed member carries the name of their current membership type (the latest membership record) and
     their credit total, so the lists show the real type and amount paid instead of working them out on the page."""
@@ -237,22 +257,9 @@ def _attach_membership_types(db: Session, rows: list) -> None:
         latest[ms.member_id] = (t.id, t.name_en, ms.membership_number)
     from services import membership_credit
     credit = membership_credit.credit_totals(db, ids)
-    # the whole place comes with the member (PIN, post office, taluk, district, state): a list never needs the master
-    # lists just to show names (REMEMBER.txt 10.7)
-    def _names(model, key):
-        wanted = {r.get(key) for r in rows if isinstance(r, dict) and r.get(key)}
-        if not wanted:
-            return {}
-        return {x.id: x for x in db.query(model).filter(model.id.in_(wanted)).all()}
-    pins, states, districts, taluks = _names(PostalCode, "pincode_id"), _names(State, "state_id"), _names(District, "district_id"), _names(Taluk, "taluk_id")
+    _attach_places(db, rows)
     for r in rows:
         if isinstance(r, dict):
-            pin = pins.get(r.get("pincode_id"))
-            r["pincode"] = pin.pincode if pin else None
-            r["post_office_name"] = pin.post_office_name if pin else None
-            r["state_name"] = states[r["state_id"]].name_en if r.get("state_id") in states else None
-            r["district_name"] = districts[r["district_id"]].name_en if r.get("district_id") in districts else None
-            r["taluk_name"] = taluks[r["taluk_id"]].name_en if r.get("taluk_id") in taluks else None
             tid, name, ms_number = latest.get(r.get("id"), (None, None, None))
             r["membership_type_id"] = tid
             r["membership_type"] = name
@@ -752,7 +759,7 @@ def member_import_history_detail(
     return _import_run_row(run, {u.id: (u.name or u.username)} if u else {}, detail=True)
 
 
-@router.get("/{id}", response_model=schemas_members.Member)
+@router.get("/{id}")
 def read_member(
     *,
     db: Session = Depends(deps.get_db),
@@ -762,7 +769,9 @@ def read_member(
     member = crud_members.member.get(db=db, id=id)
     if not member:
         raise HTTPException(status_code=404, detail="Member not found")
-    return member
+    data = schemas_members.Member.model_validate(member).model_dump(mode="json")
+    _attach_places(db, [data])  # the popup gets state / district / taluk names with the member, in the same call
+    return data
 
 @router.get("/{id}/family", response_model=List[schemas_members.MemberFamilyLink])
 def read_member_family(
@@ -1114,6 +1123,7 @@ def approve_member(
     current_user: User = Depends(deps.require_permission("members.write")),
     background_tasks: BackgroundTasks,
     id: int,
+    reason: Optional[str] = Query(None, description="Approval reason or note"),
 ) -> Any:
     """Approve a member and auto-assign membership number."""
     member = crud_members.member.get(db=db, id=id)
@@ -1123,7 +1133,7 @@ def approve_member(
     # Shared activation core with POST /receipts/{id}/activate-member so the
     # two entry points can never drift.
     from services.member_activation import activate_member
-    member = activate_member(db, member, activated_by=current_user.id)
+    member = activate_member(db, member, activated_by=current_user.id, reason=reason)
 
     db.commit()
     db.refresh(member)
@@ -2813,6 +2823,14 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
     for g in db.query(Gotra).filter(Gotra.is_deleted == False, Gotra.status == True).all():  # noqa: E712
         gotras.setdefault(_gotra_key(g.name_en), g)
 
+    # postal codes master, looked up by 6-digit pincode
+    from models.masters import PostalCode
+    batch_pins = {str(i.pincode).strip() for i in payload.members if i.pincode and str(i.pincode).strip()}
+    postal_codes = {}
+    if batch_pins:
+        for pc in db.query(PostalCode).filter(PostalCode.pincode.in_(batch_pins), PostalCode.is_deleted == False).all():  # noqa: E712
+            postal_codes.setdefault(pc.pincode.strip(), pc)
+
     created_count = 0
     skipped = []
     warnings = []
@@ -2895,6 +2913,22 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
                 row_warnings.append(f"Gender '{item.gender}' is not recognised, so it was left blank")
             gen = None
 
+        # pincode: matched to PostalCode master; fills state/district/taluk if resolved
+        pincode_id = None
+        state_id = None
+        district_id = None
+        taluk_id = None
+        raw_pin = str(item.pincode or "").strip()
+        if raw_pin:
+            pc = postal_codes.get(raw_pin)
+            if pc:
+                pincode_id = pc.id
+                state_id = pc.state_id
+                district_id = pc.district_id
+                taluk_id = pc.taluk_id
+            else:
+                row_warnings.append(f"PIN Code '{raw_pin}' not found in postal codes master")
+
         member = Member(
             full_name_en=" ".join(x for x in (first_name, middle_name, last_name) if x),
             first_name_en=first_name,
@@ -2911,6 +2945,10 @@ def _run_bulk_import(db: Session, current_user: User, payload: "BulkMemberImport
             address_line2=item.address_line2.strip() if item.address_line2 else None,
             locality=item.locality.strip() if item.locality else (item.city.strip() if item.city else None),
             city=item.city.strip() if item.city else None,
+            state_id=state_id,
+            district_id=district_id,
+            taluk_id=taluk_id,
+            pincode_id=pincode_id,
             remarks=item.remarks.strip() if item.remarks else None,
             member_code=num,
             approval_status="APPROVED",

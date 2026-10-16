@@ -27,6 +27,7 @@ class NotificationCampaign(AuditMixin, Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
     campaign_name: Mapped[str] = mapped_column(String(150), nullable=False)
     template_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("notification_templates.id"), nullable=False)
+    channel: Mapped[str] = mapped_column(String(30), default="WHATSAPP", nullable=True)
     target_audience: Mapped[str] = mapped_column(String(50), nullable=True) 
     scheduled_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="PENDING")

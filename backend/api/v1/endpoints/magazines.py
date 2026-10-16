@@ -1202,60 +1202,58 @@ def download_label_pdf(
 
 
 # ─────────────── BACKFILL & UNIFIED RECIPIENTS ───────────────
-@router.get("/unsubscribed-paid-members", response_model=List[schemas_magazines.UnsubscribedPaidMember])
+@router.get("/unsubscribed-paid-members")
 def read_unsubscribed_paid_members(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("magazines.read")),
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: int = 25,
 ) -> Any:
     """Members who requested the magazine (magazine_needed=True) and have paid receipt allocations,
-    but have no active magazine subscription."""
+    but have no active magazine subscription. One page at a time (at most 200, rule 10.6) with the whole total."""
+    from core.pagination import LIST_PAGE_MAX
     from models.receipts import ReceiptAllocation
     from sqlalchemy import func
 
-    # All member IDs with at least one active magazine subscription
-    active_member_ids = {
-        row[0] for row in
-        db.query(MagazineSubscription.member_id)
-        .filter(
-            MagazineSubscription.is_deleted == False,  # noqa: E712
-            MagazineSubscription.delivery_status == "ACTIVE",
-        )
-        .distinct()
-        .all()
-    }
-
-    # Find paid members with magazine_needed == True
-    paid_members_query = (
-        db.query(
-            Member,
-            func.sum(ReceiptAllocation.allocated_amount).label("total_allocated"),
-        )
+    limit = max(1, min(limit, LIST_PAGE_MAX))
+    page = max(1, page)
+    subscribed = db.query(MagazineSubscription.member_id).filter(
+        MagazineSubscription.is_deleted == False,  # noqa: E712
+        MagazineSubscription.delivery_status == "ACTIVE",
+    )
+    paid = (
+        db.query(Member, func.sum(ReceiptAllocation.allocated_amount).label("total_allocated"))
         .join(ReceiptAllocation, ReceiptAllocation.member_id == Member.id)
         .filter(
             Member.is_deleted == False,  # noqa: E712
             Member.magazine_needed == True,  # noqa: E712
             ReceiptAllocation.is_deleted == False,  # noqa: E712
+            ~Member.id.in_(subscribed),
         )
-        .group_by(Member.id)
     )
-
+    if search and search.strip():
+        like = f"%{search.strip()}%"
+        paid = paid.filter(or_(
+            Member.full_name_en.ilike(like), Member.mobile.ilike(like),
+            Member.member_code.ilike(like), Member.membership_number.ilike(like),
+        ))
+    paid = paid.group_by(Member.id)
+    total = paid.count()
     results = []
-    for member, total_allocated in paid_members_query.all():
-        if member.id not in active_member_ids:
-            full_name = member.display_name or member.full_name_kn or f"Member {member.id}"
-            results.append(
-                schemas_magazines.UnsubscribedPaidMember(
-                    member_id=member.id,
-                    member_code=member.member_code or member.membership_number,
-                    name=full_name,
-                    mobile=member.mobile,
-                    magazine_needed=member.magazine_needed,
-                    magazine_delivery_address=member.magazine_delivery_address,
-                    total_allocated=float(total_allocated or 0.0),
-                )
+    for member, total_allocated in paid.order_by(Member.id.desc()).offset((page - 1) * limit).limit(limit).all():
+        results.append(
+            schemas_magazines.UnsubscribedPaidMember(
+                member_id=member.id,
+                member_code=member.member_code or member.membership_number,
+                name=member.display_name or member.full_name_kn or f"Member {member.id}",
+                mobile=member.mobile,
+                magazine_needed=member.magazine_needed,
+                magazine_delivery_address=member.magazine_delivery_address,
+                total_allocated=float(total_allocated or 0.0),
             )
-
-    return results
+        )
+    return {"data": results, "total": total, "page": page, "limit": limit, "pages": (total + limit - 1) // limit}
 
 
 @router.post("/backfill-subscriptions")

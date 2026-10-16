@@ -68,7 +68,7 @@ export default function UserManagement() {
   const { sort, toggle: toggleSort, params: sortParams } = useSort();
   const firstLoad = useRef(true);
   const readUsers = async () => {
-    const usersResponse = await api.get('/users/', { params: { limit: 500, ...sortParams } });
+    const usersResponse = await api.get('/users/', { params: { limit: 200, ...sortParams } });
     const rawUserRows = Array.isArray(usersResponse.data)
       ? usersResponse.data
       : (usersResponse.data?.data || usersResponse.data?.items || []);
@@ -84,7 +84,7 @@ export default function UserManagement() {
         setLoading(true);
         setUsers(await readUsers());
 
-        const rolesResponse = await api.get('/users/roles', { params: { limit: 500, assignable: true } });
+        const rolesResponse = await api.get('/users/roles', { params: { limit: 200, assignable: true } });
         const rawRoleRows = Array.isArray(rolesResponse.data)
           ? rolesResponse.data
           : (rolesResponse.data?.data || rolesResponse.data?.items || []);

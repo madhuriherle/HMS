@@ -25,8 +25,8 @@ import api from '../api';
 import { notify } from '../utils/notify';
 import { apiErrorMessage } from '../utils/apiError';
 import {
-  loadLocations,
-  findLocationByPin,
+  searchPostalCodes,
+  lookupPin,
   loadMembershipTypes,
   loadGothras,
   loadQualifications,
@@ -84,12 +84,10 @@ export default function RegisterNewMember() {
   // ----------------------------------------------------
   const [sharedOpen, setSharedOpen] = useState(false);
   const [membershipTypes, setMembershipTypes] = useState([]);
-  const [locations, setLocations] = useState({ states: [], districts: [], taluks: [], postalCodes: [] });
   const [gothras, setGothras] = useState([]);
   const [qualifications, setQualifications] = useState([]);
   const [paymentModes, setPaymentModes] = useState([]);
   const [mastersReady, setMastersReady] = useState(false);
-  const postalCodes = locations.postalCodes;
 
   // Toast feedback
   const showToast = (message, type = 'success') => {
@@ -100,15 +98,13 @@ export default function RegisterNewMember() {
     let cancelled = false;
     Promise.all([
       loadMembershipTypes(),
-      loadLocations(),
       loadGothras(),
       loadQualifications(),
       loadPaymentModeConfigs()
     ])
-      .then(([types, loc, goth, quals, modes]) => {
+      .then(([types, goth, quals, modes]) => {
         if (cancelled) return;
         setMembershipTypes(types);
-        setLocations(loc);
         setGothras(goth);
         setQualifications(quals);
         setPaymentModes([...new Set(modes.filter((m) => m.status === 'Active').map((m) => m.paymentMode))]);
@@ -123,13 +119,18 @@ export default function RegisterNewMember() {
     };
   }, []);
 
-  // Search the server's PIN directory (already loaded) for the autocomplete
-  const searchPostalLocations = (query, limit = 20) => {
-    const q = String(query || '').trim().toLowerCase();
+  // The PIN autocomplete asks the server (the PINs that begin with what is typed); the 15,000-row table is never downloaded
+  const pinSearchSeq = useRef(0);
+  const searchPostalLocations = async (query, limit = 20) => {
+    const q = String(query || '').trim();
     if (!q) return [];
-    return postalCodes
-      .filter((p) => String(p.postalCode).startsWith(q) || String(p.area || '').toLowerCase().includes(q))
-      .slice(0, limit);
+    const seq = (pinSearchSeq.current += 1);
+    try {
+      const found = await searchPostalCodes({ pincode_starts: q }, limit);
+      return seq === pinSearchSeq.current ? found : null; // null: a newer keystroke is already being answered
+    } catch {
+      return [];
+    }
   };
 
   // The member being viewed / edited (read from the server)
@@ -262,8 +263,7 @@ export default function RegisterNewMember() {
         ]);
         if (cancelled) return;
 
-        const nameOf = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '';
-        const pin = locations.postalCodes.find((p) => String(p.id) === String(m.pincode_id));
+        const pin = { postalCode: m.pincode || '', area: m.post_office_name || '' }; // the server sends the place with the member
         const membership = (profile?.memberships || [])[0];
         const type = membershipTypes.find((t) => String(t.id) === String(membership?.membership_type_id));
         const reg = m.registration_payment || {};
@@ -335,9 +335,9 @@ export default function RegisterNewMember() {
           postalCode: pin?.postalCode || '',
           locality: m.locality || m.post || pin?.area || '',
           localityKn: m.locality_kn || '',
-          taluk: nameOf(locations.taluks, m.taluk_id),
-          district: nameOf(locations.districts, m.district_id),
-          state: nameOf(locations.states, m.state_id),
+          taluk: m.taluk_name || '',
+          district: m.district_name || '',
+          state: m.state_name || '',
           nativePlace: m.native_place_text || '',
           appliedOnBehalfOf: !m.applied_on_behalf_of ? 'Self' : BEHALF_OPTIONS.includes(m.applied_on_behalf_of) ? m.applied_on_behalf_of : 'Others',
           behalfOtherText: m.applied_on_behalf_of && !BEHALF_OPTIONS.includes(m.applied_on_behalf_of) ? m.applied_on_behalf_of : '',
@@ -644,9 +644,11 @@ export default function RegisterNewMember() {
     if (formErrors.postalCode) setFormErrors((prev) => ({ ...prev, postalCode: '' }));
 
     if (cleanVal.length >= 2) {
-      const results = searchPostalLocations(cleanVal, 20);
-      setPinSuggestions(results);
-      setIsPinSuggestionsOpen(results.length > 0);
+      const results = await searchPostalLocations(cleanVal, 20);
+      if (results) {
+        setPinSuggestions(results);
+        setIsPinSuggestionsOpen(results.length > 0);
+      }
     } else {
       setPinSuggestions([]);
       setIsPinSuggestionsOpen(false);
@@ -654,7 +656,7 @@ export default function RegisterNewMember() {
 
     if (cleanVal.length === 6) {
       // 1. Try local data first
-      const matchInfo = findLocationByPin(postalCodes, cleanVal);
+      const matchInfo = await lookupPin(cleanVal).catch(() => ({ found: false }));
       if (matchInfo.found) {
         const wasAuto = autoLocality.current;
         autoLocality.current = matchInfo.area || '';
@@ -859,11 +861,11 @@ export default function RegisterNewMember() {
   // ----------------------------------------------------
   // SAVE (server calls)
   // ----------------------------------------------------
-  const buildPayload = () => {
+  const buildPayload = (pinRows = []) => {
     const parts = formData.name.trim().split(/\s+/);
-    const pinRow = locations.postalCodes.find(
+    const pinRow = pinRows.find(
       (p) => p.postalCode === formData.postalCode && (!formData.locality || p.area === formData.locality)
-    ) || locations.postalCodes.find((p) => p.postalCode === formData.postalCode);
+    ) || pinRows.find((p) => p.postalCode === formData.postalCode);
     return {
       name_title: formData.nameTitle || null,
       full_name_en: formData.name.trim().split(/\s+/).join(' '),
@@ -934,7 +936,9 @@ export default function RegisterNewMember() {
 
     setSaving(true);
     try {
-      const payload = buildPayload();
+      // the rows for this PIN come from the server, to find the post office's id
+      const pinRows = formData.postalCode ? await searchPostalCodes({ pincode_starts: formData.postalCode }, 100) : [];
+      const payload = buildPayload(pinRows);
       if (isEditMode && params.id) {
         const { data } = await api.put(`/members/${params.id}`, payload);
         if (photoFile) {
@@ -1472,9 +1476,11 @@ export default function RegisterNewMember() {
                         onChange={(e) => handlePinChange(e.target.value)}
                         onFocus={() => {
                           if (formData.postalCode && formData.postalCode.length >= 2) {
-                            const results = searchPostalLocations(formData.postalCode, 20);
-                            setPinSuggestions(results);
-                            setIsPinSuggestionsOpen(results.length > 0);
+                            searchPostalLocations(formData.postalCode, 20).then((results) => {
+                              if (!results) return;
+                              setPinSuggestions(results);
+                              setIsPinSuggestionsOpen(results.length > 0);
+                            });
                           }
                         }}
 

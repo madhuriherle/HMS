@@ -36,7 +36,7 @@ import {
   settingsFromApi,
   settingsToApi
 } from '../utils/organisationStore';
-import { loadLocations, findLocationByPin } from '../utils/serverData';
+import { lookupPin } from '../utils/serverData';
 import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
 import { useList } from '../hooks/useLists';
 
@@ -121,9 +121,8 @@ export default function OrganisationSettings() {
 
     // Auto-fill state / district on 6-digit PIN code lookup
     if (name === 'postalCode' && value.length === 6 && /^\d{6}$/.test(value)) {
-      loadLocations()
-        .then((loc) => {
-          const match = findLocationByPin(loc.postalCodes, value);
+      lookupPin(value)
+        .then((match) => {
           if (!match.found) return;
           setSettings((prev) => ({
             ...prev,

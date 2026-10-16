@@ -1,8 +1,8 @@
-from typing import Optional
+from typing import Any, Optional
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 class NotificationTemplateBase(BaseModel):
     template_name: str
@@ -67,12 +67,23 @@ class DeviceTokenCreate(BaseModel):
 class NotificationCampaignCreate(BaseModel):
     campaign_name: str
     template_id: int
+    channel: Optional[str] = "WHATSAPP"
     target_audience: Optional[str] = None
     scheduled_at: Optional[datetime] = None
     status: str = "PENDING"
     # MEMBERS (default): pick recipients from registered members using
     # member_filters; empty filters = all active members.
     member_filters: Optional[dict] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_filters(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "member_filters" not in data and "filters" in data:
+                data["member_filters"] = data.pop("filters")
+            elif "filters" in data:
+                data.pop("filters")
+        return data
 
 
 class BulkSendRequest(BaseModel):
@@ -85,15 +96,27 @@ class BulkSendRequest(BaseModel):
 class NotificationCampaignUpdate(BaseModel):
     campaign_name: Optional[str] = None
     template_id: Optional[int] = None
+    channel: Optional[str] = None
     target_audience: Optional[str] = None
     scheduled_at: Optional[datetime] = None
     member_filters: Optional[dict] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_filters(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "member_filters" not in data and "filters" in data:
+                data["member_filters"] = data.pop("filters")
+            elif "filters" in data:
+                data.pop("filters")
+        return data
 
 
 class NotificationCampaign(BaseModel):
     id: int
     campaign_name: str
     template_id: int
+    channel: Optional[str] = "WHATSAPP"
     target_audience: Optional[str] = None
     scheduled_at: Optional[datetime] = None
     status: str

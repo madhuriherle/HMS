@@ -17,6 +17,7 @@ members with a 409 rather than double-numbering.
 """
 
 from datetime import datetime, timezone
+from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -55,7 +56,7 @@ def approval_gaps(member: Member) -> list:
     return [label for attr, label in REQUIRED_FOR_APPROVAL if not str(getattr(member, attr, None) or "").strip()]
 
 
-def activate_member(db: Session, member: Member, *, activated_by: int) -> Member:
+def activate_member(db: Session, member: Member, *, activated_by: int, reason: Optional[str] = None) -> Member:
     """Apply the activation mutations. Does NOT commit — the caller owns the
     transaction (and, for the WhatsApp activation message, the background
     task queue)."""
@@ -77,6 +78,7 @@ def activate_member(db: Session, member: Member, *, activated_by: int) -> Member
         action="APPROVE",
         old_status=old_status,
         new_status="APPROVED",
+        reason=reason or "Approved",
         acted_by=activated_by,
         acted_at=now,
         created_by=activated_by,
