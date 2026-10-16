@@ -53,6 +53,15 @@ const titleCase = (v) => (v ? String(v).charAt(0).toUpperCase() + String(v).slic
 // set to true to show them again.
 const SHOW_KANNADA_FIELDS = false;
 
+// The different postal address for the magazine is typed on its own fields; it is saved as one text:
+// the street lines, then place / taluk / district, then state - PIN.
+const composeMagazineAddress = (f) =>
+  [
+    (f.magLine || '').trim(),
+    [f.magLocality, f.magTaluk, f.magDistrict].map((x) => (x || '').trim()).filter(Boolean).join(', '),
+    [(f.magState || '').trim(), (f.magPin || '').trim()].filter(Boolean).join(' - '),
+  ].filter(Boolean).join('\n');
+
 export default function RegisterNewMember() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -196,6 +205,8 @@ export default function RegisterNewMember() {
     magazineNeeded: 'YES',
     magazineDeliveryChoice: 'COMMUNICATION',
     magazineDeliveryAddress: '',
+    // the different postal address is filled in on its own fields, like the communication address
+    magLine: '', magPin: '', magLocality: '', magTaluk: '', magDistrict: '', magState: '',
     magazineKind: 'PHYSICAL',
     magazineEmail: '',
     referredMembershipNo: '',
@@ -347,6 +358,7 @@ export default function RegisterNewMember() {
           magazineNeeded: m.magazine_needed === false ? 'NO' : 'YES',
           magazineDeliveryChoice: m.magazine_delivery_address ? 'DIFFERENT' : 'COMMUNICATION',
           magazineDeliveryAddress: m.magazine_delivery_address || '',
+          magLine: m.magazine_delivery_address || '', // a saved address is one text: it shows whole in the first box
           magazineKind: m.magazine_kind === 'EMAIL' ? 'EMAIL' : 'PHYSICAL',
           magazineEmail: m.magazine_email || '',
           referredMembershipNo: m.referred_by_number || '',
@@ -627,6 +639,19 @@ export default function RegisterNewMember() {
     }
   };
 
+  // the PIN of the different postal address fills its own place, taluk, district and state
+  const handleMagPinChange = async (val) => {
+    const clean = val.replace(/\D/g, '').slice(0, 6);
+    setFormData((prev) => ({ ...prev, magPin: clean }));
+    if (clean.length !== 6) return;
+    const found = await lookupPin(clean).catch(() => ({ found: false }));
+    if (found.found) {
+      setFormData((prev) => (prev.magPin === clean
+        ? { ...prev, magLocality: prev.magLocality || found.area || '', magTaluk: found.talukName || '', magDistrict: found.districtName || '', magState: found.stateName || '' }
+        : prev));
+    }
+  };
+
   const handlePinChange = async (val) => {
     const cleanVal = val.replace(/\D/g, '').slice(0, 6);
     // a PIN that is being changed or cleared no longer describes the places filled in from the old one
@@ -720,6 +745,11 @@ export default function RegisterNewMember() {
 
     if (!cleanName) {
       errors.name = 'Member Name is required';
+    }
+
+    // a magazine posted to a different address needs that address
+    if (formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' && formData.magazineDeliveryChoice === 'DIFFERENT' && !formData.magLine.trim()) {
+      errors.magLine = 'Enter the postal address the magazine should be sent to.';
     }
 
     // International Mobile Validation
@@ -917,7 +947,7 @@ export default function RegisterNewMember() {
       applied_on_behalf_of: formData.appliedOnBehalfOf === 'Others' ? (formData.behalfOtherText || '').trim() || 'Others' : formData.appliedOnBehalfOf || null,
       magazine_needed: formData.magazineNeeded === 'YES',
       magazine_kind: formData.magazineNeeded === 'YES' ? formData.magazineKind || 'PHYSICAL' : null,
-      magazine_delivery_address: formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' && formData.magazineDeliveryChoice === 'DIFFERENT' ? (formData.magazineDeliveryAddress || '').trim() || null : null,
+      magazine_delivery_address: formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' && formData.magazineDeliveryChoice === 'DIFFERENT' ? composeMagazineAddress(formData) || null : null,
       // where the record came from is set once, when it is created; editing never changes it
       ...(isEditMode ? {} : { registration_source: 'OFFLINE' })
     };
@@ -981,10 +1011,12 @@ export default function RegisterNewMember() {
     const isDifferent =
       formData.magazineNeeded === 'YES' &&
       formData.magazineKind !== 'EMAIL' &&
-      formData.magazineDeliveryChoice === 'DIFFERENT' &&
-      formData.magazineDeliveryAddress;
-    // a different delivery address is typed in full (street, place, district, PIN), so none of the communication address is mixed in
-    if (isDifferent) return { line: formData.magazineDeliveryAddress, locality: '', taluk: '', district: '', state: '', pin: '', custom: true };
+      formData.magazineDeliveryChoice === 'DIFFERENT';
+    // a different delivery address has its own fields, so none of the communication address is mixed in
+    if (isDifferent) {
+      const structured = formData.magLocality || formData.magTaluk || formData.magDistrict || formData.magState || formData.magPin;
+      return { line: formData.magLine, locality: formData.magLocality, taluk: formData.magTaluk, district: formData.magDistrict, state: formData.magState, pin: formData.magPin, custom: !structured && Boolean(formData.magLine) };
+    }
     const addressLine = formData.address || '';
     return {
       line: addressLine,
@@ -998,7 +1030,7 @@ export default function RegisterNewMember() {
     formData.magazineNeeded,
     formData.magazineKind,
     formData.magazineDeliveryChoice,
-    formData.magazineDeliveryAddress,
+    formData.magLine, formData.magPin, formData.magLocality, formData.magTaluk, formData.magDistrict, formData.magState,
     formData.address,
     formData.locality,
     formData.taluk,
@@ -1739,14 +1771,43 @@ export default function RegisterNewMember() {
                                 )}
                               </div>
                             ) : (
-                              <div>
-                                <textarea
-                                  rows={2}
-                                  value={formData.magazineDeliveryAddress || ''}
-                                  onChange={(e) => setFormData({ ...formData, magazineDeliveryAddress: e.target.value })}
-                                  placeholder="Enter different delivery address (House/Door No, Street, Locality, City/Taluk, District, PIN code)..."
-                                  className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
-                                />
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="sm:col-span-2">
+                                  <label className="block text-xs text-[#3D140C] mb-1 font-semibold">Postal Address (House / Door No, Street) <span className="text-red-600">*</span></label>
+                                  <textarea
+                                    rows={2}
+                                    value={formData.magLine}
+                                    onChange={(e) => setFormData({ ...formData, magLine: e.target.value })}
+                                    placeholder="House / Door No, Street, Cross, Locality..."
+                                    className={`w-full px-3.5 py-2 bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:ring-1 ${formErrors.magLine ? 'border-red-500 focus:ring-red-500' : 'border-[#DFD5CC] focus:border-[#510601] focus:ring-[#510601]'}`}
+                                  />
+                                  {formErrors.magLine && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.magLine}</p>}
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-[#3D140C] mb-1 font-semibold">PIN Code</label>
+                                  <input type="text" inputMode="numeric" maxLength={6} value={formData.magPin} onChange={(e) => handleMagPinChange(e.target.value)} placeholder="6 digits"
+                                    className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg font-mono text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-[#3D140C] mb-1 font-semibold">Post Office / Locality</label>
+                                  <input type="text" value={formData.magLocality} onChange={(e) => setFormData({ ...formData, magLocality: e.target.value })}
+                                    className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-[#3D140C] mb-1 font-semibold">Taluk</label>
+                                  <input type="text" value={formData.magTaluk} onChange={(e) => setFormData({ ...formData, magTaluk: e.target.value })}
+                                    className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-[#3D140C] mb-1 font-semibold">District</label>
+                                  <input type="text" value={formData.magDistrict} onChange={(e) => setFormData({ ...formData, magDistrict: e.target.value })}
+                                    className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
+                                </div>
+                                <div>
+                                  <label className="block text-xs text-[#3D140C] mb-1 font-semibold">State</label>
+                                  <input type="text" value={formData.magState} onChange={(e) => setFormData({ ...formData, magState: e.target.value })}
+                                    className="w-full px-3.5 py-2 bg-white border border-[#DFD5CC] rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]" />
+                                </div>
                               </div>
                             )}
                           </div>
