@@ -1,5 +1,6 @@
 import FilterToggle from '../components/FilterToggle';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   CheckCircle2,
   XCircle,
@@ -10,12 +11,11 @@ import {
   AlertTriangle,
   Eye,
   ArrowRight,
+  ArrowLeft,
 } from 'lucide-react';
 import api from '../api';
 import { formatDateTime } from '../utils/dateUtils';
 import PermissionGate from '../components/PermissionGate';
-import Modal from '../components/Modal';
-import ModalFooter from '../components/ModalFooter';
 import useAuth from '../hooks/useAuth';
 import { askReason, confirmYesNo, showError, showSuccess } from '../utils/dialogs';
 
@@ -106,6 +106,179 @@ const formatPayloadSummary = (payload) => {
     .join(' | ');
 };
 
+// ── the full-page request detail ──
+// Rows come as { field: 'Group › Sub › Label', previous, proposed, changed }. The last part is the row label, the
+// parts before it are the section heading (a wrapper shared by every row is dropped).
+const groupRows = (rows) => {
+  const paths = rows.map((r) => String(r.field).split(' › '));
+  const first = paths[0]?.[0];
+  const dropFirst = paths.length > 0 && paths.every((p) => p.length > 1 && p[0] === first);
+  const groups = [];
+  rows.forEach((r, i) => {
+    const p = dropFirst ? paths[i].slice(1) : paths[i];
+    const title = p.slice(0, -1).join(' › ') || 'Details';
+    let g = groups.find((x) => x.title === title);
+    if (!g) {
+      g = { title, rows: [] };
+      groups.push(g);
+    }
+    g.rows.push({ ...r, label: p[p.length - 1] });
+  });
+  return groups;
+};
+
+const detailMode = (item) => {
+  if (item.kind === 'deletions') return 'delete';
+  if (item.kind === 'requests') {
+    const action = String(item.raw?.action || '').toUpperCase();
+    if (action === 'CREATE') return 'create';
+    if (action === 'DELETE') return 'delete';
+  }
+  return 'update';
+};
+
+function DetailPanel({ header, tone, groups, side, onlyChanged }) {
+  const headTone = tone === 'old' ? 'bg-amber-400 text-white' : tone === 'new' ? 'bg-emerald-500 text-white' : tone === 'del' ? 'bg-red-500 text-white' : 'bg-[#510601] text-white';
+  return (
+    <section className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden min-w-0">
+      <div className={`px-5 py-3 text-center text-xs font-bold uppercase tracking-wider ${headTone}`}>{header}</div>
+      <div className="p-5 space-y-5">
+        {groups.map((g) => {
+          const rows = onlyChanged ? g.rows.filter((r) => r.changed) : g.rows;
+          if (rows.length === 0) return null;
+          return (
+            <div key={g.title}>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[#510601] mb-1">{g.title}</h4>
+              <dl className="divide-y divide-[#EFE6DE]/60">
+                {rows.map((r, i) => (
+                  <div key={i} className="py-2 flex items-start justify-between gap-4 text-xs">
+                    <dt className="text-[#7D7068] font-medium shrink-0">{r.label}</dt>
+                    <dd
+                      className={`text-right min-w-0 break-words ${
+                        side === 'new' && r.changed ? 'text-red-600 font-bold' : 'text-[#180200] font-semibold'
+                      }`}
+                    >
+                      {side === 'old' ? r.previous : r.proposed}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function ApprovalDetail({ item, rows, canWrite, onBack, onApprove, onReject }) {
+  const [onlyChanged, setOnlyChanged] = useState(true);
+  const mode = detailMode(item);
+  const groups = useMemo(() => groupRows(rows), [rows]);
+  const changedCount = rows.filter((r) => r.changed).length;
+  const pending = item.status === 'PENDING';
+
+  return (
+    <div className="space-y-4 pb-4">
+      {/* Title bar */}
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E8DFD8] hover:bg-[#FAF7F2] text-xs font-semibold text-[#510601] rounded-xl cursor-pointer"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Back
+        </button>
+        <h2 className="text-base font-bold text-[#180200]">
+          {mode === 'create' ? 'New Record Request' : mode === 'delete' ? 'Delete Request' : 'Update Request'} #{item.rawId}
+        </h2>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${kindBadge(item.kind)}`}>{item.kindLabel}</span>
+        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${badge(item.status)}`}>{item.status}</span>
+      </div>
+
+      {/* Who / what / when */}
+      <div className="bg-white border border-[#E8DFD8] rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+        {[
+          ['Action / Request', item.summary],
+          ['Module', item.module],
+          ['Requested by', item.requested_by ? `User ${item.requested_by}` : 'System'],
+          ['Submitted on', formatDateTime(item.created_at, '—', false)],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <span className="text-[10px] uppercase font-bold text-[#863221]/70 block">{label}</span>
+            <span className="font-semibold text-[#180200] capitalize">{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {item.hasWarning && (
+        <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2.5 text-xs">
+          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold block">Caution / Dependency Notice:</span>
+            <span>{item.warningText}</span>
+          </div>
+        </div>
+      )}
+      {item.review_note && (
+        <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 text-xs text-[#180200]">
+          <span className="font-bold text-[#863221]">Reviewer Note: </span>
+          <span>{item.review_note}</span>
+        </div>
+      )}
+
+      {rows.length === 0 ? (
+        <div className="p-4 border border-[#E8DFD8] rounded-xl text-center text-xs text-[#863221]/70 bg-white">
+          No detailed field-level information is available for this request.
+        </div>
+      ) : mode === 'create' ? (
+        <DetailPanel header="New record details" tone="new" groups={groups} side="new" onlyChanged={false} />
+      ) : mode === 'delete' ? (
+        <>
+          <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-semibold">
+            Approving this request will delete the record below.
+          </div>
+          <DetailPanel header="Record to be deleted" tone="del" groups={groups} side="old" onlyChanged={false} />
+        </>
+      ) : (
+        <>
+          <div className="flex items-center justify-between text-xs text-[#863221]">
+            <span>
+              {changedCount} {changedCount === 1 ? 'field' : 'fields'} changed
+            </span>
+            <label className="inline-flex items-center gap-2 cursor-pointer font-semibold">
+              <input type="checkbox" checked={onlyChanged} onChange={(e) => setOnlyChanged(e.target.checked)} />
+              Show only changed
+            </label>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+            <DetailPanel header="Old detail" tone="old" groups={groups} side="old" onlyChanged={onlyChanged} />
+            <DetailPanel header="Updated detail" tone="new" groups={groups} side="new" onlyChanged={onlyChanged} />
+          </div>
+        </>
+      )}
+
+      {/* Action bar */}
+      <div className="flex items-center justify-center gap-3 pt-2">
+        {pending && canWrite ? (
+          <>
+            <button type="button" onClick={onReject} className="px-6 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold cursor-pointer">
+              Reject
+            </button>
+            <button type="button" onClick={onApprove} className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold cursor-pointer">
+              Approve
+            </button>
+          </>
+        ) : (
+          <button type="button" onClick={onBack} className="px-6 py-2.5 rounded-xl bg-[#510601] hover:bg-[#863221] text-white text-sm font-semibold cursor-pointer">
+            Back to list
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Approvals() {
   const { hasPermission } = useAuth();
   const [allItems, setAllItems] = useState([]);
@@ -119,7 +292,8 @@ export default function Approvals() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modal View / Comparison State
-  const [viewItem, setViewItem] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const viewId = searchParams.get('view');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -324,7 +498,10 @@ export default function Approvals() {
     }
   };
 
-  // Build field comparison rows for the modal
+  const viewItem = useMemo(() => (viewId ? allItems.find((x) => x.id === viewId) || null : null), [allItems, viewId]);
+  const setViewItem = (r) => setSearchParams(r ? { view: r.id } : {});
+
+  // Build field comparison rows for the detail page
   const comparisonRows = useMemo(() => {
     if (!viewItem) return [];
     const raw = viewItem.raw || {};
@@ -452,14 +629,43 @@ export default function Approvals() {
           changed: known ? prevFormatted !== nextFormatted && !sameNumber : true,
         };
       });
-      const changedRows = rows.filter((r) => r.changed);
-      return changedRows.length > 0 ? changedRows : rows;
+      return rows;
     }
 
     return [];
   }, [viewItem]);
   // a request that creates a record has nothing before it: show the fields and their values only
   const isNewRecord = comparisonRows.length > 0 && comparisonRows.every((r) => r.previous === '—');
+
+  if (viewId) {
+    return (
+      <PermissionGate required="approvals.read">
+        {viewItem ? (
+          <ApprovalDetail
+            item={viewItem}
+            rows={comparisonRows}
+            canWrite={hasPermission('approvals.write')}
+            onBack={() => setViewItem(null)}
+            onApprove={async () => {
+              await approve(viewItem);
+              setViewItem(null);
+            }}
+            onReject={async () => {
+              await reject(viewItem);
+              setViewItem(null);
+            }}
+          />
+        ) : (
+          <div className="text-xs text-[#863221]">
+            {loading ? 'Loading request…' : 'This request was not found in the current list.'}{' '}
+            <button type="button" onClick={() => setViewItem(null)} className="underline font-semibold cursor-pointer">
+              Back to list
+            </button>
+          </div>
+        )}
+      </PermissionGate>
+    );
+  }
 
   return (
     <PermissionGate required="approvals.read">
@@ -688,216 +894,6 @@ export default function Approvals() {
         </div>
       </div>
 
-      {/* VIEW & COMPARISON MODAL */}
-      {viewItem && (
-        <Modal isOpen={Boolean(viewItem)} onClose={() => setViewItem(null)}>
-          <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Modal Header (h-14) */}
-            <div className="h-14 px-6 border-b border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-2.5">
-                <span className="text-base font-bold text-[#180200]">
-                  Request Details {viewItem.rawId}
-                </span>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${kindBadge(
-                    viewItem.kind
-                  )}`}
-                >
-                  {viewItem.kindLabel}
-                </span>
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${badge(
-                    viewItem.status
-                  )}`}
-                >
-                  {viewItem.status}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewItem(null)}
-                className="text-[#863221]/60 hover:text-[#180200] p-1 rounded-lg transition-colors cursor-pointer"
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Modal Body: Scrollable */}
-            <div className="p-6 overflow-y-auto space-y-5 flex-1">
-              {/* Metadata Overview Card */}
-              <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]/70 block">
-                    Action / Request
-                  </span>
-                  <span className="font-semibold text-[#180200]">{viewItem.summary}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]/70 block">
-                    Module
-                  </span>
-                  <span className="font-semibold text-[#180200] capitalize">{viewItem.module}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]/70 block">
-                    Requested By
-                  </span>
-                  <span className="font-semibold text-[#180200]">
-                    {viewItem.requested_by ? `User ${viewItem.requested_by}` : 'System'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]/70 block">
-                    Submitted On
-                  </span>
-                  <span className="font-semibold text-[#180200]">
-                    {formatDateTime(viewItem.created_at, '—', false)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Warning Banner if present */}
-              {viewItem.hasWarning && (
-                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2.5 text-xs">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold block">Caution / Dependency Notice:</span>
-                    <span>{viewItem.warningText}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Review Note if already reviewed */}
-              {viewItem.review_note && (
-                <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 text-xs text-[#180200]">
-                  <span className="font-bold text-[#863221]">Reviewer Note: </span>
-                  <span>{viewItem.review_note}</span>
-                </div>
-              )}
-
-              {/* COMPARISON TABLE: Previous vs Proposed / New */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#863221]">
-                    {isNewRecord ? 'New record' : 'Comparison (Previous vs. Proposed)'}
-                  </h3>
-                  {!isNewRecord && (
-                    <span className="text-[10px] font-medium text-[#863221]/70">
-                      Highlighted rows indicate changes
-                    </span>
-                  )}
-                </div>
-
-                {comparisonRows.length === 0 ? (
-                  <div className="p-4 border border-[#E8DFD8] rounded-xl text-center text-xs text-[#863221]/70">
-                    No detailed field-level comparison available for this request.
-                  </div>
-                ) : (
-                  <div className="border border-[#E8DFD8] rounded-xl overflow-hidden shadow-xs">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[11px] font-bold uppercase tracking-wider">
-                        <tr>
-                          <th className={`py-2.5 px-4 text-[#863221] ${isNewRecord ? 'w-[40%]' : 'w-[28%]'}`}>Field / Property</th>
-                          {!isNewRecord && (
-                            <th className="py-2.5 px-4 w-[36%] bg-rose-50/50 text-rose-800 border-r border-[#E8DFD8]">
-                              Previous / Current Value
-                            </th>
-                          )}
-                          <th className="py-2.5 px-4 bg-emerald-50/50 text-emerald-800">
-                            {isNewRecord ? 'Value' : 'Proposed / New Value'}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#E8DFD8]">
-                        {comparisonRows.map((row, idx) => (
-                          <tr
-                            key={idx}
-                            className={
-                              row.changed
-                                ? 'bg-amber-50/20 hover:bg-amber-50/40 transition-colors'
-                                : 'hover:bg-[#FAF7F2]/50 transition-colors'
-                            }
-                          >
-                            <td className="py-2.5 px-4 font-medium text-[#180200] align-top">
-                              <div className="flex items-center gap-1.5">
-                                <span>{row.field}</span>
-                                {row.changed && !isNewRecord && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200">
-                                    Diff
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            {!isNewRecord && (
-                            <td className="py-2.5 px-4 text-[#863221] border-r border-[#E8DFD8] bg-rose-50/15 align-top">
-                              <div
-                                className={
-                                  row.changed
-                                    ? 'font-mono text-rose-800 line-through opacity-85 whitespace-normal break-words leading-5'
-                                    : 'text-[#863221]/70 whitespace-normal break-words leading-5'
-                                }
-                              >
-                                {row.previous}
-                              </div>
-                            </td>
-                            )}
-                            <td className="py-2.5 px-4 text-[#180200] bg-emerald-50/15 align-top">
-                              <div
-                                className={
-                                  row.changed
-                                    ? 'font-mono font-semibold text-emerald-800 whitespace-normal break-words leading-5'
-                                    : 'text-[#180200]/70 whitespace-normal break-words leading-5'
-                                }
-                              >
-                                {row.proposed}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Modal Footer (h-14) */}
-            <ModalFooter
-              kind="view"
-              onCancel={() => setViewItem(null)}
-              left={
-                viewItem.status === 'PENDING' && hasPermission('approvals.write') ? (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await approve(viewItem);
-                        setViewItem(null);
-                      }}
-                      className="btn-act btn-act-ok"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Approve</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await reject(viewItem);
-                        setViewItem(null);
-                      }}
-                      className="btn-act btn-act-danger"
-                    >
-                      <XCircle className="w-3.5 h-3.5" />
-                      <span>Reject</span>
-                    </button>
-                  </div>
-                ) : null
-              }
-            />
-          </div>
-        </Modal>
-      )}
     </PermissionGate>
   );
 }
