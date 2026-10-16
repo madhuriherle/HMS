@@ -314,12 +314,7 @@ function OverviewTab({ id }) {
             {hasMagazine && (
               <Card icon={BookOpen} title="Magazine & services">
                 <div className="flex flex-wrap gap-2">
-                  {d.magazine.magazine_needed && (
-                    <span className={`chip ${String(d.magazine.magazine_needed).toUpperCase() === 'YES' ? 'chip-on' : 'chip-off'}`}>
-                      Magazine: {d.magazine.magazine_needed}
-                    </span>
-                  )}
-                  {d.magazine.subscriptions.map((st, i) => <span key={`s${i}`} className="chip chip-on">Subscription: {st}</span>)}
+                  {d.magazine.subscriptions.map((st, i) => <span key={`s${i}`} className={`chip ${String(st).toUpperCase() === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>Magazine: {st}</span>)}
                   {d.magazine.services.map((sv, i) => <span key={`v${i}`} className="chip chip-off">{sv}</span>)}
                 </div>
               </Card>
@@ -693,9 +688,18 @@ function MagazineTab({ id }) {
       {(d) => (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
           <KycUpdateCard id={id} kyc={d.kyc} reload={section.reload} canSend={hasPermission('magazines.write')} />
-          <Card icon={BookOpen} title="Magazine" className="lg:col-span-2">
+          {(() => {
+            // active when any subscription is running; the delivery address is the one set for the magazine, else a subscription's own
+            const isActive = d.subscriptions.some((s) => s.delivery_status === 'ACTIVE');
+            const address = d.magazine_delivery_address || d.subscriptions.find((s) => s.address_override)?.address_override || '';
+            return (
+          <Card
+            icon={BookOpen}
+            title="Magazine"
+            className="lg:col-span-2"
+            badge={<span className={`chip ${isActive ? 'chip-on' : 'chip-off'}`}>{isActive ? 'Active' : 'Inactive'}</span>}
+          >
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 mb-3">
-              <Field label="Magazine needed" value={d.magazine_needed} />
               {d.magazine_kind && (
                 <Field
                   label="Magazine type"
@@ -703,26 +707,8 @@ function MagazineTab({ id }) {
                 />
               )}
               {d.magazine_email && <Field label="E-copy email" value={d.magazine_email} />}
-              {d.magazine_delivery_address && (
-                <Field label="Delivery address" value={d.magazine_delivery_address} />
-              )}
+              {address && <div className="lg:col-span-2"><Field label="Delivery address" value={address} /></div>}
             </div>
-            {d.subscriptions.length === 0 ? (
-              <Empty>No magazine subscription.</Empty>
-            ) : (
-              <div className="space-y-2 text-sm">
-                {d.subscriptions.map((s) => (
-                  <div key={s.id} className="border-b last:border-b-0 border-[#E8DFD8]/70 pb-2">
-                    <div className="flex justify-between">
-                      <span>Subscription {s.id}</span>
-                      <span className="text-xs font-semibold text-[#863221]">{s.delivery_status}</span>
-                    </div>
-                    {s.address_override && <div className="text-xs text-[#863221]">Deliver to: {s.address_override}</div>}
-                    {s.notes && <div className="text-xs text-[#863221]">{s.notes}</div>}
-                  </div>
-                ))}
-              </div>
-            )}
             {(d.issues || []).length > 0 && (
               <div className="mt-4">
                 <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mb-1">Delivery history</div>
@@ -765,6 +751,8 @@ function MagazineTab({ id }) {
               </div>
             )}
           </Card>
+            );
+          })()}
         </div>
       )}
     </Loading>
