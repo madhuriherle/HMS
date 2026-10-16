@@ -16,6 +16,7 @@ export default function Modal({
   maxWidthClass = 'max-w-2xl',
   heightClass = '',      // e.g. 'h-[90vh]' for a steady tall popup
   maxHeightClass = 'max-h-[90vh]', // the tallest it may grow (a popup that needs more room passes e.g. 'max-h-[95vh]')
+  widthPx = null,        // an exact width in pixels (a popup whose width follows its content); it never exceeds the screen
   className = '',
   backdropClassName = 'bg-[#180200]/60 backdrop-blur-sm',
   closeOnBackdrop = true,
@@ -72,6 +73,7 @@ export default function Modal({
       {title ? (
         <div
           className={`bg-white rounded-2xl ${maxWidthClass} w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col ${maxHeightClass} ${heightClass} animate-in zoom-in-95 duration-200`}
+          style={widthPx ? { maxWidth: `min(${widthPx}px, 96vw)` } : undefined}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">

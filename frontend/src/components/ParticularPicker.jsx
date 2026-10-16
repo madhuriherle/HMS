@@ -51,31 +51,43 @@ export default function ParticularPicker({
   }), [activeParticulars]);
 
   // The cards flow down a column until its height is full, then the rest continues at the top of the next column (the
-  // browser lays them out: columns of one fixed width). A card with sub types may break between two of its rows - the
-  // border is drawn on both pieces - so no space is left empty; a one-name card never breaks. If that would need more
-  // columns than fit the width, the cards are spread evenly over the columns instead and the popup scrolls up and down.
-  const widthNow = () => (typeof window === 'undefined' ? 1400 : window.innerWidth);
-  const columnsFor = (w) => (w >= 1280 ? 4 : w >= 1024 ? 3 : w >= 640 ? 2 : 1);
-  const [screenWidth, setScreenWidth] = useState(widthNow);
+  // browser lays them out). The columns are all one fixed width and the popup is exactly as wide as the columns that are
+  // needed - no empty column on the right. A card with sub types may break between two of its rows (its border is drawn
+  // on both pieces); a one-name card never breaks. When more columns are needed than the screen holds, the popup is as
+  // wide as the screen and scrolls sideways.
+  const COL_W = 420;
+  const GAP = 12;
+  const [screenWidth, setScreenWidth] = useState(() => (typeof window === 'undefined' ? 1400 : window.innerWidth));
   useEffect(() => {
-    const onResize = () => setScreenWidth(widthNow());
+    const onResize = () => setScreenWidth(window.innerWidth);
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
-  const columnCount = columnsFor(screenWidth);
   const wrapRef = useRef(null);
   const flowRef = useRef(null);
   const [wrapHeight, setWrapHeight] = useState(0);
-  const [flow, setFlow] = useState('height'); // 'height': fill each column to the popup's height; 'balanced': it would not fit
+  const [cols, setCols] = useState(null); // null: being measured (the whole width is offered once); then the columns needed
   useLayoutEffect(() => {
     if (!open) return;
     if (wrapRef.current) setWrapHeight(wrapRef.current.clientHeight);
-    setFlow('height');
-  }, [open, cards, screenWidth, columnCount]);
+    setCols(null);
+  }, [open, cards, screenWidth]);
   useLayoutEffect(() => {
     const el = flowRef.current;
-    if (open && flow === 'height' && el && el.scrollWidth > el.clientWidth + 2) setFlow('balanced');
+    if (!open || !el || !wrapHeight) return;
+    if (cols === null) {
+      // count the columns the cards really occupy
+      const box = el.getBoundingClientRect();
+      const lefts = new Set();
+      el.querySelectorAll('[data-pcard]').forEach((card) => {
+        for (const r of card.getClientRects()) lefts.add(Math.round((r.left - box.left) / 10));
+      });
+      setCols(Math.max(1, lefts.size));
+    } else if (el.scrollWidth > el.clientWidth + 2 && cols < 12) {
+      setCols(cols + 1); // the cards needed one more column than counted
+    }
   });
+  const popupWidth = cols ? cols * COL_W + (cols - 1) * GAP + 64 : null; // the columns plus the popup's side padding
 
   const q = searchQuery.trim().toLowerCase();
   const matches = (card, btn) => !q || btn.title.toLowerCase().includes(q) || card.name.toLowerCase().includes(q);
@@ -172,7 +184,8 @@ export default function ParticularPicker({
           isOpen
           onClose={() => setOpen(false)}
           title="Select Receipt Particular"
-          maxWidthClass="max-w-[1500px]"
+          maxWidthClass="max-w-[96vw]"
+          widthPx={popupWidth}
           heightClass="h-[95vh]"
           maxHeightClass="max-h-[95vh]"
           footer={
@@ -206,14 +219,16 @@ export default function ParticularPicker({
             {cards.length === 0 ? (
               <p className="py-10 text-center text-sm text-[#863221]">No active particulars.</p>
             ) : (
-              <div ref={wrapRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+              <div ref={wrapRef} className="flex-1 min-h-0 overflow-auto">
                 <div
                   ref={flowRef}
                   style={{
-                    columnCount,
-                    columnGap: '12px',
-                    columnFill: flow === 'height' ? 'auto' : 'balance',
-                    height: flow === 'height' && wrapHeight ? `${wrapHeight}px` : 'auto',
+                    columnFill: 'auto',
+                    columnGap: `${GAP}px`,
+                    height: wrapHeight ? `${wrapHeight - 16}px` : 'auto',
+                    ...(cols === null
+                      ? { columnWidth: `${COL_W}px`, width: '100%' }
+                      : { columnCount: cols, width: `${cols * COL_W + (cols - 1) * GAP}px` }),
                   }}
                 >
                   {cards.map((card) => {
@@ -221,6 +236,7 @@ export default function ParticularPicker({
                     return (
                       <div
                         key={card.name}
+                        data-pcard
                         className={`mb-3 min-w-0 rounded-xl border border-[#B8A89B] p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
                         style={card.single ? { breakInside: 'avoid' } : { breakInside: 'auto', boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone' }}
                       >
