@@ -221,7 +221,7 @@ export default function BulkReceiptMapping() {
     }
     setSearchingMembers(true);
     try {
-      const { data } = await api.get('/members/', { params: { search: q.trim(), limit: 10 } });
+      const { data } = await api.get('/members/', { params: { search: q.trim(), limit: 25 } });
       const list = data?.data || data?.members || data || [];
       setMemberSearchResults(Array.isArray(list) ? list : []);
     } catch (err) {
@@ -558,7 +558,7 @@ export default function BulkReceiptMapping() {
         {/* Modal: Manual Member Picker for unmatched receipt */}
         <Modal isOpen={manualModalOpen} onClose={() => setManualModalOpen(false)}>
           <div
-            className="bg-white rounded-2xl max-w-xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+            className="bg-white rounded-2xl max-w-3xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col h-[88vh] max-h-[88vh]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
@@ -606,7 +606,7 @@ export default function BulkReceiptMapping() {
                 </div>
               )}
 
-              <div className="space-y-2 max-h-60 overflow-y-auto">
+              <div className="space-y-2 flex-1 overflow-y-auto">
                 {memberSearchResults.map((m) => (
                   <div
                     key={m.id}
