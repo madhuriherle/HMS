@@ -280,17 +280,7 @@ export default function ReceiptEntry() {
   const [formData, setFormData] = useState(emptyForm);
   const [formErrors, setFormErrors] = useState({});
 
-  // The default particular is Membership when it exists, otherwise the first active one
-  const defaultParticular = useMemo(() => {
-    return activeParticulars.some((p) => p.name === 'Membership') ? 'Membership' : activeParticulars[0]?.name || '';
-  }, [activeParticulars]);
-
-  useEffect(() => {
-    if (!defaultParticular) return;
-    if (!activeParticulars.some((p) => p.name === formData.particulars)) {
-      setFormData((prev) => ({ ...prev, particulars: defaultParticular }));
-    }
-  }, [defaultParticular]);
+  // No particular is chosen by default: the person picks one (a new or reset form starts with none)
 
   // Determine current selected particular object & active sub-types dynamically
   const currentParticularObj = useMemo(() => {
@@ -1223,7 +1213,7 @@ export default function ReceiptEntry() {
     setSelectedMember(null);
     setLookupMembershipNo('');
     setLookupError('');
-    setFormData({ ...emptyForm, particulars: defaultParticular });
+    setFormData({ ...emptyForm });
     setFormErrors({});
     numberTouched.current = false;
     setExtraLines([]);

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Search, X } from 'lucide-react';
 import Modal from './Modal';
 import ModalFooter from './ModalFooter';
@@ -50,9 +50,9 @@ export default function ParticularPicker({
     return { name: p.name, hasSubs: false, single: true, buttons: [{ id: `${p.id || p.name}-root`, title: p.name, particular: p.name, subType: '', key: lineKey(p.name, '') }] };
   }), [activeParticulars]);
 
-  // The cards are packed so no space is wasted: the column count follows the screen, a very tall card is split over two
-  // columns, and each card (in order) goes into the shortest column so far, so a card that does not fit under the
-  // others moves to the next column. The height of a card is whatever it needs; the width is the same for all.
+  // The cards flow down a column until its height is full, then the rest continues in the next column (the browser
+  // lays them out: columns of one fixed width, a card is never cut in two). If that would need more columns than fit
+  // the width, the cards are spread evenly over the columns instead and the popup scrolls up and down.
   const widthNow = () => (typeof window === 'undefined' ? 1400 : window.innerWidth);
   const columnsFor = (w) => (w >= 1280 ? 4 : w >= 1024 ? 3 : w >= 640 ? 2 : 1);
   const [screenWidth, setScreenWidth] = useState(widthNow);
@@ -62,33 +62,19 @@ export default function ParticularPicker({
     return () => window.removeEventListener('resize', onResize);
   }, []);
   const columnCount = columnsFor(screenWidth);
-  const columns = useMemo(() => {
-    const colWidth = Math.max(160, (Math.min(screenWidth * 0.95, 1500) - 80 - (columnCount - 1) * 12) / columnCount - 28);
-    // how tall the buttons come out when they wrap inside a column (each ~6.5px a letter, 20px padding, 6px gap)
-    const heightOf = (buttons, single) => {
-      if (single) return 46; // a small card: just the name
-      const lines = buttons.reduce((sum, b) => sum + Math.max(1, Math.ceil((b.title.length * 6.5 + 16) / colWidth)), 0);
-      return 52 + lines * 24 + buttons.length * 2; // heading and padding, then a row for each sub type
-    };
-    let pieces = [];
-    cards.forEach((card) => {
-      if (columnCount >= 2 && card.buttons.length >= 8) {
-        const half = Math.ceil(card.buttons.length / 2);
-        pieces.push({ ...card, key: `${card.name}-1`, buttons: card.buttons.slice(0, half) });
-        pieces.push({ ...card, key: `${card.name}-2`, title: `${card.name} (continued)`, buttons: card.buttons.slice(half) });
-      } else {
-        pieces.push({ ...card, key: card.name });
-      }
-    });
-    pieces = pieces.map((piece) => ({ ...piece, weight: heightOf(piece.buttons, piece.single) }));
-    const cols = Array.from({ length: columnCount }, () => ({ height: 0, items: [] }));
-    pieces.forEach((piece) => {
-      const shortest = cols.reduce((best, col) => (col.height < best.height ? col : best), cols[0]);
-      shortest.items.push(piece);
-      shortest.height += piece.weight + 12;
-    });
-    return cols;
-  }, [cards, columnCount, screenWidth]);
+  const wrapRef = useRef(null);
+  const flowRef = useRef(null);
+  const [wrapHeight, setWrapHeight] = useState(0);
+  const [flow, setFlow] = useState('height'); // 'height': fill each column to the popup's height; 'balanced': it would not fit
+  useLayoutEffect(() => {
+    if (!open) return;
+    if (wrapRef.current) setWrapHeight(wrapRef.current.clientHeight);
+    setFlow('height');
+  }, [open, cards, screenWidth, columnCount]);
+  useLayoutEffect(() => {
+    const el = flowRef.current;
+    if (open && flow === 'height' && el && el.scrollWidth > el.clientWidth + 2) setFlow('balanced');
+  });
 
   const q = searchQuery.trim().toLowerCase();
   const matches = (card, btn) => !q || btn.title.toLowerCase().includes(q) || card.name.toLowerCase().includes(q);
@@ -218,33 +204,37 @@ export default function ParticularPicker({
             {cards.length === 0 ? (
               <p className="py-10 text-center text-sm text-[#863221]">No active particulars.</p>
             ) : (
-              <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-3">
-                {/* a card each: the sub types as rows, or just the name for a particular without sub types */}
-                <div className="flex items-start gap-3">
-                  {columns.map((col, colIndex) => (
-                    <div key={colIndex} className="flex min-w-0 flex-1 flex-col gap-3">
-                      {col.items.map((card) => {
-                        const cardHasMatch = card.buttons.some((b) => matches(card, b));
-                        return (
-                          <div
-                            key={card.key}
-                            className={`min-w-0 rounded-xl border border-[#B8A89B] p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
-                          >
-                            {card.single ? (
-                              pickButton(card.buttons[0], card, true)
-                            ) : (
-                              <>
-                                <p className="mb-2 border-b border-[#CDBFB3] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.title || card.name}</p>
-                                <div className="flex flex-col gap-0.5">
-                                  {card.buttons.map((btn) => pickButton(btn, card))}
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
+              <div ref={wrapRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+                <div
+                  ref={flowRef}
+                  style={{
+                    columnCount,
+                    columnGap: '12px',
+                    columnFill: flow === 'height' ? 'auto' : 'balance',
+                    height: flow === 'height' && wrapHeight ? `${wrapHeight}px` : 'auto',
+                  }}
+                >
+                  {cards.map((card) => {
+                    const cardHasMatch = card.buttons.some((b) => matches(card, b));
+                    return (
+                      <div
+                        key={card.name}
+                        className={`mb-3 min-w-0 rounded-xl border border-[#B8A89B] p-3 transition-opacity ${cardHasMatch ? '' : 'opacity-30'}`}
+                        style={{ breakInside: 'avoid' }}
+                      >
+                        {card.single ? (
+                          pickButton(card.buttons[0], card, true)
+                        ) : (
+                          <>
+                            <p className="mb-2 border-b border-[#CDBFB3] pb-1.5 text-[11px] font-bold uppercase tracking-wider text-[#510601]">{card.name}</p>
+                            <div className="flex flex-col gap-0.5">
+                              {card.buttons.map((btn) => pickButton(btn, card))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
