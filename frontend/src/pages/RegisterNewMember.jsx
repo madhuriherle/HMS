@@ -1477,9 +1477,9 @@ export default function RegisterNewMember() {
                 {/* Address & work */}
                 <div className="pt-4 border-t border-[#DFD5CC] space-y-3">
                   <div className="pb-2 border-b border-[#E8DFD8]"><h3 className="text-sm font-bold text-[#8C1801] uppercase tracking-wider">Address & Work</h3></div>
-                {/* the fields take three quarters, the sticker preview one quarter */}
-                <div className="grid grid-cols-1 lg:grid-cols-4 gap-5 items-start">
-                <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* the fields take two thirds, the sticker preview one third */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+                <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Communication Address */}
                   <div className="col-span-full">
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
