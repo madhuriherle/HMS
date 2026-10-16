@@ -625,15 +625,27 @@ export default function ReceiptTracking() {
               <div className="mt-3 flex flex-wrap items-center gap-1.5">
                 <button type="button" onClick={() => setViewingReceipt(receipt)} className="btn-act" title="View"><Eye className="w-3.5 h-3.5" /><span>View</span></button>
                 {hasPermission('receipts.tracking.write') && (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEdit(receipt)}
-                    className="btn-act"
-                    title="Edit"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    <span>Edit</span>
-                  </button>
+                  receipt.receiptStatus === 'CANCELLED' || String(receipt.status || '').toUpperCase() === 'CANCELLED' ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="btn-act opacity-40 cursor-not-allowed text-stone-400 border-stone-200"
+                      title="Cancelled receipts cannot be edited"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(receipt)}
+                      className="btn-act"
+                      title="Edit"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                  )
                 )}
               </div>
             </div>
@@ -729,15 +741,27 @@ export default function ReceiptTracking() {
 
                           {/* Edit Action */}
                           {hasPermission('receipts.tracking.write') && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEdit(receipt)}
-                              className="btn-act"
-                              title={'Edit Receipt'}
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                              <span>Edit</span>
-                            </button>
+                            receipt.receiptStatus === 'CANCELLED' || String(receipt.status || '').toUpperCase() === 'CANCELLED' ? (
+                              <button
+                                type="button"
+                                disabled
+                                className="btn-act opacity-40 cursor-not-allowed text-stone-400 border-stone-200"
+                                title="Cancelled receipts cannot be edited"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                <span>Edit</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenEdit(receipt)}
+                                className="btn-act"
+                                title={'Edit Receipt'}
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                                <span>Edit</span>
+                              </button>
+                            )
                           )}
 
                           {/* Delete Action */}
