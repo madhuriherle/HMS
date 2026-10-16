@@ -2740,7 +2740,8 @@ export default function ReceiptEntry() {
                               </button>
                             )}
 
-                            {(hasPermission('members.unapproved.read') || hasPermission('members.list.read')) && (
+                            {/* View button hidden for now as requested (commented out, not removed) */}
+                            {/* {(hasPermission('members.unapproved.read') || hasPermission('members.list.read')) && (
                               <button
                                 type="button"
                                 onClick={() => navigate(`/dashboard/membership/profile/${member.id}`)}
@@ -2750,7 +2751,7 @@ export default function ReceiptEntry() {
                                 <Eye className="w-3.5 h-3.5 shrink-0 text-[#863221]" />
                                 <span>View</span>
                               </button>
-                            )}
+                            )} */}
                           </div>
                         </td>
                       </tr>
