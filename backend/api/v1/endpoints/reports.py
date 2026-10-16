@@ -2,10 +2,11 @@ from typing import Any, List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from datetime import datetime, date, timezone
-from sqlalchemy import func
+from sqlalchemy import func, or_, and_
 from models.members import Member, MemberMembership
 from models.masters import District, Taluk, MembershipType
-from models.receipts import Receipt, ReceiptAllocation
+from models.receipts import Receipt, ReceiptAllocation, ReceiptItem
+from services.receipt_numbers import financial_year_for
 from models.magazines import (
     MagazineSubscription,
     MagazineDeliveryPause,
@@ -843,6 +844,279 @@ def report_receipts_by_member(
         "total_allocated": sum(r["allocated_amount"] for r in data),
         "distinct_members": len({r["member_id"] for r in data}),
         "data": data,
+    }
+
+
+@router.get("/member-collections-by-fy")
+def report_member_collections_by_fy(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+    fy: Optional[str] = None,
+    category: Optional[str] = None,  # "ALL", "NEW_MEMBER", "EXISTING_MEMBER", "UNASSIGNED"
+    search: Optional[str] = None,
+    export: Optional[str] = None,  # "csv", "excel"
+) -> Any:
+    """Breakdown of collections for a financial year into:
+    - New Member Admissions: The first admission/registration receipt of a member whose account was created in this FY.
+    - Existing Member Collections: Subsequent receipts of members enrolled in this FY, or receipts of members enrolled in previous FYs (renewals, donations, subscriptions, upgrades).
+    - Unassigned Receipts: Counter receipts not yet mapped to a member.
+    """
+    if not fy or fy.strip().upper() == "ALL":
+        fy = financial_year_for(date.today())
+    else:
+        fy = fy.strip()
+        if not re.match(r"^\d{4}-\d{2}$", fy):
+            raise HTTPException(400, "fy must look like 2026-27")
+
+    start_year = int(fy.split("-")[0])
+    start_date = date(start_year, 4, 1)
+    end_date = date(start_year + 1, 3, 31)
+
+    # 1. Fetch all live, non-cancelled receipts for this financial year
+    receipts = (
+        db.query(Receipt)
+        .filter(
+            Receipt.is_deleted == False,
+            Receipt.receipt_status != "CANCELLED",
+            or_(
+                Receipt.financial_year == fy,
+                and_(Receipt.receipt_date >= start_date, Receipt.receipt_date <= end_date),
+            ),
+        )
+        .order_by(Receipt.receipt_date.asc(), Receipt.id.asc())
+        .all()
+    )
+
+    receipt_ids = [r.id for r in receipts]
+
+    # 2. Map line items (particulars)
+    items_map = {}
+    if receipt_ids:
+        items = (
+            db.query(ReceiptItem)
+            .filter(ReceiptItem.receipt_id.in_(receipt_ids), ReceiptItem.is_deleted == False)
+            .order_by(ReceiptItem.receipt_id, ReceiptItem.line_no.asc(), ReceiptItem.id.asc())
+            .all()
+        )
+        for it in items:
+            items_map.setdefault(it.receipt_id, []).append(it)
+
+    # 3. Map allocations to members
+    allocations_map = {}
+    if receipt_ids:
+        allocs = (
+            db.query(ReceiptAllocation, Member)
+            .join(Member, Member.id == ReceiptAllocation.member_id)
+            .filter(
+                ReceiptAllocation.receipt_id.in_(receipt_ids),
+                ReceiptAllocation.is_deleted == False,
+                Member.is_deleted == False,
+            )
+            .all()
+        )
+        for a, m in allocs:
+            allocations_map.setdefault(a.receipt_id, []).append((a, m))
+
+    # 4. For all mapped members, find their earliest receipt date and ID across the entire system
+    member_ids = list({m.id for alloc_list in allocations_map.values() for a, m in alloc_list})
+    member_earliest = {}
+    member_meta = {}
+
+    if member_ids:
+        earliest_rows = (
+            db.query(
+                ReceiptAllocation.member_id,
+                Receipt.id,
+                Receipt.receipt_date,
+                Receipt.financial_year,
+            )
+            .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
+            .filter(
+                ReceiptAllocation.member_id.in_(member_ids),
+                ReceiptAllocation.is_deleted == False,
+                Receipt.is_deleted == False,
+                Receipt.receipt_status != "CANCELLED",
+            )
+            .order_by(ReceiptAllocation.member_id, Receipt.receipt_date.asc(), Receipt.id.asc())
+            .all()
+        )
+        for mid, rid, rdate, rfy in earliest_rows:
+            if mid not in member_earliest:
+                member_earliest[mid] = {
+                    "first_receipt_id": rid,
+                    "first_receipt_date": rdate,
+                    "first_receipt_fy": rfy or financial_year_for(rdate),
+                }
+
+        m_rows = db.query(Member.id, Member.created_at, Member.approved_at).filter(Member.id.in_(member_ids)).all()
+        for mid, m_created, m_approved in m_rows:
+            member_meta[mid] = {
+                "created_at": m_created,
+                "approved_at": m_approved,
+            }
+
+    # 5. Build all rows
+    all_rows = []
+    for r in receipts:
+        # Particulars summary
+        r_items = items_map.get(r.id, [])
+        if r_items:
+            part_summary = ", ".join(
+                f"{it.particular_name or it.item_type or 'Item'} (₹{float(it.amount):g})"
+                for it in r_items
+            )
+        else:
+            part_summary = r.receipt_type or "Membership"
+
+        alloc_list = allocations_map.get(r.id, [])
+
+        if not alloc_list:
+            all_rows.append({
+                "receipt_id": r.id,
+                "receipt_number": r.receipt_number,
+                "receipt_date": str(r.receipt_date),
+                "financial_year": r.financial_year or fy,
+                "category": "UNASSIGNED",
+                "category_label": "Unassigned Receipt",
+                "member_id": None,
+                "membership_number": r.payer_membership_no or "—",
+                "member_name": r.payer_name or "—",
+                "full_name_kn": None,
+                "mobile": r.payer_mobile or "—",
+                "particulars": part_summary,
+                "payment_mode": r.payment_mode,
+                "transaction_reference": r.transaction_reference or "—",
+                "amount": float(r.net_amount),
+                "allocated_amount": float(r.net_amount),
+                "is_first_receipt": False,
+            })
+        else:
+            for a, m in alloc_list:
+                earliest = member_earliest.get(m.id, {})
+                first_rid = earliest.get("first_receipt_id")
+                first_rfy = earliest.get("first_receipt_fy")
+                m_info = member_meta.get(m.id, {})
+                m_created = m_info.get("created_at")
+
+                # Check if member was created / first joined in this financial year
+                created_in_this_fy = False
+                if m_created:
+                    created_date = m_created.date() if hasattr(m_created, "date") else m_created
+                    created_in_this_fy = (created_date >= start_date and created_date <= end_date)
+                elif first_rfy == fy:
+                    created_in_this_fy = True
+
+                is_new_member_admission = (created_in_this_fy and r.id == first_rid)
+
+                if is_new_member_admission:
+                    cat = "NEW_MEMBER"
+                    cat_label = "New Member Admission"
+                else:
+                    cat = "EXISTING_MEMBER"
+                    cat_label = "Existing Member Collection"
+
+                all_rows.append({
+                    "receipt_id": r.id,
+                    "receipt_number": r.receipt_number,
+                    "receipt_date": str(r.receipt_date),
+                    "financial_year": r.financial_year or fy,
+                    "category": cat,
+                    "category_label": cat_label,
+                    "member_id": m.id,
+                    "membership_number": m.membership_number or "—",
+                    "member_name": m.display_name or m.first_name_en or "—",
+                    "full_name_kn": m.full_name_kn,
+                    "mobile": m.mobile or r.payer_mobile or "—",
+                    "particulars": part_summary,
+                    "payment_mode": r.payment_mode,
+                    "transaction_reference": r.transaction_reference or "—",
+                    "amount": float(r.net_amount),
+                    "allocated_amount": float(a.allocated_amount),
+                    "is_first_receipt": (r.id == first_rid),
+                })
+
+    # Summary totals
+    summary = {
+        "financial_year": fy,
+        "total_receipts_count": len(receipts),
+        "total_collections": sum(float(r.net_amount) for r in receipts),
+        "new_members_count": len({row["member_id"] for row in all_rows if row["category"] == "NEW_MEMBER" and row["member_id"]}),
+        "new_members_amount": sum(row["allocated_amount"] for row in all_rows if row["category"] == "NEW_MEMBER"),
+        "existing_members_count": len({row["member_id"] for row in all_rows if row["category"] == "EXISTING_MEMBER" and row["member_id"]}),
+        "existing_members_amount": sum(row["allocated_amount"] for row in all_rows if row["category"] == "EXISTING_MEMBER"),
+        "unassigned_count": sum(1 for r in receipts if r.id not in allocations_map or not allocations_map[r.id]),
+        "unassigned_amount": sum(float(r.net_amount) for r in receipts if r.id not in allocations_map or not allocations_map[r.id]),
+    }
+
+    # Available financial years
+    months = (
+        db.query(
+            func.extract("year", Receipt.receipt_date),
+            func.extract("month", Receipt.receipt_date),
+        )
+        .filter(Receipt.is_deleted == False)
+        .group_by(
+            func.extract("year", Receipt.receipt_date),
+            func.extract("month", Receipt.receipt_date),
+        )
+        .all()
+    )
+    years = sorted({int(y) if int(m) >= 4 else int(y) - 1 for y, m in months if y and m}, reverse=True)
+    available_fys = [f"{y}-{str(y + 1)[-2:]}" for y in years]
+    cur_fy = financial_year_for(date.today())
+    if cur_fy not in available_fys:
+        available_fys.insert(0, cur_fy)
+
+    # Filter by category if requested
+    filtered_rows = all_rows
+    if category and category.strip().upper() != "ALL":
+        c_upper = category.strip().upper()
+        filtered_rows = [row for row in filtered_rows if row["category"] == c_upper]
+
+    # Filter by search if requested
+    if search and search.strip():
+        s = search.strip().lower()
+        filtered_rows = [
+            row for row in filtered_rows
+            if s in str(row["receipt_number"]).lower()
+            or s in str(row["member_name"]).lower()
+            or s in str(row["membership_number"]).lower()
+            or s in str(row["mobile"]).lower()
+            or s in str(row["particulars"]).lower()
+            or (row["full_name_kn"] and s in str(row["full_name_kn"]).lower())
+        ]
+
+    # Export handling
+    if export:
+        export_filters = {"fy": fy, "category": category, "search": search}
+        export_data = [
+            {
+                "Receipt No": row["receipt_number"],
+                "Receipt Date": row["receipt_date"],
+                "Financial Year": row["financial_year"],
+                "Category": row["category_label"],
+                "Membership No": row["membership_number"],
+                "Member Name": row["member_name"],
+                "Mobile": row["mobile"],
+                "Particulars": row["particulars"],
+                "Payment Mode": row["payment_mode"],
+                "Reference": row["transaction_reference"],
+                "Amount (Rs)": row["allocated_amount"],
+            }
+            for row in filtered_rows
+        ]
+        filename = f"member_collections_fy_{fy}_{category or 'all'}"
+        return _export_response(
+            db, current_user, "member_collections_by_fy", export,
+            export_filters, export_data, filename,
+        )
+
+    return {
+        "financial_year": fy,
+        "financial_years": available_fys,
+        "summary": summary,
+        "total": len(filtered_rows),
+        "data": filtered_rows,
     }
 
 

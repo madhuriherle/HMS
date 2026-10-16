@@ -810,12 +810,90 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
 // 3. RECEIPTS & FINANCE REPORT TAB
 // ==============================================================
 function ReceiptsReportTab({ membershipTypes, onDownload }) {
+  const [subView, setSubView] = useState('fy_breakdown'); // 'fy_breakdown' | 'register'
+
+  // ── State for FY Collections Breakdown ──
+  const getCurrentFY = () => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth() + 1;
+    const start = m >= 4 ? y : y - 1;
+    return `${start}-${String(start + 1).slice(-2)}`;
+  };
+
+  const [selectedFY, setSelectedFY] = useState(getCurrentFY());
+  const [availableFYs, setAvailableFYs] = useState([getCurrentFY()]);
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [fyRows, setFyRows] = useState([]);
+  const [fySummary, setFySummary] = useState({});
+  const [fyLoading, setFyLoading] = useState(false);
+  const [fyPage, setFyPage] = useState(1);
+  const fyPageSize = 15;
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Load FY collections breakdown data
+  const loadFYData = useCallback(async () => {
+    setFyLoading(true);
+    try {
+      const params = {
+        fy: selectedFY,
+        category: selectedCategory,
+      };
+      if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+
+      const res = await api.get('/reports/member-collections-by-fy', { params });
+      const body = res.data || {};
+      setFyRows(body.data || []);
+      setFySummary(body.summary || {});
+      if (body.financial_years && body.financial_years.length > 0) {
+        setAvailableFYs(body.financial_years);
+      }
+      setFyPage(1);
+    } catch (err) {
+      console.error('Failed to load FY member collections report.', err);
+      notify('Failed to load FY member collections report.', 'error');
+    } finally {
+      setFyLoading(false);
+    }
+  }, [selectedFY, selectedCategory, debouncedSearch]);
+
+  useEffect(() => {
+    if (subView === 'fy_breakdown') {
+      loadFYData();
+    }
+  }, [subView, loadFYData]);
+
+  const handleExportFY = (format) => {
+    const params = {
+      fy: selectedFY,
+      category: selectedCategory,
+      export: format,
+    };
+    if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+    const filename = `member-collections-fy-${selectedFY}-${selectedCategory.toLowerCase()}.${format === 'csv' ? 'csv' : 'xlsx'}`;
+    onDownload('/reports/member-collections-by-fy', params, filename);
+  };
+
+  const paginatedFYRows = useMemo(() => {
+    const start = (fyPage - 1) * fyPageSize;
+    return fyRows.slice(start, start + fyPageSize);
+  }, [fyRows, fyPage]);
+
+  const totalFYPages = Math.ceil(fyRows.length / fyPageSize) || 1;
+
+  // ── State for General Receipts Register ──
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [paymentMode, setPaymentMode] = useState('');
   const [particularId, setParticularId] = useState('');
   const [particulars, setParticulars] = useState([]);
-
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -830,7 +908,7 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
     })();
   }, []);
 
-  const loadData = useCallback(async () => {
+  const loadRegisterData = useCallback(async () => {
     setLoading(true);
     try {
       const params = {};
@@ -851,56 +929,71 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
   }, [fromDate, toDate, paymentMode, particularId]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (subView === 'register') {
+      loadRegisterData();
+    }
+  }, [subView, loadRegisterData]);
 
-  const handleExport = (format) => {
+  const handleExportRegister = (format) => {
     const params = { export: format };
     if (fromDate) params.from_date = fromDate;
     if (toDate) params.to_date = toDate;
     if (paymentMode) params.payment_mode = paymentMode;
     if (particularId) params.particular_id = particularId;
 
-    const filename = `receipts-report-${new Date().toISOString().slice(0, 10)}.${format === 'csv' ? 'csv' : 'xlsx'}`;
+    const filename = `receipts-register-${new Date().toISOString().slice(0, 10)}.${format === 'csv' ? 'csv' : 'xlsx'}`;
     onDownload('/reports/receipts', params, filename);
   };
 
-  const totalAmount = useMemo(() => {
+  const totalRegisterAmount = useMemo(() => {
     return rows.reduce((acc, r) => acc + Number(r.net_amount || r.total_amount || 0), 0);
   }, [rows]);
 
-  const paginatedRows = useMemo(() => {
+  const paginatedRegisterRows = useMemo(() => {
     const start = (page - 1) * pageSize;
     return rows.slice(start, start + pageSize);
   }, [rows, page]);
 
-  const totalPages = Math.ceil(rows.length / pageSize) || 1;
+  const totalRegisterPages = Math.ceil(rows.length / pageSize) || 1;
 
   return (
     <div className="space-y-4">
-      {/* Top Banner & Export Buttons */}
+      {/* Sub-view Switcher & Action Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4 text-xs">
-          <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg px-3 py-2">
-            <span className="text-stone-500">Total Count: </span>
-            <strong className="text-[#180200]">{rows.length}</strong>
-          </div>
-          <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg px-3 py-2">
-            <span className="text-stone-500">Total Collections: </span>
-            <strong className="text-emerald-700">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
-          </div>
+        <div className="inline-flex rounded-lg border border-[#E8DFD8] bg-white p-1 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setSubView('fy_breakdown')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+              subView === 'fy_breakdown' ? 'bg-[#510601] text-white' : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            FY Member Collections (New vs. Existing)
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubView('register')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+              subView === 'register' ? 'bg-[#510601] text-white' : 'text-stone-600 hover:text-stone-900'
+            }`}
+          >
+            All Receipts Register
+          </button>
         </div>
 
+        {/* Export Buttons */}
         <PageActions>
           <button
-            onClick={() => handleExport('csv')}
+            type="button"
+            onClick={() => (subView === 'fy_breakdown' ? handleExportFY('csv') : handleExportRegister('csv'))}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-lg hover:bg-[#FAF7F2] cursor-pointer shadow-sm transition-colors"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export CSV</span>
           </button>
           <button
-            onClick={() => handleExport('excel')}
+            type="button"
+            onClick={() => (subView === 'fy_breakdown' ? handleExportFY('excel') : handleExportRegister('excel'))}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-[#510601] rounded-lg hover:bg-[#3D0400] cursor-pointer shadow-sm transition-colors"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
@@ -909,124 +1002,372 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
         </PageActions>
       </div>
 
-      {/* Filter Toolbar */}
-      <FilterCard className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-        <div>
-          <label className="block text-xs font-bold text-stone-600 uppercase mb-1">From Date</label>
-          <DateInput
-            value={fromDate}
-            onChange={(val) => setFromDate(val)}
-            className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-stone-600 uppercase mb-1">To Date</label>
-          <DateInput
-            value={toDate}
-            onChange={(val) => setToDate(val)}
-            className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Payment Mode</label>
-          <select
-            value={paymentMode}
-            onChange={(e) => setPaymentMode(e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-          >
-            <option value="">All Payment Modes</option>
-            <option value="CASH">Cash</option>
-            <option value="CHEQUE">Cheque</option>
-            <option value="DD">Demand Draft (D.D.)</option>
-            <option value="UPI">UPI</option>
-            <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS)</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Particular</label>
-          <select
-            value={particularId}
-            onChange={(e) => setParticularId(e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
-          >
-            <option value="">All Particulars</option>
-            {particulars.map((p) => (
-              <option key={p.id} value={p.id}>{p.name_en || p.name}</option>
-            ))}
-          </select>
-        </div>
-            </FilterCard>
+      {/* ──────────────────────────────────────────────────────────── */}
+      {/* SUBVIEW 1: FY MEMBER COLLECTIONS (NEW VS EXISTING)          */}
+      {/* ──────────────────────────────────────────────────────────── */}
+      {subView === 'fy_breakdown' && (
+        <div className="space-y-4">
+          {/* KPI Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* 1. New Member Admissions */}
+            <div className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">New Member Admissions</span>
+                <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xs">
+                  <Users className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="text-xl font-bold text-emerald-800">
+                ₹{Number(fySummary.new_members_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-xs text-stone-500 mt-1">
+                <strong>{fySummary.new_members_count || 0}</strong> new member accounts this FY
+              </div>
+            </div>
 
-      {/* Receipts Table */}
-      <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="py-3 px-4">Receipt Number</th>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Payee / Member</th>
-                <th className="py-3 px-4">Payment Mode</th>
-                <th className="py-3 px-4">Bank Account</th>
-                <th className="py-3 px-4 text-right">Net Amount</th>
-                <th className="py-3 px-4">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E8DFD8]">
-              {paginatedRows.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="py-12 text-center text-stone-400">
-                    No receipt transactions match the selected filters.
-                  </td>
-                </tr>
-              ) : (
-                paginatedRows.map((r, i) => (
-                  <tr key={i} className="hover:bg-stone-50">
-                    <td className="py-3 px-4 font-semibold text-stone-800">{r.receipt_number || '—'}</td>
-                    <td className="py-3 px-4 text-stone-600">{formatDate(r.receipt_date) || '—'}</td>
-                    <td className="py-3 px-4 text-stone-800">{r.received_from || r.member_name || '—'}</td>
-                    <td className="py-3 px-4 text-stone-600">{r.payment_mode || '—'}</td>
-                    <td className="py-3 px-4 text-stone-600">{r.bank_account || '—'}</td>
-                    <td className="py-3 px-4 text-right font-bold text-stone-900">
-                      ₹{Number(r.net_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        r.status === 'ACTIVE' || r.status === 'PAID'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-stone-100 text-stone-600 border border-stone-200'
-                      }`}>
-                        {r.status || 'ACTIVE'}
-                      </span>
-                    </td>
+            {/* 2. Existing Member Collections */}
+            <div className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Existing Member Collections</span>
+                <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs">
+                  <RefreshCw className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="text-xl font-bold text-blue-800">
+                ₹{Number(fySummary.existing_members_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-xs text-stone-500 mt-1">
+                <strong>{fySummary.existing_members_count || 0}</strong> existing members renewed / paid
+              </div>
+            </div>
+
+            {/* 3. Unassigned Receipts */}
+            <div className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Unassigned Receipts</span>
+                <span className="w-7 h-7 rounded-lg bg-stone-100 text-stone-700 flex items-center justify-center font-bold text-xs">
+                  <CreditCard className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="text-xl font-bold text-stone-800">
+                ₹{Number(fySummary.unassigned_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-xs text-stone-500 mt-1">
+                <strong>{fySummary.unassigned_count || 0}</strong> counter / unassigned receipts
+              </div>
+            </div>
+
+            {/* 4. Grand Total */}
+            <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-[#863221] uppercase tracking-wider">Total FY Collections</span>
+                <span className="w-7 h-7 rounded-lg bg-[#510601] text-white flex items-center justify-center font-bold text-xs">
+                  <Receipt className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="text-xl font-bold text-[#510601]">
+                ₹{Number(fySummary.total_collections || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-xs text-stone-500 mt-1">
+                <strong>{fySummary.total_receipts_count || 0}</strong> total receipts in FY {selectedFY}
+              </div>
+            </div>
+          </div>
+
+          {/* Filter Toolbar */}
+          <FilterCard className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Financial Year</label>
+              <select
+                value={selectedFY}
+                onChange={(e) => setSelectedFY(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+              >
+                {availableFYs.map((fy) => (
+                  <option key={fy} value={fy}>FY {fy}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Collection Category</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+              >
+                <option value="ALL">All Categories</option>
+                <option value="NEW_MEMBER">New Member Admissions Only</option>
+                <option value="EXISTING_MEMBER">Existing Member Collections Only</option>
+                <option value="UNASSIGNED">Unassigned Receipts Only</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Search</label>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search member, receipt, mobile..."
+                  className="w-full pl-8 pr-3 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+                />
+              </div>
+            </div>
+          </FilterCard>
+
+          {/* FY Breakdown Table */}
+          <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
+                  <tr>
+                    <th className="py-3 px-4">Receipt</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Member Name & Number</th>
+                    <th className="py-3 px-4">Contact</th>
+                    <th className="py-3 px-4">Particulars / Purpose</th>
+                    <th className="py-3 px-4">Payment Mode</th>
+                    <th className="py-3 px-4 text-right">Amount</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-[#E8DFD8]">
+                  {fyLoading ? (
+                    <tr>
+                      <td colSpan="7" className="py-12 text-center text-stone-400">
+                        Loading financial year collections...
+                      </td>
+                    </tr>
+                  ) : paginatedFYRows.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="py-12 text-center text-stone-400">
+                        No member collection records found for FY {selectedFY}.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedFYRows.map((r, i) => (
+                      <tr key={i} className="hover:bg-stone-50">
+                        <td className="py-3 px-4">
+                          <div className="font-semibold text-stone-800">{r.receipt_number || '—'}</div>
+                          <div className="text-[11px] text-stone-500">{formatDate(r.receipt_date)}</div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {r.category === 'NEW_MEMBER' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              New Admission
+                            </span>
+                          ) : r.category === 'EXISTING_MEMBER' ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                              Existing Member
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-600 border border-stone-200">
+                              Unassigned
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="font-semibold text-stone-800">{r.member_name || '—'}</div>
+                          {r.full_name_kn && <div className="text-[11px] text-stone-500">{r.full_name_kn}</div>}
+                          {r.membership_number && r.membership_number !== '—' && (
+                            <div className="text-[10px] font-mono font-semibold text-[#510601]">No: {r.membership_number}</div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-stone-600 font-mono text-[11px]">
+                          {r.mobile || '—'}
+                        </td>
+                        <td className="py-3 px-4 text-stone-700 max-w-[220px] truncate" title={r.particulars}>
+                          {r.particulars || '—'}
+                        </td>
+                        <td className="py-3 px-4 text-stone-600">
+                          <div>{r.payment_mode || '—'}</div>
+                          {r.transaction_reference && r.transaction_reference !== '—' && (
+                            <div className="text-[10px] text-stone-400 font-mono">Ref: {r.transaction_reference}</div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-right font-bold text-stone-900">
+                          ₹{Number(r.allocated_amount || r.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-        {/* Pagination */}
-        <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8] flex items-center justify-between text-xs text-[#863221]">
-          <span>Page {page} of {totalPages}</span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
+            {/* Pagination Controls */}
+            <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8] flex items-center justify-between text-xs text-[#863221]">
+              <span>Page {fyPage} of {totalFYPages} ({fyRows.length} total)</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setFyPage((p) => Math.max(1, p - 1))}
+                  disabled={fyPage <= 1}
+                  className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFyPage((p) => Math.min(totalFYPages, p + 1))}
+                  disabled={fyPage >= totalFYPages}
+                  className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ──────────────────────────────────────────────────────────── */}
+      {/* SUBVIEW 2: GENERAL RECEIPTS REGISTER (ORIGINAL VIEW)         */}
+      {/* ──────────────────────────────────────────────────────────── */}
+      {subView === 'register' && (
+        <div className="space-y-4">
+          {/* Summary Strip */}
+          <div className="flex items-center gap-4 text-xs">
+            <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg px-3 py-2">
+              <span className="text-stone-500">Total Count: </span>
+              <strong className="text-[#180200]">{rows.length}</strong>
+            </div>
+            <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-lg px-3 py-2">
+              <span className="text-stone-500">Total Collections: </span>
+              <strong className="text-emerald-700">₹{totalRegisterAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong>
+            </div>
+          </div>
+
+          {/* Filter Toolbar */}
+          <FilterCard className="bg-white border border-[#E8DFD8] rounded-xl p-4 shadow-sm grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">From Date</label>
+              <DateInput
+                value={fromDate}
+                onChange={(val) => setFromDate(val)}
+                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">To Date</label>
+              <DateInput
+                value={toDate}
+                onChange={(val) => setToDate(val)}
+                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Payment Mode</label>
+              <select
+                value={paymentMode}
+                onChange={(e) => setPaymentMode(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+              >
+                <option value="">All Payment Modes</option>
+                <option value="CASH">Cash</option>
+                <option value="CHEQUE">Cheque</option>
+                <option value="DD">Demand Draft (D.D.)</option>
+                <option value="UPI">UPI</option>
+                <option value="BANK_TRANSFER">Bank Transfer (NEFT/RTGS)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-stone-600 uppercase mb-1">Particular</label>
+              <select
+                value={particularId}
+                onChange={(e) => setParticularId(e.target.value)}
+                className="w-full px-2.5 py-1.5 bg-white border border-[#DFD5CC] rounded-lg text-xs text-stone-800 focus:outline-none focus:border-[#510601]"
+              >
+                <option value="">All Particulars</option>
+                {particulars.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name_en || p.name}</option>
+                ))}
+              </select>
+            </div>
+          </FilterCard>
+
+          {/* Receipts Table */}
+          <div className="bg-white border border-[#E8DFD8] rounded-xl shadow-sm overflow-hidden">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="sticky top-0 z-10 bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
+                  <tr>
+                    <th className="py-3 px-4">Receipt Number</th>
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">Payee / Member</th>
+                    <th className="py-3 px-4">Payment Mode</th>
+                    <th className="py-3 px-4">Bank Account</th>
+                    <th className="py-3 px-4 text-right">Net Amount</th>
+                    <th className="py-3 px-4">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E8DFD8]">
+                  {loading ? (
+                    <tr>
+                      <td colSpan="7" className="py-12 text-center text-stone-400">
+                        Loading receipts...
+                      </td>
+                    </tr>
+                  ) : paginatedRegisterRows.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="py-12 text-center text-stone-400">
+                        No receipt transactions match the selected filters.
+                      </td>
+                    </tr>
+                  ) : (
+                    paginatedRegisterRows.map((r, i) => (
+                      <tr key={i} className="hover:bg-stone-50">
+                        <td className="py-3 px-4 font-semibold text-stone-800">{r.receipt_number || '—'}</td>
+                        <td className="py-3 px-4 text-stone-600">{formatDate(r.receipt_date) || '—'}</td>
+                        <td className="py-3 px-4 text-stone-800">{r.received_from || r.member_name || '—'}</td>
+                        <td className="py-3 px-4 text-stone-600">{r.payment_mode || '—'}</td>
+                        <td className="py-3 px-4 text-stone-600">{r.bank_account || '—'}</td>
+                        <td className="py-3 px-4 text-right font-bold text-stone-900">
+                          ₹{Number(r.net_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            r.status === 'ACTIVE' || r.status === 'PAID'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-stone-100 text-stone-600 border border-stone-200'
+                          }`}>
+                            {r.status || 'ACTIVE'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="px-4 py-3 bg-[#FAF7F2] border-t border-[#E8DFD8] flex items-center justify-between text-xs text-[#863221]">
+              <span>Page {page} of {totalRegisterPages}</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalRegisterPages, p + 1))}
+                  disabled={page >= totalRegisterPages}
+                  className="p-1 rounded border border-[#DFD5CC] disabled:opacity-30 hover:bg-stone-100 cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

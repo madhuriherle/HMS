@@ -4423,6 +4423,30 @@ def test_reports_module_end_to_end(client, admin_headers):
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
+    # ── member collections by financial year breakdown ──
+    fy_report = client.get(
+        "/api/v1/reports/member-collections-by-fy",
+        headers=admin_headers,
+        params={"fy": "2026-27"},
+    )
+    assert fy_report.status_code == 200, fy_report.text
+    fy_body = fy_report.json()
+    assert fy_body["financial_year"] == "2026-27"
+    assert "summary" in fy_body
+    assert "total_collections" in fy_body["summary"]
+    assert "new_members_count" in fy_body["summary"]
+    assert "existing_members_count" in fy_body["summary"]
+    assert len(fy_body["data"]) >= 1
+
+    # export test
+    fy_csv = client.get(
+        "/api/v1/reports/member-collections-by-fy",
+        headers=admin_headers,
+        params={"fy": "2026-27", "export": "csv"},
+    )
+    assert fy_csv.status_code == 200, fy_csv.text
+    assert "Receipt No" in fy_csv.text or "Receipt Date" in fy_csv.text
+
     # ── magazines: subscriptions, pause, return, labels ──
     sub = client.post(
         "/api/v1/magazines/subscriptions", headers=admin_headers,
