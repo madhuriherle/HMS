@@ -1220,10 +1220,6 @@ export default function MemberProfile() {
                 </div>
               </div>
               <div className="flex items-center gap-4 shrink-0">
-                <div className="text-right">
-                  <div className="text-[10px] uppercase font-semibold text-[#863221]/80 tracking-wider">Paid so far</div>
-                  <div className="text-base font-semibold font-mono text-[#180200]">{inr(s.paid_so_far)}</div>
-                </div>
                 {hasPermission('members.list.write') && (
                   <Link
                     to={`/dashboard/membership/edit/${s.id}`}

@@ -247,8 +247,8 @@ def _attach_places(db: Session, rows: list) -> None:
 
 
 def _attach_membership_types(db: Session, rows: list) -> None:
-    """Each listed member carries the name of their current membership type (the latest membership record) and
-    their credit total, so the lists show the real type and amount paid instead of working them out on the page."""
+    """Each listed member carries the name of their current membership type (the latest membership record) and their
+    place names. (The amount paid is not listed: it is worked out for a member's own profile, not for every row.)"""
     from models.masters import District, MembershipType, PostalCode, State, Taluk
     ids = [r.get("id") for r in rows if isinstance(r, dict) and r.get("id")]
     if not ids:
@@ -262,15 +262,12 @@ def _attach_membership_types(db: Session, rows: list) -> None:
         .all()
     ):
         latest[ms.member_id] = (t.id, t.name_en, ms.membership_number)
-    from services import membership_credit
-    credit = membership_credit.credit_totals(db, ids)
     _attach_places(db, rows)
     for r in rows:
         if isinstance(r, dict):
             tid, name, ms_number = latest.get(r.get("id"), (None, None, None))
             r["membership_type_id"] = tid
             r["membership_type"] = name
-            r["credit_total"] = credit.get(r.get("id"), 0.0)  # what the member has paid toward membership
             mem_no = r.get("membership_number") or r.get("member_code") or ms_number
             if mem_no:
                 r["membership_number"] = mem_no
@@ -2084,13 +2081,6 @@ def _profile_summary(db: Session, member: Member) -> dict:
         .order_by((MemberMembership.status == "ACTIVE").desc(), MemberMembership.applied_at.desc())
         .first()
     )
-    paid_rows = (
-        db.query(func.count(ReceiptAllocation.id), func.coalesce(func.sum(ReceiptAllocation.allocated_amount), 0))
-        .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
-        .filter(ReceiptAllocation.member_id == mid, ReceiptAllocation.is_deleted == False,  # noqa: E712
-                Receipt.is_deleted == False, Receipt.payment_status != "CANCELLED")  # noqa: E712
-        .first()
-    )
     receipt_count = (
         db.query(func.count(ReceiptAllocation.id))
         .filter(ReceiptAllocation.member_id == mid, ReceiptAllocation.is_deleted == False)  # noqa: E712
@@ -2149,7 +2139,6 @@ def _profile_summary(db: Session, member: Member) -> dict:
             "membership_number": mm.membership_number,
         } if mm else None,
         "membership_credit": membership_credit.summary(db, mid),
-        "paid_so_far": float(paid_rows[1] or 0) if paid_rows else 0.0,
         "counts": {
             "family": family_count,
             "membership": membership_count,

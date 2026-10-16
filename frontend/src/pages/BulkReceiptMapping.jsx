@@ -373,16 +373,6 @@ export default function BulkReceiptMapping() {
             </div>
           </div>
 
-          {/* Selection Helper Strip */}
-          {candidates.length > 0 && (
-            <div className="flex items-center justify-between text-xs text-[#863221] pt-1 border-t border-[#E8DFD8]/60">
-              <div />
-
-              <span>
-                Showing <b>{candidates.length}</b> of <b>{total}</b> receipts
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Reconciliation Table */}

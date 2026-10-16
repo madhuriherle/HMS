@@ -190,7 +190,7 @@ export default function MembershipList() {
 
   // Row Selection (Set of Selected Members)
   const [selectedMemberIds, setSelectedMemberIds] = useState(new Set());
-  const [selectionMode, setSelectionMode] = useState(false); // checkboxes show only after the Select button is pressed
+  const selectionMode = true; // the checkboxes are always showing, so there is no Select / Done button
 
   // ----------------------------------------------------
   // MODAL STATES
@@ -713,6 +713,7 @@ export default function MembershipList() {
         onResetFilters={handleClearFilters}
         rightSlot={
           <>
+            {/* Select / Done button hidden: the checkboxes always show (kept here to bring back)
             <button
               type="button"
               onClick={() => {
@@ -727,6 +728,7 @@ export default function MembershipList() {
               <CheckSquare className="w-4 h-4" />
               <span>{selectionMode ? 'Done' : 'Select'}</span>
             </button>
+            */}
             {selectedMemberIds.size > 0 && (
               <>
                 <button
@@ -748,6 +750,7 @@ export default function MembershipList() {
                 </button>
               </>
             )}
+            {/* Import Members button hidden: the Member Import page has its own menu entry (kept here to bring back)
             {(hasPermission('members.register.write') || hasPermission('members.write')) && (
               <Link
                 to="/dashboard/membership/import"
@@ -758,6 +761,7 @@ export default function MembershipList() {
                 <span>Import Members</span>
               </Link>
             )}
+            */}
             {hasPermission('members.list.write') && (
               <button
                 type="button"
@@ -919,6 +923,7 @@ export default function MembershipList() {
                 <SortTh label="Member No." field="member_code" sort={sort} onSort={toggleSort} className="py-3 px-4" />
                 <SortTh label="Name" field="name" sort={sort} onSort={toggleSort} className="py-3 px-4" />
                 <SortTh label="Contact" field="mobile" sort={sort} onSort={toggleSort} className="py-3 px-4" />
+                <th className="py-3 px-4">Address</th>
                 <th className="py-3 px-4">Type</th>
                 <SortTh label="Status" field="member_status" sort={sort} onSort={toggleSort} className="py-3 px-4 text-center" />
                 <th className="py-3 px-4 text-right">Actions</th>
@@ -926,10 +931,10 @@ export default function MembershipList() {
             </thead>
             <tbody className="divide-y divide-[#E8DFD8]">
               {loadingPage && paginatedMembers.length === 0 ? (
-                <tr><td colSpan={8} className="py-12 text-center text-sm text-[#863221]">Loading members…</td></tr>
+                <tr><td colSpan={9} className="py-12 text-center text-sm text-[#863221]">Loading members…</td></tr>
               ) : paginatedMembers.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="py-12 text-center text-[#863221]">
+                  <td colSpan="9" className="py-12 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center">
                       <AlertCircle className="w-8 h-8 text-[#863221]/40 mb-2" />
                       <p className="font-semibold text-sm text-[#180200]">No members found</p>
@@ -980,14 +985,25 @@ export default function MembershipList() {
                         )}
                       </td>
 
-                      {/* Membership Type and amount paid, both from the server */}
+                      {/* Address: the street lines, then taluk / district, then state - PIN (all from the list call) */}
+                      <td className="py-3 px-4 align-top">
+                        {(() => {
+                          const street = m.addressLine || m.address || '';
+                          const place = [m.talukName, m.districtName].filter(Boolean).join(', ');
+                          const pin = [m.stateName, m.postalCode].filter(Boolean).join(' - ');
+                          const whole = [street, place, pin].filter(Boolean).join(', ');
+                          return whole ? (
+                            <div className="max-w-[280px] text-xs text-[#180200] leading-snug" title={whole}>
+                              {street && <div className="line-clamp-2">{street}</div>}
+                              {(place || pin) && <div className="text-[11px] text-[#863221]">{[place, pin].filter(Boolean).join(' · ')}</div>}
+                            </div>
+                          ) : <span className="text-xs text-[#863221]/60">—</span>;
+                        })()}
+                      </td>
+
+                      {/* Membership Type, from the server */}
                       <td className="py-3 px-4">
-                        <div className="space-y-0.5">
-                          <span className="text-xs font-semibold text-[#510601]">{m.membershipType || '—'}</span>
-                          <div className="text-[10px] text-[#863221] font-mono font-medium">
-                            Paid: {formatMoney(m.credit_total || 0)}
-                          </div>
-                        </div>
+                        <span className="text-xs font-semibold text-[#510601]">{m.membershipType || '—'}</span>
                       </td>
 
                       {/* Status Toggle Button */}
