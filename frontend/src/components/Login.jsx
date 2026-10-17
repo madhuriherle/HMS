@@ -89,7 +89,14 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center font-sans p-4 sm:p-8 bg-[#F4EFE6]">
+    <div
+      className="min-h-screen w-full flex flex-col items-center justify-center font-sans p-4 sm:p-8 bg-[#0c0402]"
+      style={{
+        // warm lamp glow behind the card (no photo needed; a lamp photo can be layered under these gradients later)
+        backgroundImage:
+          'radial-gradient(circle at 50% 38%, rgba(255,200,60,0.42) 0%, rgba(110,30,8,0.40) 45%, rgba(12,4,2,0.96) 90%)',
+      }}
+    >
       {/* Top Logo Header (Spanning Full Width of Card) */}
       <div className="w-full max-w-[420px] flex items-center justify-center sm:justify-between gap-4 mb-7 px-2 select-none">
         <img 
@@ -98,14 +105,14 @@ export default function Login() {
           className="w-16 h-20 sm:w-18 sm:h-22 object-contain filter drop-shadow-sm shrink-0"
         />
         <div className="flex-1 flex flex-col items-start justify-center">
-          <span className="text-[11.5px] sm:text-[12.5px] font-bold text-[#4A1208] tracking-wider uppercase mt-1">
+          <span className="text-[11.5px] sm:text-[12.5px] font-bold text-amber-100 tracking-wider uppercase mt-1 drop-shadow">
             SHRI AKHILA HAVYAKA MAHASABHA (R.)
           </span>
         </div>
       </div>
 
       {/* Centered Login Card */}
-      <div className="w-full max-w-[420px] bg-[#FCFAF7] rounded-[32px] shadow-[0_16px_50px_rgba(70,20,10,0.07)] border border-[#EFE5DA] px-7 sm:px-9 py-12 sm:py-14 transition-all duration-300">
+      <div className="w-full max-w-[420px] bg-[#FCFAF7] rounded-[32px] shadow-[0_24px_60px_rgba(0,0,0,0.5)] border border-[#EFE5DA] px-7 sm:px-9 py-12 sm:py-14 transition-all duration-300">
         {/* Login Form */}
         <form onSubmit={handleSubmit} noValidate className="space-y-5">
           {/* Auth Error Banner */}
