@@ -1323,12 +1323,14 @@ export default function ReceiptEntry() {
   const typedMobile = activeBox === 'mobile' ? mobileText : '';
   // the box typed in last decides the Membership List; the search icon above it is used when no box does
   const rightTerm = (typedNumber || typedName || typedMobile || rightSearchQuery).trim();
+  const rightIsNumber = Boolean(typedNumber); // the Membership No. box matches a membership number exactly; the search icon searches everything
   const [debouncedRightTerm, setDebouncedRightTerm] = useState('');
+  const [debouncedRightIsNumber, setDebouncedRightIsNumber] = useState(false);
   const [debouncedBottomTerm, setDebouncedBottomTerm] = useState('');
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedRightTerm(rightTerm), 350);
+    const timer = setTimeout(() => { setDebouncedRightTerm(rightTerm); setDebouncedRightIsNumber(rightIsNumber); }, 350);
     return () => clearTimeout(timer);
-  }, [rightTerm]);
+  }, [rightTerm, rightIsNumber]);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedBottomTerm(unapprovedSearchQuery.trim()), 350);
     return () => clearTimeout(timer);
@@ -1341,7 +1343,7 @@ export default function ReceiptEntry() {
     if (!locations.districts.length && !dataReady) return;
     const seq = (rightSeq.current += 1);
     setRightLoading(true);
-    fetchMemberPage({ approval_status: 'APPROVED', page: rightPage, limit: rightPageSize, ...(debouncedRightTerm ? { search: debouncedRightTerm } : {}) })
+    fetchMemberPage({ approval_status: 'APPROVED', page: rightPage, limit: rightPageSize, ...(debouncedRightTerm ? (debouncedRightIsNumber ? { membership_no: debouncedRightTerm } : { search: debouncedRightTerm }) : {}) })
       .then((res) => {
         if (seq !== rightSeq.current) return;
         setRegisteredMembers(res.rows.map((m) => toEntryMember(m, locations)));
@@ -1353,7 +1355,7 @@ export default function ReceiptEntry() {
         if (seq === rightSeq.current) setRightLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedRightTerm, rightPage, rightPageSize, listsVersion, dataReady]);
+  }, [debouncedRightTerm, debouncedRightIsNumber, rightPage, rightPageSize, listsVersion, dataReady]);
 
   const bottomSeq = useRef(0);
   useEffect(() => {

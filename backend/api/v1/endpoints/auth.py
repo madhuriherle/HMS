@@ -272,7 +272,7 @@ def read_me(db: Session = Depends(deps.get_db), current_user: User = Depends(dep
 def update_my_profile(
     payload: ProfileUpdate,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.require_permission("users.my_profile.write")),
 ) -> Any:
     """Edit your own name / username / contact details. Role, status and
     password are not editable here. Any change signs out your existing

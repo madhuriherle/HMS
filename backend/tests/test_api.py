@@ -6337,7 +6337,7 @@ def test_remaining_get_delete_endpoints(client, admin_headers):
 
 def test_update_own_profile_rotates_session(client, admin_headers):
     uid, role_id, headers = _staff_with_role(
-        client, admin_headers, "prof_user", "Prof Role", "PROF_ROLE", permission_grants=[],
+        client, admin_headers, "prof_user", "Prof Role", "PROF_ROLE", permission_grants=[("users.my_profile.write", False)],
     )
     taken = client.put("/api/v1/auth/me", headers=headers, json={"username": "admin"})
     assert taken.status_code == 400
@@ -6347,6 +6347,22 @@ def test_update_own_profile_rotates_session(client, admin_headers):
     fresh = client.post("/api/v1/auth/login", data={"username": "prof_user", "password": STAFF_PW}).json()
     me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {fresh['access_token']}"}).json()
     assert me["name"] == "New Name" and me["email"] == "n@x.com"
+
+
+def test_open_pages_have_their_own_privileges(client, admin_headers):
+    """My Profile, Modules and the Label List are privileges now, not 'any login'."""
+    _, _, nobody = _staff_with_role(client, admin_headers, "gate_nobody", "Gate Nobody", "GATE_NOBODY", permission_grants=[])
+    assert client.put("/api/v1/auth/me", headers=nobody, json={"name": "X Y"}).status_code == 403
+    assert client.get("/api/v1/members/label-list", headers=nobody).status_code == 403
+    assert client.get("/api/v1/users/modules", headers=nobody).status_code == 403
+    # Membership List alone no longer opens the Label List; the Label List privilege does
+    _, _, lister = _staff_with_role(client, admin_headers, "gate_lister", "Gate Lister", "GATE_LISTER", permission_grants=[("members.list.read", False)])
+    assert client.get("/api/v1/members/label-list", headers=lister).status_code == 403
+    _, _, labels = _staff_with_role(client, admin_headers, "gate_labels", "Gate Labels", "GATE_LABELS", permission_grants=[("members.label_list.read", False)])
+    assert client.get("/api/v1/members/label-list", headers=labels).status_code == 200
+    # Modules: the privilege alone is not enough without rank 0, and rank 0 alone is not enough without the privilege
+    # Modules also stays rank-0 only: a lower role cannot even be given the privilege
+    assert client.get("/api/v1/users/modules", headers=admin_headers).status_code == 200
 
 
 def test_gotra_master_and_extra_address_fields(client, admin_headers):
@@ -7368,6 +7384,19 @@ def test_a_receipt_line_keeps_its_sub_type_by_id_not_as_description_text(client,
         "receipt_date": date.today().isoformat(), "receipt_type": "OTHER", "payment_mode": "CASH", "gross_amount": 50, "net_amount": 50,
         "items": [{**line, "amount": 50, "sub_particular_id": other["id"]}]})
     assert bad.status_code == 400
+
+
+def test_member_list_membership_no_filter_is_exact(client, admin_headers):
+    """membership_no matches the whole membership number only: never part of it, a name or a mobile."""
+    H = admin_headers
+    m = _create_member(client, H, "9699000091", "Zexactno")
+    assert client.put(f"/api/v1/members/{m['id']}/approve", headers=H).status_code in (200, 201)
+    code = client.get(f"/api/v1/members/{m['id']}", headers=H).json()["member_code"]
+    hit = client.get("/api/v1/members/", headers=H, params={"membership_no": code.lower()}).json()
+    assert [x["id"] for x in hit["data"]] == [m["id"]]
+    for partial in (code[-3:], code[-1:], "Zexactno", "9699000091"):
+        none = client.get("/api/v1/members/", headers=H, params={"membership_no": partial}).json()
+        assert none["total"] == 0, partial
 
 
 def test_seeding_privileges_leaves_a_deleted_privilege_deleted(client, admin_headers):

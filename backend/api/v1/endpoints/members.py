@@ -44,6 +44,7 @@ def read_members(
     mobile_status: Optional[str] = None,  # MISSING (no mobile at all) | INVALID (the register's number was unusable)
     include_deleted: bool = False,
     search: Optional[str] = None,
+    membership_no: Optional[str] = None,   # EXACT membership number only (never part of a number, a name or a mobile)
     sort_by: Optional[str] = None,   # id | created_at | name | member_code | mobile | approval_status | member_status
     sort_dir: str = "desc",
     no_membership_type: bool = False,   # members who have not reached any type yet
@@ -95,6 +96,13 @@ def read_members(
                 MemberMembership.is_deleted == False,  # noqa: E712
                 MemberMembership.membership_type_id.isnot(None),
             )
+        ))
+    if membership_no and membership_no.strip():
+        up = membership_no.strip().upper()
+        query = query.filter(or_(
+            func.upper(Member.member_code) == up,
+            Member.id.in_(db.query(MemberMembership.member_id).filter(
+                MemberMembership.is_deleted == False, func.upper(MemberMembership.membership_number) == up)),  # noqa: E712
         ))
     if search:
         from models.masters import District, PostalCode  # the list also shows the place: search it too

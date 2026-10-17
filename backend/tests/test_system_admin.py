@@ -225,7 +225,7 @@ def test_my_profile_returns_contact_and_login_details_and_can_be_edited(client, 
     me = client.get(f"{API}/auth/me", headers=admin_headers).json()
     assert {"mobile", "mobile_country_code", "last_login_at", "created_at"} <= set(me)
 
-    h = _role_user(client, admin_headers, ["masters.particulars.read"])  # any signed-in user may open their own profile
+    h = _role_user(client, admin_headers, ["masters.particulars.read", "users.my_profile.write"])  # editing your own profile is a privilege now
     mine = client.get(f"{API}/auth/me", headers=h).json()
     assert mine["username"].startswith("subm")
     saved = client.put(f"{API}/auth/me", headers=h, json={"name": "Renamed Self", "mobile": "9876501234", "mobile_country_code": "+91"})

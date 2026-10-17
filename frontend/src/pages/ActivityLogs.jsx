@@ -26,20 +26,21 @@ import { apiErrorMessage } from '../utils/apiError';
 export default function ActivityLogs() {
   const lists = useLists(); // filter choices from the server (GET /meta/lists)
   // Preset tabs: 'today' | 'yesterday' | 'week' | 'month' | 'custom'
-  const [activeDateTab, setActiveDateTab] = useState('custom');
+  const [activeDateTab, setActiveDateTab] = useState('today');
 
   // Filters
-  const [fromDate, setFromDate] = useState(() => {
+  // opens on today (the local date, not the UTC one)
+  const localToday = () => {
     const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString().split('T')[0];
-  });
-  const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const [fromDate, setFromDate] = useState(localToday);
+  const [toDate, setToDate] = useState(localToday);
   const [selectedUser, setSelectedUser] = useState('');
   const [selectedActivityType, setSelectedActivityType] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All Status');
   const [selectedClient, setSelectedClient] = useState('All Clients');
-  const [showNavigation, setShowNavigation] = useState(true);
+  const [showNavigation, setShowNavigation] = useState(false); // navigation activity is hidden until it is ticked
 
   // Pagination
   const [page, setPage] = useState(1);

@@ -44,11 +44,14 @@ SUB_MODULE_AREAS = {
     "members": [
         ("members.list", "Membership List", [
             ("GET", r"^/members/?$", "not-unapproved"),
-            ("GET", r"^/members/export-labels/?$"),
-            ("GET", r"^/members/label-list/?$"),
             ("GET", r"^/members/documents/\d+/file/?$"),
             ("GET", r"^/members/\d+(/(family|services|donations|profile(/[a-z]+)?|membership-credit|documents|service-optins))?/?$"),
             ("PUT|DELETE", r"^/members/\d+/?$"),
+        ]),
+        # the printable label list has its own privilege (it used to ride on Membership List's)
+        ("members.label_list", "Label List", [
+            ("GET", r"^/members/export-labels/?$"),
+            ("GET", r"^/members/label-list/?$"),
         ]),
         ("members.unapproved", "Unapproved Members", [
             ("GET", r"^/members/?$", "unapproved"),
@@ -173,6 +176,7 @@ AREA_ACTIONS = {
     "reports.magazines_report": ("read",),
     "notifications.inbox": ("read", "write"),
     "members.import": ("read", "write"),
+    "members.label_list": ("read",),
     "members.assigned": ("read", "write"),
     "members.unapproved": ("read", "write"),
     "members.register": ("write",),
@@ -210,6 +214,8 @@ MODULE_CATALOG = [
 # Settings tools reached from the System Settings page (no sidebar entry of their own, so no route).
 # Data Cleanup is also locked to rank 0 roles, whatever a role is granted.
 MODULE_CATALOG += [
+    ("members.label_list", "Label List", "members", None, None, 6, None),
+    ("users.my_profile", "My Profile", "users", None, None, 6, None),
     ("system.recycle_bin", "Recycle Bin", "system", None, None, 4, None),
     ("system.cleanup", "Data Cleanup", "system", None, None, 5, 0),
 ]
@@ -257,6 +263,11 @@ PERMISSION_CATALOG += [
     ("imports.write", "imports", "Bulk imports", "CSV imports such as postal codes"),
     # Dashboard opener: the endpoint itself is gated on it, while every data
     # block on it keeps following the module reads (members/receipts/...).
+    # Pages every login used to open freely: now each is a privilege (Modules also stays rank-0 only)
+    ("users.modules.read", "users.modules", "Read Modules", "Open the Modules page"),
+    ("users.modules.write", "users.modules", "Write Modules", "Add, edit, reorder and delete modules"),
+    ("users.my_profile.read", "users.my_profile", "Open My Profile", "Open your own profile page"),
+    ("users.my_profile.write", "users.my_profile", "Edit My Profile", "Edit your own name, username and contact details"),
     ("dashboard.read", "dashboard", "Open the Dashboard", "See the dashboard summary (each card still follows the module's own read privilege)"),
 ]
 
@@ -471,6 +482,7 @@ MENU_PERMISSION_FIXES = {
     # the dashboard opens only for roles holding dashboard.read (migration 0046);
     # applied only while the row still has no privilege, so admin edits are kept.
     "dashboard": (None, "dashboard.read"),
+    "users.modules": (None, "users.modules.read"),
 }
 
 MENU_ROUTE_FIXES = {

@@ -35,7 +35,6 @@ import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
-import RecentlyDeleted from '../components/RecentlyDeleted';
 import { formatMoney } from '../utils/money';
 
 
@@ -475,7 +474,9 @@ export default function MembershipTypeManagement() {
       {/* Action Bar */}
       <div className="flex items-center justify-end gap-2 -mb-2">
         <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'ALL' ? 1 : 0} />
+        {/* The Recently deleted button is hidden (the RecentlyDeleted component is kept to bring it back):
         {hasPermission('masters.membership_types.delete') && <RecentlyDeleted kind="membership-types" label="membership types" onRestored={fetchMembershipTypes} />}
+        */}
         {hasPermission('masters.membership_types.write') && (
           <button
             onClick={openAddModal}

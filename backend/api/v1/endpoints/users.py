@@ -237,7 +237,7 @@ def privilege_tree(
 @router.get("/modules")
 def read_modules(
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.require_superuser_permission("users.modules.read")),
     page: int = 1, limit: int = 100,
     search: Optional[str] = None, status: Optional[bool] = None,
 ) -> Any:
@@ -267,7 +267,7 @@ def read_modules(
 
 
 @router.get("/modules/{module_id}", response_model=schemas_users.ModuleWithPermissionCount)
-def read_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_active_superuser), module_id: int) -> Any:
+def read_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_superuser_permission("users.modules.read")), module_id: int) -> Any:
     module = crud_users.module.get(db, module_id)
     if not module:
         raise HTTPException(404, "Module not found")
@@ -370,7 +370,7 @@ def _retire_module_privileges(db: Session, module: Module, wanted_actions: set, 
 
 
 @router.post("/modules", response_model=schemas_users.Module)
-def create_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_active_superuser), module_in: schemas_users.ModuleCreate) -> Any:
+def create_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_superuser_permission("users.modules.write")), module_in: schemas_users.ModuleCreate) -> Any:
     if db.query(Module).filter(Module.code == module_in.code, Module.is_deleted == False).first():  # noqa: E712
         raise HTTPException(409, f"Module code '{module_in.code}' already exists")
     _check_module_refs(db, module_in.parent_id, module_in.opens_module_id)
@@ -410,7 +410,7 @@ class ModuleReorder(BaseModel):
 @router.put("/modules/reorder")
 def reorder_modules(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.require_superuser_permission("users.modules.write")),
     payload: ModuleReorder,
 ) -> Any:
     """Rearrange the sidebar: set parent and display order of many modules in one call (Rank 0)."""
@@ -443,7 +443,7 @@ def reorder_modules(
 
 
 @router.put("/modules/{module_id}", response_model=schemas_users.Module)
-def update_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_active_superuser), module_id: int, module_in: schemas_users.ModuleUpdate) -> Any:
+def update_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_superuser_permission("users.modules.write")), module_id: int, module_in: schemas_users.ModuleUpdate) -> Any:
     module = crud_users.module.get(db, module_id)
     if not module:
         raise HTTPException(404, "Module not found")
@@ -462,7 +462,7 @@ def update_module(*, db: Session = Depends(deps.get_db), current_user: User = De
 
 
 @router.delete("/modules/{module_id}", response_model=schemas_users.Module)
-def delete_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_active_superuser), module_id: int) -> Any:
+def delete_module(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_superuser_permission("users.modules.write")), module_id: int) -> Any:
     module = crud_users.module.get(db, module_id)
     if not module:
         raise HTTPException(404, "Module not found")
@@ -489,7 +489,7 @@ def delete_module(*, db: Session = Depends(deps.get_db), current_user: User = De
 @router.post("/modules/{module_id}/link-privileges")
 def link_privileges(
     *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.require_superuser_permission("users.modules.write")),
     module_id: int, permission_ids: List[int],
 ) -> Any:
     """Attach privileges to a module (Rank 0)."""

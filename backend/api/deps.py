@@ -102,6 +102,19 @@ def get_current_active_superuser(
     return current_user
 
 
+def require_superuser_permission(permission_code: str):
+    """Rank-0 only AND the privilege: removing the rank gate later still leaves the privilege in place."""
+    holds = require_permission(permission_code)
+
+    def _check(
+        db: Session = Depends(get_db), current_user: User = Depends(holds)
+    ) -> User:
+        if user_rank(db, current_user) != 0:
+            raise HTTPException(status_code=403, detail="You do not have access to this")
+        return current_user
+    return _check
+
+
 def user_permission_codes(db: Session, user: User) -> set:
     """Active privilege codes granted to the user's role (not expanded for
     all-access roles — callers check is_all_access first)."""

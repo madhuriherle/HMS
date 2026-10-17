@@ -73,7 +73,7 @@ function App() {
         <Route path="/notifications" element={<Navigate to="/dashboard/notifications" replace />} />
 
         <Route path="/dashboard" element={<RequireLogin><MainLayout /></RequireLogin>}>
-          <Route index element={<Dashboard />} />
+          <Route index element={<PermissionGate required="dashboard.read" title="Access Restricted" message="You need the Dashboard privilege to open this page."><Dashboard /></PermissionGate>} />
           
           {/* Membership Module Routes */}
           <Route path="membership/list" element={<MembershipList />} />
@@ -107,7 +107,7 @@ function App() {
           <Route path="system/number-formats" element={<NumberFormats />} />
           <Route path="master/organisation" element={<OrganisationSettings />} />
           <Route path="settings/organisation" element={<OrganisationSettings />} />
-          <Route path="profile" element={<MyProfile />} />
+          <Route path="profile" element={<PermissionGate required="users.my_profile.read" title="Access Restricted" message="You need the My Profile privilege to open this page."><MyProfile /></PermissionGate>} />
           <Route path="settings" element={<SystemSettings />} />
           <Route path="settings/recycle-bin" element={<RecycleBin />} />
           <Route path="settings/cleanup" element={<DataCleanup />} />
@@ -128,13 +128,13 @@ function App() {
           <Route path="users" element={<UserManagement />} />
           <Route path="users/management" element={<UserManagement />} />
           <Route path="users/user-management" element={<UserManagement />} />
-          <Route path="users/modules" element={<PermissionGate minRank={0} title="Access Restricted" message="You do not have access to this page."><ModulesManagement /></PermissionGate>} />
+          <Route path="users/modules" element={<PermissionGate minRank={0} required="users.modules.read" title="Access Restricted" message="You do not have access to this page."><ModulesManagement /></PermissionGate>} />
           <Route path="users/activity" element={<PermissionGate required="activity.read"><ActivityLogs /></PermissionGate>} />
           <Route path="activity/logs" element={<PermissionGate required="activity.read"><ActivityLogs /></PermissionGate>} />
           <Route path="activity" element={<PermissionGate required="activity.read"><ActivityLogs /></PermissionGate>} />
-          <Route path="master/modules" element={<PermissionGate minRank={0} title="Access Restricted" message="You do not have access to this page."><ModulesManagement /></PermissionGate>} />
-          <Route path="masters/modules" element={<PermissionGate minRank={0} title="Access Restricted" message="You do not have access to this page."><ModulesManagement /></PermissionGate>} />
-          <Route path="settings/modules" element={<PermissionGate minRank={0} title="Access Restricted" message="You do not have access to this page."><ModulesManagement /></PermissionGate>} />
+          <Route path="master/modules" element={<PermissionGate minRank={0} required="users.modules.read" title="Access Restricted" message="You do not have access to this page."><ModulesManagement /></PermissionGate>} />
+          <Route path="masters/modules" element={<PermissionGate minRank={0} required="users.modules.read" title="Access Restricted" message="You do not have access to this page."><ModulesManagement /></PermissionGate>} />
+          <Route path="settings/modules" element={<PermissionGate minRank={0} required="users.modules.read" title="Access Restricted" message="You do not have access to this page."><ModulesManagement /></PermissionGate>} />
 
           {/* Receipts Module Routes */}
           <Route path="receipts" element={<Navigate to="/dashboard/receipts/entry" replace />} />
@@ -145,15 +145,15 @@ function App() {
           <Route path="receipt/tracking" element={<ReceiptTracking />} />
           <Route path="receipts/bulk-mapping" element={<PermissionGate required="receipts.bulk_mapping.read" title="Access Restricted" message="You need the Bulk Receipt Mapping privilege to open this page."><BulkReceiptMapping /></PermissionGate>} />
           <Route path="receipts/auto-map" element={<PermissionGate required="receipts.bulk_mapping.read" title="Access Restricted" message="You need the Bulk Receipt Mapping privilege to open this page."><BulkReceiptMapping /></PermissionGate>} />
-          <Route path="receipts/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
-          <Route path="receipts/label-list" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
+          <Route path="receipts/labels" element={<PermissionGate required="members.label_list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
+          <Route path="receipts/label-list" element={<PermissionGate required="members.label_list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
           <Route path="magazine" element={<Navigate to="/dashboard/magazine/subscriptions" replace />} />
           <Route path="magazine/management" element={<Navigate to="/dashboard/magazine/subscriptions" replace />} />
           <Route path="magazine/subscriptions" element={<MagazineManagement />} />
           <Route path="magazine/pauses-returns" element={<Navigate to="/dashboard/magazine/subscriptions" replace />} />
           <Route path="magazine/labels-delivery" element={<MagazineManagement />} />
           <Route path="magazines" element={<Navigate to="/dashboard/magazine" replace />} />
-          <Route path="magazine/labels" element={<PermissionGate required="members.list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
+          <Route path="magazine/labels" element={<PermissionGate required="members.label_list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
 
           {/* Events Module Routes */}
           <Route path="events" element={<PermissionGate required="events.read" title="Access Restricted" message="You need the Events privilege to view this page."><EventsManagement /></PermissionGate>} />

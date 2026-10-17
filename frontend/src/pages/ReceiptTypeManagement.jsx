@@ -25,7 +25,6 @@ import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import PermissionGate from '../components/PermissionGate';
-import RecentlyDeleted from '../components/RecentlyDeleted';
 
 import ModalFooter from '../components/ModalFooter';
 export default function ReceiptTypeManagement() {
@@ -512,7 +511,9 @@ export default function ReceiptTypeManagement() {
       {/* Action Bar */}
       <div className="flex items-center justify-end gap-2 -mb-2">
         <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'ALL' ? 1 : 0} />
+        {/* The Recently deleted button is hidden (the RecentlyDeleted component is kept to bring it back):
         {hasPermission('masters.particulars.delete') && <RecentlyDeleted kind="particulars" label="particulars" onRestored={fetchReceiptTypes} />}
+        */}
         {hasPermission('masters.particulars.write') && (
           <button
             onClick={openAddTypeModal}

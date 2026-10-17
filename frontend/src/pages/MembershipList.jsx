@@ -835,20 +835,21 @@ export default function MembershipList() {
           widthClass="w-full sm:w-48"
         />
 
-        {/* 5. Mobile filter: members with no number, or whose number from the old register was unusable */}
-        <FilterSelect
-          value={mobileFilter}
-          onChange={(val) => {
-            setMobileFilter(val);
-            setCurrentPage(1);
-          }}
-          options={[
-            { value: 'ALL', label: 'Any Mobile' },
-            { value: 'MISSING', label: 'No mobile number' },
-            { value: 'INVALID', label: 'Invalid number (to correct)' },
-          ]}
-          widthClass="w-full sm:w-52"
-        />
+        {/* 5. Mobile filter: two tick boxes, shown directly (no dropdown) - no number, or a number from the old register that was unusable */}
+        {[['MISSING', 'No mobile number'], ['INVALID', 'Invalid number (to correct)']].map(([val, label]) => (
+          <label key={val} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#180200] cursor-pointer select-none whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={mobileFilter === val}
+              onChange={(e) => {
+                setMobileFilter(e.target.checked ? val : 'ALL');
+                setCurrentPage(1);
+              }}
+              className="w-4 h-4 accent-[#510601] cursor-pointer"
+            />
+            {label}
+          </label>
+        ))}
 
         {/* Single reset / clear icon for search + filters */}
         <button
