@@ -12,6 +12,9 @@ import {
   Eye,
   ArrowRight,
   ArrowLeft,
+  FileText,
+  History,
+  Trash2,
 } from 'lucide-react';
 import api from '../api';
 import { formatDateTime } from '../utils/dateUtils';
@@ -30,23 +33,23 @@ const CATEGORIES = [
 
 const badge = (status) =>
   status === 'APPROVED'
-    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    ? 'bg-[#3D705C]/10 text-[#3D705C] border-[#3D705C]/30'
     : status === 'REJECTED'
-      ? 'bg-red-50 text-red-700 border-red-200'
-      : 'bg-amber-50 text-amber-700 border-amber-200';
+      ? 'bg-[#8C1801]/10 text-[#8C1801] border-[#8C1801]/30'
+      : 'bg-[#EE6A00]/10 text-[#B34E00] border-[#EE6A00]/30';
 
 const kindBadge = (kind) => {
   switch (kind) {
     case 'requests':
-      return 'bg-blue-50 text-blue-700 border-blue-200';
+      return 'bg-[#510601]/10 text-[#510601] border-[#510601]/20';
     case 'deletions':
-      return 'bg-rose-50 text-rose-700 border-rose-200';
+      return 'bg-[#8C1801]/10 text-[#8C1801] border-[#8C1801]/20';
     case 'profile':
-      return 'bg-purple-50 text-purple-700 border-purple-200';
+      return 'bg-[#863221]/10 text-[#863221] border-[#863221]/20';
     case 'types':
-      return 'bg-amber-50 text-amber-700 border-amber-200';
+      return 'bg-[#EE6A00]/10 text-[#B34E00] border-[#EE6A00]/20';
     default:
-      return 'bg-gray-50 text-gray-700 border-gray-200';
+      return 'bg-[#FAF7F2] text-[#863221] border-[#E8DFD8]';
   }
 };
 
@@ -138,10 +141,19 @@ const detailMode = (item) => {
 };
 
 function DetailPanel({ header, tone, groups, side, onlyChanged }) {
-  const headTone = tone === 'old' ? 'bg-amber-400 text-white' : tone === 'new' ? 'bg-emerald-500 text-white' : tone === 'del' ? 'bg-red-500 text-white' : 'bg-[#510601] text-white';
+  const Icon = tone === 'old' ? History : tone === 'del' ? Trash2 : FileText;
+  const tag = tone === 'old' ? 'Before' : tone === 'new' ? 'After' : tone === 'del' ? 'Removed' : 'New';
   return (
-    <section className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden min-w-0">
-      <div className={`px-5 py-3 text-center text-xs font-bold uppercase tracking-wider ${headTone}`}>{header}</div>
+    <section className="bg-white rounded-2xl border border-[#EFE6DE] shadow-xs overflow-hidden min-w-0">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#EFE6DE]/70">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-[#F7EDE6] text-[#8D4C32] flex items-center justify-center">
+            <Icon className="w-3.5 h-3.5" />
+          </div>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[#241B16]">{header}</h3>
+        </div>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${tone === 'del' ? 'bg-[#8C1801]/10 text-[#8C1801] border-[#8C1801]/20' : tone === 'new' ? 'bg-[#3D705C]/10 text-[#3D705C] border-[#3D705C]/30' : tone === 'old' ? 'bg-[#EE6A00]/10 text-[#B34E00] border-[#EE6A00]/30' : 'bg-[#510601]/10 text-[#510601] border-[#510601]/20'}`}>{tag}</span>
+      </div>
       <div className="p-5 space-y-5">
         {groups.map((g) => {
           const rows = onlyChanged ? g.rows.filter((r) => r.changed) : g.rows;
@@ -155,7 +167,7 @@ function DetailPanel({ header, tone, groups, side, onlyChanged }) {
                     <dt className="text-[#7D7068] font-medium shrink-0">{r.label}</dt>
                     <dd
                       className={`text-right min-w-0 break-words ${
-                        side === 'new' && r.changed ? 'text-red-600 font-bold' : 'text-[#180200] font-semibold'
+                        side === 'new' && r.changed ? 'text-[#8C1801] font-bold' : 'text-[#180200] font-semibold'
                       }`}
                     >
                       {side === 'old' ? r.previous : r.proposed}
@@ -212,8 +224,8 @@ function ApprovalDetail({ item, rows, canWrite, onBack, onApprove, onReject }) {
       </div>
 
       {item.hasWarning && (
-        <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2.5 text-xs">
-          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+        <div className="p-3.5 rounded-xl bg-[#FFF7EC] border border-[#EE6A00]/30 text-[#7A3A00] flex items-start gap-2.5 text-xs">
+          <AlertTriangle className="w-4 h-4 text-[#EE6A00] shrink-0 mt-0.5" />
           <div>
             <span className="font-bold block">Caution / Dependency Notice:</span>
             <span>{item.warningText}</span>
@@ -221,7 +233,7 @@ function ApprovalDetail({ item, rows, canWrite, onBack, onApprove, onReject }) {
         </div>
       )}
       {item.review_note && (
-        <div className="p-3 rounded-xl bg-gray-50 border border-gray-200 text-xs text-[#180200]">
+        <div className="p-3 rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] text-xs text-[#180200]">
           <span className="font-bold text-[#863221]">Reviewer Note: </span>
           <span>{item.review_note}</span>
         </div>
@@ -235,7 +247,7 @@ function ApprovalDetail({ item, rows, canWrite, onBack, onApprove, onReject }) {
         <DetailPanel header="New record details" tone="new" groups={groups} side="new" onlyChanged={false} />
       ) : mode === 'delete' ? (
         <>
-          <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-semibold">
+          <div className="p-3.5 rounded-xl bg-[#FAF1EE] border border-[#8C1801]/25 text-[#8C1801] text-xs font-semibold">
             Approving this request will delete the record below.
           </div>
           <DetailPanel header="Record to be deleted" tone="del" groups={groups} side="old" onlyChanged={false} />
@@ -247,7 +259,7 @@ function ApprovalDetail({ item, rows, canWrite, onBack, onApprove, onReject }) {
               {changedCount} {changedCount === 1 ? 'field' : 'fields'} changed
             </span>
             <label className="inline-flex items-center gap-2 cursor-pointer font-semibold">
-              <input type="checkbox" checked={onlyChanged} onChange={(e) => setOnlyChanged(e.target.checked)} />
+              <input type="checkbox" checked={onlyChanged} onChange={(e) => setOnlyChanged(e.target.checked)} className="w-4 h-4 accent-[#510601] cursor-pointer" />
               Show only changed
             </label>
           </div>
@@ -262,10 +274,10 @@ function ApprovalDetail({ item, rows, canWrite, onBack, onApprove, onReject }) {
       <div className="flex items-center justify-center gap-3 pt-2">
         {pending && canWrite ? (
           <>
-            <button type="button" onClick={onReject} className="px-6 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold cursor-pointer">
+            <button type="button" onClick={onReject} className="px-6 py-2.5 rounded-xl bg-white border border-[#8C1801] text-[#8C1801] hover:bg-[#FAF1EE] text-sm font-semibold cursor-pointer">
               Reject
             </button>
-            <button type="button" onClick={onApprove} className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold cursor-pointer">
+            <button type="button" onClick={onApprove} className="px-6 py-2.5 rounded-xl bg-[#3D705C] hover:bg-[#2F5A49] text-white text-sm font-semibold cursor-pointer shadow-sm">
               Approve
             </button>
           </>
@@ -744,7 +756,7 @@ export default function Approvals() {
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-[#863221]/50 hover:text-[#510601] cursor-pointer"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -755,7 +767,7 @@ export default function Approvals() {
         </div>
 
         {error && (
-          <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700">
+          <div className="p-3 rounded-xl bg-[#FAF1EE] border border-[#8C1801]/25 text-xs text-[#8C1801]">
             {error}
           </div>
         )}
@@ -813,7 +825,7 @@ export default function Approvals() {
                       <td className="py-3 px-4 max-w-[300px]">
                         {r.hasWarning ? (
                           <div
-                            className="inline-flex items-center gap-1 font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded text-[11px]"
+                            className="inline-flex items-center gap-1 font-semibold text-[#8C1801] bg-[#8C1801]/10 border border-[#8C1801]/20 px-2 py-0.5 rounded text-[11px]"
                             title={r.warningText}
                           >
                             <AlertTriangle className="w-3 h-3 shrink-0" />
