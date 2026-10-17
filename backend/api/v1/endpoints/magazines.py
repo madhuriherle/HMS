@@ -31,7 +31,7 @@ def _page_limit(limit: int) -> int:
     """A list a person pages through never returns more than 200 rows per request (rule 10.6)."""
     return max(1, min(int(limit), LIST_PAGE_MAX))
 
-VALID_DELIVERY_STATUSES = {"ACTIVE", "STOPPED", "CANCELLED"}
+VALID_DELIVERY_STATUSES = {"ACTIVE", "STOPPED"}  # Cancelled was merged into Stopped (migration 0091)
 VALID_FOLLOW_UP_STATUSES = {"PENDING", "CONTACTED", "RESOLVED"}
 
 
@@ -112,7 +112,7 @@ def update_subscription(
     sub_id: int,
     sub_in: schemas_magazines.MagazineSubscriptionUpdate,
 ) -> Any:
-    """Stop/start magazine delivery: set delivery_status to ACTIVE, STOPPED or CANCELLED."""
+    """Stop/start magazine delivery: set delivery_status to ACTIVE or STOPPED. The member's Yes / No follows it."""
     sub = crud_magazines.subscription.get(db, sub_id)
     if not sub:
         raise HTTPException(404, "Subscription not found")
@@ -120,7 +120,15 @@ def update_subscription(
     if "delivery_status" in data:
         if data["delivery_status"] not in VALID_DELIVERY_STATUSES:
             raise HTTPException(400, f"delivery_status must be one of {sorted(VALID_DELIVERY_STATUSES)}")
-    return crud_magazines.subscription.update(db, db_obj=sub, obj_in=data, updated_by=current_user.id)
+    result = crud_magazines.subscription.update(db, db_obj=sub, obj_in=data, updated_by=current_user.id)
+    if "delivery_status" in data:
+        member = db.query(Member).filter(Member.id == sub.member_id).first()
+        if member is not None:
+            member.magazine_needed = data["delivery_status"] == "ACTIVE"
+            from services.service_types import sync_magazine_optin
+            sync_magazine_optin(db, member_id=sub.member_id, linked_id=sub.id if member.magazine_needed else None)
+            db.commit()
+    return result
 
 
 @router.delete("/subscriptions/{sub_id}", response_model=Union[schemas_magazines.MagazineSubscription, PendingApproval])
@@ -138,6 +146,9 @@ def delete_subscription(
     result = crud_magazines.subscription.remove(db, id=sub_id, deleted_by=current_user.id)
     from services.service_types import sync_magazine_optin
     sync_magazine_optin(db, member_id=sub.member_id, linked_id=None)
+    member = db.query(Member).filter(Member.id == sub.member_id).first()
+    if member is not None:
+        member.magazine_needed = False  # otherwise a later receipt or edit would start it again
     db.commit()
     return result
 
@@ -235,8 +246,8 @@ def _month_bounds(year: int, month: int):
 
 def _monthly_grid(db: Session, sub: MagazineSubscription, year: int) -> dict:
     """One box per month of `year`: 'R' = issue returned (not delivered),
-    'P' = service paused that month, 'S' = the issue was sent (the member was on that month's label list and a
-    delivery batch for that issue is Dispatched or Completed), '' = nothing recorded."""
+    'P' = service paused that month, 'S' = the issue was sent (the member was on that month's label batch and that
+    batch is marked Sent), '' = nothing recorded."""
     returns = {
         r.issue_month_year: r for r in db.query(MagazineReturn).filter(
             MagazineReturn.subscription_id == sub.id,
@@ -255,17 +266,11 @@ def _monthly_grid(db: Session, sub: MagazineSubscription, year: int) -> dict:
             MagazineLabelBatchItem.recipient_type == "MEMBER",
             MagazineLabelBatchItem.recipient_id == sub.member_id,
             MagazineLabelBatch.issue_month_year.like(f"{year}-%"),
+            MagazineLabelBatch.status == "SENT",
             MagazineLabelBatch.is_deleted == False,  # noqa: E712
         ).all()
     }
-    dispatched = {
-        row[0] for row in db.query(MagazineDeliveryBatch.issue_month_year).filter(
-            MagazineDeliveryBatch.status.in_(("DISPATCHED", "COMPLETED")),
-            MagazineDeliveryBatch.is_deleted == False,  # noqa: E712
-            MagazineDeliveryBatch.issue_month_year.like(f"{year}-%"),
-        ).all()
-    }
-    sent = on_labels & dispatched
+    sent = on_labels
     months = []
     for m in range(1, 13):
         first, last = _month_bounds(year, m)
@@ -314,31 +319,26 @@ def _grid_response(db: Session, sub: MagazineSubscription, year: int) -> dict:
 
 def build_subscription_history(db: Session, sub: MagazineSubscription) -> list:
     """Issue-by-issue history of one subscription, newest first. Per issue month: RETURNED (the copy came back),
-    SENT (the member was on that month's label list and a delivery batch for the issue is Dispatched/Completed),
+    SENT (the member was on that month's label batch and the batch is marked Sent),
     PAUSED (delivery was paused that month) or LISTED (on the label list, not sent yet)."""
     issues: dict = {}
 
     labels = (
-        db.query(MagazineLabelBatch.issue_month_year, MagazineLabelBatch.generation_date)
+        db.query(MagazineLabelBatch)
         .join(MagazineLabelBatchItem, MagazineLabelBatchItem.label_batch_id == MagazineLabelBatch.id)
         .filter(
             MagazineLabelBatchItem.recipient_type == "MEMBER",
             MagazineLabelBatchItem.recipient_id == sub.member_id,
+            MagazineLabelBatch.status != "CANCELLED",
             MagazineLabelBatch.is_deleted == False,  # noqa: E712
-        ).all()
+        ).order_by(MagazineLabelBatch.id).all()
     )
-    delivery = {
-        b.issue_month_year: b for b in db.query(MagazineDeliveryBatch).filter(
-            MagazineDeliveryBatch.status.in_(("DISPATCHED", "COMPLETED")),
-            MagazineDeliveryBatch.is_deleted == False,  # noqa: E712
-        ).all()
-    }
-    for issue, generated in labels:
-        batch = delivery.get(issue)
-        if batch:
-            issues[issue] = {"result": "SENT", "date": batch.dispatch_date, "detail": batch.batch_name}
-        else:
-            issues[issue] = {"result": "LISTED", "date": generated, "detail": "labels generated, not marked sent"}
+    for batch in labels:
+        issue = batch.issue_month_year
+        if batch.status == "SENT":
+            issues[issue] = {"result": "SENT", "date": batch.sent_date, "detail": batch.batch_name}
+        elif issues.get(issue, {}).get("result") != "SENT":
+            issues[issue] = {"result": "LISTED", "date": batch.generation_date, "detail": "labels generated, not marked sent"}
 
     today = date.today()
     for p in db.query(MagazineDeliveryPause).filter(
@@ -467,30 +467,6 @@ def read_delivery_batch(*, db: Session = Depends(deps.get_db), current_user: Use
     if not b: raise HTTPException(404, "Delivery batch not found")
     return b
 
-@router.put("/delivery-batches/{batch_id}", response_model=Union[schemas_magazines.MagazineDeliveryBatch, PendingApproval])
-@approval_gate.gated("magazines", "UPDATE", "MagazineDeliveryBatch", "magazines.write", id_param="batch_id")
-def update_delivery_batch(
-    *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
-    batch_id: int, batch_in: schemas_magazines.MagazineDeliveryBatchUpdate,
-) -> Any:
-    b = db.query(MagazineDeliveryBatch).filter(MagazineDeliveryBatch.id == batch_id, MagazineDeliveryBatch.is_deleted == False).first()
-    if not b: raise HTTPException(404, "Delivery batch not found")
-    for k, v in batch_in.model_dump(exclude_unset=True).items():
-        setattr(b, k, v)
-    b.updated_by = current_user.id
-    db.commit(); db.refresh(b)
-    return b
-
-@router.delete("/delivery-batches/{batch_id}")
-@approval_gate.gated("magazines", "DELETE", "MagazineDeliveryBatch", "magazines.delete", id_param="batch_id")
-def delete_delivery_batch(*, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("magazines.delete")), batch_id: int) -> Any:
-    b = db.query(MagazineDeliveryBatch).filter(MagazineDeliveryBatch.id == batch_id, MagazineDeliveryBatch.is_deleted == False).first()
-    if not b: raise HTTPException(404, "Delivery batch not found")
-    b.is_deleted = True; b.deleted_by = current_user.id
-    db.commit()
-    return {"message": "Deleted"}
-
 @router.put("/pauses/{pause_id}", response_model=Union[schemas_magazines.MagazineDeliveryPause, PendingApproval])
 @approval_gate.gated("magazines", "UPDATE", "MagazineDeliveryPause", "magazines.write", id_param="pause_id")
 def update_pause(
@@ -604,6 +580,21 @@ def create_return(
     ).first()
     if duplicate:
         raise HTTPException(409, f"Issue {return_in.issue_month_year} is already marked returned (id={duplicate.id})")
+    # a copy can only come back if it was posted: the member must be on a label batch of that issue that is marked Sent
+    sent_to_member = (
+        db.query(MagazineLabelBatchItem.id)
+        .join(MagazineLabelBatch, MagazineLabelBatch.id == MagazineLabelBatchItem.label_batch_id)
+        .filter(
+            MagazineLabelBatchItem.recipient_type == "MEMBER",
+            MagazineLabelBatchItem.recipient_id == subscription.member_id,
+            MagazineLabelBatch.issue_month_year == return_in.issue_month_year,
+            MagazineLabelBatch.status == "SENT",
+            MagazineLabelBatch.is_deleted == False,  # noqa: E712
+        ).first()
+    )
+    if not sent_to_member:
+        raise HTTPException(409, f"Issue {return_in.issue_month_year} was not sent to this member: mark its label batch as sent first, "
+                                 "and the member must be on that batch.")
 
     obj = MagazineReturn(**return_in.model_dump(), created_by=current_user.id)
     db.add(obj)
@@ -685,21 +676,6 @@ def read_delivery_batches(
     )
 
 
-@router.post("/delivery-batches", response_model=Union[schemas_magazines.MagazineDeliveryBatch, PendingApproval])
-@approval_gate.gated("magazines", "CREATE", "MagazineDeliveryBatch", "magazines.write")
-def create_delivery_batch(
-    *,
-    db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
-    batch_in: schemas_magazines.MagazineDeliveryBatchCreate,
-) -> Any:
-    batch = MagazineDeliveryBatch(**batch_in.model_dump(), created_by=current_user.id)
-    db.add(batch)
-    db.commit()
-    db.refresh(batch)
-    return batch
-
-
 # ─────────────── LABEL GENERATION ───────────────
 def _member_label_address(member) -> str:
     """Postal address lines for a label: street lines, then the village-style
@@ -723,13 +699,14 @@ def generate_labels(
     district_id: Optional[int] = None,
     taluk_id: Optional[int] = None,
     only_paid: bool = False,
+    force: bool = False,
 ) -> Any:
     """Generate a magazine label batch (state/district/taluk-wise).
 
-    Members with STOPPED/CANCELLED subscriptions are excluded, active pauses
-    are skipped, returned issues are flagged. only_paid=True restricts the
-    member list to members whose subscription has a receipt allocation
-    ('receipt generated members').
+    Members with STOPPED subscriptions are excluded, a pause that covers the issue month is skipped, members who
+    are not approved yet are left out, returned issues are flagged. only_paid=True restricts the member list to
+    members whose subscription has a receipt allocation ('receipt generated members'). A batch for the same issue
+    and the same filters that is not cancelled is refused (409) unless force=true.
     """
     from models.engagements import Affiliation, Associate, PressMedia
     from models.receipts import ReceiptAllocation
@@ -739,14 +716,26 @@ def generate_labels(
     if not re.match(r"^\d{4}-\d{2}$", issue_month_year):
         raise HTTPException(400, "issue_month_year must be in YYYY-MM format")
 
+    filters_text = str({
+        "state_id": state_id, "district_id": district_id,
+        "taluk_id": taluk_id, "only_paid": only_paid,
+    })
+    twin = db.query(MagazineLabelBatch).filter(
+        MagazineLabelBatch.issue_month_year == issue_month_year,
+        MagazineLabelBatch.filters_applied == filters_text,
+        MagazineLabelBatch.status != "CANCELLED",
+        MagazineLabelBatch.is_deleted == False,  # noqa: E712
+    ).first()
+    if twin and not force:
+        raise HTTPException(409, f"A label batch for {issue_month_year} with the same filters already exists "
+                                 f"({twin.batch_name}, {twin.status.title()}). Cancel it, or generate another one anyway.")
+
     batch = MagazineLabelBatch(
         batch_name=f"Labels-{issue_month_year}",
         generation_date=dt.today(),
         issue_month_year=issue_month_year,
-        filters_applied=str({
-            "state_id": state_id, "district_id": district_id,
-            "taluk_id": taluk_id, "only_paid": only_paid,
-        }),
+        filters_applied=filters_text,
+        status="GENERATED",
         created_by=current_user.id
     )
     db.add(batch)
@@ -762,6 +751,7 @@ def generate_labels(
             MagazineSubscription.delivery_status == "ACTIVE",
             MagazineSubscription.is_deleted == False,
             Member.is_deleted == False,
+            Member.approval_status == "APPROVED",
             # a member who wants only the e-copy gets no posted label
             or_(Member.magazine_kind.is_(None), Member.magazine_kind != "EMAIL"),
         )
@@ -786,11 +776,13 @@ def generate_labels(
         }
         rows = [(sub, m) for sub, m in rows if m.id in paid_ids]
 
+    # a pause skips the member when it covers any day of the issue month
+    first_day, last_day = _month_bounds(int(issue_month_year[:4]), int(issue_month_year[5:7]))
     paused_sub_ids = {
         p.subscription_id for p in
         db.query(MagazineDeliveryPause).filter(
-            MagazineDeliveryPause.pause_start_date <= today,
-            (MagazineDeliveryPause.pause_end_date >= today) | (MagazineDeliveryPause.pause_end_date == None),  # noqa: E711
+            MagazineDeliveryPause.pause_start_date <= last_day,
+            (MagazineDeliveryPause.pause_end_date >= first_day) | (MagazineDeliveryPause.pause_end_date == None),  # noqa: E711
             MagazineDeliveryPause.is_deleted == False
         ).all()
     }
@@ -997,6 +989,78 @@ def read_label_batches(
     return paginate(q.order_by(MagazineLabelBatch.id.desc()), page, _page_limit(limit))
 
 
+def _batch_row(batch: MagazineLabelBatch) -> dict:
+    return {"id": batch.id, "batch_name": batch.batch_name, "issue_month_year": batch.issue_month_year, "status": batch.status,
+            "sent_date": batch.sent_date, "total_labels": batch.total_labels, "cancel_reason": batch.cancel_reason}
+
+
+def _label_batch(db: Session, batch_id: int) -> MagazineLabelBatch:
+    batch = db.query(MagazineLabelBatch).filter(MagazineLabelBatch.id == batch_id, MagazineLabelBatch.is_deleted == False).first()  # noqa: E712
+    if not batch:
+        raise HTTPException(404, "Label batch not found")
+    return batch
+
+
+@router.post("/label-batches/{batch_id}/send")
+def mark_label_batch_sent(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
+    batch_id: int, sent_date: Optional[date] = None,
+) -> Any:
+    """Step 2: the printed labels were posted. Returns can be marked for this issue only after this."""
+    batch = _label_batch(db, batch_id)
+    if batch.status != "GENERATED":
+        raise HTTPException(409, f"This batch is {batch.status.title()}; only a Generated batch can be marked as sent.")
+    sent_on = sent_date or date.today()
+    if sent_on > date.today():
+        raise HTTPException(400, "The sent date cannot be in the future.")
+    batch.status, batch.sent_date, batch.updated_by = "SENT", sent_on, current_user.id
+    db.commit()
+    return _batch_row(batch)
+
+
+@router.post("/label-batches/{batch_id}/undo-send")
+def undo_label_batch_sent(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
+    batch_id: int,
+) -> Any:
+    """Marked as sent by mistake: back to Generated. Blocked once a return is marked on an issue sent by this batch."""
+    batch = _label_batch(db, batch_id)
+    if batch.status != "SENT":
+        raise HTTPException(409, "Only a batch marked as sent can be undone.")
+    returned = (
+        db.query(MagazineReturn.id)
+        .join(MagazineSubscription, MagazineSubscription.id == MagazineReturn.subscription_id)
+        .join(MagazineLabelBatchItem, (MagazineLabelBatchItem.recipient_id == MagazineSubscription.member_id) & (MagazineLabelBatchItem.recipient_type == "MEMBER"))
+        .filter(
+            MagazineLabelBatchItem.label_batch_id == batch.id,
+            MagazineReturn.issue_month_year == batch.issue_month_year,
+            MagazineReturn.is_deleted == False,  # noqa: E712
+        ).first()
+    )
+    if returned:
+        raise HTTPException(409, "Returns are already marked for this issue; remove them before undoing the sent mark.")
+    batch.status, batch.sent_date, batch.updated_by = "GENERATED", None, current_user.id
+    db.commit()
+    return _batch_row(batch)
+
+
+@router.post("/label-batches/{batch_id}/cancel")
+def cancel_label_batch(
+    *, db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("magazines.write")),
+    batch_id: int, reason: Optional[str] = None,
+) -> Any:
+    """A batch printed wrongly: cancel it before it is sent (a sent batch is undone first)."""
+    batch = _label_batch(db, batch_id)
+    if batch.status != "GENERATED":
+        raise HTTPException(409, "Only a Generated batch can be cancelled; undo the sent mark first." if batch.status == "SENT" else "This batch is already cancelled.")
+    batch.status, batch.cancel_reason, batch.updated_by = "CANCELLED", (reason or getattr(db, "_action_reason", None) or None), current_user.id
+    db.commit()
+    return _batch_row(batch)
+
+
 def _label_names(db: Session, items) -> dict:
     """Resolve (recipient_type, recipient_id) → display name in bulk."""
     from models.engagements import Affiliation, Associate, PressMedia
@@ -1063,6 +1127,8 @@ def read_label_batch(
             "generation_date": batch.generation_date,
             "total_labels": batch.total_labels,
             "filters_applied": batch.filters_applied,
+            "status": batch.status,
+            "sent_date": batch.sent_date,
         },
         "total": total_items,
         "page": page,
@@ -1228,6 +1294,7 @@ def read_unsubscribed_paid_members(
         .filter(
             Member.is_deleted == False,  # noqa: E712
             Member.magazine_needed == True,  # noqa: E712
+            Member.approval_status == "APPROVED",  # an applicant gets the subscription at approval
             ReceiptAllocation.is_deleted == False,  # noqa: E712
             ~Member.id.in_(subscribed),
         )

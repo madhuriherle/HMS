@@ -112,7 +112,7 @@ def test_approvals_lists_and_label_batch(client, admin_headers):
         assert "data" in r.json()
     assert client.put(f"{API}/approvals/requests/999999/reject", headers=h, params={"note": "no"}).status_code == 404
     # Label List "Generate batch": create the batch, then fetch its PDF
-    g = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": "2026-10", "only_paid": True})
+    g = client.post(f"{API}/magazines/generate-labels", headers=h, params={"force": True, "issue_month_year": "2026-10", "only_paid": True})
     assert g.status_code in (200, 201), g.text
     pdf = client.get(f"{API}/magazines/label-batches/{g.json()['batch_id']}/pdf", headers=h)
     assert pdf.status_code == 200 and pdf.headers["content-type"].startswith("application/pdf"), pdf.text[:200]

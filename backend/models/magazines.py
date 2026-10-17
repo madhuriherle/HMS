@@ -43,6 +43,10 @@ class MagazineLabelBatch(AuditMixin, Base):
     issue_month_year: Mapped[str] = mapped_column(String(20), nullable=False)
     total_labels: Mapped[int] = mapped_column(BigInteger, default=0)
     filters_applied: Mapped[str] = mapped_column(Text, nullable=True)
+    # GENERATED (printed, not yet posted) -> SENT (posted) ; GENERATED -> CANCELLED ; SENT -> GENERATED (undo)
+    status: Mapped[str] = mapped_column(String(20), default="GENERATED", server_default="GENERATED")
+    sent_date: Mapped[Date] = mapped_column(Date, nullable=True)
+    cancel_reason: Mapped[str] = mapped_column(Text, nullable=True)
 
 class MagazineLabelBatchItem(AuditMixin, Base):
     __tablename__ = "magazine_label_batch_items"

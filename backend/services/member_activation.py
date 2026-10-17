@@ -106,4 +106,9 @@ def activate_member(db: Session, member: Member, *, activated_by: int, reason: O
     db.flush()
     receipt_status.refresh_for_members(db, [member.id])
 
+    # a member who said Yes to the magazine is on the subscription from final approval
+    if member.magazine_needed:
+        from services.magazine_subscriptions import sync_member_magazine_subscription
+        sync_member_magazine_subscription(db, member, user_id=activated_by)
+
     return member

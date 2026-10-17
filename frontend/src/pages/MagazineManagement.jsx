@@ -42,9 +42,9 @@ import {
 } from 'lucide-react';
 
 // ── constants ────────────────────────────────────────────────
-const DELIVERY_STATUSES = ['ACTIVE', 'PAUSED', 'STOPPED', 'CANCELLED'];
+const DELIVERY_STATUSES = ['ACTIVE', 'PAUSED', 'STOPPED'];
 // The server only accepts these three when starting/stopping (PAUSED is set by a pause).
-const SETTABLE_STATUSES = ['ACTIVE', 'STOPPED', 'CANCELLED'];
+const SETTABLE_STATUSES = ['ACTIVE', 'STOPPED'];
 const FOLLOW_UP_STATUSES = ['PENDING', 'CONTACTED', 'RESOLVED'];
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -52,14 +52,13 @@ const CHIP_STYLES = {
   ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   PAUSED: 'bg-amber-50 text-amber-700 border-amber-200',
   STOPPED: 'bg-gray-100 text-gray-600 border-gray-200',
-  CANCELLED: 'bg-red-50 text-red-700 border-red-200',
   PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
   CONTACTED: 'bg-blue-50 text-blue-700 border-blue-200',
   RESOLVED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
 // the words staff see for a delivery status
-const STATUS_LABELS = { ACTIVE: 'Subscribed', PAUSED: 'Paused', STOPPED: 'Stopped', CANCELLED: 'Cancelled' };
+const STATUS_LABELS = { ACTIVE: 'Subscribed', PAUSED: 'Paused', STOPPED: 'Stopped' };
 const statusLabel = (v) => STATUS_LABELS[v] || v;
 
 const RECIPIENT_TYPE_CHIPS = {
@@ -233,7 +232,6 @@ export default function MagazineManagement() {
             {tab === 'labels-delivery' && (
               <>
                 <LabelsTab locations={locations} canWrite={canWrite} />
-                <DeliveryBatchesTab canWrite={canWrite} canDelete={canDelete} />
               </>
             )}
           </>
@@ -1352,6 +1350,7 @@ function ReturnForm({ subOptions, presetSubscriptionId, onClose, onSaved }) {
                 onChange={(e) => { setForm((f) => ({ ...f, issue_month_year: e.target.value })); setErrors((er) => ({ ...er, issue_month_year: '' })); }}
                 className={INPUT}
               />
+              <p className="mt-1 text-[11px] text-[#863221]/80">Only an issue whose label batch is marked as sent to this member can be marked returned.</p>
               <FieldError>{errors.issue_month_year}</FieldError>
             </div>
             <div>
@@ -1443,21 +1442,16 @@ function LabelsTab({ locations, canWrite }) {
   const [busy, setBusy] = useState(false);
 
   const [gen, setGen] = useState({ issue_month_year: thisMonth(), state_id: '', district_id: '', taluk_id: '', only_paid: true });
-  const [deliveries, setDeliveries] = useState([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
 
-  // a page of label batches; the 200 newest delivery batches tell which issues were sent
+  // a page of label batches: each one carries its own status (Generated, Sent, Cancelled)
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [{ data }, del] = await Promise.all([
-        api.get('/magazines/label-batches', { params: { page, limit: pageSize } }),
-        api.get('/magazines/delivery-batches', { params: { limit: 200 } }),
-      ]);
-      setDeliveries(Array.isArray(del.data?.data) ? del.data.data : []);
+      const { data } = await api.get('/magazines/label-batches', { params: { page, limit: pageSize } });
       setBatches(Array.isArray(data?.data) ? data.data : []);
       setTotal(data?.total ?? 0);
       setPages(Math.max(1, data?.pages ?? 1));
@@ -1471,26 +1465,40 @@ function LabelsTab({ locations, canWrite }) {
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [pageSize]);
 
-  // the delivery batch of an issue month tells whether that month's labels were sent
-  const deliveryOf = (issue) => deliveries.find((d) => d.issue_month_year === issue && ['DISPATCHED', 'COMPLETED'].includes(d.status));
-
-  const markDispatched = async (batch) => {
+  // step 2: the printed labels were posted. Step 3 (a return) is only possible after this.
+  const markSent = async (batch) => {
+    const ok = await confirmYesNo({ title: 'Mark as sent?', text: `${batch.batch_name} (${batch.total_labels ?? 0} labels) was posted today. A return can be marked for this issue only after this.`, confirmText: 'Yes, mark sent' });
+    if (!ok) return;
     try {
-      const open = deliveries.find((d) => d.issue_month_year === batch.issue_month_year);
-      if (open) {
-        await api.put(`/magazines/delivery-batches/${open.id}`, { status: 'DISPATCHED', dispatch_date: today() });
-      } else {
-        await api.post('/magazines/delivery-batches', {
-          batch_name: `Dispatch ${batch.issue_month_year}`,
-          issue_month_year: batch.issue_month_year,
-          dispatch_date: today(),
-          status: 'DISPATCHED',
-        });
-      }
-      notify('Marked as dispatched.');
+      await api.post(`/magazines/label-batches/${batch.id}/send`);
+      notify(`${batch.batch_name} marked as sent.`);
       load();
     } catch (error) {
-      notify(error.response?.data?.detail || 'Could not mark the issue as dispatched.', 'error');
+      notify(error.response?.data?.detail || 'Could not mark the batch as sent.', 'error');
+    }
+  };
+
+  const undoSent = async (batch) => {
+    const ok = await confirmYesNo({ title: 'Undo the sent mark?', text: `${batch.batch_name} goes back to Generated. This is only for a batch marked as sent by mistake.`, confirmText: 'Yes, undo', danger: true });
+    if (!ok) return;
+    try {
+      await api.post(`/magazines/label-batches/${batch.id}/undo-send`);
+      notify(`${batch.batch_name} is back to Generated.`);
+      load();
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Could not undo the sent mark.', 'error');
+    }
+  };
+
+  const cancelBatch = async (batch) => {
+    const ok = await confirmYesNo({ title: 'Cancel this batch?', text: `${batch.batch_name} was printed wrongly and will not be sent. Cancelled batches stay in the list for the record.`, confirmText: 'Yes, cancel it', danger: true });
+    if (!ok) return;
+    try {
+      await api.post(`/magazines/label-batches/${batch.id}/cancel`);
+      notify(`${batch.batch_name} cancelled.`);
+      load();
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Could not cancel the batch.', 'error');
     }
   };
 
@@ -1514,7 +1522,7 @@ function LabelsTab({ locations, canWrite }) {
     URL.revokeObjectURL(url);
   };
 
-  const generate = async () => {
+  const generate = async (force = false) => {
     if (!/^\d{4}-\d{2}$/.test(gen.issue_month_year)) { notify('Pick an issue month.', 'error'); return; }
     setBusy(true);
     try {
@@ -1525,6 +1533,7 @@ function LabelsTab({ locations, canWrite }) {
           district_id: gen.district_id || undefined,
           taluk_id: gen.taluk_id || undefined,
           only_paid: gen.only_paid,
+          ...(force ? { force: true } : {}),
         },
       });
       if (data?.approval_request_id || data?.status === 'PENDING') {
@@ -1538,6 +1547,12 @@ function LabelsTab({ locations, canWrite }) {
       let message = error.response?.data?.detail;
       if (!message && error.response?.data instanceof Blob) {
         try { message = JSON.parse(await error.response.data.text()).detail; } catch (_) { /* keep default */ }
+      }
+      if (error.response?.status === 409 && !force && /already exists/.test(message || '')) {
+        setBusy(false);
+        const again = await confirmYesNo({ title: 'Labels already generated', text: message, confirmText: 'Generate another anyway' });
+        if (again) generate(true);
+        return;
       }
       notify(message || 'Could not generate labels.', 'error');
     } finally {
@@ -1592,7 +1607,7 @@ function LabelsTab({ locations, canWrite }) {
             Paid members only (receipt allocated)
           </label>
           {canWrite && (
-            <button type="button" onClick={generate} disabled={busy} className={BTN_PRIMARY}>
+            <button type="button" onClick={() => generate(false)} disabled={busy} className={BTN_PRIMARY}>
               <Printer className="w-4 h-4" /><span>{busy ? 'Generating…' : 'Generate & Download PDF'}</span>
             </button>
           )}
@@ -1614,7 +1629,7 @@ function LabelsTab({ locations, canWrite }) {
                 <TH>Issue</TH>
                 <TH>Generated</TH>
                 <TH className="text-center">Labels</TH>
-                <TH>Sent</TH>
+                <TH>Status</TH>
                 <TH className="text-center">Actions</TH>
               </tr>
             </thead>
@@ -1631,21 +1646,29 @@ function LabelsTab({ locations, canWrite }) {
                     <td className="px-4 py-3.5 text-xs text-gray-600">{formatDate(b.generation_date)}</td>
                     <td className="px-4 py-3.5 text-center text-xs font-bold text-gray-800">{b.total_labels ?? 0}</td>
                     <td className="px-4 py-3.5">
-                      {deliveryOf(b.issue_month_year) ? (
+                      {b.status === 'SENT' ? (
                         <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
-                          Sent{deliveryOf(b.issue_month_year).dispatch_date ? ` on ${formatDate(deliveryOf(b.issue_month_year).dispatch_date)}` : ''}
+                          Sent{b.sent_date ? ` on ${formatDate(b.sent_date)}` : ''}
                         </span>
+                      ) : b.status === 'CANCELLED' ? (
+                        <span className="inline-flex items-center rounded-full border border-stone-300 bg-stone-100 px-2 py-0.5 text-[11px] font-bold text-stone-600">Cancelled</span>
                       ) : (
-                        <span className="text-[11px] text-gray-400">Not sent yet</span>
+                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">Generated, not sent</span>
                       )}
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-center gap-1.5">
-                        {canWrite && !deliveryOf(b.issue_month_year) && (
-                          <button type="button" onClick={() => markDispatched(b)} className="btn-act" title="Mark this issue as sent"><PackageCheck className="w-3.5 h-3.5" /><span>Mark sent</span></button>
+                        {canWrite && b.status === 'GENERATED' && (
+                          <button type="button" onClick={() => markSent(b)} className="btn-act" title="The labels were posted: mark this batch as sent"><PackageCheck className="w-3.5 h-3.5" /><span>Mark sent</span></button>
+                        )}
+                        {canWrite && b.status === 'SENT' && (
+                          <button type="button" onClick={() => undoSent(b)} className="btn-act" title="Marked as sent by mistake"><RefreshCw className="w-3.5 h-3.5" /><span>Undo sent</span></button>
+                        )}
+                        {canWrite && b.status === 'GENERATED' && (
+                          <button type="button" onClick={() => cancelBatch(b)} className="btn-act" title="Printed wrongly: cancel this batch"><X className="w-3.5 h-3.5" /><span>Cancel</span></button>
                         )}
                         <button type="button" onClick={() => setDetail(b)} className="btn-act" title="View labels"><Eye className="w-3.5 h-3.5" /><span>View</span></button>
-                        {canWrite && (
+                        {canWrite && b.status !== 'CANCELLED' && (
                           <button type="button" onClick={() => onDownload(b)} className="btn-act" title="Download PDF"><Download className="w-3.5 h-3.5" /><span>PDF</span></button>
                         )}
                       </div>
@@ -1760,187 +1783,6 @@ function LabelBatchModal({ batch, onClose }) {
         {(data?.total ?? 0) > 0 && <Pager page={page} pages={Math.max(1, data?.pages ?? 1)} total={data.total} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />}
         <ModalFooter kind="view" onCancel={onClose} />
       </div>
-    </Modal>
-  );
-}
-
-// ── Delivery Batches ─────────────────────────────────────────
-function DeliveryBatchesTab({ canWrite, canDelete }) {
-  const [batches, setBatches] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
-  const [total, setTotal] = useState(0);
-  const [pages, setPages] = useState(1);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.get('/magazines/delivery-batches', { params: { page, limit: pageSize } });
-      setBatches(Array.isArray(data?.data) ? data.data : []);
-      setTotal(data?.total ?? 0);
-      setPages(Math.max(1, data?.pages ?? 1));
-    } catch (error) {
-      notify(error.response?.data?.detail || 'Could not load delivery batches.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize]);
-
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { setPage(1); }, [pageSize]);
-
-  const remove = async (batch) => {
-    const ok = await confirmYesNo({ title: 'Delete delivery batch?', text: `"${batch.batch_name}" will be removed.`, confirmText: 'Yes, delete', danger: true });
-    if (!ok) return;
-    try {
-      await api.delete(`/magazines/delivery-batches/${batch.id}`);
-      notify('Delivery batch deleted.');
-      load();
-    } catch (error) {
-      notify(error.response?.data?.detail || 'Could not delete the batch.', 'error');
-    }
-  };
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-gray-500">Dispatch batches track when an issue was sent out.</p>
-        {canWrite && (
-          <PageActions><button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
-            <Plus className="w-4 h-4" /><span>New Delivery Batch</span>
-          </button></PageActions>
-        )}
-      </div>
-
-      <div className="overflow-hidden rounded-xl border border-[#E8DFD8] bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-700">
-            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-              <tr>
-                <TH>Batch</TH>
-                <TH>Issue</TH>
-                <TH>Dispatch date</TH>
-                <TH>Status</TH>
-                <TH className="text-center">Actions</TH>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E8DFD8]">
-              {loading ? (
-                <EmptyRow colSpan={5} title="Loading…" />
-              ) : batches.length === 0 ? (
-                <EmptyRow colSpan={5} icon={PackageCheck} title="No delivery batches" hint="Create a batch to track a magazine dispatch." />
-              ) : (
-                batches.map((b) => (
-                  <tr key={b.id} className="hover:bg-amber-50/40 transition-colors">
-                    <td className="px-4 py-3.5 font-semibold text-gray-900">{b.batch_name}</td>
-                    <td className="px-4 py-3.5 text-xs font-mono">{b.issue_month_year}</td>
-                    <td className="px-4 py-3.5 text-xs text-gray-700">{b.dispatch_date ? formatDate(b.dispatch_date) : '—'}</td>
-                    <td className="px-4 py-3.5"><Chip value={b.status} /></td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {canWrite && (
-                          <button type="button" onClick={() => { setEditing(b); setFormOpen(true); }} className="btn-act" title="Edit"><Pencil className="w-3.5 h-3.5" /><span>Edit</span></button>
-                        )}
-                        {canDelete && (
-                          <button type="button" onClick={() => remove(b)} className="btn-act btn-act-danger" title="Delete"><Trash2 className="w-3.5 h-3.5" /><span>Delete</span></button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {total > 0 && <Pager page={page} pages={pages} total={total} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />}
-      </div>
-
-      {formOpen && (
-        <DeliveryBatchForm
-          editing={editing}
-          onClose={() => setFormOpen(false)}
-          onSaved={() => { setFormOpen(false); load(); }}
-        />
-      )}
-    </div>
-  );
-}
-
-function DeliveryBatchForm({ editing, onClose, onSaved }) {
-  const [form, setForm] = useState({
-    batch_name: editing?.batch_name || '',
-    issue_month_year: editing?.issue_month_year || thisMonth(),
-    dispatch_date: editing?.dispatch_date || '',
-    status: editing?.status || 'PENDING',
-  });
-  const [errors, setErrors] = useState({});
-  const [busy, setBusy] = useState(false);
-
-  const save = async () => {
-    const errs = {};
-    if (!form.batch_name.trim()) errs.batch_name = 'A batch name is required.';
-    if (!/^\d{4}-\d{2}$/.test(form.issue_month_year)) errs.issue_month_year = 'Pick an issue month.';
-    setErrors(errs);
-    if (Object.keys(errs).length) return;
-    setBusy(true);
-    try {
-      const payload = {
-        batch_name: form.batch_name.trim(),
-        issue_month_year: form.issue_month_year,
-        dispatch_date: form.dispatch_date || null,
-        status: form.status,
-      };
-      if (editing) {
-        await api.put(`/magazines/delivery-batches/${editing.id}`, payload);
-        notify('Delivery batch updated.');
-      } else {
-        await api.post('/magazines/delivery-batches', payload);
-        notify('Delivery batch created.');
-      }
-      onSaved();
-    } catch (error) {
-      notify(error.response?.data?.detail || 'Could not save the batch.', 'error');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Modal isOpen onClose={onClose}>
-      <ModalShell title={editing ? 'Edit Delivery Batch' : 'New Delivery Batch'} footer={<ModalFooter kind={editing ? 'edit' : 'add'} onCancel={onClose} onSubmit={save} busy={busy} />}>
-        <div className="p-6 space-y-4">
-          <div>
-            <label className={LABEL}>Batch name <span className="text-[#ED4636]">*</span></label>
-            <input type="text" value={form.batch_name} onChange={(e) => { setForm((f) => ({ ...f, batch_name: e.target.value })); setErrors((er) => ({ ...er, batch_name: '' })); }} className={INPUT} placeholder="e.g. February dispatch" />
-            <FieldError>{errors.batch_name}</FieldError>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className={LABEL}>Issue month <span className="text-[#ED4636]">*</span></label>
-              <input type="month" value={form.issue_month_year} onChange={(e) => { setForm((f) => ({ ...f, issue_month_year: e.target.value })); setErrors((er) => ({ ...er, issue_month_year: '' })); }} className={INPUT} />
-              <FieldError>{errors.issue_month_year}</FieldError>
-            </div>
-            <div>
-              <label className={LABEL}>Dispatch date</label>
-              <DateInput
-                value={form.dispatch_date}
-                onChange={(e) => setForm((f) => ({ ...f, dispatch_date: e.target.value }))}
-                placeholder="DD-MM-YYYY"
-                className="border border-[#E8DFD8] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
-              />
-            </div>
-          </div>
-          <div>
-            <label className={LABEL}>Status</label>
-            <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))} className={INPUT}>
-              {['PENDING', 'DISPATCHED', 'COMPLETED'].map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-        </div>
-      </ModalShell>
     </Modal>
   );
 }

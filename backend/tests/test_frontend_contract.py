@@ -21,6 +21,25 @@ def _state(client, h):
     return r.json()["id"]
 
 
+def _approve_member(client, headers, member_id):
+    """Approve a member the way the office does (a date of birth and an address must be on file first)."""
+    have = client.get(f"{API}/members/{member_id}", headers=headers).json()
+    missing = {k: v for k, v in (("date_of_birth", "1980-01-01"), ("address_line1", "1 Test Road")) if not have.get(k)}
+    if missing:
+        got = client.put(f"{API}/members/{member_id}", headers=headers, json=missing)
+        assert got.status_code == 200, got.text
+    done = client.put(f"{API}/members/{member_id}/approve", headers=headers)
+    assert done.status_code == 200, done.text
+
+
+def _send_label_batch(client, headers, batch_id, sent_date=None):
+    """Step 2 of the monthly run: the printed labels were posted."""
+    params = {"sent_date": sent_date} if sent_date else {}
+    done = client.post(f"{API}/magazines/label-batches/{batch_id}/send", headers=headers, params=params)
+    assert done.status_code == 200, done.text
+    return done.json()
+
+
 def _sfx():
     return str(int(time.time() * 1000))[-6:]
 

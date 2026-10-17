@@ -692,6 +692,18 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
 15.24 RANKS ARE NEVER SHOWN. Super Admin is rank 0 (god mode, hidden from everyone else), Admin is rank 1. No screen or
       error message names a rank number, a rank gate to a role, or "a higher rank" (rule 13.6). The Modules page
       keeps its Rank gate field (rank-0 users only).
+15.25 THE MAGAZINE MONTHLY RUN IS THREE STEPS (migration 0091). (1) Generate labels: one label batch per issue month and
+      filter set; an identical batch (same issue, same filters, not cancelled) is refused with 409 unless force=true (the
+      screen asks "Generate another anyway?"). Only APPROVED members with an ACTIVE subscription are listed (e-copy
+      members, a pause covering any day of the issue month, and unapproved applicants are left out). (2) Mark sent:
+      POST /magazines/label-batches/{id}/send (status GENERATED -> SENT, sent_date today; undo-send is allowed until a
+      return is marked on that issue; cancel is allowed only while GENERATED). The batch itself carries the status; the
+      old Delivery Batches screen and its write routes are gone (the table and the GET routes stay for history).
+      (3) Mark returned: only for an issue whose label batch is SENT and contains that member, once per issue. The
+      monthly "S" box and the history read the batch status. A subscription is ACTIVE, PAUSED or STOPPED (Cancelled was
+      merged into Stopped); stopping or starting on the Magazine page also sets the member's magazine_needed, and
+      deleting a subscription sets it to No. A member's Yes at registration starts the subscription at FINAL APPROVAL
+      (services/member_activation.py), not at registration or at receipt assignment.
 
 ================================================================================
 

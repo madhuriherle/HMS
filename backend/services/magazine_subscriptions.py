@@ -2,8 +2,8 @@
 
 Ensures synchronization of magazine delivery subscriptions with member profile changes
 and receipt allocations:
-1. When a member's `magazine_needed` is set to True (on edit):
-   - Creates or reactivates an ACTIVE MagazineSubscription.
+1. When a member's `magazine_needed` is True and the member is APPROVED (at final approval, or on a later edit):
+   - Creates or reactivates an ACTIVE MagazineSubscription. An applicant who is not approved yet gets none.
    - Synchronizes `address_override` with `magazine_delivery_address`.
    - Mirrors into member service opt-ins.
 2. When a member's `magazine_needed` is set to False (on edit):
@@ -45,6 +45,8 @@ def sync_member_magazine_subscription(
     )
 
     if effective_needed:
+        if member.approval_status != "APPROVED":
+            return sub  # the subscription starts at final approval, not at registration
         if not sub:
             sub = MagazineSubscription(
                 member_id=member.id,
@@ -93,6 +95,7 @@ def ensure_subscription_on_receipt_assigned(
             Member.id.in_(valid_ids),
             Member.is_deleted == False,
             Member.magazine_needed == True,  # noqa: E712
+            Member.approval_status == "APPROVED",  # an applicant waiting for approval gets none yet
         )
         .all()
     )

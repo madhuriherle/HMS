@@ -16,6 +16,8 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
+from test_frontend_contract import _approve_member, _send_label_batch
+
 
 # ─────────────── helpers ───────────────
 
@@ -27,6 +29,14 @@ def _create_member(client, headers, mobile, name="Member"):
     )
     assert response.status_code in (200, 201), response.text
     return response.json()
+
+
+def _post_issue(client, headers, issue):
+    """Print and post an issue (a member must be approved and subscribed to be on it); returns the label batch id."""
+    made = client.post("/api/v1/magazines/generate-labels", headers=headers, params={"force": True, "issue_month_year": issue})
+    assert made.status_code == 200, made.text
+    _send_label_batch(client, headers, made.json()["batch_id"])
+    return made.json()["batch_id"]
 
 
 def _create_membership_type(client, headers, code, name):
@@ -1331,6 +1341,7 @@ def test_affiliation_full_lifecycle_magazine_and_labels(client, admin_headers):
 
     # member with subscription for the label batch comparison
     member = _create_member(client, admin_headers, "9340000310", "LabelMember")
+    _approve_member(client, admin_headers, member["id"])
     sub = client.post(
         "/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": member["id"]}
     )
@@ -1340,7 +1351,7 @@ def test_affiliation_full_lifecycle_magazine_and_labels(client, admin_headers):
     generated = client.post(
         "/api/v1/magazines/generate-labels",
         headers=admin_headers,
-        params={"issue_month_year": issue},
+        params={"force": True, "issue_month_year": issue},
     )
     assert generated.status_code == 200, generated.text
     batch_id = generated.json()["batch_id"]
@@ -1367,7 +1378,7 @@ def test_affiliation_full_lifecycle_magazine_and_labels(client, admin_headers):
     generated2 = client.post(
         "/api/v1/magazines/generate-labels",
         headers=admin_headers,
-        params={"issue_month_year": issue},
+        params={"force": True, "issue_month_year": issue},
     )
     batch2 = generated2.json()["batch_id"]
     detail2 = client.get(
@@ -1400,7 +1411,7 @@ def test_affiliation_full_lifecycle_magazine_and_labels(client, admin_headers):
     generated3 = client.post(
         "/api/v1/magazines/generate-labels",
         headers=admin_headers,
-        params={"issue_month_year": issue},
+        params={"force": True, "issue_month_year": issue},
     )
     detail3 = client.get(
         f"/api/v1/magazines/label-batches/{generated3.json()['batch_id']}", headers=admin_headers
@@ -1428,7 +1439,7 @@ def test_affiliation_full_lifecycle_magazine_and_labels(client, admin_headers):
     generated4 = client.post(
         "/api/v1/magazines/generate-labels",
         headers=admin_headers,
-        params={"issue_month_year": issue},
+        params={"force": True, "issue_month_year": issue},
     )
     detail4 = client.get(
         f"/api/v1/magazines/label-batches/{generated4.json()['batch_id']}", headers=admin_headers
@@ -1478,13 +1489,14 @@ def test_receipt_refund_and_payment_transaction_serialize(client, admin_headers)
 
 
 def test_delivery_batch_and_member_document_serialize(client, admin_headers):
+    # the Delivery Batches screen was removed (Sent is marked on the label batch): old rows stay readable, nothing writes them
     batch = client.post(
         "/api/v1/magazines/delivery-batches",
         headers=admin_headers,
         json={"batch_name": "Jan 2026", "issue_month_year": "2026-01"},
     )
-    assert batch.status_code == 200, batch.text
-    assert batch.json()["id"]
+    assert batch.status_code == 405, batch.text
+    assert client.get("/api/v1/magazines/delivery-batches", headers=admin_headers).status_code == 200
 
     doc_type = client.post(
         "/api/v1/masters/document-types",
@@ -2788,9 +2800,11 @@ def test_magazine_pause_resume_cycle(client, admin_headers):
 
 def test_magazine_returns_lifecycle_and_label_flagging(client, admin_headers):
     member = _create_member(client, admin_headers, "9340000003", "Returner")
+    _approve_member(client, admin_headers, member["id"])
     sub = client.post(
         "/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": member["id"]}
     ).json()
+    _post_issue(client, admin_headers, "2026-04")   # a copy can only come back once the issue was posted to the member
 
     # mark a return
     ret = client.post(
@@ -2853,7 +2867,7 @@ def test_magazine_returns_lifecycle_and_label_flagging(client, admin_headers):
     generated = client.post(
         "/api/v1/magazines/generate-labels",
         headers=admin_headers,
-        params={"issue_month_year": "2026-04"},
+        params={"force": True, "issue_month_year": "2026-04"},
     )
     assert generated.status_code == 200, generated.text
     assert generated.json()["returned_count"] == 1
@@ -2881,6 +2895,8 @@ def test_label_generation_skips_stopped_and_paused(client, admin_headers):
     m_active = _create_member(client, admin_headers, "9340000010", "Active")
     m_stopped = _create_member(client, admin_headers, "9340000011", "Stopped")
     m_paused = _create_member(client, admin_headers, "9340000012", "Paused")
+    for m in (m_active, m_stopped, m_paused):
+        _approve_member(client, admin_headers, m["id"])
 
     sub_a = client.post(
         "/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": m_active["id"]}
@@ -2905,7 +2921,7 @@ def test_label_generation_skips_stopped_and_paused(client, admin_headers):
 
     issue = (date.today()).strftime("%Y-%m")
     generated = client.post(
-        "/api/v1/magazines/generate-labels", headers=admin_headers, params={"issue_month_year": issue}
+        "/api/v1/magazines/generate-labels", headers=admin_headers, params={"force": True, "issue_month_year": issue}
     )
     assert generated.status_code == 200, generated.text
 
@@ -2935,7 +2951,7 @@ def test_label_generation_skips_stopped_and_paused(client, admin_headers):
     filtered = client.post(
         "/api/v1/magazines/generate-labels",
         headers=admin_headers,
-        params={"issue_month_year": issue, "district_id": district["id"]},
+        params={"force": True, "issue_month_year": issue, "district_id": district["id"]},
     )
     assert filtered.status_code == 200, filtered.text
     detail2 = client.get(
@@ -2950,13 +2966,15 @@ def test_label_generation_skips_stopped_and_paused(client, admin_headers):
     assert client.post(
         "/api/v1/magazines/generate-labels",
         headers=admin_headers,
-        params={"issue_month_year": "Jan 2026"},
+        params={"force": True, "issue_month_year": "Jan 2026"},
     ).status_code == 400
 
 
 def test_label_generation_only_paid_receipt_members(client, admin_headers):
     m_paid = _create_member(client, admin_headers, "9340000020", "PaidUp")
     m_free = _create_member(client, admin_headers, "9340000021", "FreeRider")
+    for m in (m_paid, m_free):
+        _approve_member(client, admin_headers, m["id"])
 
     for m in (m_paid, m_free):
         sub = client.post(
@@ -2987,7 +3005,7 @@ def test_label_generation_only_paid_receipt_members(client, admin_headers):
     generated = client.post(
         "/api/v1/magazines/generate-labels",
         headers=admin_headers,
-        params={"issue_month_year": issue, "only_paid": "true"},
+        params={"force": True, "issue_month_year": issue, "only_paid": "true"},
     )
     assert generated.status_code == 200, generated.text
 
@@ -3178,7 +3196,8 @@ def test_receipt_allocation_mapping_and_label_list(client, admin_headers):
     assert listing.json()["total"] == 1
     assert listing.json()["data"][0]["member_name"] == "Allocated"
 
-    # assigned member starts appearing in the label print list (only_paid)
+    # assigned member starts appearing in the label print list (only_paid): once approved
+    _approve_member(client, admin_headers, member["id"])
     sub = client.post(
         "/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": member["id"]}
     )
@@ -3187,7 +3206,7 @@ def test_receipt_allocation_mapping_and_label_list(client, admin_headers):
     generated = client.post(
         "/api/v1/magazines/generate-labels",
         headers=admin_headers,
-        params={"issue_month_year": issue, "only_paid": "true"},
+        params={"force": True, "issue_month_year": issue, "only_paid": "true"},
     )
     assert generated.status_code == 200, generated.text
     detail = client.get(
@@ -3208,7 +3227,7 @@ def test_receipt_allocation_mapping_and_label_list(client, admin_headers):
     regenerated = client.post(
         "/api/v1/magazines/generate-labels",
         headers=admin_headers,
-        params={"issue_month_year": issue, "only_paid": "true"},
+        params={"force": True, "issue_month_year": issue, "only_paid": "true"},
     )
     detail2 = client.get(
         f"/api/v1/magazines/label-batches/{regenerated.json()['batch_id']}", headers=admin_headers
@@ -4215,7 +4234,7 @@ def test_label_batches_and_printable_pdf(client, admin_headers):
     generated = client.post(
         "/api/v1/magazines/generate-labels",
         headers=admin_headers,
-        params={"issue_month_year": "2026-03"},
+        params={"force": True, "issue_month_year": "2026-03"},
     )
     assert generated.status_code == 200, generated.text
     batch_id = generated.json()["batch_id"]
@@ -4448,6 +4467,8 @@ def test_reports_module_end_to_end(client, admin_headers):
     assert "Receipt No" in fy_csv.text or "Receipt Date" in fy_csv.text
 
     # ── magazines: subscriptions, pause, return, labels ──
+    for m in (m_male, m_female):
+        _approve_member(client, admin_headers, m["id"])
     sub = client.post(
         "/api/v1/magazines/subscriptions", headers=admin_headers,
         json={"member_id": m_male["id"]},
@@ -4458,6 +4479,7 @@ def test_reports_module_end_to_end(client, admin_headers):
         json={"member_id": m_female["id"]},
     )
     assert sub_f.status_code == 201, sub_f.text
+    _post_issue(client, admin_headers, "2026-07")   # the issue is posted before a return can be marked
 
     # mark a return for the male member's subscription
     ret = client.post(
@@ -4475,7 +4497,7 @@ def test_reports_module_end_to_end(client, admin_headers):
     returns_report = client.get(
         "/api/v1/reports/magazine-returns",
         headers=admin_headers,
-        params={"issue_month_year": "2026-07"},
+        params={"force": True, "issue_month_year": "2026-07"},
     )
     assert returns_report.status_code == 200, returns_report.text
     rr = returns_report.json()
@@ -4487,7 +4509,7 @@ def test_reports_module_end_to_end(client, admin_headers):
     generated = client.post(
         "/api/v1/magazines/generate-labels",
         headers=admin_headers,
-        params={"issue_month_year": "2026-07"},
+        params={"force": True, "issue_month_year": "2026-07"},
     )
     assert generated.status_code == 200, generated.text
 
@@ -6260,7 +6282,7 @@ def test_label_pdf_renders_kannada_text(client, admin_headers):
     assert aff.status_code == 201, aff.text
     gen = client.post(
         "/api/v1/magazines/generate-labels", headers=admin_headers,
-        params={"issue_month_year": "2026-04"},
+        params={"force": True, "issue_month_year": "2026-04"},
     )
     assert gen.status_code == 200, gen.text
     pdf = client.get(
@@ -6323,11 +6345,18 @@ def test_remaining_get_delete_endpoints(client, admin_headers):
         assert client.get(f"{E}/committee/{path}/{obj['id']}", headers=admin_headers).status_code == 200
         assert client.get(f"{E}/committee/{path}/99999999", headers=admin_headers).status_code == 404
 
-    b = client.post(f"{M}/delivery-batches", headers=admin_headers, json={"batch_name": "B1", "issue_month_year": "2026-05"}).json()
-    assert client.get(f"{M}/delivery-batches/{b['id']}", headers=admin_headers).status_code == 200
-    assert client.put(f"{M}/delivery-batches/{b['id']}", headers=admin_headers, json={"status": "DISPATCHED"}).json()["status"] == "DISPATCHED"
-    assert client.delete(f"{M}/delivery-batches/{b['id']}", headers=admin_headers).status_code == 200
-    assert client.get(f"{M}/delivery-batches/{b['id']}", headers=admin_headers).status_code == 404
+    # an old delivery batch (the screen is gone, the rows stay readable)
+    from db.session import SessionLocal
+    from models.magazines import MagazineDeliveryBatch
+    with SessionLocal() as db:
+        row = MagazineDeliveryBatch(batch_name="B1", issue_month_year="2026-05")
+        db.add(row)
+        db.commit()
+        old_id = row.id
+    assert client.get(f"{M}/delivery-batches/{old_id}", headers=admin_headers).status_code == 200
+    assert client.get(f"{M}/delivery-batches/99999999", headers=admin_headers).status_code == 404
+    assert client.put(f"{M}/delivery-batches/{old_id}", headers=admin_headers, json={"status": "DISPATCHED"}).status_code == 405
+    assert client.delete(f"{M}/delivery-batches/{old_id}", headers=admin_headers).status_code == 405
 
     sr = client.post("/api/v1/reports/saved", headers=admin_headers, json={"report_name": "SR1", "report_key": "members", "filters": {}})
     if sr.status_code in (200, 201):
@@ -6395,9 +6424,10 @@ def test_gotra_master_and_extra_address_fields(client, admin_headers):
     assert client.delete(f"/api/v1/masters/gotras/{g.json()['id']}", headers=admin_headers).status_code == 409
 
     # the label address carries the village-style parts
+    _approve_member(client, admin_headers, body["id"])
     sub = client.post("/api/v1/magazines/subscriptions", headers=admin_headers, json={"member_id": body["id"]})
     assert sub.status_code in (200, 201), sub.text
-    gen = client.post("/api/v1/magazines/generate-labels", headers=admin_headers, params={"issue_month_year": "2026-06"})
+    gen = client.post("/api/v1/magazines/generate-labels", headers=admin_headers, params={"force": True, "issue_month_year": "2026-06"})
     assert gen.status_code == 200, gen.text
     items = client.get(f"/api/v1/magazines/label-batches/{gen.json()['batch_id']}", headers=admin_headers).json()
     text = str(items)
@@ -6407,14 +6437,16 @@ def test_gotra_master_and_extra_address_fields(client, admin_headers):
 def test_monthly_marks_returned_R_and_pause_with_reason(client, admin_headers):
     M = "/api/v1/magazines"
     member = _create_member(client, admin_headers, "9622222222", "Returned Twice")
+    _approve_member(client, admin_headers, member["id"])
     sub = client.post(f"{M}/subscriptions", headers=admin_headers, json={"member_id": member["id"]}).json()
 
     # no marks yet: 12 empty boxes, no pause suggestion
     grid = client.get(f"{M}/subscriptions/{sub['id']}/monthly", headers=admin_headers, params={"year": 2026}).json()
     assert [b["mark"] for b in grid["months"]] == [""] * 12 and grid["suggest_pause"] is False
 
-    # mark R for two issues (return_date defaults to today)
+    # mark R for two issues (return_date defaults to today); each issue was posted to the member first
     for month in ("2026-03", "2026-07"):
+        _post_issue(client, admin_headers, month)
         r = client.post(f"{M}/returns", headers=admin_headers,
                         json={"subscription_id": sub["id"], "issue_month_year": month, "return_reason": "door locked"})
         assert r.status_code == 201, r.text
@@ -6426,6 +6458,7 @@ def test_monthly_marks_returned_R_and_pause_with_reason(client, admin_headers):
     # repeat-return list + suggestion once it is within the last 12 months
     from datetime import date
     this_month = date.today().strftime("%Y-%m")
+    _post_issue(client, admin_headers, this_month)
     client.post(f"{M}/returns", headers=admin_headers, json={"subscription_id": sub["id"], "issue_month_year": this_month})
     repeat = client.get(f"{M}/returns/repeat", headers=admin_headers, params={"min_returns": 2}).json()
     row = next(r for r in repeat["data"] if r["subscription_id"] == sub["id"])
@@ -6454,7 +6487,7 @@ def test_monthly_marks_returned_R_and_pause_with_reason(client, admin_headers):
     ret = client.get(f"{M}/returns", headers=admin_headers, params={"subscription_id": sub["id"], "issue_month_year": "2026-03"}).json()["data"][0]
     assert client.delete(f"{M}/returns/{ret['id']}", headers=admin_headers).status_code == 200
     grid = client.get(f"{M}/subscriptions/{sub['id']}/monthly", headers=admin_headers, params={"year": 2026}).json()
-    assert grid["months"][2]["mark"] in ("", "P")
+    assert grid["months"][2]["mark"] in ("", "P", "S")   # March is posted (S) once the return is unmarked
     assert client.get(f"{M}/members/99999999/monthly", headers=admin_headers).status_code == 404
 
 
@@ -7097,7 +7130,7 @@ def test_every_page_of_magazine_reports_and_notifications_has_its_own_privilege(
     assert client.get("/api/v1/magazines/label-batches", headers=labels).status_code == 200
     assert client.get("/api/v1/magazines/delivery-batches", headers=labels).status_code == 200
     assert client.get("/api/v1/magazines/subscriptions", headers=labels).status_code == 403
-    assert client.post("/api/v1/magazines/generate-labels", headers=subs, params={"issue_month_year": "2031-01"}).status_code == 403
+    assert client.post("/api/v1/magazines/generate-labels", headers=subs, params={"force": True, "issue_month_year": "2031-01"}).status_code == 403
 
     # Notifications: campaigns, templates, inbox
     templates = role_with("pg_not_tpl", "pg_not_tpl", "notifications.message_templates.read")

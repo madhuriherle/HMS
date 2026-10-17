@@ -7,7 +7,7 @@
 6. Label generation with only_paid filtering and custom delivery address usage.
 """
 
-from test_frontend_contract import API, _sfx
+from test_frontend_contract import API, _approve_member, _send_label_batch, _sfx
 from test_receipt_entry_flow import _entry_payload
 
 
@@ -31,7 +31,10 @@ def test_member_registration_stores_magazine_delivery_address(client, admin_head
     prof = client.get(f"{API}/members/{mid}/profile", headers=h).json()
     assert prof["personal"]["magazine_needed"] is True
     assert prof["personal"]["magazine_delivery_address"] == custom_addr
-    # A member who says Yes is on the magazine subscription straight away (Active, delivering to that address)
+    # An applicant who says Yes has no subscription yet: it starts at final approval
+    assert prof["services"]["magazine"] == []
+    _approve_member(client, h, mid)
+    prof = client.get(f"{API}/members/{mid}/profile", headers=h).json()
     assert len(prof["services"]["magazine"]) == 1
     assert prof["services"]["magazine"][0]["delivery_status"] == "ACTIVE"
     assert prof["services"]["magazine"][0]["address_override"] == custom_addr
@@ -48,6 +51,7 @@ def test_member_edit_starts_and_stops_subscription(client, admin_headers):
     })
     assert res.status_code in (200, 201), res.text
     mid = res.json()["id"]
+    _approve_member(client, h, mid)   # a subscription only exists for an approved member
 
     # Turn magazine_needed to True
     upd1 = client.put(f"{API}/members/{mid}", headers=h, json={"magazine_needed": True})
@@ -89,6 +93,7 @@ def test_receipt_assignment_creates_active_subscription(client, admin_headers):
         "magazine_needed": True,
         "magazine_delivery_address": custom_addr,
     }).json()
+    _approve_member(client, h, m1["id"])
 
     body1 = _entry_payload(f"RC1-{s}", "Inline Payer", payment_mode="CASH",
                            allocations=[{"member_id": m1["id"], "allocated_amount": 500}])
@@ -108,6 +113,7 @@ def test_receipt_assignment_creates_active_subscription(client, admin_headers):
         "magazine_needed": True,
         "magazine_delivery_address": f"Address 2 {s2}",
     }).json()
+    _approve_member(client, h, m2["id"])
 
     body2 = _entry_payload(f"RC2-{s2}", "Manual Payer", payment_mode="CASH", allocations=[])
     r2 = client.post(f"{API}/receipts/", headers=h, json=body2).json()
@@ -131,6 +137,7 @@ def test_receipt_assignment_creates_active_subscription(client, admin_headers):
         "magazine_needed": True,
         "magazine_delivery_address": f"Address 3 {s3}",
     }).json()
+    _approve_member(client, h, m3["id"])
 
     body3 = _entry_payload(f"RC3-{s3}", "Bulk Payer", payment_mode="CASH", allocations=[])
     r3 = client.post(f"{API}/receipts/", headers=h, json=body3).json()
@@ -155,6 +162,7 @@ def test_unsubscribed_paid_members_and_backfill(client, admin_headers):
         "magazine_needed": True,
         "magazine_delivery_address": f"Backfill Addr {s}",
     }).json()
+    _approve_member(client, h, m["id"])
 
     # Pay a receipt for this member
     body = _entry_payload(f"BF-{s}", "BF Payer", payment_mode="CASH",
@@ -164,7 +172,11 @@ def test_unsubscribed_paid_members_and_backfill(client, admin_headers):
     # Now member has subscription because of receipt assignment. Delete the subscription to simulate legacy member!
     subs = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": m["id"]}).json()["data"]
     assert len(subs) == 1
-    client.delete(f"{API}/magazines/subscriptions/{subs[0]['id']}", headers=h)
+    from db.session import SessionLocal
+    from models.magazines import MagazineSubscription
+    with SessionLocal() as db:   # deleting it through the API would also switch the member's Yes off, so remove the row itself
+        db.query(MagazineSubscription).filter(MagazineSubscription.id == subs[0]["id"]).update({"is_deleted": True})
+        db.commit()
 
     # Now verify GET /magazines/unsubscribed-paid-members finds this member
     unsub = client.get(f"{API}/magazines/unsubscribed-paid-members", headers=h, params={"limit": 200}).json()
@@ -222,6 +234,7 @@ def test_all_recipients_and_labels_paid_filtering(client, admin_headers):
         "magazine_needed": True,
         "address_line1": "Paid Street 1",
     }).json()
+    _approve_member(client, h, m_paid["id"])
     client.post(f"{API}/receipts/", headers=h, json=_entry_payload(
         f"LBL-{s}", "Paid Member", payment_mode="CASH", allocations=[{"member_id": m_paid["id"], "allocated_amount": 500}]
     ))
@@ -238,6 +251,7 @@ def test_all_recipients_and_labels_paid_filtering(client, admin_headers):
     gen = client.post(f"{API}/magazines/generate-labels", headers=h, params={
         "issue_month_year": "2026-07",
         "only_paid": True,
+        "force": True,
     })
     assert gen.status_code == 200, gen.text
     batch_id = gen.json()["batch_id"]
@@ -251,10 +265,12 @@ def test_all_recipients_and_labels_paid_filtering(client, admin_headers):
     assert "PRESS" in batch_recip_types
 
 
-def _register(client, h, s, **extra):
+def _register(client, h, s, approve=False, **extra):
     res = client.post(f"{API}/members/", headers=h, json={
         "first_name_en": f"MagKind{s}", "mobile": "93" + s.zfill(8), "magazine_needed": True, **extra,
     })
+    if approve and res.status_code in (200, 201):
+        _approve_member(client, h, res.json()["id"])
     return res
 
 
@@ -265,6 +281,8 @@ def test_yes_puts_the_member_on_the_subscription_with_the_kind(client, admin_hea
     mid = res.json()["id"]
     m = client.get(f"{API}/members/{mid}", headers=h).json()
     assert (m["magazine_kind"], m["magazine_email"]) == ("EMAIL", "reader@example.com")
+    assert client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"] == []  # not before approval
+    _approve_member(client, h, mid)
     subs = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"]
     assert len(subs) == 1 and subs[0]["delivery_status"] == "ACTIVE"
     prof = client.get(f"{API}/members/{mid}/profile/magazine", headers=h).json()
@@ -299,19 +317,19 @@ def _label_members(client, h, batch_id):
 
 def test_an_e_copy_member_gets_no_posted_label(client, admin_headers):
     h, s = admin_headers, _sfx()
-    mid = _register(client, h, s, magazine_kind="EMAIL", magazine_email="e@example.com").json()["id"]
-    labels = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": "2026-07", "only_paid": False})
+    mid = _register(client, h, s, approve=True, magazine_kind="EMAIL", magazine_email="e@example.com").json()["id"]
+    labels = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": "2026-07", "only_paid": False, "force": True})
     assert labels.status_code in (200, 201), labels.text
     assert mid not in _label_members(client, h, labels.json()["batch_id"])
     # switching the same member to a posted copy puts them on the next list
     assert client.put(f"{API}/members/{mid}", headers=h, json={"magazine_kind": "PHYSICAL"}).status_code == 200
-    again = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": "2026-08", "only_paid": False})
+    again = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": "2026-08", "only_paid": False, "force": True})
     assert mid in _label_members(client, h, again.json()["batch_id"])
 
 
 def test_the_profile_lists_the_members_pauses(client, admin_headers):
     h, s = admin_headers, _sfx()
-    mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]
+    mid = _register(client, h, s, approve=True, magazine_kind="PHYSICAL").json()["id"]
     sub = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"][0]
     made = client.post(f"{API}/magazines/pauses", headers=h, json={
         "subscription_id": sub["id"], "pause_start_date": "2026-10-01", "pause_end_date": None, "reason": "returned twice",
@@ -322,43 +340,92 @@ def test_the_profile_lists_the_members_pauses(client, admin_headers):
     assert prof["pauses"][0]["pause_end_date"] is None
 
 
-def test_an_issue_shows_as_sent_once_its_delivery_batch_is_dispatched(client, admin_headers):
+def test_an_issue_shows_as_sent_once_its_label_batch_is_marked_sent(client, admin_headers):
     h, s = admin_headers, _sfx()
-    mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]
+    mid = _register(client, h, s, approve=True, magazine_kind="PHYSICAL").json()["id"]
     sub = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"][0]
     year = 1990 + int(s) % 9      # a year no other test uses, so older batches cannot interfere
     issue = f"{year}-05"
-    made = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": issue, "only_paid": False})
+    made = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": issue, "only_paid": False, "force": True})
     assert made.status_code in (200, 201), made.text
+    batch_id = made.json()["batch_id"]
 
     def may():
         grid = client.get(f"{API}/magazines/subscriptions/{sub['id']}/monthly", headers=h, params={"year": year}).json()
         return grid["months"][4]
 
-    assert may()["mark"] == "" and may()["sent"] is False          # labels printed, nothing dispatched yet
-    batch = client.post(f"{API}/magazines/delivery-batches", headers=h, json={
-        "batch_name": f"Dispatch {issue}", "issue_month_year": issue, "dispatch_date": f"{year}-05-03", "status": "PENDING",
-    }).json()
-    assert may()["mark"] == ""                                      # a pending batch is not a send
-    assert client.put(f"{API}/magazines/delivery-batches/{batch['id']}", headers=h, json={"status": "DISPATCHED"}).status_code == 200
+    assert may()["mark"] == "" and may()["sent"] is False          # labels printed, not marked sent yet
+    # a return needs a posted issue
+    early = client.post(f"{API}/magazines/returns", headers=h, json={"subscription_id": sub["id"], "issue_month_year": issue, "return_date": f"{year}-05-20"})
+    assert early.status_code == 409 and "mark its label batch as sent" in early.json()["detail"]
+    # the same filters again is refused unless forced; a cancelled batch no longer counts
+    again = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": issue, "only_paid": False})
+    assert again.status_code == 409 and "already exists" in again.json()["detail"]
+    forced = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": issue, "only_paid": False, "force": True})
+    assert forced.status_code == 200
+    assert client.post(f"{API}/magazines/label-batches/{forced.json()['batch_id']}/cancel", headers=h).json()["status"] == "CANCELLED"
+
+    sent = _send_label_batch(client, h, batch_id, f"{year}-05-03")
+    assert sent["status"] == "SENT" and sent["sent_date"] == f"{year}-05-03"
     assert may()["mark"] == "S" and may()["sent"] is True
-    # a return still wins over the send
+    assert client.post(f"{API}/magazines/label-batches/{batch_id}/send", headers=h).status_code == 409   # already sent
+    assert client.post(f"{API}/magazines/label-batches/{batch_id}/cancel", headers=h).status_code == 409  # undo the send first
+    # a return still wins over the send, and it blocks undoing the send
     assert client.post(f"{API}/magazines/returns", headers=h, json={
         "subscription_id": sub["id"], "issue_month_year": issue, "return_date": f"{year}-05-20",
     }).status_code in (200, 201)
     assert may()["mark"] == "R"
+    assert client.post(f"{API}/magazines/label-batches/{batch_id}/undo-send", headers=h).status_code == 409
+
+
+def test_undoing_a_sent_mark_and_cancelling_a_batch(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    _register(client, h, s, approve=True, magazine_kind="PHYSICAL")
+    issue = f"{1960 + int(s) % 9}-02"
+    batch_id = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": issue, "only_paid": False, "force": True}).json()["batch_id"]
+    _send_label_batch(client, h, batch_id)
+    assert client.post(f"{API}/magazines/label-batches/{batch_id}/send", headers=h, params={"sent_date": "2999-01-01"}).status_code == 409
+    undone = client.post(f"{API}/magazines/label-batches/{batch_id}/undo-send", headers=h)
+    assert undone.status_code == 200 and undone.json()["status"] == "GENERATED" and undone.json()["sent_date"] is None
+    cancelled = client.post(f"{API}/magazines/label-batches/{batch_id}/cancel", headers=h, params={"reason": "printed for the wrong taluk"})
+    assert cancelled.status_code == 200 and cancelled.json()["status"] == "CANCELLED"
+    assert cancelled.json()["cancel_reason"] == "printed for the wrong taluk"
+    assert client.post(f"{API}/magazines/label-batches/{batch_id}/send", headers=h).status_code == 409   # a cancelled batch cannot be sent
+    listed = {b["id"]: b for b in client.get(f"{API}/magazines/label-batches", headers=h, params={"limit": 200}).json()["data"]}
+    assert listed[batch_id]["status"] == "CANCELLED"
+
+
+def test_an_unapproved_applicant_gets_no_subscription_or_label_until_approval(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]
+    body = _entry_payload(f"UNAP-{s}", "Applicant Payer", payment_mode="CASH", allocations=[{"member_id": mid, "allocated_amount": 500}])
+    assert client.post(f"{API}/receipts/", headers=h, json=body).status_code in (200, 201)
+    assert client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"] == []   # a receipt does not start it either
+    _approve_member(client, h, mid)
+    subs = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"]
+    assert len(subs) == 1 and subs[0]["delivery_status"] == "ACTIVE"
+    # stopping it on the Magazine page switches the member's Yes off, and a later edit does not bring it back
+    assert client.put(f"{API}/magazines/subscriptions/{subs[0]['id']}", headers=h, json={"delivery_status": "STOPPED"}).status_code == 200
+    assert client.get(f"{API}/members/{mid}", headers=h).json()["magazine_needed"] is False
+    assert client.put(f"{API}/members/{mid}", headers=h, json={"magazine_delivery_address": "New Address"}).status_code == 200
+    assert client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"][0]["delivery_status"] == "STOPPED"
+    assert client.put(f"{API}/magazines/subscriptions/{subs[0]['id']}", headers=h, json={"delivery_status": "CANCELLED"}).status_code == 400   # merged into Stopped
+    assert client.put(f"{API}/magazines/subscriptions/{subs[0]['id']}", headers=h, json={"delivery_status": "ACTIVE"}).status_code == 200
+    assert client.get(f"{API}/members/{mid}", headers=h).json()["magazine_needed"] is True
 
 
 def test_the_delivery_history_lists_each_issue(client, admin_headers):
     h, s = admin_headers, _sfx()
-    mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]
+    mid = _register(client, h, s, approve=True, magazine_kind="PHYSICAL").json()["id"]
     sub = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"][0]
     year = 1980 + int(s) % 9
+    made = {}
     for month in (3, 4, 5):
-        assert client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": f"{year}-{month:02d}", "only_paid": False}).status_code in (200, 201)
-    batch = client.post(f"{API}/magazines/delivery-batches", headers=h, json={
-        "batch_name": f"Dispatch {year}-03", "issue_month_year": f"{year}-03", "dispatch_date": f"{year}-03-04", "status": "DISPATCHED"}).json()
-    assert batch["id"]
+        gen = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": f"{year}-{month:02d}", "only_paid": False, "force": True})
+        assert gen.status_code in (200, 201)
+        made[month] = gen.json()["batch_id"]
+    _send_label_batch(client, h, made[3], f"{year}-03-04")
+    _send_label_batch(client, h, made[4], f"{year}-04-04")
     assert client.post(f"{API}/magazines/returns", headers=h, json={
         "subscription_id": sub["id"], "issue_month_year": f"{year}-04", "return_date": f"{year}-04-20", "return_reason": "address wrong"}).status_code in (200, 201)
     got = client.get(f"{API}/magazines/subscriptions/{sub['id']}/history", headers=h).json()["issues"]
@@ -381,8 +448,10 @@ def test_the_summary_lists_the_top_districts(client, admin_headers):
 
 def test_recipients_are_paged_with_their_subscription_pause_and_returns(client, admin_headers):
     h, s = admin_headers, _sfx()
-    mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]
+    mid = _register(client, h, s, approve=True, magazine_kind="PHYSICAL").json()["id"]
     sub = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"][0]
+    gen = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": "2031-02", "only_paid": False, "force": True})
+    _send_label_batch(client, h, gen.json()["batch_id"])
     assert client.post(f"{API}/magazines/returns", headers=h, json={
         "subscription_id": sub["id"], "issue_month_year": "2031-02", "return_date": "2031-02-20",
     }).status_code in (200, 201)
@@ -402,5 +471,5 @@ def test_recipients_are_paged_with_their_subscription_pause_and_returns(client, 
     two = client.get(f"{API}/magazines/recipients", headers=h, params={"limit": 1, "page": 2}).json()
     assert len(two["data"]) <= 1 and two["total"] >= 1 and two["pages"] == two["total"]
     # the lists the screen reads next are capped as well
-    for path in ("subscriptions", "pauses", "returns", "label-batches", "delivery-batches"):
+    for path in ("subscriptions", "pauses", "returns", "label-batches", "delivery-batches"):  # the old delivery batches stay readable
         assert client.get(f"{API}/magazines/{path}", headers=h, params={"limit": 5000}).json()["limit"] == 200, path
