@@ -511,6 +511,7 @@ export default function ReceiptTypeManagement() {
 
       {/* Action Bar */}
       <div className="flex items-center justify-end gap-2 -mb-2">
+        <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'ALL' ? 1 : 0} />
         {hasPermission('masters.particulars.delete') && <RecentlyDeleted kind="particulars" label="particulars" onRestored={fetchReceiptTypes} />}
         {hasPermission('masters.particulars.write') && (
           <button
@@ -524,7 +525,8 @@ export default function ReceiptTypeManagement() {
       </div>
 
       {/* Search and Filters Toolbar Card */}
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-4 sm:p-5">
+      {filtersOpen && (
+<div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
 
             {/* Search Input */}
@@ -549,10 +551,7 @@ export default function ReceiptTypeManagement() {
 
             {/* Filter Controls */}
             <div className="flex items-center gap-2.5 flex-wrap">
-              <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'ALL' ? 1 : 0} />
-              {filtersOpen && (
-                <>
-              <select
+                            <select
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
                 className="py-2 px-3.5 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] shadow-sm cursor-pointer"
@@ -572,12 +571,11 @@ export default function ReceiptTypeManagement() {
                   <span>Clear Filters</span>
                 </button>
               )}
-                </>
-              )}
-            </div>
+                            </div>
 
           </div>
       </div>
+      )}
 
       {/* Particulars Master Table Card */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">

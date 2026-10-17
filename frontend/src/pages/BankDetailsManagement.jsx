@@ -475,9 +475,10 @@ export default function BankDetailsManagement() {
         </div>
       )}
 
-      {/* Action Button: Add Payment Mode */}
-      {hasPermission('masters.payment_modes.write') && (
-        <div className="flex justify-end -mb-2">
+      {/* Action row: the filter icon, and Add Payment Mode when this login may write */}
+      <div className="flex items-center justify-end gap-2 -mb-2">
+        <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'ALL' ? 1 : 0} />
+        {hasPermission('masters.payment_modes.write') && (
           <button
             onClick={openAddModal}
             id="btn-add-payment-mode"
@@ -486,11 +487,12 @@ export default function BankDetailsManagement() {
             <Plus className="w-4 h-4" />
             <span>Add Payment Mode</span>
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Search & Filter Card */}
-      <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-4 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      {filtersOpen && (
+<div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-4 sm:p-5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
             {/* Search Input */}
             <div className="relative flex-1 max-w-md">
@@ -514,10 +516,7 @@ export default function BankDetailsManagement() {
               )}
             </div>
 
-            <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'ALL' ? 1 : 0} />
-            {filtersOpen && (
-              <>
-            {/* Status Filter */}
+                        {/* Status Filter */}
             <div className="flex items-center gap-2 shrink-0">
               <label className="text-xs font-bold text-[#863221] whitespace-nowrap">
                 Status:
@@ -546,14 +545,13 @@ export default function BankDetailsManagement() {
                 <span>Reset</span>
               </button>
             )}
-              </>
-            )}
-          </div>
+                        </div>
 
           <div className="text-xs font-semibold text-[#863221] self-end sm:self-auto">
             Showing <span className="text-[#180200]">{filteredData.length}</span> payment modes
           </div>
       </div>
+      )}
 
       {/* Main Table Card Container */}
       <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-sm overflow-hidden">

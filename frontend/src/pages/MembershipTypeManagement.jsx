@@ -46,10 +46,8 @@ export default function MembershipTypeManagement() {
   // Master state
   const [membershipTypes, setMembershipTypes] = useState([]);
 
-  const [usage, setUsage] = useState({});
 
   const fetchMembershipTypes = async () => {
-    api.get('/masters/usage/membership-types').then(({ data }) => setUsage(data?.counts || {})).catch(() => {});
     try {
       const res = await api.get('/masters/membership-types?limit=1000');
       const mapped = (res.data?.data || []).map(m => ({
@@ -476,6 +474,7 @@ export default function MembershipTypeManagement() {
 
       {/* Action Bar */}
       <div className="flex items-center justify-end gap-2 -mb-2">
+        <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'ALL' ? 1 : 0} />
         {hasPermission('masters.membership_types.delete') && <RecentlyDeleted kind="membership-types" label="membership types" onRestored={fetchMembershipTypes} />}
         {hasPermission('masters.membership_types.write') && (
           <button
@@ -489,7 +488,8 @@ export default function MembershipTypeManagement() {
       </div>
 
       {/* Search and Filters Toolbar Card */}
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-4 sm:p-5">
+      {filtersOpen && (
+<div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
 
             {/* Search Input */}
@@ -514,10 +514,7 @@ export default function MembershipTypeManagement() {
 
             {/* Filter Controls */}
             <div className="flex items-center gap-2.5 flex-wrap">
-              <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'ALL' ? 1 : 0} />
-              {filtersOpen && (
-                <>
-              <select
+                            <select
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
                 className="py-2 px-3.5 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] shadow-sm cursor-pointer"
@@ -537,12 +534,11 @@ export default function MembershipTypeManagement() {
                   <span>Clear Filters</span>
                 </button>
               )}
-                </>
-              )}
-            </div>
+                            </div>
 
           </div>
       </div>
+      )}
 
       {/* Membership Types Table Card */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
@@ -574,14 +570,6 @@ export default function MembershipTypeManagement() {
                       {/* Type Name */}
                       <td className="px-5 py-4 font-bold text-[#180200]">
                         <span className="text-sm">{item.name}</span>
-                        {usage[item.id]?.used > 0 && (
-                          <span
-                            className="ml-2 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-semibold text-[#863221]"
-                            title={`${usage[item.id].used} membership(s) of this type`}
-                          >
-                            {usage[item.id].used} member(s)
-                          </span>
-                        )}
                       </td>
 
                       {/* Amount */}

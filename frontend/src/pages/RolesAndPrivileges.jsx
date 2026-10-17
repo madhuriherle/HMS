@@ -639,9 +639,10 @@ export default function RolesAndPrivileges() {
       </Modal>
 
       <div className={privilegeTargetRole ? 'hidden' : 'space-y-6'}>
-      {/* Action Bar */}
-      {hasPermission('roles.write') && (
-        <div className="flex justify-end -mb-2">
+      {/* Action row: the filter icon, and Add Role when this login may write */}
+      <div className="flex items-center justify-end gap-2 -mb-2">
+        <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'ALL' ? 1 : 0} />
+        {hasPermission('roles.write') && (
           <button
             onClick={openAddModal}
             title={'Add Role'}
@@ -650,11 +651,12 @@ export default function RolesAndPrivileges() {
             <Plus className="w-4 h-4" />
             <span>Add Role</span>
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Search & Filters Toolbar Card */}
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-4 sm:p-5">
+      {filtersOpen && (
+<div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
 
             {/* Search Field */}
@@ -679,10 +681,7 @@ export default function RolesAndPrivileges() {
 
             {/* Filter Controls */}
             <div className="flex items-center gap-2.5">
-              <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={statusFilter !== 'ALL' ? 1 : 0} />
-              {filtersOpen && (
-                <>
-              <select
+                            <select
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
                 className="py-2 px-3.5 bg-white border border-[#E8DFD8] rounded-xl text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] shadow-sm cursor-pointer"
@@ -702,12 +701,11 @@ export default function RolesAndPrivileges() {
                   <span>Clear Filters</span>
                 </button>
               )}
-                </>
-              )}
-            </div>
+                            </div>
 
           </div>
       </div>
+      )}
 
       {/* Roles Table Card */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] overflow-hidden">
