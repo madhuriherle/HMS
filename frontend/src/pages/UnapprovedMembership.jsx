@@ -239,6 +239,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   // the API behind Map enforces receipts.write; the sibling Bulk Mapping screen uses the page privilege,
   // so either one is enough to press it
   const canMapReceipts = hasPermission('receipts.bulk_mapping.write') || hasPermission('receipts.write');
+  const canEnterReceipt = hasPermission('receipts.entry.write') || hasPermission('receipts.write'); // making a new receipt is Receipt Entry's privilege, not mapping's
   // what a receipt was for: the first line, and +N when there are more
   const assignItemsText = (c) => {
     const lines = c.items || [];
@@ -1033,21 +1034,23 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
             )}
 
             {/* Not entered at all */}
-            <div className="flex items-center justify-between gap-3 border-t border-[#E8DFD8] pt-3">
-              <span className="text-xs font-semibold text-[#180200]">Receipt not entered yet?</span>
-              <button
-                type="button"
-                onClick={() => {
-                  const applicant = assigningMember;
-                  setAssigningMember(null);
-                  goToReceiptEntry(applicant);
-                }}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#863221] hover:text-[#510601] text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0"
-              >
-                <ArrowRight className="w-3.5 h-3.5" />
-                <span>Enter a new receipt</span>
-              </button>
-            </div>
+            {canEnterReceipt && (
+              <div className="flex items-center justify-between gap-3 border-t border-[#E8DFD8] pt-3">
+                <span className="text-xs font-semibold text-[#180200]">Receipt not entered yet?</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const applicant = assigningMember;
+                    setAssigningMember(null);
+                    goToReceiptEntry(applicant);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#863221] hover:text-[#510601] text-xs font-bold rounded-xl transition-all cursor-pointer shrink-0"
+                >
+                  <ArrowRight className="w-3.5 h-3.5" />
+                  <span>Enter a new receipt</span>
+                </button>
+              </div>
+            )}
           </div>
         </Modal>
       )}

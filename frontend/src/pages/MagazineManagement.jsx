@@ -196,31 +196,6 @@ export default function MagazineManagement() {
           <PageActionsSlot />
         </div>
 
-        {/* Top Module Navigation Bar */}
-        <div className="bg-[#FAF7F2] p-1.5 rounded-2xl border border-[#E8DFD8] flex flex-wrap gap-1 shadow-sm">
-          {[
-            { key: 'subscriptions', label: 'Subscriptions', path: '/dashboard/magazine/subscriptions', icon: BookOpen },
-            { key: 'labels-delivery', label: 'Labels & Delivery', path: '/dashboard/magazine/labels-delivery', icon: PackageCheck },
-          ].map((t) => {
-            const Icon = t.icon;
-            const isActive = tab === t.key;
-            return (
-              <Link
-                key={t.key}
-                to={t.path}
-                className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[#510601] text-white shadow-sm'
-                    : 'text-[#863221] hover:bg-white hover:text-[#510601]'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{t.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-
         {unsubscribedPaid.length > 0 && (
           <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[#510601]">
             <div className="flex items-center gap-2.5">
@@ -394,28 +369,18 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
 
   return (
     <div className="space-y-5">
-      {/* Summary KPI Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase text-[#863221]">Total Recipients</p>
-          <p className="text-xl font-bold text-[#510601] mt-0.5">{stats.total}</p>
-        </div>
-        <div className="rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase text-[#863221]">Active Deliveries</p>
-          <p className="text-xl font-bold text-emerald-700 mt-0.5">{stats.active}</p>
-        </div>
-        <div className="rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase text-[#863221]">Paused Deliveries</p>
-          <p className="text-xl font-bold text-amber-700 mt-0.5">{stats.paused}</p>
-        </div>
-        <div className="rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase text-[#863221]">Stopped / Inactive</p>
-          <p className="text-xl font-bold text-gray-600 mt-0.5">{stats.stopped}</p>
-        </div>
-      </div>
+        <PageActions>
+          <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={(typeFilter !== 'ALL' ? 1 : 0) + (statusFilter !== 'ALL' ? 1 : 0) + (returnsFilter !== 'ALL' ? 1 : 0)} />
+          {canWrite && (
+            <button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
+              <Plus className="w-4 h-4" />
+              <span>Start Subscription</span>
+            </button>
+          )}
+        </PageActions>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
+      {filtersOpen && (
+        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center gap-3">
           <div className="relative w-64">
             <Search className="w-4 h-4 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -426,13 +391,6 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
               className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]"
             />
           </div>
-          <FilterToggle
-            open={filtersOpen}
-            onToggle={() => setFiltersOpen((o) => !o)}
-            count={(typeFilter !== 'ALL' ? 1 : 0) + (statusFilter !== 'ALL' ? 1 : 0) + (returnsFilter !== 'ALL' ? 1 : 0)}
-          />
-          {filtersOpen && (
-            <>
           <FilterSelect
             value={typeFilter}
             onChange={(v) => { setTypeFilter(v); setPage(1); }}
@@ -457,21 +415,8 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
             options={[{ value: 'ALL', label: 'All Returns' }, { value: 'WITH', label: 'With Returns' }]}
             widthClass="w-40"
           />
-            </>
-          )}
         </div>
-        <PageActions>
-          <button type="button" onClick={() => setRepeatOpen(true)} className={BTN_OUTLINE} title="Subscriptions with repeated returns">
-            <RefreshCw className="w-3.5 h-3.5" /><span>Repeat Returns</span>
-          </button>
-          {canWrite && (
-            <button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
-              <Plus className="w-4 h-4" />
-              <span>Start Subscription</span>
-            </button>
-          )}
-        </PageActions>
-      </div>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-[#E8DFD8] bg-white shadow-sm">
         <div className="overflow-x-auto">

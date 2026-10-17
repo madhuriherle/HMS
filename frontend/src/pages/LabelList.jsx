@@ -233,13 +233,15 @@ export default function LabelList() {
 
       {/* Action Buttons Toolbar */}
       <div className="flex flex-wrap items-center justify-end gap-3 -mb-2">
-        <Link
-          to="/dashboard/membership/list"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[#E8DFD8] bg-white px-3.5 py-2 text-xs font-semibold text-[#863221] hover:bg-[#FAF7F2] shadow-xs transition-colors"
-        >
-          <User className="h-4 w-4 text-[#8C1801]" />
-          <span>Membership List</span>
-        </Link>
+        {hasPermission('members.list.read') && (
+          <Link
+            to="/dashboard/membership/list"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-[#E8DFD8] bg-white px-3.5 py-2 text-xs font-semibold text-[#863221] hover:bg-[#FAF7F2] shadow-xs transition-colors"
+          >
+            <User className="h-4 w-4 text-[#8C1801]" />
+            <span>Membership List</span>
+          </Link>
+        )}
 
         {hasPermission('magazines.write') && (
           <button
@@ -410,13 +412,15 @@ export default function LabelList() {
                       <p className="text-xs text-[#863221]/70">
                         Select members from the Membership List to add to the label printing queue.
                       </p>
-                      <Link
-                        to="/dashboard/membership/list"
-                        className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-[#510601] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#3D0400] transition-colors"
-                      >
-                        <User className="h-3.5 w-3.5" />
-                        <span>Go to Membership List</span>
-                      </Link>
+                      {hasPermission('members.list.read') && (
+                        <Link
+                          to="/dashboard/membership/list"
+                          className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-[#510601] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#3D0400] transition-colors"
+                        >
+                          <User className="h-3.5 w-3.5" />
+                          <span>Go to Membership List</span>
+                        </Link>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -486,14 +490,16 @@ export default function LabelList() {
 
                       {/* Actions */}
                       <td className="px-4 py-3.5 text-center">
-                        <Link
-                          to="/dashboard/receipts/tracking"
-                          title="Receipts decide who is on the label list"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-[#863221] bg-[#FAF7F2] hover:bg-[#E8DFD8] border border-[#E8DFD8] rounded-lg transition-colors cursor-pointer"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-[#510601]" />
-                          <span>View receipts</span>
-                        </Link>
+                        {hasPermission('receipts.tracking.read') && (
+                          <Link
+                            to="/dashboard/receipts/tracking"
+                            title="Receipts decide who is on the label list"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-[#863221] bg-[#FAF7F2] hover:bg-[#E8DFD8] border border-[#E8DFD8] rounded-lg transition-colors cursor-pointer"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-[#510601]" />
+                            <span>View receipts</span>
+                          </Link>
+                        )}
                       </td>
                     </tr>
                   );

@@ -1,4 +1,4 @@
-import { FilterInline } from '../components/FilterToggle';
+import FilterToggle from '../components/FilterToggle';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useLocation, Link } from 'react-router-dom';
 import Pager from '../components/Pager';
@@ -43,8 +43,6 @@ import { memberName } from '../utils/memberName';
 
 export default function EngagementsManagement() {
   const { hasPermission } = useAuth();
-  const canWrite = hasPermission('engagements.write');
-  const canDelete = hasPermission('engagements.delete');
 
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -66,6 +64,11 @@ export default function EngagementsManagement() {
     committee: { title: 'Managing Committee', privilege: 'engagements.committee.read' },
   }[activeTab];
 
+  // each screen has its own write / delete privilege (engagements.associates.write, ...); the module-wide one still works
+  const area = section.privilege.replace(/\.read$/, '');
+  const canWrite = hasPermission('engagements.write') || hasPermission(`${area}.write`);
+  const canDelete = hasPermission('engagements.delete') || hasPermission(`${area}.delete`);
+
   return (
     <PermissionGate
       required={['engagements.read', section.privilege]}
@@ -79,33 +82,6 @@ export default function EngagementsManagement() {
         {/* Action Toolbar */}
         <div className="flex justify-end -mb-2">
           <PageActionsSlot />
-        </div>
-
-        {/* Top Module Navigation Bar */}
-        <div className="bg-[#FAF7F2] p-1.5 rounded-2xl border border-[#E8DFD8] flex flex-wrap gap-1 shadow-sm">
-          {[
-            { key: 'affiliations', label: 'Affiliations', path: '/dashboard/engagements/affiliations', icon: Building },
-            { key: 'associates', label: 'Associates', path: '/dashboard/engagements/associates', icon: Users },
-            { key: 'press-media', label: 'Press & Media', path: '/dashboard/engagements/press-media', icon: Newspaper },
-            { key: 'committee', label: 'Managing Committee', path: '/dashboard/engagements/committee', icon: Shield },
-          ].map((t) => {
-            const Icon = t.icon;
-            const isActive = activeTab === t.key;
-            return (
-              <Link
-                key={t.key}
-                to={t.path}
-                className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[#510601] text-white shadow-sm'
-                    : 'text-[#863221] hover:bg-white hover:text-[#510601]'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{t.label}</span>
-              </Link>
-            );
-          })}
         </div>
 
         {/* Active Tab View */}
@@ -128,6 +104,7 @@ function AffiliationsView({ canWrite, canDelete }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [magFilter, setMagFilter] = useState('ALL');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Modal states
   const [formModalOpen, setFormModalOpen] = useState(false);
@@ -345,8 +322,21 @@ function AffiliationsView({ canWrite, canDelete }) {
   return (
     <div className="space-y-4">
       {/* Controls & Filter Bar */}
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3 flex-1">
+      <PageActions><FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={(magFilter !== 'ALL' ? 1 : 0)} /></PageActions>
+        {canWrite && (
+          <PageActions><button
+            type="button"
+            onClick={openAddModal}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Affiliate</span>
+          </button></PageActions>
+        )}
+      
+
+      {filtersOpen && (
+        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center gap-3">
           <div className="relative w-64">
             <Search className="w-4 h-4 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -358,8 +348,7 @@ function AffiliationsView({ canWrite, canDelete }) {
             />
           </div>
 
-          <FilterInline count={(magFilter !== 'ALL' ? 1 : 0)}>
-          <select
+                    <select
             value={magFilter}
             onChange={(e) => setMagFilter(e.target.value)}
             className="px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
@@ -368,20 +357,9 @@ function AffiliationsView({ canWrite, canDelete }) {
             <option value="ENABLED">Magazine Delivery Enabled</option>
             <option value="DISABLED">Magazine Delivery Disabled</option>
           </select>
-          </FilterInline>
+        
         </div>
-
-        {canWrite && (
-          <PageActions><button
-            type="button"
-            onClick={openAddModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Affiliate</span>
-          </button></PageActions>
-        )}
-      </div>
+      )}
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden">
@@ -767,6 +745,7 @@ function AssociatesView({ canWrite, canDelete }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [magFilter, setMagFilter] = useState('ALL');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAssoc, setEditingAssoc] = useState(null);
@@ -897,8 +876,21 @@ function AssociatesView({ canWrite, canDelete }) {
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3 flex-1">
+      <PageActions><FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={(magFilter !== 'ALL' ? 1 : 0)} /></PageActions>
+        {canWrite && (
+          <PageActions><button
+            type="button"
+            onClick={openAdd}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Register Associate</span>
+          </button></PageActions>
+        )}
+      
+
+      {filtersOpen && (
+        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center gap-3">
           <div className="relative w-64">
             <Search className="w-4 h-4 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -910,8 +902,7 @@ function AssociatesView({ canWrite, canDelete }) {
             />
           </div>
 
-          <FilterInline count={(magFilter !== 'ALL' ? 1 : 0)}>
-          <select
+                    <select
             value={magFilter}
             onChange={(e) => setMagFilter(e.target.value)}
             className="px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
@@ -920,20 +911,9 @@ function AssociatesView({ canWrite, canDelete }) {
             <option value="ENABLED">Magazine Delivery Enabled</option>
             <option value="DISABLED">Magazine Delivery Disabled</option>
           </select>
-          </FilterInline>
+        
         </div>
-
-        {canWrite && (
-          <PageActions><button
-            type="button"
-            onClick={openAdd}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Register Associate</span>
-          </button></PageActions>
-        )}
-      </div>
+      )}
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden">
@@ -1160,6 +1140,7 @@ function PressMediaView({ canWrite, canDelete }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [magFilter, setMagFilter] = useState('ALL');
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPress, setEditingPress] = useState(null);
@@ -1285,8 +1266,21 @@ function PressMediaView({ canWrite, canDelete }) {
   return (
     <div className="space-y-4">
       {/* Controls */}
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3 flex-1">
+      <PageActions><FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={(magFilter !== 'ALL' ? 1 : 0)} /></PageActions>
+        {canWrite && (
+          <PageActions><button
+            type="button"
+            onClick={openAdd}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Press / Media</span>
+          </button></PageActions>
+        )}
+      
+
+      {filtersOpen && (
+        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center gap-3">
           <div className="relative w-64">
             <Search className="w-4 h-4 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -1298,8 +1292,7 @@ function PressMediaView({ canWrite, canDelete }) {
             />
           </div>
 
-          <FilterInline count={(magFilter !== 'ALL' ? 1 : 0)}>
-          <select
+                    <select
             value={magFilter}
             onChange={(e) => setMagFilter(e.target.value)}
             className="px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
@@ -1308,20 +1301,9 @@ function PressMediaView({ canWrite, canDelete }) {
             <option value="ENABLED">Magazine Delivery Enabled</option>
             <option value="DISABLED">Magazine Delivery Disabled</option>
           </select>
-          </FilterInline>
+        
         </div>
-
-        {canWrite && (
-          <PageActions><button
-            type="button"
-            onClick={openAdd}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Press / Media</span>
-          </button></PageActions>
-        )}
-      </div>
+      )}
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden">
@@ -1524,6 +1506,7 @@ function CommitteeView({ canWrite, canDelete }) {
   const [loading, setLoading] = useState(true);
 
   // Filters
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
   const [selectedTermFilter, setSelectedTermFilter] = useState('ALL');
 
@@ -1787,37 +1770,7 @@ function CommitteeView({ canWrite, canDelete }) {
   return (
     <div className="space-y-4">
       {/* Controls & Filter Bar */}
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <FilterInline count={(selectedCategoryFilter !== 'ALL' ? 1 : 0) + (selectedTermFilter !== 'ALL' ? 1 : 0)}>
-          <select
-            value={selectedCategoryFilter}
-            onChange={(e) => setSelectedCategoryFilter(e.target.value)}
-            className="px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
-          >
-            <option value="ALL">All Categories</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name_en} {c.name_kn ? `(${c.name_kn})` : ''}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={selectedTermFilter}
-            onChange={(e) => setSelectedTermFilter(e.target.value)}
-            className="px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
-          >
-            <option value="ALL">All Terms</option>
-            {terms.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.term_name} {t.is_current ? '(Current)' : ''}
-              </option>
-            ))}
-          </select>
-          </FilterInline>
-        </div>
-
+      <PageActions><FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={(selectedCategoryFilter !== 'ALL' ? 1 : 0) + (selectedTermFilter !== 'ALL' ? 1 : 0)} /></PageActions>
         <div className="flex items-center gap-2">
           {canWrite && (
             <>
@@ -1858,7 +1811,38 @@ function CommitteeView({ canWrite, canDelete }) {
             </>
           )}
         </div>
-      </div>
+      
+
+      {filtersOpen && (
+        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center gap-3">
+                    <select
+            value={selectedCategoryFilter}
+            onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+            className="px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
+          >
+            <option value="ALL">All Categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name_en} {c.name_kn ? `(${c.name_kn})` : ''}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={selectedTermFilter}
+            onChange={(e) => setSelectedTermFilter(e.target.value)}
+            className="px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
+          >
+            <option value="ALL">All Terms</option>
+            {terms.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.term_name} {t.is_current ? '(Current)' : ''}
+              </option>
+            ))}
+          </select>
+        
+        </div>
+      )}
 
       {/* Roster Table */}
       <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden">

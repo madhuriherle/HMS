@@ -244,7 +244,7 @@ export default function Dashboard() {
               <span className="text-xs font-semibold text-[#180200] text-center">Add Member</span>
             </Link>
           )}
-          {hasPermission('members.list.read') && (
+          {hasPermission('members.label_list.read') && (
             <Link to="/dashboard/receipts/labels" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#FFC107] hover:shadow-md transition-all group h-full">
               <div className="h-10 w-10 rounded-full bg-[#FFC107]/15 flex items-center justify-center mb-3 group-hover:bg-[#FFC107] transition-colors">
                 <Printer className="h-5 w-5 text-[#863221] group-hover:text-[#180200] transition-colors" />
@@ -252,12 +252,14 @@ export default function Dashboard() {
               <span className="text-xs font-semibold text-[#180200] text-center">Print Labels</span>
             </Link>
           )}
-          <Link to="/dashboard/membership/list" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#ED4636] hover:shadow-md transition-all group h-full">
-            <div className="h-10 w-10 rounded-full bg-[#ED4636]/10 flex items-center justify-center mb-3 group-hover:bg-[#ED4636] transition-colors">
-              <List className="h-5 w-5 text-[#ED4636] group-hover:text-white transition-colors" />
-            </div>
-            <span className="text-xs font-semibold text-[#180200] text-center">Member Directory</span>
-          </Link>
+          {hasPermission('members.list.read') && (
+            <Link to="/dashboard/membership/list" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#ED4636] hover:shadow-md transition-all group h-full">
+              <div className="h-10 w-10 rounded-full bg-[#ED4636]/10 flex items-center justify-center mb-3 group-hover:bg-[#ED4636] transition-colors">
+                <List className="h-5 w-5 text-[#ED4636] group-hover:text-white transition-colors" />
+              </div>
+              <span className="text-xs font-semibold text-[#180200] text-center">Member Directory</span>
+            </Link>
+          )}
         </div>
       </div>
 
