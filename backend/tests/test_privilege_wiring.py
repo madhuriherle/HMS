@@ -71,3 +71,14 @@ def test_login_landing_follows_the_menu(client, admin_headers):
 
     assert "dashboard" not in codes(menu)
     assert first_route(menu) == "/dashboard/master/payment-modes"
+
+
+def test_dashboard_awaiting_final_approval_card_follows_its_privilege(client, admin_headers):
+    d = client.get(f"{API}/dashboard/", headers=admin_headers).json()
+    assert isinstance(d["awaiting_final_approval"], int)
+    _, _, cashier = _staff_with_role(client, admin_headers, "await_cashier", "AwaitCashier", "AWAIT_CASHIER",
+                                     permission_grants=[("dashboard.read", False), ("receipts.read", False)])
+    assert client.get(f"{API}/dashboard/", headers=cashier).json()["awaiting_final_approval"] is None
+    _, _, approver = _staff_with_role(client, admin_headers, "await_appr", "AwaitAppr", "AWAIT_APPR",
+                                      permission_grants=[("dashboard.read", False), ("members.assigned.read", False)])
+    assert client.get(f"{API}/dashboard/", headers=approver).json()["awaiting_final_approval"] == d["awaiting_final_approval"]

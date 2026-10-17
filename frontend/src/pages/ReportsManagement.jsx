@@ -144,29 +144,8 @@ export default function ReportsManagement() {
       {/* Dynamic Page Title in Header Bar */}
       <PageTitle>{TABS.find((t) => t.key === activeTab)?.label || 'Reports'}</PageTitle>
 
-      {/* TOP TAB SWITCHER (INTERNAL MODULE TABS) */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="bg-white rounded-2xl p-1.5 border border-[#E8DFD8] shadow-sm inline-flex flex-wrap gap-1.5">
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            const isActive = activeTab === t.key;
-            return (
-              <button
-                key={t.key}
-                type="button"
-                onClick={() => setTab(t.key)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                  isActive
-                    ? 'bg-[#510601] text-white shadow-sm'
-                    : 'text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2]'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
+      {/* each report is its own sidebar page: no tab row, only the page actions */}
+      <div className="flex justify-end -mb-2">
         <PageActionsSlot />
       </div>
 

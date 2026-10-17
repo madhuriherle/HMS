@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Pager from '../components/Pager';
+import FilterToggle from '../components/FilterToggle';
 import { Link } from 'react-router-dom';
 import {
   Link2,
@@ -57,6 +58,10 @@ export default function BulkReceiptMapping() {
   const [activeReceiptForManual, setActiveReceiptForManual] = useState(null);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [memberSearchResults, setMemberSearchResults] = useState([]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [memberPage, setMemberPage] = useState(1);
+  const [memberPages, setMemberPages] = useState(1);
+  const [memberTotal, setMemberTotal] = useState(0);
   const [searchingMembers, setSearchingMembers] = useState(false);
 
   const fetchCandidates = async () => {
@@ -214,16 +219,22 @@ export default function BulkReceiptMapping() {
   };
 
   // Manual member search
-  const searchMembers = async (q) => {
+  const searchMembers = async (q, pageNo = 1) => {
     if (!q || q.trim().length < 1) {
       setMemberSearchResults([]);
+      setMemberTotal(0);
+      setMemberPages(1);
+      setMemberPage(1);
       return;
     }
     setSearchingMembers(true);
     try {
-      const { data } = await api.get('/members/', { params: { search: q.trim(), limit: 25 } });
+      const { data } = await api.get('/members/', { params: { search: q.trim(), page: pageNo, limit: 25 } });
       const list = data?.data || data?.members || data || [];
       setMemberSearchResults(Array.isArray(list) ? list : []);
+      setMemberTotal(data?.total || 0);
+      setMemberPages(Math.max(1, data?.pages || 1));
+      setMemberPage(pageNo);
     } catch (err) {
       console.error(err);
     } finally {
@@ -235,6 +246,8 @@ export default function BulkReceiptMapping() {
     setActiveReceiptForManual(cand);
     setMemberSearchQuery(cand.payer_membership_no || cand.payer_name || '');
     setMemberSearchResults([]);
+    setMemberTotal(0);
+    setMemberPage(1);
     setManualModalOpen(true);
     if (cand.payer_membership_no || cand.payer_name) {
       searchMembers(cand.payer_membership_no || cand.payer_name);
@@ -285,9 +298,44 @@ export default function BulkReceiptMapping() {
     <PermissionGate required={['receipts.tracking.read', 'receipts.read']} title="Access Restricted" message="You need permission to track receipts to access Bulk Mapping.">
       <div className="space-y-6">
 
-        {/* Action Bar: Filters + 1-Click Bulk Action Button */}
-        <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-sm p-4 space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Action row: the filter icon, then the bulk buttons; the search and the filter tabs open in a card below it */}
+        <div className="flex flex-wrap items-center justify-end gap-2 -mb-2">
+          <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={(filterTab !== 'ALL' ? 1 : 0) + (debouncedQuery.trim() ? 1 : 0)} />
+          {totalMatched > 0 && (
+            canWrite && (
+              <button
+                type="button"
+                disabled={isAllocating}
+                onClick={handleBulkAutoMapAll}
+                title={"Link every receipt whose membership number matches a member"}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#3D705C] hover:bg-[#2d5445] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {isAllocating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Sparkles className="w-4 h-4 text-emerald-200" />
+                )}
+                Map all matched ({totalMatched})
+              </button>
+            )
+          )}
+
+          {canWrite && selectionMode && selectedReceiptIds.size > 0 && (
+            <button
+              type="button"
+              disabled={isAllocating}
+              onClick={handleMapSelected}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50"
+            >
+              Map Selected ({selectedReceiptIds.size})
+            </button>
+          )}
+    
+        </div>
+
+        {filtersOpen && (
+          <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-sm p-4">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
             {/* Search Input */}
             <form onSubmit={handleSearchSubmit} className="flex items-center gap-2 flex-1 max-w-md">
               <div className="relative flex-1">
@@ -339,41 +387,9 @@ export default function BulkReceiptMapping() {
               </button>
             </div>
 
-            {/* Primary Action Button: 1-Click Auto Map All Matches */}
-            <div className="flex items-center gap-2">
-              {totalMatched > 0 && (
-                canWrite && (
-                  <button
-                    type="button"
-                    disabled={isAllocating}
-                    onClick={handleBulkAutoMapAll}
-                    title={"Link every receipt whose membership number matches a member"}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#3D705C] hover:bg-[#2d5445] text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {isAllocating ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-4 h-4 text-emerald-200" />
-                    )}
-                    Map all matched ({totalMatched})
-                  </button>
-                )
-              )}
-
-              {canWrite && selectionMode && selectedReceiptIds.size > 0 && (
-                <button
-                  type="button"
-                  disabled={isAllocating}
-                  onClick={handleMapSelected}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl shadow-sm transition-all cursor-pointer disabled:opacity-50"
-                >
-                  Map Selected ({selectedReceiptIds.size})
-                </button>
-              )}
-            </div>
           </div>
-
-        </div>
+          </div>
+        )}
 
         {/* Reconciliation Table */}
         <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-sm overflow-hidden">
@@ -624,6 +640,9 @@ export default function BulkReceiptMapping() {
                   </p>
                 )}
               </div>
+              {memberTotal > 0 && (
+                <Pager page={memberPage} pages={memberPages} total={memberTotal} pageSize={25} sizes={[25]} onPage={(n) => searchMembers(memberSearchQuery, n)} onPageSize={() => {}} />
+              )}
             </div>
 
             <ModalFooter kind="view" onCancel={() => setManualModalOpen(false)} />

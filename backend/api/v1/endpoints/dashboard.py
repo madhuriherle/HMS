@@ -69,6 +69,23 @@ def get_dashboard(
 
     unassigned = db.query(Receipt).filter(*live_receipts, Receipt.receipt_status == "UNASSIGNED").count()
 
+    # applicants who already have a receipt mapped and only need the final approval (the Assigned for Approval screen)
+    awaiting_final = (
+        db.query(Member.id)
+        .filter(
+            Member.is_deleted == False, Member.approval_status == "UNAPPROVED",  # noqa: E712
+            Member.id.in_(
+                db.query(ReceiptAllocation.member_id)
+                .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
+                .filter(
+                    ReceiptAllocation.is_deleted == False, ReceiptAllocation.member_id.isnot(None),  # noqa: E712
+                    Receipt.is_deleted == False, Receipt.receipt_status != "CANCELLED",  # noqa: E712
+                )
+            ),
+        )
+        .count()
+    )
+
     from models.masters import MembershipType
     by_type = [
         {"membership_type": mt.name_en, "member_count": count, "color": mt.chart_color}
@@ -89,6 +106,7 @@ def get_dashboard(
             "inactive": inactive_members,
         } if allowed("members.read", "members.list.read", "members.unapproved.read") else None,
         # members per membership type (the dashboard chart); needs no Reports access
+        "awaiting_final_approval": awaiting_final if allowed("members.assigned.read", "members.unapproved.read") else None,
         "memberships_by_type": by_type if allowed("members.read", "members.list.read", "members.unapproved.read") else None,
         "receipts": {
             "total_count": total_receipts,

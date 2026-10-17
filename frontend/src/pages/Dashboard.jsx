@@ -37,7 +37,7 @@ const StatCard = ({ title, value, icon, color, trend }) => {
   const Icon = iconMap[icon] || BookOpen || Users;
 
   return (
-    <div className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] hover:shadow-lg transition-all h-full flex flex-col justify-between">
+    <div className="bg-white rounded-2xl p-5 border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)] h-full flex flex-col justify-between">
       <div className="flex justify-between items-start gap-3">
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-[#863221] uppercase tracking-wider mb-1 truncate" title={title}>
@@ -67,6 +67,7 @@ export default function Dashboard() {
     pending: null,
     magazineCount: null
   });
+  const [awaitingFinal, setAwaitingFinal] = useState(null); // applicants with a receipt assigned, waiting for the final approval (null when not allowed)
   const [money, setMoney] = useState(null); // today / month / unassigned / renewals (null when not allowed)
   
   const [recentActivity, setRecentActivity] = useState([]);
@@ -104,6 +105,7 @@ export default function Dashboard() {
         });
         
         setMoney(dData.receipts && dData.receipts.today_amount !== undefined ? dData.receipts : null);
+        setAwaitingFinal(typeof dData.awaiting_final_approval === 'number' ? dData.awaiting_final_approval : null);
 
         if (dData.memberships_by_type) {
           setMembershipTypeData(dData.memberships_by_type.map((item, i) => ({
@@ -158,6 +160,9 @@ export default function Dashboard() {
         { id: 'unassigned', title: 'Unassigned Receipts', value: money.unassigned_count.toLocaleString(), icon: 'clock', color: '#EE6A00', to: '/dashboard/receipts/tracking' }
       ]
     : [];
+  if (awaitingFinal !== null) {
+    moneyCards.push({ id: 'awaiting', title: 'Awaiting Final Approval', value: awaitingFinal.toLocaleString(), icon: 'user-check', color: '#863221', to: '/dashboard/membership/assigned' });
+  }
 
   const currentDate = `${new Date().toLocaleDateString('en-US', { weekday: 'long' })}, ${getTodayDisplayDate()}`;
 
@@ -217,51 +222,51 @@ export default function Dashboard() {
       {moneyCards.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mt-6">
           {moneyCards.map(({ to, ...card }) => (
-            <Link key={card.id} to={to} className="block">
-              <StatCard {...card} />
-            </Link>
+            <StatCard key={card.id} {...card} /> // information only: the cards do not open another page
           ))}
         </div>
       )}
 
       {/* Quick Actions */}
-      <div>
-        <h2 className="text-sm font-semibold text-[#180200] uppercase tracking-wider mb-4 mt-8">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {hasPermission('receipts.entry.write') && (
-            <Link to="/dashboard/receipts/entry" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#510601] hover:shadow-md transition-all group h-full">
-              <div className="h-10 w-10 rounded-full bg-[#510601]/10 flex items-center justify-center mb-3 group-hover:bg-[#510601] transition-colors">
-                <FileText className="h-5 w-5 text-[#510601] group-hover:text-white transition-colors" />
-              </div>
-              <span className="text-xs font-semibold text-[#180200] text-center">Add Receipt</span>
-            </Link>
-          )}
-          {hasPermission('members.register.write') && (
-            <Link to="/dashboard/membership/register" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#3D705C] hover:shadow-md transition-all group h-full">
-              <div className="h-10 w-10 rounded-full bg-[#3D705C]/10 flex items-center justify-center mb-3 group-hover:bg-[#3D705C] transition-colors">
-                <UserPlus className="h-5 w-5 text-[#3D705C] group-hover:text-white transition-colors" />
-              </div>
-              <span className="text-xs font-semibold text-[#180200] text-center">Add Member</span>
-            </Link>
-          )}
-          {hasPermission('members.label_list.read') && (
-            <Link to="/dashboard/receipts/labels" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#FFC107] hover:shadow-md transition-all group h-full">
-              <div className="h-10 w-10 rounded-full bg-[#FFC107]/15 flex items-center justify-center mb-3 group-hover:bg-[#FFC107] transition-colors">
-                <Printer className="h-5 w-5 text-[#863221] group-hover:text-[#180200] transition-colors" />
-              </div>
-              <span className="text-xs font-semibold text-[#180200] text-center">Print Labels</span>
-            </Link>
-          )}
-          {hasPermission('members.list.read') && (
-            <Link to="/dashboard/membership/list" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#ED4636] hover:shadow-md transition-all group h-full">
-              <div className="h-10 w-10 rounded-full bg-[#ED4636]/10 flex items-center justify-center mb-3 group-hover:bg-[#ED4636] transition-colors">
-                <List className="h-5 w-5 text-[#ED4636] group-hover:text-white transition-colors" />
-              </div>
-              <span className="text-xs font-semibold text-[#180200] text-center">Member Directory</span>
-            </Link>
-          )}
+      {(hasPermission('receipts.entry.write') || hasPermission('members.register.write') || hasPermission('members.label_list.read') || hasPermission('members.list.read')) && (
+        <div>
+          <h2 className="text-sm font-semibold text-[#180200] uppercase tracking-wider mb-4 mt-8">Quick Actions</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {hasPermission('receipts.entry.write') && (
+              <Link to="/dashboard/receipts/entry" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#510601] hover:shadow-md transition-all group h-full">
+                <div className="h-10 w-10 rounded-full bg-[#510601]/10 flex items-center justify-center mb-3 group-hover:bg-[#510601] transition-colors">
+                  <FileText className="h-5 w-5 text-[#510601] group-hover:text-white transition-colors" />
+                </div>
+                <span className="text-xs font-semibold text-[#180200] text-center">Add Receipt</span>
+              </Link>
+            )}
+            {hasPermission('members.register.write') && (
+              <Link to="/dashboard/membership/register" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#3D705C] hover:shadow-md transition-all group h-full">
+                <div className="h-10 w-10 rounded-full bg-[#3D705C]/10 flex items-center justify-center mb-3 group-hover:bg-[#3D705C] transition-colors">
+                  <UserPlus className="h-5 w-5 text-[#3D705C] group-hover:text-white transition-colors" />
+                </div>
+                <span className="text-xs font-semibold text-[#180200] text-center">Add Member</span>
+              </Link>
+            )}
+            {hasPermission('members.label_list.read') && (
+              <Link to="/dashboard/receipts/labels" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#FFC107] hover:shadow-md transition-all group h-full">
+                <div className="h-10 w-10 rounded-full bg-[#FFC107]/15 flex items-center justify-center mb-3 group-hover:bg-[#FFC107] transition-colors">
+                  <Printer className="h-5 w-5 text-[#863221] group-hover:text-[#180200] transition-colors" />
+                </div>
+                <span className="text-xs font-semibold text-[#180200] text-center">Print Labels</span>
+              </Link>
+            )}
+            {hasPermission('members.list.read') && (
+              <Link to="/dashboard/membership/list" className="flex flex-col items-center justify-center p-4 bg-white rounded-xl border border-[#E8DFD8] shadow-sm hover:border-[#ED4636] hover:shadow-md transition-all group h-full">
+                <div className="h-10 w-10 rounded-full bg-[#ED4636]/10 flex items-center justify-center mb-3 group-hover:bg-[#ED4636] transition-colors">
+                  <List className="h-5 w-5 text-[#ED4636] group-hover:text-white transition-colors" />
+                </div>
+                <span className="text-xs font-semibold text-[#180200] text-center">Member Directory</span>
+              </Link>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Analytics Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">

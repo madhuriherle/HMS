@@ -166,7 +166,7 @@ function CreditBanner({ credit }) {
                     <span className="text-[10px] uppercase font-bold text-[#863221] block">Membership Type</span>
                     <p className="font-bold text-sm text-[#180200] mt-0.5 flex items-center gap-1">
                       <Award className="w-3.5 h-3.5 text-[#510601] shrink-0" />
-                      <span>{credit.current_type?.name_en || credit.qualified_type?.name_en || 'Basic'}</span>
+                      <span>{credit.current_type?.name_en || ''}</span>
                     </p>
                   </div>
                   <div className="bg-white p-3 rounded-xl border border-[#E8DFD8]">
