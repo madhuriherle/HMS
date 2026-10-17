@@ -10,8 +10,9 @@ particular carries two yes/no ticks:
 and every receipt line keeps a copy of the first one as it was when the receipt was saved
 (receipt_items.pays_for_membership), so changing a tick later never rewrites an old member's credit.
 
-Existing data keeps behaving exactly as before: the main particulars with "membership" in the name are ticked, the one
-named "Others" needs a description, and every existing Membership / Type change line is marked as paying for membership.
+Existing data keeps behaving exactly as before: the main particulars with "membership" in the name are ticked and every
+existing Membership / Type change line is marked as paying for membership. Nothing is ticked "needs a description": a
+particular with sub types (like Others) already gets its description from the sub type, and the tick can be set by hand.
 """
 import sqlalchemy as sa
 from alembic import op
@@ -38,8 +39,6 @@ def upgrade() -> None:
     bind.execute(sa.text(
         "UPDATE particulars SET pays_for_membership = :yes "
         "WHERE parent_id IS NULL AND LOWER(name_en) LIKE '%membership%'"), flags)
-    bind.execute(sa.text(
-        "UPDATE particulars SET needs_description = :yes WHERE parent_id IS NULL AND LOWER(name_en) = 'others'"), flags)
     bind.execute(sa.text(
         "UPDATE receipt_items SET pays_for_membership = :yes WHERE UPPER(item_type) IN ('MEMBERSHIP', 'TYPE_CHANGE')"), flags)
 

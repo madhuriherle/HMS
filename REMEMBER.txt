@@ -207,7 +207,7 @@ RULE 8: MEMBERSHIP TYPE AND CREDIT
      of counted receipt types (8.1). The Assign popup's "membership only" filter, "counts for membership" amount,
      the renewal mark and the Description box in Receipt Entry all read these ticks (no "Membership" / "Others"
      name checks anywhere). Migration 0087 ticked the existing main particulars whose name has "membership" in
-     it and the one named "Others" (needs a description).
+     it; none is ticked "needs a description" (a particular with sub types gets its description from the sub type).
 8.4  MEMBERSHIP TYPE PRICE: a type's price is a history of rows (MembershipTypePrice), not a
      field. The Amount on the Edit form and the Update Price screen use the SAME call
      (POST /masters/membership-types/{id}/prices): a changed amount is a new revision with a
