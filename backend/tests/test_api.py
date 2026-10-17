@@ -2115,7 +2115,7 @@ def test_menu_and_privilege_tree_come_from_module_table(client, admin_headers):
     menu = client.get("/api/v1/users/modules/menu", headers=headers)
     assert menu.status_code == 200, menu.text
     # only the pages they can read: the Dashboard now needs dashboard.read too (migration 0046)
-    assert [m["code"] for m in menu.json()] == ["members", "approvals"]  # Assigned for Approval now lives under Approvals
+    assert [m["code"] for m in menu.json()] == ["members"]  # Assigned for Approval lives under Membership
 
     full_menu = client.get("/api/v1/users/modules/menu", headers=admin_headers).json()
 

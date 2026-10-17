@@ -374,10 +374,10 @@ MENU_PAGE_CATALOG = [
     ("dashboard", "Dashboard", None, "/dashboard", "layout-dashboard", 5, "dashboard.read", None),
     ("members.list", "Membership List", "members", "/dashboard/membership/list", "list", 1, "members.list.read", None),
     ("members.unapproved", "Unapproved Members", "members", "/dashboard/membership/unapproved", "user-check", 2, "members.unapproved.read", None),
-    ("members.register", "Register New Member", "members", "/dashboard/membership/register", "user-plus", 3, "members.register.write", None),
-    ("members.import", "Member Import", "members", "/dashboard/membership/import", "upload", 4, "members.import.read", None),
+    ("members.register", "Register New Member", "members", "/dashboard/membership/register", "user-plus", 4, "members.register.write", None),
+    ("members.import", "Member Import", "members", "/dashboard/membership/import", "upload", 5, "members.import.read", None),
     # Final-approval queue: unapproved members who already have a receipt assigned (same privilege as Unapproved Members).
-    ("members.assigned", "Assigned for Approval", "approvals", "/dashboard/membership/assigned", "check-circle", 2, "members.assigned.read", None),
+    ("members.assigned", "Assigned for Approval", "members", "/dashboard/membership/assigned", "check-circle", 3, "members.assigned.read", None),
     ("receipts.entry", "Receipt Entry", "receipts", "/dashboard/receipts/entry", "file-plus", 1, "receipts.entry.read", None),
     ("receipts.tracking", "Receipt Tracking", "receipts", "/dashboard/receipts/tracking", "search", 2, "receipts.tracking.read", None),
     ("receipts.bulk_mapping", "Bulk Receipt Mapping", "receipts", "/dashboard/receipts/bulk-mapping", "link", 3, "receipts.bulk_mapping.read", None),
@@ -433,7 +433,7 @@ MENU_NAME_FIXES_EXTRA = [
 # still under the old parent, so a move an admin made by hand is kept.
 MENU_MOVES = {
     "masters.organisation": ("masters", "system", 1),
-    "members.assigned": ("members", "approvals", 2),
+    "members.assigned": ("approvals", "members", 3),  # Assigned for Approval belongs to Membership, right after Unapproved Members
     "events.management": ("events", "engagements", 1),
 }
 # Pages nested one level deeper, under another page (the System Settings page holds its tools). Same rule as MENU_MOVES.
@@ -443,6 +443,9 @@ MENU_NEST = {
 }
 # Order changes, applied only while the row still has the old order: code -> (old, new)
 MENU_ORDER_FIXES = {
+    # make room under Membership for Assigned for Approval (3): Register 3 -> 4, Import 4 -> 5
+    "members.import": (4, 5),
+    "members.register": (3, 4),
     "system.number_formats": (3, 2),
     "system.files": (1, 3),  # make room: Organisation Settings 1, Number Formats 2
     "system.error_logs": (2, 4),
