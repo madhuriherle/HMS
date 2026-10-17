@@ -16,7 +16,9 @@ class ReceiptItemBase(BaseModel):
     item_type: str
     particular_id: Optional[int] = None
     particular_name: Optional[str] = None
-    description: Optional[str] = None
+    sub_particular_id: Optional[int] = None   # the sub type picked (a child of the particular)
+    sub_particular_name: Optional[str] = None  # filled in by the server from the id
+    description: Optional[str] = None          # only a description someone typed
     amount: float
 
     @field_validator("amount")

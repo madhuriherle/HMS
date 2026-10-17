@@ -7347,6 +7347,29 @@ def test_a_particular_says_whether_it_pays_for_a_membership(client, admin_header
     assert [c["receipt_id"] for c in only] == [waiting["id"]] and only[0]["membership_amount"] == 80
 
 
+def test_a_receipt_line_keeps_its_sub_type_by_id_not_as_description_text(client, admin_headers):
+    """The sub type is a link to the particulars master (with its name as saved); the description stays for typed text."""
+    H = admin_headers
+    main = client.post("/api/v1/masters/particulars", headers=H, json={"name_en": "Zsub Main"}).json()
+    sub = client.post("/api/v1/masters/particulars", headers=H, json={"name_en": "Zsub Child", "parent_id": main["id"]}).json()
+    other = client.post("/api/v1/masters/particulars", headers=H, json={"name_en": "Zsub Other"}).json()
+    line = {"item_type": "OTHER", "particular_id": main["id"], "particular_name": "Zsub Main", "amount": 120}
+    ok = _make_receipt(client, H, gross_amount=120, net_amount=120, receipt_type="OTHER", payer_name="Zsubpayee",
+                       items=[{**line, "sub_particular_id": sub["id"]}])
+    row = client.get("/api/v1/receipts/tracking", headers=H, params={"search": ok["receipt_number"]}).json()["data"][0]
+    it = row["items"][0]
+    assert it["sub_particular_id"] == sub["id"] and it["sub_type"] == "Zsub Child" and not it["description"]
+    # the filter and the filter list use the saved name
+    found = client.get("/api/v1/receipts/tracking", headers=H, params={"sub_type": "Zsub Child"}).json()["data"]
+    assert [r["receipt_number"] for r in found] == [ok["receipt_number"]]
+    assert "Zsub Child" in client.get("/api/v1/receipts/tracking-options", headers=H).json()["sub_types"].get("Zsub Main", [])
+    # a sub type of another particular is refused
+    bad = client.post("/api/v1/receipts/", headers=H, json={
+        "receipt_date": date.today().isoformat(), "receipt_type": "OTHER", "payment_mode": "CASH", "gross_amount": 50, "net_amount": 50,
+        "items": [{**line, "amount": 50, "sub_particular_id": other["id"]}]})
+    assert bad.status_code == 400
+
+
 def test_seeding_privileges_leaves_a_deleted_privilege_deleted(client, admin_headers):
     """A privilege someone deleted keeps its code (the column is unique): seeding must not try to insert it again
     (that crashed migration 0081 on UAT, where system.read had been deleted)."""

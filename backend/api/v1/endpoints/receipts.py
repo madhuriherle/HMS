@@ -360,7 +360,9 @@ def read_receipt_tracking(
     if sub_type:
         filters.append(Receipt.id.in_(
             db.query(ReceiptItem.receipt_id).filter(
-                ReceiptItem.is_deleted == False, func.trim(ReceiptItem.description) == sub_type.strip(),  # noqa: E712
+                ReceiptItem.is_deleted == False,  # noqa: E712
+                or_(func.trim(ReceiptItem.sub_particular_name) == sub_type.strip(),
+                    (ReceiptItem.sub_particular_name.is_(None)) & (func.trim(ReceiptItem.description) == sub_type.strip())),
             )
         ))
     if year:
@@ -414,7 +416,7 @@ def read_receipt_tracking(
             Receipt.id.in_(
                 db.query(ReceiptItem.receipt_id).filter(
                     ReceiptItem.is_deleted == False,  # noqa: E712
-                    or_(ReceiptItem.particular_name.ilike(like), ReceiptItem.description.ilike(like)),
+                    or_(ReceiptItem.particular_name.ilike(like), ReceiptItem.description.ilike(like), ReceiptItem.sub_particular_name.ilike(like)),
                 )
             ),
         ))
@@ -462,6 +464,8 @@ def read_receipt_tracking(
                 "item_type": it.item_type,
                 "particular_id": it.particular_id,
                 "particular": it.particular_name or it.item_type,
+                "sub_type": it.sub_particular_name,
+                "sub_particular_id": it.sub_particular_id,
                 "description": it.description,
                 "amount": float(it.amount),
             })
@@ -579,10 +583,10 @@ def read_receipt_tracking_options(
     years = sorted({int(y) if int(m) >= 4 else int(y) - 1 for y, m in months if y and m}, reverse=True)
     sub_types: dict = {}
     for name, desc in (
-        db.query(ReceiptItem.particular_name, ReceiptItem.description)
+        db.query(ReceiptItem.particular_name, func.coalesce(ReceiptItem.sub_particular_name, ReceiptItem.description))
         .join(Receipt, Receipt.id == ReceiptItem.receipt_id)
         .filter(ReceiptItem.is_deleted == False, Receipt.is_deleted == False,  # noqa: E712
-                ReceiptItem.description.isnot(None), ReceiptItem.particular_name.isnot(None))
+                func.coalesce(ReceiptItem.sub_particular_name, ReceiptItem.description).isnot(None), ReceiptItem.particular_name.isnot(None))
         .distinct().limit(5000).all()
     ):
         d = (desc or "").strip()
@@ -891,7 +895,7 @@ def receipt_pdf(
         .order_by(ReceiptItem.line_no, ReceiptItem.id).all()
     )
     lines = [
-        {"particular": i.particular_name or i.item_type.replace("_", " ").title(), "description": i.description, "amount": float(i.amount)}
+        {"particular": i.particular_name or i.item_type.replace("_", " ").title(), "description": i.sub_particular_name or i.description, "amount": float(i.amount)}
         for i in items
     ] or [{"particular": receipt.receipt_type.replace("_", " ").title(), "description": None, "amount": float(receipt.net_amount)}]
     payee = []
@@ -1112,7 +1116,7 @@ def get_unassigned_candidates(
             .all()
         ):
             lines_by_receipt.setdefault(it.receipt_id, []).append(
-                {"particular": it.particular_name or it.item_type, "detail": it.description, "amount": float(it.amount)}
+                {"particular": it.particular_name or it.item_type, "sub_type": it.sub_particular_name, "detail": it.description, "amount": float(it.amount)}
             )
             if it.pays_for_membership:
                 counted_by_receipt[it.receipt_id] = counted_by_receipt.get(it.receipt_id, 0.0) + float(it.amount)
@@ -1306,11 +1310,12 @@ def update_receipt(
             for old in db.query(ReceiptItem).filter(ReceiptItem.receipt_id == receipt.id, ReceiptItem.is_deleted == False):  # noqa: E712
                 old.is_deleted = True
                 old.deleted_by = current_user.id
-            from services.particular_flags import line_pays_for_membership
+            from services.particular_flags import line_pays_for_membership, sub_name_for
             for line_no, it in enumerate(new_items, start=1):
                 db.add(ReceiptItem(
                     receipt_id=receipt.id, item_type=it.item_type, particular_id=it.particular_id,
                     particular_name=it.particular_name, description=it.description,
+                    sub_particular_id=it.sub_particular_id, sub_particular_name=sub_name_for(db, it.particular_id, it.sub_particular_id),
                     amount=it.amount, line_no=line_no, created_by=current_user.id,
                     pays_for_membership=line_pays_for_membership(db, it.particular_id, it.item_type),
                 ))

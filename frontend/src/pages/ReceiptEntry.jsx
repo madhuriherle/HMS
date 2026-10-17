@@ -304,6 +304,7 @@ export default function ReceiptEntry() {
   // More particulars on the same receipt (the paper receipt has many lines)
   const [extraLines, setExtraLines] = useState([]);
   const emptyLine = () => ({ key: Math.random().toString(36).slice(2), particular: '', subType: '', description: '', amount: '' });
+  const subIdOf = (particular, subName) => (particular?.subTypes || []).find((st) => st.name === subName)?.id || null; // a sub type is saved by id
   const needsDescriptionFor = (name) => Boolean(particularObj(name)?.needsDescription); // the particular's own tick, not its name
   const particularObj = (name) =>
     particularsMaster.find((p) => (p.name || '').toLowerCase().trim() === (name || '').toLowerCase().trim());
@@ -586,12 +587,14 @@ export default function ReceiptEntry() {
         const subsOf = (name) => (particularObj(name)?.subTypes || []).filter((st) => (st.status || 'Active') === 'Active');
         const toLine = (it) => {
           const name = it.particular || '';
-          const desc = it.description && it.description !== name ? it.description : '';
           const subs = subsOf(name);
+          // the sub type is saved by id (sub_type); an old line that was never matched has it only as description text
+          const legacy = it.description && it.description !== name ? it.description : '';
+          const picked = it.sub_type || (subs.some((st) => st.name === legacy) ? legacy : '');
           return {
             particular: name,
-            subType: subs.some((st) => st.name === desc) ? desc : '',
-            description: needsDescriptionFor(name) && !subs.length ? desc : '',
+            subType: picked,
+            description: needsDescriptionFor(name) && !subs.length && !it.sub_type ? legacy : '',
             amount: String(it.amount ?? ''),
           };
         };
@@ -1007,8 +1010,8 @@ export default function ReceiptEntry() {
       try {
         // everything entered is kept on the cancelled receipt (it is only never mapped to a member)
         const entered = [
-          { particular: formData.particulars, particularId: currentParticularObj?.id || null, detail: formData.donationSubType || (currentParticularObj?.needsDescription ? formData.othersDescription.trim() : '') || formData.particulars, amount: Number(formData.amount) },
-          ...extraLines.map((l) => ({ particular: l.particular, particularId: particularObj(l.particular)?.id || null, detail: l.subType || l.description.trim() || l.particular, amount: Number(l.amount) })),
+          { particular: formData.particulars, particularId: currentParticularObj?.id || null, subParticularId: subIdOf(currentParticularObj, formData.donationSubType), detail: currentParticularObj?.needsDescription && !formData.donationSubType ? formData.othersDescription.trim() : '', amount: Number(formData.amount) },
+          ...extraLines.map((l) => ({ particular: l.particular, particularId: particularObj(l.particular)?.id || null, subParticularId: subIdOf(particularObj(l.particular), l.subType), detail: needsDescriptionFor(l.particular) && !l.subType ? l.description.trim() : '', amount: Number(l.amount) })),
         ].filter((l) => l.particular && Number.isFinite(l.amount) && l.amount > 0);
         const isCashCancelled = String(formData.paymentMode || '').trim().toLowerCase() === 'cash';
         const body = receiptToApiPayload({
@@ -1081,16 +1084,16 @@ export default function ReceiptEntry() {
         {
           particular: formData.particulars,
           particularId: currentParticularObj?.id || null,
-          detail:
-            formData.donationSubType ||
-            (currentParticularObj?.needsDescription ? formData.othersDescription.trim() : '') ||
-            formData.particulars,
+          subParticularId: subIdOf(currentParticularObj, formData.donationSubType),
+          // only a description someone typed (a particular ticked "needs a description"); a sub type is saved by id
+          detail: currentParticularObj?.needsDescription && !formData.donationSubType ? formData.othersDescription.trim() : '',
           amount: Number(formData.amount),
         },
         ...extraLines.map((l) => ({
           particular: l.particular,
           particularId: particularObj(l.particular)?.id || null,
-          detail: l.subType || l.description.trim() || l.particular,
+          subParticularId: subIdOf(particularObj(l.particular), l.subType),
+          detail: needsDescriptionFor(l.particular) && !l.subType ? l.description.trim() : '',
           amount: Number(l.amount),
         })),
       ],
@@ -1185,16 +1188,16 @@ export default function ReceiptEntry() {
         {
           particular: formData.particulars,
           particularId: currentParticularObj?.id || null,
-          detail:
-            formData.donationSubType ||
-            (currentParticularObj?.needsDescription ? formData.othersDescription.trim() : '') ||
-            formData.particulars,
+          subParticularId: subIdOf(currentParticularObj, formData.donationSubType),
+          // only a description someone typed (a particular ticked "needs a description"); a sub type is saved by id
+          detail: currentParticularObj?.needsDescription && !formData.donationSubType ? formData.othersDescription.trim() : '',
           amount: Number(formData.amount),
         },
         ...extraLines.map((l) => ({
           particular: l.particular,
           particularId: particularObj(l.particular)?.id || null,
-          detail: l.subType || l.description.trim() || l.particular,
+          subParticularId: subIdOf(particularObj(l.particular), l.subType),
+          detail: needsDescriptionFor(l.particular) && !l.subType ? l.description.trim() : '',
           amount: Number(l.amount),
         })),
       ],
@@ -1258,12 +1261,14 @@ export default function ReceiptEntry() {
     const subsOf = (name) => (particularObj(name)?.subTypes || []).filter((st) => (st.status || 'Active') === 'Active');
     const toLine = (it) => {
       const name = it.particular || '';
-      const desc = it.description && it.description !== name ? it.description : '';
       const subs = subsOf(name);
+      // the sub type is saved by id (sub_type); an old line that was never matched has it only as description text
+      const legacy = it.description && it.description !== name ? it.description : '';
+      const picked = it.sub_type || (subs.some((st) => st.name === legacy) ? legacy : '');
       return {
         particular: name,
-        subType: subs.some((st) => st.name === desc) ? desc : '',
-        description: needsDescriptionFor(name) && !subs.length ? desc : '',
+        subType: picked,
+        description: needsDescriptionFor(name) && !subs.length && !it.sub_type ? legacy : '',
         amount: String(it.amount ?? ''),
       };
     };

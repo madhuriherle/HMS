@@ -85,7 +85,7 @@ const numberToWords = (num) => {
 // the status names and chip colours come from the server (receipt_statuses in GET /meta/lists)
 // What a receipt line is called: the sub type the clerk picked, else the particular itself
 const lineLabel = (i) => {
-  const sub = (i.description || '').trim();
+  const sub = (i.sub_type || i.description || '').trim();
   return sub && sub.toLowerCase() !== String(i.particular || '').trim().toLowerCase() ? sub : (i.particular || '');
 };
 

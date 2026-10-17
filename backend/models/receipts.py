@@ -1,3 +1,4 @@
+from typing import Optional
 from sqlalchemy import text
 from sqlalchemy import Index, event
 from sqlalchemy import String, Integer, BigInteger, Boolean, DateTime, Date, Time, Numeric, Text, ForeignKey
@@ -54,6 +55,10 @@ class ReceiptItem(AuditMixin, Base):
     description: Mapped[str] = mapped_column(Text, nullable=True)
     amount: Mapped[float] = mapped_column(Numeric(12,2), nullable=False)
     line_no: Mapped[int] = mapped_column(Integer, nullable=True)
+    # the sub type the clerk picked (a child of the main particular above) and its name as it was when saved; the
+    # description column holds only a description someone typed
+    sub_particular_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("particulars.id"), nullable=True)
+    sub_particular_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     # a copy of the particular's "pays for membership" tick as it was when the receipt was saved
     pays_for_membership: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 

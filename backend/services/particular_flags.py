@@ -16,6 +16,17 @@ def main_particular(db: Session, particular_id: Optional[int]) -> Optional[Parti
     return p
 
 
+def sub_name_for(db: Session, particular_id: Optional[int], sub_particular_id: Optional[int]) -> Optional[str]:
+    """The name to keep on a line for its sub type. The sub type must belong to the line's particular."""
+    if not sub_particular_id:
+        return None
+    sub = db.get(Particular, sub_particular_id)
+    if sub is None or (particular_id and sub.parent_id != particular_id):
+        from fastapi import HTTPException
+        raise HTTPException(400, f"Sub type {sub_particular_id} does not belong to that particular")
+    return sub.name_en
+
+
 def line_pays_for_membership(db: Session, particular_id: Optional[int], item_type: Optional[str]) -> bool:
     """Does this receipt line pay for a membership? The main particular's tick decides. A line with no particular on
     record (an old receipt, or the upgrade difference the system raises itself) is by its line type."""

@@ -208,6 +208,13 @@ RULE 8: MEMBERSHIP TYPE AND CREDIT
      the renewal mark and the Description box in Receipt Entry all read these ticks (no "Membership" / "Others"
      name checks anywhere). Migration 0087 ticked the existing main particulars whose name has "membership" in
      it; none is ticked "needs a description" (a particular with sub types gets its description from the sub type).
+8.8  A RECEIPT LINE KEEPS ITS SUB TYPE BY ID: receipt_items.sub_particular_id (a child of the line's main
+     particular, validated on save) plus sub_particular_name (the name as saved, so a rename never rewrites
+     history). The description column holds ONLY a description someone typed (a main particular ticked "needs a
+     description" and no sub type picked). Screens show the line as "Particular > sub type", reading
+     sub_type and falling back to description for an old line that migration 0088 could not match (its
+     description text did not equal a sub type's name). Receipt Tracking's sub type filter and filter list use
+     the saved sub type name.
 8.4  MEMBERSHIP TYPE PRICE: a type's price is a history of rows (MembershipTypePrice), not a
      field. The Amount on the Edit form and the Update Price screen use the SAME call
      (POST /masters/membership-types/{id}/prices): a changed amount is a new revision with a

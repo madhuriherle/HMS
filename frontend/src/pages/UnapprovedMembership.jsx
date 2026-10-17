@@ -243,7 +243,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const assignItemsText = (c) => {
     const lines = c.items || [];
     if (lines.length === 0) return String(c.receipt_type || '').replace(/_/g, ' ') || '—';
-    const first = lines[0].detail && lines[0].detail !== lines[0].particular ? `${lines[0].particular} › ${lines[0].detail}` : lines[0].particular;
+    const sub = lines[0].sub_type || lines[0].detail;
+    const first = sub && sub !== lines[0].particular ? `${lines[0].particular} › ${sub}` : lines[0].particular;
     return lines.length > 1 ? `${first} +${lines.length - 1}` : first;
   };
   const assignButton = (c) => (

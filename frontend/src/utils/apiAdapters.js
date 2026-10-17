@@ -212,7 +212,7 @@ export const receiptToApiPayload = (formData, selectedMember = null) => {
   const lines = (formData.lines && formData.lines.length ? formData.lines : [{
     particular: formData.particulars,
     particularId: null,
-    detail: formData.donationSubType || formData.othersDescription || formData.particulars,
+    detail: formData.othersDescription || '',
     amount: formData.amount,
   }]).map((l) => ({ ...l, amount: Number(l.amount || 0), type: receiptTypeToApi(l.particular) }));
   const amount = lines.reduce((sum, l) => sum + l.amount, 0);
@@ -251,7 +251,8 @@ export const receiptToApiPayload = (formData, selectedMember = null) => {
       item_type: l.type,
       particular_id: l.particularId || null,
       particular_name: l.particular || null,
-      description: l.detail || l.particular || null,
+      sub_particular_id: l.subParticularId || null,
+      description: l.detail || null,
       amount: l.amount,
     })),
     allocations: allocationMemberId
