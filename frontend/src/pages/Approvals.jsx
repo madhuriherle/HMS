@@ -163,10 +163,10 @@ function DetailPanel({ header, tone, groups, side, onlyChanged }) {
               <h4 className="text-xs font-bold uppercase tracking-wider text-[#510601] mb-1">{g.title}</h4>
               <dl className="divide-y divide-[#EFE6DE]/60">
                 {rows.map((r, i) => (
-                  <div key={i} className="py-2 flex items-start justify-between gap-4 text-xs">
-                    <dt className="text-[#7D7068] font-medium shrink-0">{r.label}</dt>
+                  <div key={i} className="py-2 grid grid-cols-[38%_1fr] items-start gap-4 text-xs">
+                    <dt className="text-[#7D7068] font-medium">{r.label}</dt>
                     <dd
-                      className={`text-right min-w-0 break-words ${
+                      className={`text-left min-w-0 break-words ${
                         side === 'new' && r.changed ? 'text-[#8C1801] font-bold' : 'text-[#180200] font-semibold'
                       }`}
                     >
