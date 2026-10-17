@@ -198,6 +198,16 @@ RULE 8: MEMBERSHIP TYPE AND CREDIT
      When a cancelled / deleted / refunded receipt or a removed allocation leaves the credit
      below the price of the member's type, the type stays (8.2) and the approvers get an inbox
      notice "Membership type needs review" to decide.
+8.7  A PARTICULAR SAYS FOR ITSELF WHAT IT IS - NEVER GUESS FROM ITS NAME. The MAIN particular carries two ticks
+     (particulars.pays_for_membership, particulars.needs_description); its sub types follow it and carry
+     neither (the server forces them off). When a receipt is saved each line copies "pays for membership" onto
+     receipt_items.pays_for_membership (services/particular_flags.py, climbing from a sub type to its main
+     particular), so changing a tick later never rewrites an old member's credit. Credit counts the lines with
+     the tick; a line with no particular on record (an old receipt) counts by its line type against the saved list
+     of counted receipt types (8.1). The Assign popup's "membership only" filter, "counts for membership" amount,
+     the renewal mark and the Description box in Receipt Entry all read these ticks (no "Membership" / "Others"
+     name checks anywhere). Migration 0087 ticked the existing main particulars whose name has "membership" in
+     it and the one named "Others" (needs a description).
 8.4  MEMBERSHIP TYPE PRICE: a type's price is a history of rows (MembershipTypePrice), not a
      field. The Amount on the Edit form and the Update Price screen use the SAME call
      (POST /masters/membership-types/{id}/prices): a changed amount is a new revision with a

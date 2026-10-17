@@ -167,18 +167,19 @@ def _counted_rows(db: Session, member_ids: list, types: list) -> list:
     )
     receipt_ids = {r.id for _, r in rows}
     wanted = {t.upper() for t in types}
-    known = {t.upper() for t in all_receipt_types()}
     line_total, has_typed_lines = {}, set()
     refunded = {}
     if receipt_ids:
         for it in db.query(ReceiptItem).filter(
             ReceiptItem.receipt_id.in_(receipt_ids), ReceiptItem.is_deleted == False  # noqa: E712
         ).all():
-            kind = (it.item_type or "").upper()
-            if kind in known:
-                has_typed_lines.add(it.receipt_id)
-                if kind in wanted:
-                    line_total[it.receipt_id] = line_total.get(it.receipt_id, Decimal(0)) + _d(it.amount)
+            # a line with a particular on record counts when that main particular is ticked "pays for membership"
+            # (copied onto the line when the receipt was saved); a line with no particular (an old receipt) counts by
+            # its line type against the saved list of counted receipt types
+            has_typed_lines.add(it.receipt_id)
+            counted = it.pays_for_membership if it.particular_id is not None else (it.item_type or "").upper() in wanted
+            if counted:
+                line_total[it.receipt_id] = line_total.get(it.receipt_id, Decimal(0)) + _d(it.amount)
         for rf in db.query(RefundTransaction).filter(
             RefundTransaction.receipt_id.in_(receipt_ids), RefundTransaction.is_deleted == False  # noqa: E712
         ).all():

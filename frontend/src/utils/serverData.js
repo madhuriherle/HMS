@@ -150,6 +150,9 @@ export const loadParticulars = cached('particulars', async () => {
       id: p.id,
       name: p.name_en,
       status: statusLabel(p.status),
+      // the two ticks on the main particular (a sub type follows it)
+      paysForMembership: Boolean(p.pays_for_membership),
+      needsDescription: Boolean(p.needs_description),
       subTypes: all
         .filter((c) => c.parent_id === p.id)
         .map((c) => ({ id: c.id, name: c.name_en, status: statusLabel(c.status) })),

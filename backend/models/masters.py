@@ -92,7 +92,11 @@ class Particular(AuditMixin, Base):
     # so a receipt line can be attributed to a service on the member profile.
     service_type_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("service_types.id"), nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
-    
+    # Set on a MAIN particular (its sub types follow it): its money counts toward a member's membership credit,
+    # and Receipt Entry asks for a description when it has no sub types.
+    pays_for_membership: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    needs_description: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+
     children = relationship("Particular", backref=backref("parent", remote_side=[id]))
 
 class ServiceType(AuditMixin, Base):

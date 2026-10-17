@@ -54,6 +54,8 @@ class ReceiptItem(AuditMixin, Base):
     description: Mapped[str] = mapped_column(Text, nullable=True)
     amount: Mapped[float] = mapped_column(Numeric(12,2), nullable=False)
     line_no: Mapped[int] = mapped_column(Integer, nullable=True)
+    # a copy of the particular's "pays for membership" tick as it was when the receipt was saved
+    pays_for_membership: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
 
 class ReceiptAllocation(AuditMixin, Base):
     __tablename__ = "receipt_allocations"

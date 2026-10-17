@@ -126,6 +126,8 @@ export default function ReceiptTypeManagement() {
           id: p.id,
           name: p.name_en,
           serviceTypeId: p.service_type_id ?? '',
+          paysForMembership: Boolean(p.pays_for_membership),
+          needsDescription: Boolean(p.needs_description),
           status: p.status ? 'Active' : 'Inactive',
           subTypes: subs
         };
@@ -191,6 +193,8 @@ export default function ReceiptTypeManagement() {
     setTypeFormData({
       name: '',
       serviceTypeId: '',
+      paysForMembership: false,
+      needsDescription: false,
       status: 'Active',
       subTypes: []
     });
@@ -204,6 +208,8 @@ export default function ReceiptTypeManagement() {
     setTypeFormData({
       name: type.name || '',
       serviceTypeId: type.serviceTypeId ?? '',
+      paysForMembership: Boolean(type.paysForMembership),
+      needsDescription: Boolean(type.needsDescription),
       status: type.status || 'Active',
       subTypes: type.subTypes ? [...type.subTypes] : []
     });
@@ -254,6 +260,8 @@ export default function ReceiptTypeManagement() {
         await api.post('/masters/particulars', {
           name_en: trimmedName,
           service_type_id: serviceTypeId,
+          pays_for_membership: Boolean(typeFormData.paysForMembership),
+          needs_description: Boolean(typeFormData.needsDescription),
           status: isActive
         });
         showToast(`Particular "${trimmedName}" created successfully.`);
@@ -261,6 +269,8 @@ export default function ReceiptTypeManagement() {
         await api.put(`/masters/particulars/${editingType.id}`, {
           name_en: trimmedName,
           service_type_id: serviceTypeId,
+          pays_for_membership: Boolean(typeFormData.paysForMembership),
+          needs_description: Boolean(typeFormData.needsDescription),
           status: isActive
         });
         showToast(`Particular "${trimmedName}" updated successfully.`);
@@ -637,6 +647,11 @@ export default function ReceiptTypeManagement() {
                               <GripVertical className="w-4 h-4 text-[#863221]/50 cursor-grab shrink-0" title="Drag to change the order" />
                             )}
                             <span className="text-sm text-[#180200]">{type.name}</span>
+                            {type.paysForMembership && (
+                              <span className="ml-2 px-1.5 py-0.5 rounded-full bg-[#3D705C]/10 border border-[#3D705C]/30 text-[10px] font-semibold text-[#3D705C]" title="Counts toward a member's membership credit">
+                                pays for membership
+                              </span>
+                            )}
                             {serviceTypes.find((s) => String(s.id) === String(type.serviceTypeId)) && (
                               <span
                                 className="ml-2 px-1.5 py-0.5 rounded-full bg-[#510601]/10 border border-[#510601]/20 text-[10px] font-semibold text-[#510601]"
@@ -1012,6 +1027,34 @@ export default function ReceiptTypeManagement() {
               <p className="text-[11px] text-[#863221]/70 mt-1">
                 Optional. Ties this particular to a service (Temple, Mangalya, Hall...) so it is counted on the member profile under Services.
               </p>
+            </div>
+
+            {/* What this particular means (set on the main particular; its sub types follow it) */}
+            <div className="space-y-2.5 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2]/60 p-3.5">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(typeFormData.paysForMembership)}
+                  onChange={(e) => setTypeFormData((prev) => ({ ...prev, paysForMembership: e.target.checked }))}
+                  className="mt-0.5 w-4 h-4 accent-[#510601] cursor-pointer"
+                />
+                <span>
+                  <span className="block text-xs font-bold text-[#180200]">Pays for membership</span>
+                  <span className="block text-[11px] text-[#863221]/80">The money paid on this particular (and its sub types) counts toward a member's membership credit and type.</span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(typeFormData.needsDescription)}
+                  onChange={(e) => setTypeFormData((prev) => ({ ...prev, needsDescription: e.target.checked }))}
+                  className="mt-0.5 w-4 h-4 accent-[#510601] cursor-pointer"
+                />
+                <span>
+                  <span className="block text-xs font-bold text-[#180200]">Needs a description</span>
+                  <span className="block text-[11px] text-[#863221]/80">Receipt Entry asks what the money is for (a sub type, when this particular has sub types, counts as that description).</span>
+                </span>
+              </label>
             </div>
 
             {/* Status Radio */}

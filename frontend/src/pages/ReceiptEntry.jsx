@@ -154,7 +154,6 @@ const numberToWords = (num) => {
 };
 
 // "Other" / "Others" particular (free-text description unless it has sub-types)
-const isOthersName = (name) => /^others?$/i.test(String(name || '').trim());
 
 export default function ReceiptEntry() {
   const rules = useRules(); // formats and limits from the server
@@ -300,11 +299,12 @@ export default function ReceiptEntry() {
 
   const hasActiveSubTypes = activeSubTypes.length > 0;
   // "Others" with no sub-types listed keeps a free-text description beside the amount
-  const showDescription = isOthersName(formData.particulars) && !hasActiveSubTypes;
+  const showDescription = Boolean(currentParticularObj?.needsDescription) && !hasActiveSubTypes;
 
   // More particulars on the same receipt (the paper receipt has many lines)
   const [extraLines, setExtraLines] = useState([]);
   const emptyLine = () => ({ key: Math.random().toString(36).slice(2), particular: '', subType: '', description: '', amount: '' });
+  const needsDescriptionFor = (name) => Boolean(particularObj(name)?.needsDescription); // the particular's own tick, not its name
   const particularObj = (name) =>
     particularsMaster.find((p) => (p.name || '').toLowerCase().trim() === (name || '').toLowerCase().trim());
   const activeSubTypesOf = (name) => (particularObj(name)?.subTypes || []).filter((st) => (st.status || 'Active') === 'Active');
@@ -591,7 +591,7 @@ export default function ReceiptEntry() {
           return {
             particular: name,
             subType: subs.some((st) => st.name === desc) ? desc : '',
-            description: isOthersName(name) && !subs.length ? desc : '',
+            description: needsDescriptionFor(name) && !subs.length ? desc : '',
             amount: String(it.amount ?? ''),
           };
         };
@@ -746,7 +746,7 @@ export default function ReceiptEntry() {
       ...prev,
       particulars: selectedParticular,
       donationSubType: subType || '',
-      othersDescription: isOthersName(selectedParticular) && selectedParticular === prev.particulars ? prev.othersDescription : ''
+      othersDescription: needsDescriptionFor(selectedParticular) && selectedParticular === prev.particulars ? prev.othersDescription : ''
     }));
 
     if (formErrors.particulars || formErrors.othersDescription || formErrors.donationSubType) {
@@ -888,7 +888,7 @@ export default function ReceiptEntry() {
     }
 
     // 6. Others without sub-types: a description is mandatory
-    if (isOthersName(formData.particulars) && !hasActiveSubTypes && !formData.othersDescription.trim()) {
+    if (Boolean(currentParticularObj?.needsDescription) && !hasActiveSubTypes && !formData.othersDescription.trim()) {
       errors.othersDescription = 'Please specify the description for Others.';
     }
 
@@ -938,7 +938,7 @@ export default function ReceiptEntry() {
         errors.extraLines = `Line ${n}: choose the ${l.particular} sub-type.`;
         break;
       }
-      if (isOthersName(l.particular) && activeSubTypesOf(l.particular).length === 0 && !l.description.trim()) {
+      if (needsDescriptionFor(l.particular) && activeSubTypesOf(l.particular).length === 0 && !l.description.trim()) {
         errors.extraLines = `Line ${n}: describe the Others amount.`;
         break;
       }
@@ -1007,7 +1007,7 @@ export default function ReceiptEntry() {
       try {
         // everything entered is kept on the cancelled receipt (it is only never mapped to a member)
         const entered = [
-          { particular: formData.particulars, particularId: currentParticularObj?.id || null, detail: formData.donationSubType || (isOthersName(formData.particulars) ? formData.othersDescription.trim() : '') || formData.particulars, amount: Number(formData.amount) },
+          { particular: formData.particulars, particularId: currentParticularObj?.id || null, detail: formData.donationSubType || (currentParticularObj?.needsDescription ? formData.othersDescription.trim() : '') || formData.particulars, amount: Number(formData.amount) },
           ...extraLines.map((l) => ({ particular: l.particular, particularId: particularObj(l.particular)?.id || null, detail: l.subType || l.description.trim() || l.particular, amount: Number(l.amount) })),
         ].filter((l) => l.particular && Number.isFinite(l.amount) && l.amount > 0);
         const isCashCancelled = String(formData.paymentMode || '').trim().toLowerCase() === 'cash';
@@ -1075,7 +1075,7 @@ export default function ReceiptEntry() {
       mobile: formData.mobile.trim(),
       particulars: formData.particulars,
       donationSubType: hasActiveSubTypes ? formData.donationSubType : '',
-      othersDescription: isOthersName(formData.particulars) && !hasActiveSubTypes ? formData.othersDescription.trim() : '',
+      othersDescription: Boolean(currentParticularObj?.needsDescription) && !hasActiveSubTypes ? formData.othersDescription.trim() : '',
       amount: receiptTotal,
       lines: [
         {
@@ -1083,7 +1083,7 @@ export default function ReceiptEntry() {
           particularId: currentParticularObj?.id || null,
           detail:
             formData.donationSubType ||
-            (isOthersName(formData.particulars) ? formData.othersDescription.trim() : '') ||
+            (currentParticularObj?.needsDescription ? formData.othersDescription.trim() : '') ||
             formData.particulars,
           amount: Number(formData.amount),
         },
@@ -1105,7 +1105,7 @@ export default function ReceiptEntry() {
       periodFromTime: formData.periodFromTime,
       periodToTime: formData.periodToTime,
       // a payment for someone who already holds a membership number is a renewal
-      isRenewal: Boolean(linked && (linked.isRenewal || (linked.membershipNumber && formData.particulars === 'Membership')))
+      isRenewal: Boolean(linked && (linked.isRenewal || (linked.membershipNumber && [formData.particulars, ...extraLines.map((l) => l.particular)].some((name) => particularObj(name)?.paysForMembership))))
     };
 
     setSaving(true);
@@ -1187,7 +1187,7 @@ export default function ReceiptEntry() {
           particularId: currentParticularObj?.id || null,
           detail:
             formData.donationSubType ||
-            (isOthersName(formData.particulars) ? formData.othersDescription.trim() : '') ||
+            (currentParticularObj?.needsDescription ? formData.othersDescription.trim() : '') ||
             formData.particulars,
           amount: Number(formData.amount),
         },
@@ -1263,7 +1263,7 @@ export default function ReceiptEntry() {
       return {
         particular: name,
         subType: subs.some((st) => st.name === desc) ? desc : '',
-        description: isOthersName(name) && !subs.length ? desc : '',
+        description: needsDescriptionFor(name) && !subs.length ? desc : '',
         amount: String(it.amount ?? ''),
       };
     };
@@ -1905,7 +1905,7 @@ export default function ReceiptEntry() {
                     <div className="space-y-2 pt-2 border-t border-dashed border-[#E8DFD8]">
                       {extraLines.map((l, index) => {
                         const subs = activeSubTypesOf(l.particular);
-                        const needsDescription = isOthersName(l.particular) && subs.length === 0;
+                        const needsDescription = needsDescriptionFor(l.particular) && subs.length === 0;
                         return (
                           <div key={l.key} className="relative grid grid-cols-12 gap-3 items-end">
                             <div className={`col-span-12 ${needsDescription ? 'sm:col-span-5' : 'sm:col-span-7'}`}>

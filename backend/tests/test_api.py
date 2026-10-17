@@ -7315,6 +7315,38 @@ def test_assign_popup_lists_only_receipts_that_can_pay_for_a_membership(client, 
     assert only[0]["membership_amount"] == 500  # Membership 500 + Donation 1000 counts 500
 
 
+def test_a_particular_says_whether_it_pays_for_a_membership(client, admin_headers):
+    """The main particular carries the tick (not its name); sub types follow it; a line copies the tick when saved."""
+    H = admin_headers
+    paying = client.post("/api/v1/masters/particulars", headers=H, json={"name_en": "Zpay Life Fee", "pays_for_membership": True, "needs_description": True})
+    assert paying.status_code in (200, 201), paying.text
+    pid = paying.json()["id"]
+    assert paying.json()["pays_for_membership"] is True and paying.json()["needs_description"] is True
+    # named like a membership, but not ticked: it does not count
+    named = client.post("/api/v1/masters/particulars", headers=H, json={"name_en": "Zpay Membership Look-alike"}).json()
+    # a sub type carries neither tick, whatever is sent
+    sub = client.post("/api/v1/masters/particulars", headers=H, json={"name_en": "Zpay Sub", "parent_id": pid, "pays_for_membership": True}).json()
+    assert sub["pays_for_membership"] is False and sub["needs_description"] is False
+
+    m = _create_member(client, H, "9699000081", "Zpaycredit")
+    def pay(particular_id, name, amount):
+        return _make_receipt(client, H, gross_amount=amount, net_amount=amount, receipt_type="OTHER",
+                             items=[{"item_type": "OTHER", "particular_id": particular_id, "particular_name": name, "amount": amount}],
+                             allocations=[{"member_id": m["id"], "allocated_amount": amount}])
+    pay(pid, "Zpay Life Fee", 300)           # ticked: counts
+    pay(sub["id"], "Zpay Sub", 200)          # a sub type of the ticked particular: counts
+    pay(named["id"], "Zpay Membership Look-alike", 999)  # named like a membership, not ticked: does not
+    credit = client.get(f"/api/v1/members/{m['id']}/membership-credit", headers=H).json()
+    assert credit["credit_total"] == 500
+
+    # the Assign popup lists a receipt that has a paying line, and says what counts
+    waiting = client.post("/api/v1/receipts/", headers=H, json={
+        "receipt_date": date.today().isoformat(), "receipt_type": "OTHER", "payment_mode": "CASH", "gross_amount": 80, "net_amount": 80,
+        "payer_name": "Zpaywaiting", "items": [{"item_type": "OTHER", "particular_id": pid, "particular_name": "Zpay Life Fee", "amount": 80}]}).json()
+    only = client.get("/api/v1/receipts/unassigned-candidates", headers=H, params={"search": "Zpaywaiting", "membership_only": True}).json()["candidates"]
+    assert [c["receipt_id"] for c in only] == [waiting["id"]] and only[0]["membership_amount"] == 80
+
+
 def test_seeding_privileges_leaves_a_deleted_privilege_deleted(client, admin_headers):
     """A privilege someone deleted keeps its code (the column is unique): seeding must not try to insert it again
     (that crashed migration 0081 on UAT, where system.read had been deleted)."""

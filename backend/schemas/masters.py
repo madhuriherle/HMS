@@ -221,6 +221,8 @@ class ParticularBase(BaseModel):
     parent_id: Optional[int] = None
     service_type_id: Optional[int] = None
     status: bool = True
+    pays_for_membership: bool = False  # main particulars only (a sub type follows its main particular)
+    needs_description: bool = False
 
 class ParticularCreate(_AutoCode, ParticularBase):
     pass
@@ -232,6 +234,8 @@ class ParticularUpdate(BaseModel):
     parent_id: Optional[int] = None
     service_type_id: Optional[int] = None
     status: Optional[bool] = None
+    pays_for_membership: Optional[bool] = None
+    needs_description: Optional[bool] = None
 
 class Particular(ParticularBase):
     id: int

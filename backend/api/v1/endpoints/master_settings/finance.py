@@ -348,6 +348,9 @@ def create_particular(
     current_user: User = Depends(deps.require_permission("masters.write")),
     obj_in: schemas_masters.ParticularCreate,
 ) -> Any:
+    if obj_in.parent_id:  # a sub type follows its main particular: it carries neither tick
+        obj_in.pays_for_membership = False
+        obj_in.needs_description = False
     return crud_masters.particular.create(db=db, obj_in=obj_in, created_by=current_user.id)
 
 @router.put("/particulars/{id}", response_model=Union[schemas_masters.Particular, PendingApproval])
@@ -365,6 +368,11 @@ def update_particular(
     data = obj_in.model_dump(exclude_unset=True)
     if "parent_id" in data and data["parent_id"] == id:
         raise HTTPException(400, "A particular cannot be its own parent")
+    if data.get("parent_id", obj.parent_id):  # a sub type carries neither tick
+        if "pays_for_membership" in data:
+            obj_in.pays_for_membership = False
+        if "needs_description" in data:
+            obj_in.needs_description = False
     for field in ("code", "name_en"):
         if field in data and data[field] != getattr(obj, field):
             dup = db.query(Particular).filter(

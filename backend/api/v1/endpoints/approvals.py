@@ -397,6 +397,7 @@ def approve_type_change(
             db.add(ReceiptItem(
                 receipt_id=receipt.id,
                 item_type="TYPE_CHANGE",
+                pays_for_membership=True,  # the upgrade difference always counts toward the membership
                 description=description,
                 amount=difference,
                 created_by=current_user.id,

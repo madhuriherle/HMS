@@ -1034,11 +1034,8 @@ def get_unassigned_candidates(
     from services import membership_credit
     counted_types = membership_credit.credit_receipt_types(db)
     if membership_only:
-        q = q.filter(or_(
-            Receipt.id.in_(db.query(ReceiptItem.receipt_id).filter(
-                ReceiptItem.is_deleted == False, func.upper(ReceiptItem.item_type).in_(counted_types))),  # noqa: E712
-            Receipt.receipt_type.in_(counted_types),
-        ))
+        q = q.filter(Receipt.id.in_(db.query(ReceiptItem.receipt_id).filter(
+            ReceiptItem.is_deleted == False, ReceiptItem.pays_for_membership == True)))  # noqa: E712
 
     # a receipt is matched when its typed number is exactly a member's permanent membership number
     typed = func.upper(func.trim(func.coalesce(Receipt.payer_membership_no, "")))
@@ -1117,7 +1114,7 @@ def get_unassigned_candidates(
             lines_by_receipt.setdefault(it.receipt_id, []).append(
                 {"particular": it.particular_name or it.item_type, "detail": it.description, "amount": float(it.amount)}
             )
-            if (it.item_type or "").upper() in counted_types:
+            if it.pays_for_membership:
                 counted_by_receipt[it.receipt_id] = counted_by_receipt.get(it.receipt_id, 0.0) + float(it.amount)
 
     candidates = []
@@ -1137,7 +1134,7 @@ def get_unassigned_candidates(
             "receipt_type": r.receipt_type,
             "items": lines_by_receipt.get(r.id, []),
             # what of this receipt counts for a membership: its Membership lines (an old single-line receipt: by its type)
-            "membership_amount": counted_by_receipt.get(r.id, float(r.net_amount) if (r.receipt_type in counted_types and r.id not in lines_by_receipt) else 0.0),
+            "membership_amount": counted_by_receipt.get(r.id, 0.0),
             "match_type": "EXACT_NUMBER" if matched_m else "NONE",
             "matched_member": None,
             "likely_score": int(likely or 0),
@@ -1309,11 +1306,13 @@ def update_receipt(
             for old in db.query(ReceiptItem).filter(ReceiptItem.receipt_id == receipt.id, ReceiptItem.is_deleted == False):  # noqa: E712
                 old.is_deleted = True
                 old.deleted_by = current_user.id
+            from services.particular_flags import line_pays_for_membership
             for line_no, it in enumerate(new_items, start=1):
                 db.add(ReceiptItem(
                     receipt_id=receipt.id, item_type=it.item_type, particular_id=it.particular_id,
                     particular_name=it.particular_name, description=it.description,
                     amount=it.amount, line_no=line_no, created_by=current_user.id,
+                    pays_for_membership=line_pays_for_membership(db, it.particular_id, it.item_type),
                 ))
             db.commit()
             db.refresh(updated)

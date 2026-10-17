@@ -32,6 +32,7 @@ class CRUDReceipt(CRUDBase[Receipt, ReceiptCreate, ReceiptUpdate]):
         db.add(db_obj)
         db.flush()  # mint the receipt id before dependants reference it
 
+        from services.particular_flags import line_pays_for_membership
         for line_no, item in enumerate(obj_in.items, start=1):
             db.add(ReceiptItem(
                 receipt_id=db_obj.id,
@@ -41,6 +42,7 @@ class CRUDReceipt(CRUDBase[Receipt, ReceiptCreate, ReceiptUpdate]):
                 description=item.description,
                 amount=item.amount,
                 line_no=line_no,
+                pays_for_membership=line_pays_for_membership(db, item.particular_id, item.item_type),
                 created_by=created_by,
             ))
 
