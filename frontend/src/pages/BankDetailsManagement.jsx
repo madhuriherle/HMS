@@ -32,7 +32,6 @@ export default function BankDetailsManagement() {
 
   // Master state
   const [paymentConfigs, setPaymentConfigs] = useState([]);
-  const [modeUsage, setModeUsage] = useState([]); // [{ payment_mode, bank_account, count }] counted by the server
   const [banks, setBanks] = useState([]);
 
   // Dropdown options and bank details come from the Bank master / existing payment modes
@@ -124,9 +123,6 @@ export default function BankDetailsManagement() {
 
   useEffect(() => {
     fetchConfigs();
-    api.get('/receipts/payment-mode-usage')
-      .then(({ data }) => setModeUsage(Array.isArray(data) ? data : []))
-      .catch((error) => showToast(error.response?.data?.detail || 'Failed to load the usage counts from the server.', 'error'));
   }, []);
 
 
@@ -380,19 +376,6 @@ export default function BankDetailsManagement() {
 
   const isPendingApproval = (data) => Boolean(data && (data.approval_request_id || data.status === 'PENDING'));
 
-  // How many receipts were recorded with this payment mode / bank account
-  const getModeUsageCount = (cfg) => {
-    const bank = (cfg.bankAccount || '').trim().toLowerCase();
-    const mode = (cfg.paymentMode || '').trim().toLowerCase();
-    const label = formatPaymentModeLabel(cfg).trim().toLowerCase();
-    return modeUsage
-      .filter((r) => {
-        const rBank = (r.bank_account || '').trim().toLowerCase();
-        const rMode = String(r.payment_mode || '').trim().toLowerCase();
-        return bank ? rBank === bank : rMode === mode || rMode === label;
-      })
-      .reduce((sum, r) => sum + r.count, 0);
-  };
 
   const handleDeleteClick = (cfg) => {
     setDeleteDialog(cfg); // the server warns (and offers "delete anyway") if receipts use it
@@ -601,9 +584,6 @@ export default function BankDetailsManagement() {
                         <span className="font-black text-[#180200] text-sm font-serif">
                           {config.paymentMode}
                         </span>
-                        <div className="text-[10px] text-[#863221]/80 mt-0.5">
-                          Used in {getModeUsageCount(config)} receipt{getModeUsageCount(config) === 1 ? '' : 's'}
-                        </div>
                       </td>
 
                       {/* Column: Display in Receipts */}

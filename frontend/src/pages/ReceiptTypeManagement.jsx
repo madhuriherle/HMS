@@ -85,7 +85,6 @@ export default function ReceiptTypeManagement() {
   };
 
 
-  const [usage, setUsage] = useState({});
   const canReorder = hasPermission('masters.particulars.write') && !searchQuery;
 
   const [dragId, setDragId] = useState(null);
@@ -109,7 +108,6 @@ export default function ReceiptTypeManagement() {
   };
 
   const fetchReceiptTypes = async () => {
-    api.get('/masters/usage/particulars').then(({ data }) => setUsage(data?.counts || {})).catch(() => {});
     api.get('/masters/service-types?limit=200').then(({ data }) => setServiceTypes(data?.data || [])).catch(() => {});
     try {
       const res = await api.get('/masters/particulars?limit=2000');
@@ -658,14 +656,6 @@ export default function ReceiptTypeManagement() {
                                 title="Service this particular is counted under"
                               >
                                 {serviceTypes.find((s) => String(s.id) === String(type.serviceTypeId)).name_en}
-                              </span>
-                            )}
-                            {usage[type.id]?.used > 0 && (
-                              <span
-                                className="ml-2 px-1.5 py-0.5 rounded-full bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-semibold text-[#863221]"
-                                title={`Used on ${usage[type.id].used} receipt line(s)`}
-                              >
-                                used {usage[type.id].used}×
                               </span>
                             )}
                           </div>
