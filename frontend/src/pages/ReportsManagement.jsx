@@ -1,4 +1,3 @@
-import { FilterCard } from '../components/FilterToggle';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import PageActions, { PageActionsSlot } from '../components/PageActions';
@@ -18,25 +17,14 @@ import {
   BookOpen,
   History,
   Download,
-  Printer,
   Search,
   Filter,
   RefreshCw,
   SlidersHorizontal,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
   CreditCard,
   FileSpreadsheet,
-  FileText,
-  AlertCircle,
-  CheckCircle2,
-  Clock,
   MapPin,
-  Bookmark,
   Trash2,
-  Play,
-  X
 } from 'lucide-react';
 import api from '../api';
 import useAuth from '../hooks/useAuth';

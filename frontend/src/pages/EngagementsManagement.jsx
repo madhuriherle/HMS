@@ -13,20 +13,11 @@ import {
   Search,
   BookOpen,
   CheckCircle2,
-  XCircle,
-  ExternalLink,
   X,
   Loader2,
   Phone,
-  Mail,
-  MapPin,
-  Building,
-  CreditCard,
-  Eye,
-  Settings,
   Calendar,
   Layers,
-  ChevronDown
 } from 'lucide-react';
 import api from '../api';
 import useAuth from '../hooks/useAuth';
@@ -460,7 +451,6 @@ function AffiliationsView({ canWrite, canDelete }) {
                     required
                     value={formData.group_name}
                     onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
-                    placeholder="e.g. Uttara Kannada Havyaka Parishat"
                     className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
                   />
                 </div>
@@ -472,7 +462,6 @@ function AffiliationsView({ canWrite, canDelete }) {
                     rows={2}
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                    placeholder="Delivery / correspondence address..."
                     className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
                   />
                 </div>
@@ -861,7 +850,6 @@ function AssociatesView({ canWrite, canDelete }) {
                 required
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g. Sri Anantha Murthy"
                 className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
               />
             </div>
@@ -873,7 +861,6 @@ function AssociatesView({ canWrite, canDelete }) {
                 type="text"
                 value={formData.organization}
                 onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
-                placeholder="Organization or Trust name"
                 className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
               />
             </div>
@@ -886,7 +873,6 @@ function AssociatesView({ canWrite, canDelete }) {
                   type="text"
                   value={formData.mobile}
                   onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                  placeholder="10 digit mobile"
                   className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
                 />
               </div>
@@ -898,7 +884,6 @@ function AssociatesView({ canWrite, canDelete }) {
                   type="text"
                   value={formData.pan_number}
                   onChange={(e) => setFormData({ ...formData, pan_number: e.target.value.toUpperCase() })}
-                  placeholder="ABCDE1234F"
                   className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601] font-mono"
                 />
               </div>
@@ -911,7 +896,6 @@ function AssociatesView({ canWrite, canDelete }) {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="associate@example.com"
                 className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
               />
             </div>
@@ -923,7 +907,6 @@ function AssociatesView({ canWrite, canDelete }) {
                 rows={3}
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Correspondence address..."
                 className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
               />
             </div>
@@ -1236,7 +1219,6 @@ function PressMediaView({ canWrite, canDelete }) {
                 required
                 value={formData.organization_name}
                 onChange={(e) => setFormData({ ...formData, organization_name: e.target.value })}
-                placeholder="e.g. Prajavani / Havyaka Sandesha"
                 className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
               />
             </div>
@@ -1248,7 +1230,6 @@ function PressMediaView({ canWrite, canDelete }) {
                 type="text"
                 value={formData.reporter_name}
                 onChange={(e) => setFormData({ ...formData, reporter_name: e.target.value })}
-                placeholder="e.g. Sri Govinda Bhat"
                 className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
               />
             </div>
@@ -1261,7 +1242,6 @@ function PressMediaView({ canWrite, canDelete }) {
                   type="text"
                   value={formData.mobile}
                   onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                  placeholder="10 digit mobile"
                   className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
                 />
               </div>
@@ -1273,7 +1253,6 @@ function PressMediaView({ canWrite, canDelete }) {
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="press@example.com"
                   className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
                 />
               </div>
@@ -1286,7 +1265,6 @@ function PressMediaView({ canWrite, canDelete }) {
                 rows={3}
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Press office / delivery address..."
                 className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
               />
             </div>
@@ -2018,7 +1996,6 @@ function CommitteeView({ canWrite, canDelete }) {
                 type="text"
                 value={memberForm.designation}
                 onChange={(e) => setMemberForm({ ...memberForm, designation: e.target.value })}
-                placeholder="e.g. Vice President / Director / Joint Secretary"
                 className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
               />
             </div>
@@ -2148,14 +2125,14 @@ function CommitteeView({ canWrite, canDelete }) {
                     required
                     value={catForm.name_en}
                     onChange={(e) => setCatForm({ ...catForm, name_en: e.target.value })}
-                    placeholder="Name (English) *  e.g. Bangalore Region"
+                    placeholder="Name (English) *"
                     className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
                   />
                   <input
                     type="text"
                     value={catForm.name_kn}
                     onChange={(e) => setCatForm({ ...catForm, name_kn: e.target.value })}
-                    placeholder="ಹೆಸರು (ಕನ್ನಡ)  e.g. ಬೆಂಗಳೂರು ಕ್ಷೇತ್ರ"
+                    placeholder="ಹೆಸರು (ಕನ್ನಡ)"
                     className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
                   />
                 </div>
@@ -2244,7 +2221,7 @@ function CommitteeView({ canWrite, canDelete }) {
                   required
                   value={termForm.term_name}
                   onChange={(e) => setTermForm({ ...termForm, term_name: e.target.value })}
-                  placeholder="Term name *  e.g. 2024–2027"
+                  placeholder="Term name *"
                   className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
                 />
                 <div className="grid grid-cols-2 gap-3">

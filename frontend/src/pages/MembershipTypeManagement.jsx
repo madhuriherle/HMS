@@ -1,6 +1,5 @@
 import FilterToggle from '../components/FilterToggle';
 import React, { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import {
   Tag,
@@ -8,22 +7,15 @@ import {
   Search,
   Pencil,
   Trash2,
-  Eye,
   History,
   TrendingUp,
-  Power,
   ChevronRight,
   ChevronLeft,
   CheckCircle2,
   X,
   AlertCircle,
-  AlertTriangle,
   RefreshCw,
-  Calendar,
-  Clock,
-  Globe,
-  Check,
-  FileText
+  FileText,
 } from 'lucide-react';
 import api from '../api';
 import { formatDate as formatDateShared } from '../utils/dateUtils';
@@ -93,7 +85,6 @@ export default function MembershipTypeManagement() {
   const [formErrors, setFormErrors] = useState({});
 
   // Delete Confirmation Modal State
-  const [deletingItem, setDeletingItem] = useState(null);
 
   // Update Price Modal State
   const [isUpdatePriceOpen, setIsUpdatePriceOpen] = useState(false);
@@ -126,12 +117,6 @@ export default function MembershipTypeManagement() {
   // ----------------------------------------------------
   // SUMMARY METRICS
   // ----------------------------------------------------
-  const summaryStats = useMemo(() => {
-    const total = membershipTypes.length;
-    const active = membershipTypes.filter(m => m.status === 'Active').length;
-    const inactive = membershipTypes.filter(m => m.status === 'Inactive').length;
-    return { total, active, inactive };
-  }, [membershipTypes]);
 
   // ----------------------------------------------------
   // SEARCH & FILTERING

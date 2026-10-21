@@ -16,11 +16,9 @@ import {
   Lock,
   AlertCircle,
   CheckCircle2,
-  RefreshCw,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
-  X
+  X,
 } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';
@@ -56,8 +54,7 @@ export default function ModulesManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('Active'); // by default only the modules that are built and switched on
   const [openGroups, setOpenGroups] = useState({}); // module id -> true/false (open by default)
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [, setCurrentPage] = useState(1);
   const [view, setView] = useState('table'); // 'table' | 'arrange' (drag and drop the sidebar order)
 
   const [isAddEditOpen, setIsAddEditOpen] = useState(false);
@@ -130,11 +127,6 @@ export default function ModulesManagement() {
 
   const hiddenOffCount = statusFilter === 'Active' ? modules.filter((m) => !m.status).length : 0;
 
-  const parentName = (id) => {
-    if (id == null) return null;
-    const p = modules.find((m) => m.id === id || String(m.id) === String(id));
-    return p ? p.name_en : null;
-  };
 
   const handleClearFilters = () => {
     setSearchQuery('');

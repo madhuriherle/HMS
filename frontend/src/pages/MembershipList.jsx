@@ -6,70 +6,35 @@ import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
 import {
-  UserCheck,
-  User,
   Plus,
-  Search,
   Upload,
   Pencil,
   Trash2,
   Eye,
   Printer,
-  ChevronRight,
-  ChevronLeft,
   CheckCircle2,
   X,
   AlertCircle,
-  AlertTriangle,
-  Building,
   MapPin,
-  Phone,
-  Mail,
-  Calendar,
-  Layers,
-  Check,
-  Download,
   Filter,
-  RefreshCw,
   RotateCcw,
-  Sparkles,
-  Award,
-  TrendingUp,
-  Coins,
-  Receipt,
-  CheckSquare
+  CheckSquare,
 } from 'lucide-react';
-import { calculateMemberMembershipStatus } from '../utils/displayHelpers';
-import {
-  loadLocations,
-  lookupPin,
-  loadMembershipTypes,
-  loadGothras,
-} from '../utils/serverData';
+import { loadLocations, loadMembershipTypes, loadGothras } from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import api from '../api';
-import MemberApplicationDetails from '../components/MemberApplicationDetails';
-import { askForm } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import Pager from '../components/Pager';
-import {
-  fetchMemberPage,
-  memberToApiPayload,
-  normalizeMember,
-} from '../utils/apiAdapters';
-import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
-import { formatMoney } from '../utils/money';
+import { fetchMemberPage, normalizeMember } from '../utils/apiAdapters';
+import useRules from '../hooks/useRules';
 
 import ModalFooter from '../components/ModalFooter';
-const toId = (v) => (v === '' || v == null || Number.isNaN(Number(v)) ? v : Number(v));
 
 
 export default function MembershipList() {
   const rules = useRules(); // formats and limits from the server
-  const BLOOD_GROUPS = rules?.blood_groups || [];
-  const MEMBER_CATEGORIES = rules?.member_categories || [];
   const location = useLocation();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
@@ -81,11 +46,10 @@ export default function MembershipList() {
   const [pages, setPages] = useState(1);
   const [loadingPage, setLoadingPage] = useState(true);
   const [membershipTypes, setMembershipTypes] = useState([]);
-  const receipts = []; // the member details popup further down is switched off; it used to read every receipt
   const [states, setStates] = useState([]);
   const [districts, setDistricts] = useState([]);
   const [taluks, setTaluks] = useState([]);
-  const [gothras, setGothras] = useState([]);
+  const [, setGothras] = useState([]);
 
   const { sort, toggle: toggleSort, params: sortParams } = useSort();
   const requestSeq = useRef(0);
@@ -154,7 +118,7 @@ export default function MembershipList() {
 
 
   // Toast feedback
-  const [toastMessage, setToastMessage] = useState(null);
+  const [toastMessage] = useState(null);
   const showToast = (message, type = 'success') => {
     notify(message, type);
   };
@@ -196,117 +160,31 @@ export default function MembershipList() {
   // MODAL STATES
   // ----------------------------------------------------
   // 1. Add / Edit Member Modal
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [formModalMode, setFormModalMode] = useState('add'); // 'add' | 'edit'
-  const [editingMember, setEditingMember] = useState(null);
+  const [] = useState(false);
 
   // Form tab inside Add/Edit modal: 'personal' | 'location' | 'membership' | 'additional'
-  const [activeFormSection, setActiveFormSection] = useState('personal');
 
-  const initialFormState = {
-    // Basic Details
-    name: '',
-    address: '',
-    remarks: '',
-    phone: '',
-    mobile: '',
-    email: '',
 
-    // Location Details
-    country: 'India',
-    stateId: '',
-    stateName: '',
-    districtId: '',
-    districtName: '',
-    postalCode: '',
-    post: '',
-    city: '',
-    area: '',
-    place: '',
-    grama: '',
-    village: '',
-    labelPoint: '',
-
-    // Membership Details
-    membershipTypeId: '',
-    membershipType: '',
-    category: 'Individual',
-    profession: '',
-    company: '',
-
-    // Additional Member Details
-    website: '',
-    gothra: '',
-    bloodGroup: 'O+',
-    birthDate: '',
-    status: 'Active',
-    expireDate: '',
-    magazineRemarks: '',
-    nativeDetails: ''
-  };
-
-  const [formData, setFormData] = useState(initialFormState);
-  const [formErrors, setFormErrors] = useState({});
-
-  // 2. View Member Details Modal
-  const [viewingMember, setViewingMember] = useState(null);
-  const [activeViewTab, setActiveViewTab] = useState('profile');
-  const [tabData, setTabData] = useState({ family: null, services: null, donations: null });
-  const [isTabLoading, setIsTabLoading] = useState(false);
-
-  useEffect(() => {
-    if (viewingMember) {
-      setActiveViewTab('profile');
-      setTabData({ family: null, services: null, donations: null });
-    }
-  }, [viewingMember]);
-
-  useEffect(() => {
-    if (!viewingMember || activeViewTab === 'profile') return;
-    
-    if (!tabData[activeViewTab]) {
-      setIsTabLoading(true);
-      api.get(`/members/${viewingMember.id}/${activeViewTab}`)
-        .then(res => {
-          return res.data;
-        })
-        .then(data => {
-          setTabData(prev => ({ ...prev, [activeViewTab]: data }));
-          setIsTabLoading(false);
-        })
-        .catch(err => {
-          console.error('Failed to load member ' + activeViewTab, err);
-          setIsTabLoading(false);
-          showToast(err.response?.data?.detail || 'Failed to load ' + activeViewTab + ' from the server.', 'error');
-        });
-    }
-  }, [activeViewTab, viewingMember]);
+  const [] = useState({});
 
   // 3. Status Change Confirmation Modal
   const [statusDialog, setStatusDialog] = useState(null); // { member, nextStatus }
 
   // 4. Delete Confirmation Modal
   const [deleteDialog, setDeleteDialog] = useState(null); // member
-  const [deleteReason, setDeleteReason] = useState('');
+  const [, setDeleteReason] = useState('');
 
   // 5. Label Preview Modal
   const [isLabelPreviewOpen, setIsLabelPreviewOpen] = useState(false);
   const printContainerRef = useRef(null);
 
   // Active membership types available for new registrations
-  const activeMembershipTypes = useMemo(() => {
-    return membershipTypes.filter((mt) => formModalMode === 'edit' || mt.status === 'Active');
-  }, [membershipTypes, formModalMode]);
 
   // Filtered districts for Add/Edit Form based on selected State
-  const formDistricts = useMemo(() => {
-    return districts.filter((d) => d.stateId === formData.stateId && (formModalMode === 'edit' || d.status === 'Active'));
-  }, [districts, formData.stateId, formModalMode]);
 
   // Filtered taluks for Add/Edit Form based on selected District
-  const formTaluks = useMemo(() => {
-    return taluks.filter((t) => t.districtId === formData.districtId && (formModalMode === 'edit' || t.status === 'Active'));
-  }, [taluks, formData.districtId, formModalMode]);
+
+  // Districts for table filter dropdown based on table state filter
 
   // Districts for table filter dropdown based on table state filter
   const tableFilterDistricts = useMemo(() => {
@@ -377,97 +255,6 @@ export default function MembershipList() {
   // ----------------------------------------------------
   // PIN LOOKUP HELPER (LOCATION SETUP INTEGRATION)
   // ----------------------------------------------------
-  const handlePinCodeLookup = async (pin) => {
-    if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) return;
-
-    const lookup = await lookupPin(pin).catch(() => ({ found: false }));
-    if (lookup.found) {
-      // Cascading match against master states & districts
-      const matchState = states.find(
-        (s) => s.id === lookup.stateId || s.name.toLowerCase() === (lookup.stateName || '').toLowerCase()
-      ) || states[0];
-
-      const stateDistrictsList = districts.filter(
-        (d) => d.stateId === (matchState ? matchState.id : lookup.stateId)
-      );
-
-      const matchDistrict = stateDistrictsList.find(
-        (d) => d.id === lookup.districtId || d.name.toLowerCase() === (lookup.districtName || '').toLowerCase()
-      ) || districts.find((d) => d.id === lookup.districtId || d.name.toLowerCase() === (lookup.districtName || '').toLowerCase());
-
-      setFormData((prev) => ({
-        ...prev,
-        postalCode: pin,
-        country: 'India',
-        stateId: matchState ? matchState.id : (lookup.stateId || ''),
-        stateName: matchState ? matchState.name : (lookup.stateName || ''),
-        districtId: matchDistrict ? matchDistrict.id : (lookup.districtId || ''),
-        districtName: matchDistrict ? matchDistrict.name : (lookup.districtName || ''),
-        post: lookup.area || '',
-        place: lookup.talukName || lookup.area || '',
-        city: lookup.area || lookup.talukName || '',
-        area: lookup.area || ''
-      }));
-
-      // Clear any prior PIN error
-      setFormErrors((prev) => {
-        const next = { ...prev };
-        delete next.postalCode;
-        return next;
-      });
-
-      showToast(`Location auto-resolved: ${lookup.area}, ${lookup.talukName ? lookup.talukName + ', ' : ''}${lookup.districtName}, ${lookup.stateName}`);
-    } else {
-      try {
-        // looked up by the server, so the browser does not depend on the public postal service
-        const res = await api.get(`/meta/pincode/${pin}`);
-        if (res.data) {
-          const data = res.data;
-          if (data.found) {
-            const postOffice = { Name: data.area, Block: data.taluk, District: data.district, State: data.state };
-            setFormData((prev) => ({
-              ...prev,
-              postalCode: pin,
-              country: 'India',
-              stateName: postOffice.State || '',
-              districtName: postOffice.District || '',
-              post: postOffice.Name || '',
-              place: postOffice.Block || '',
-              city: postOffice.Name || '',
-              area: postOffice.Name || ''
-            }));
-            setFormErrors((prev) => {
-              const next = { ...prev };
-              delete next.postalCode;
-              return next;
-            });
-            showToast(`Location fetched from API: ${postOffice.Name}, ${postOffice.District}, ${postOffice.State}`);
-            return;
-          }
-        }
-      } catch (err) {
-        console.error("API Fetch Error", err); showToast(err.response?.data?.detail || 'Could not load data from the server.', 'error');
-      }
-
-      // Clear previously auto-populated location fields
-      setFormData((prev) => ({
-        ...prev,
-        districtId: '',
-        districtName: '',
-        post: '',
-        place: '',
-        city: '',
-        area: ''
-      }));
-
-      const errorMsg = 'PIN Code not found in Location Setup or API. Please verify the PIN Code.';
-      setFormErrors((prev) => ({
-        ...prev,
-        postalCode: errorMsg
-      }));
-      showToast(errorMsg, 'error');
-    }
-  };
 
   // ----------------------------------------------------
   // ADD / EDIT FORM HANDLERS
@@ -481,75 +268,7 @@ export default function MembershipList() {
     navigate(`/dashboard/membership/edit/${member.id}`);
   };
 
-  const validateForm = () => {
-    const errors = {};
-    const cleanName = formData.name.trim();
-    const cleanMobile = formData.mobile.trim();
-    const cleanAddress = formData.address.trim();
 
-    if (!cleanName) {
-      errors.name = 'Full Name is required';
-    }
-
-    if (!cleanMobile) {
-      errors.mobile = 'Mobile number is required';
-    } else if (mobileProblem(rules, cleanMobile)) {
-      errors.mobile = mobileProblem(rules, cleanMobile);
-    }
-
-    if (!cleanAddress) {
-      errors.address = 'Address is required';
-    }
-
-    if (!formData.membershipTypeId) {
-      errors.membershipTypeId = 'Please select a Membership Type';
-    }
-
-    if (formData.postalCode && !hasDigits(formData.postalCode.trim(), rules?.pincode?.digits)) {
-      errors.postalCode = `PIN Code must be ${rules?.pincode?.digits} numeric digits`;
-    }
-
-    if (formData.email && !matchesPattern(formData.email.trim(), rules?.email?.pattern)) {
-      errors.email = 'Please enter a valid email address';
-    }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSaveMember = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) {
-      showToast('Please fix the validation errors in the form.', 'error');
-      return;
-    }
-
-    if (formModalMode === 'add') {
-      try {
-        const { data } = await api.post('/members/', memberToApiPayload(formData));
-        const newMember = normalizeMember(data);
-        loadMembers();
-        showToast(`Member "${newMember.fullName}" (${newMember.membershipNumber}) registered successfully.`);
-      } catch (error) {
-        console.error('Failed to create member.', error);
-        showToast(error.response?.data?.detail || 'Failed to register member through API.', 'error');
-        return;
-      }
-    } else {
-      try {
-        const { data } = await api.put(`/members/${editingMember.id}`, memberToApiPayload(formData, { isUpdate: true }));
-        const updatedMember = normalizeMember(data);
-        setMembers((prev) => prev.map((m) => (m.id === editingMember.id ? updatedMember : m)));
-        showToast(`Member "${formData.name}" updated successfully.`);
-      } catch (error) {
-        console.error('Failed to update member.', error);
-        showToast(error.response?.data?.detail || 'Failed to update member through API.', 'error');
-        return;
-      }
-    }
-
-    setIsFormModalOpen(false);
-  };
 
   // ----------------------------------------------------
   // STATUS & DELETE HANDLERS
@@ -557,56 +276,7 @@ export default function MembershipList() {
   // ----------------------------------------------------
   // MEMBER PROFILE ACTIONS (server calls): membership type, photo
   // ----------------------------------------------------
-  const handleAssignMembership = async (member) => {
-    const v = await askForm({
-      title: `Membership for ${member.fullName || member.name}`,
-      text: 'The membership starts at the type\'s current price.',
-      confirmText: 'Add membership',
-      fields: [
-        {
-          name: 'typeId',
-          label: 'Membership type',
-          type: 'select',
-          required: true,
-          options: membershipTypes
-            .filter((mt) => mt.status === 'Active')
-            .map((mt) => ({ value: mt.id, label: mt.name }))
-        }
-      ]
-    });
-    if (!v) return;
-    try {
-      const { data } = await api.post(`/members/${member.id}/memberships`, {
-        membership_type_id: Number(v.typeId)
-      });
-      showToast(
-        data?.approval_request_id || data?.status === 'PENDING'
-          ? 'Membership change submitted for approval.'
-          : 'Membership added.'
-      );
-      await loadMembers();
-    } catch (error) {
-      showToast(error.response?.data?.detail || 'Error adding the membership', 'error');
-    }
-  };
 
-  const handleUploadPhoto = async (member) => {
-    const v = await askForm({
-      title: `Photo for ${member.fullName || member.name}`,
-      confirmText: 'Upload',
-      fields: [{ name: 'file', label: 'Photo (JPG or PNG)', type: 'file', required: true }]
-    });
-    if (!v) return;
-    try {
-      const form = new FormData();
-      form.append('file', v.file);
-      await api.post(`/members/${member.id}/photo`, form);
-      showToast('Photo uploaded.');
-      await loadMembers();
-    } catch (error) {
-      showToast(error.response?.data?.detail || 'Error uploading the photo', 'error');
-    }
-  };
 
   const handleConfirmStatusToggle = async () => {
     if (!statusDialog) return;
@@ -1078,386 +748,6 @@ export default function MembershipList() {
       </div>
 
       {/* View Member Profile is handled on dedicated full-screen page /dashboard/membership/profile/:id */}
-      {false && viewingMember && (
-          <div
-            className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-[#510601] text-white flex items-center justify-center font-bold text-base">
-                  {(viewingMember.fullName || viewingMember.name || 'M').charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-[#180200]">
-                      {viewingMember.fullName || viewingMember.name}
-                    </h3>
-                    {viewingMember.membershipNumber && (
-                      <span className="font-mono font-bold text-xs bg-[#FAF7F2] text-[#510601] px-2 py-0.5 rounded border border-[#E8DFD8]">
-                        {viewingMember.membershipNumber}
-                      </span>
-                    )}
-                  </div>
-                  {(() => {
-                    const memStatus = calculateMemberMembershipStatus(viewingMember, receipts, membershipTypes);
-                    return (
-                      <p className="text-xs text-[#863221]">
-                        {memStatus.isMilestoneReached ? `${memStatus.currentMembershipType} Member` : 'Member (Milestone in progress)'}
-                      </p>
-                    );
-                  })()}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewingMember(null)}
-                className="text-[#863221]/60 hover:text-[#180200] p-1.5 rounded-lg hover:bg-white transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Read-only: no actions in view popup */}
-
-            {/* Tabs */}
-            <div className="flex items-center gap-6 px-6 border-b border-[#E8DFD8] bg-[#FAF7F2]/50">
-              {['profile', 'family', 'services', 'donations'].map(tab => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveViewTab(tab)}
-                  className={`py-3 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors cursor-pointer ${
-                    activeViewTab === tab 
-                      ? 'border-[#510601] text-[#510601]' 
-                      : 'border-transparent text-[#863221]/60 hover:text-[#863221]'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-
-            {/* Modal Body Content */}
-            <div className="flex flex-col flex-1 overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs text-[#180200]">
-              {activeViewTab === 'profile' && (
-                <div className="space-y-5">
-              {/* Dynamic Membership Milestone & Cumulative Contribution Card */}
-              {(() => {
-                const memStatus = calculateMemberMembershipStatus(viewingMember, receipts, membershipTypes);
-                return (
-                  <>
-                    <div className="bg-gradient-to-br from-[#FAF7F2] to-white rounded-2xl p-4 border border-[#510601]/20 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-[#510601] text-white">
-                          <TrendingUp className="w-4 h-4" />
-                        </div>
-                        <span className="font-bold text-xs uppercase tracking-wider text-[#510601]">
-                          Cumulative Membership Milestone Progress
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-[#863221] font-semibold bg-white px-2 py-0.5 rounded-full border border-[#E8DFD8]">
-                        Source: Masters → Membership Types
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                      <div className="bg-white p-2.5 rounded-xl border border-[#E8DFD8]">
-                        <span className="text-[10px] uppercase font-bold text-[#863221] block">Total Paid</span>
-                        <p className="font-mono font-bold text-base text-[#510601] mt-0.5">
-                          {formatMoney(memStatus.totalMembershipPaid)}
-                        </p>
-                      </div>
-                      <div className="bg-white p-2.5 rounded-xl border border-[#E8DFD8]">
-                        <span className="text-[10px] uppercase font-bold text-[#863221] block">Current Member</span>
-                        <p className="font-bold text-sm text-[#180200] mt-0.5 flex items-center gap-1">
-                          {memStatus.isMilestoneReached ? (
-                            <>
-                              <Award className="w-3.5 h-3.5 text-[#510601]" />
-                              <span>{memStatus.currentMembershipType}</span>
-                            </>
-                          ) : (
-                            <span className="text-amber-800 text-xs">Not Yet Reached</span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="bg-white p-2.5 rounded-xl border border-[#E8DFD8]">
-                        <span className="text-[10px] uppercase font-bold text-[#863221] block">Next Milestone</span>
-                        <p className="font-bold text-xs text-[#180200] mt-0.5">
-                          {memStatus.nextMilestoneType ? (
-                            <span>{memStatus.nextMilestoneType} ({formatMoney(memStatus.nextMilestoneAmount)})</span>
-                          ) : (
-                            <span className="text-emerald-700 font-semibold">Highest Milestone Achieved</span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="bg-white p-2.5 rounded-xl border border-[#E8DFD8]">
-                        <span className="text-[10px] uppercase font-bold text-[#863221] block">Remaining</span>
-                        <p className="font-mono font-bold text-sm text-[#863221] mt-0.5">
-                          {memStatus.nextMilestoneType ? (
-                            `${formatMoney(memStatus.remainingAmount)}`
-                          ) : (
-                            <span className="text-emerald-700">{formatMoney(0)}</span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Progress indicator */}
-                    {memStatus.nextMilestoneAmount && memStatus.nextMilestoneAmount > 0 && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-[10px] text-[#863221]">
-                          <span>Progress to {memStatus.nextMilestoneType}</span>
-                          <span className="font-mono font-semibold">
-                            {Math.min(100, Math.round((memStatus.totalMembershipPaid / memStatus.nextMilestoneAmount) * 100))}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
-                          <div
-                            className="bg-[#510601] h-1.5 rounded-full transition-all duration-500"
-                            style={{
-                              width: `${Math.min(100, (memStatus.totalMembershipPaid / memStatus.nextMilestoneAmount) * 100)}%`
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Contributing Membership Receipts List */}
-                    {memStatus.receipts.length > 0 && (
-                      <div className="pt-2 border-t border-[#E8DFD8]">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#863221] flex items-center gap-1 mb-1.5">
-                          <Receipt className="w-3 h-3 text-[#510601]" />
-                          <span>Linked Membership Receipts ({memStatus.receipts.length})</span>
-                        </span>
-                        <div className="space-y-1 max-h-28 overflow-y-auto pr-1">
-                          {memStatus.receipts.map((r) => (
-                            <div
-                              key={r.id || r.receiptNumber}
-                              className="flex items-center justify-between p-1.5 bg-white rounded-lg border border-[#E8DFD8] text-[11px]"
-                            >
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold text-[#510601]">{r.receiptNumber}</span>
-                                <span className="text-stone-400">•</span>
-                                <span className="text-[#863221]">{r.receiptDate || '—'}</span>
-                                <span className="text-stone-400">•</span>
-                                <span className="text-stone-600 font-medium">{r.paymentMode || '—'}</span>
-                              </div>
-                              <span className="font-mono font-bold text-[#180200]">
-                                {formatMoney(r.amount)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Section 2: Donations & Other Contributions (Separate from Membership Milestones) */}
-                  <div className="bg-white rounded-2xl p-4 border border-[#E8DFD8] shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-amber-100/80 text-amber-800">
-                          <Coins className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-xs uppercase tracking-wider text-[#180200]">
-                            Donations & Other Contributions
-                          </h4>
-                          <p className="text-[10px] text-[#863221]">
-                            Non-membership receipts (Donations, Hostel, Scholarship, Events, etc.)
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] uppercase font-bold text-[#863221] block">Total Contributed</span>
-                        <span className="font-mono font-bold text-sm text-[#3D705C]">
-                          {formatMoney(memStatus.totalOtherPaid)}
-                        </span>
-                      </div>
-                    </div>
-
-                    {memStatus.otherReceipts && memStatus.otherReceipts.length > 0 ? (
-                      <div className="pt-2 border-t border-[#E8DFD8]">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                              <tr className="bg-[#FAF7F2] text-[#863221] text-[10px] uppercase font-bold tracking-wider border-b border-[#E8DFD8]">
-                                <th className="py-2 px-2.5">Receipt No.</th>
-                                <th className="py-2 px-2.5">Date</th>
-                                <th className="py-2 px-2.5">Particulars</th>
-                                <th className="py-2 px-2.5">Sub-Type / Details</th>
-                                <th className="py-2 px-2.5">Payment Mode</th>
-                                <th className="py-2 px-2.5 text-right">Amount</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-[#E8DFD8]/60">
-                              {memStatus.otherReceipts.map((r) => {
-                                const subType =
-                                  r.donationSubType ||
-                                  r.donationDetails ||
-                                  r.othersDescription ||
-                                  r.paymentReceivedDetails ||
-                                  '—';
-                                return (
-                                  <tr key={r.id || r.receiptNumber} className="hover:bg-[#FAF7F2]/40 transition-colors">
-                                    <td className="py-2 px-2.5 font-mono font-bold text-[#510601]">
-                                      {r.receiptNumber}
-                                    </td>
-                                    <td className="py-2 px-2.5 text-[#863221] font-mono text-[11px]">
-                                      {r.receiptDate || '—'}
-                                    </td>
-                                    <td className="py-2 px-2.5 font-semibold text-[#180200]">
-                                      {r.particulars}
-                                    </td>
-                                    <td className="py-2 px-2.5 text-[#863221] text-[11px]">
-                                      {subType}
-                                    </td>
-                                    <td className="py-2 px-2.5 text-stone-600 text-[11px]">
-                                      {r.paymentMode || '—'}
-                                    </td>
-                                    <td className="py-2 px-2.5 text-right font-mono font-bold text-[#180200]">
-                                      {formatMoney(r.amount)}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="pt-2 border-t border-[#E8DFD8]/60 text-center py-2.5 text-stone-400 text-xs">
-                        No donations or non-membership receipts recorded for this member.
-                      </div>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-              {/* Card 1: Contact & Basic Info */}
-              <div className="bg-[#FAF7F2]/40 rounded-xl p-4 border border-[#E8DFD8] grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]">Mobile</span>
-                  <p className="font-mono font-bold text-sm text-[#510601] mt-0.5">
-                    {viewingMember.mobile || viewingMember.mobileNumber || '—'}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]">Email</span>
-                  <p className="font-medium mt-0.5">{viewingMember.email || '—'}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]">Alt Phone</span>
-                  <p className="font-mono mt-0.5">{viewingMember.phone || '—'}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]">Status</span>
-                  <p className="mt-0.5">
-                    <span
-                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${viewingMember.status === 'Active' || viewingMember.status === 'Approved'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : 'bg-red-50 text-red-700 border border-red-200'
-                        }`}
-                    >
-                      {viewingMember.status || 'Active'}
-                    </span>
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]">Gotra</span>
-                  <p className="font-bold mt-0.5">{viewingMember.gothra || '—'}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]">Blood Group</span>
-                  <p className="font-bold mt-0.5">{viewingMember.bloodGroup || '—'}</p>
-                </div>
-              </div>
-
-              {/* New registration-form details */}
-              <MemberApplicationDetails member={viewingMember} />
-
-              {/* Card 2: Address & Location Details */}
-              <div className="bg-white rounded-xl p-4 border border-[#E8DFD8] space-y-3">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-[#510601] uppercase tracking-wider">
-                  <MapPin className="w-4 h-4" />
-                  <span>Address & Geographical Hierarchy</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="sm:col-span-2">
-                    <span className="text-[10px] uppercase font-bold text-[#863221]">Street Address</span>
-                    <p className="font-medium mt-0.5">{viewingMember.addressLine || viewingMember.address || '—'}</p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-[#863221]">Post / Taluk</span>
-                    <p className="font-medium mt-0.5">{viewingMember.talukName || viewingMember.post || '—'}</p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-[#863221]">District & State</span>
-                    <p className="font-medium mt-0.5">
-                      {[viewingMember.districtName, viewingMember.stateName].filter(Boolean).join(', ') || '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-[#863221]">PIN Code</span>
-                    <p className="font-mono font-bold text-sm text-[#510601] mt-0.5">
-                      {viewingMember.postalCode || '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-bold text-[#863221]">Label Point</span>
-                    <p className="font-medium mt-0.5">{viewingMember.labelPoint || 'Primary'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Card 3: Membership & Magazine Remarks */}
-              <div className="bg-[#FAF7F2]/40 rounded-xl p-4 border border-[#E8DFD8] grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]">Category</span>
-                  <p className="font-medium mt-0.5">{viewingMember.category || 'Individual'}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]">Profession</span>
-                  <p className="font-medium mt-0.5">{viewingMember.profession || '—'}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-[#863221]">Native Details</span>
-                  <p className="font-medium mt-0.5">{viewingMember.nativeDetails || '—'}</p>
-                </div>
-                <div className="sm:col-span-3">
-                  <span className="text-[10px] uppercase font-bold text-[#863221]">Magazine Remarks</span>
-                  <p className="font-medium mt-0.5">{viewingMember.magazineRemarks || 'Standard dispatch'}</p>
-                </div>
-              </div>
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            </div>
-            <ModalFooter
-              kind="view"
-              onCancel={() => setViewingMember(null)}
-              left={
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedMemberIds(new Set([viewingMember.id]));
-                    setIsLabelPreviewOpen(true);
-                    setViewingMember(null);
-                  }}
-                  className="text-sm font-semibold text-[#510601] hover:text-[#8C1801] cursor-pointer"
-                >
-                  Preview Label
-                </button>
-              }
-            />
-          </div>
-      )}
 
       {/* ==================================================== */}
       {/* MODAL 3: LABEL PREVIEW & PRINT INTERFACE             */}

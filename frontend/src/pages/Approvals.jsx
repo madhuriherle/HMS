@@ -10,7 +10,6 @@ import {
   X,
   AlertTriangle,
   Eye,
-  ArrowRight,
   ArrowLeft,
   FileText,
   History,
@@ -638,7 +637,6 @@ export default function Approvals() {
     return [];
   }, [viewItem]);
   // a request that creates a record has nothing before it: show the fields and their values only
-  const isNewRecord = comparisonRows.length > 0 && comparisonRows.every((r) => r.previous === '—');
 
   if (viewId) {
     return (

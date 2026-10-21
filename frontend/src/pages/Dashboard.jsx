@@ -1,12 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Users, UserCheck, Clock, Activity, UserX, Tag,
-  UserPlus, List, CheckCircle, FileText, ArrowRight, Eye, BookOpen, Printer,
-  X, MapPin, Phone, Mail, Calendar, Award, ShieldCheck, CheckCircle2, AlertCircle
+  Users,
+  UserCheck,
+  Clock,
+  Activity,
+  UserX,
+  Tag,
+  UserPlus,
+  List,
+  FileText,
+  ArrowRight,
+  Eye,
+  BookOpen,
+  Printer,
+  X,
+  MapPin,
+  Phone,
+  Mail,
+  Calendar,
+  Award,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, Legend
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
 } from 'recharts';
 import Modal from '../components/Modal';
 import clsx from 'clsx';
@@ -72,8 +99,8 @@ export default function Dashboard() {
   
   const [recentActivity, setRecentActivity] = useState([]);
   const [membershipTypeData, setMembershipTypeData] = useState([]);
-  const [registrationData, setRegistrationData] = useState([]);
-  const [districtData, setDistrictData] = useState([]);
+  const [registrationData] = useState([]);
+  const [districtData] = useState([]);
   
   // the dashboard is privilege-gated now (dashboard.read); a role without it
   // lands on its first accessible page instead of a screen full of errors.

@@ -1,6 +1,20 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { User, Users, CreditCard, FileText, BookOpen, History, Phone, MapPin, Briefcase, Award, TrendingUp, CalendarDays, Pencil } from 'lucide-react';
+import {
+  User,
+  Users,
+  CreditCard,
+  FileText,
+  BookOpen,
+  History,
+  Phone,
+  MapPin,
+  Briefcase,
+  Award,
+  TrendingUp,
+  CalendarDays,
+  Pencil,
+} from 'lucide-react';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
 import Modal from '../components/Modal';
@@ -53,7 +67,6 @@ const Field = ({ label, value, stack = false }) =>
 const Empty = ({ children }) => <p className="text-xs text-[#863221]/70">{children}</p>;
 
 const phone = (code, number) => (number ? `${code || ''} ${number}`.trim() : '');
-const yesNo = (v) => (v === true ? 'Yes' : v === false ? 'No' : '');
 
 // A relative named on the profile: link to their own profile when their membership number is a member.
 function Relative({ relation, name, number, links }) {
@@ -213,22 +226,6 @@ function CreditBanner({ credit }) {
 // ── Overview: one neat card per section ──
 const initialOf = (name) => String(name || '?').trim().charAt(0).toUpperCase();
 
-function PersonRow({ name, relation, number }) {
-  return (
-    <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-[#FAF7F2] border border-[#E8DFD8] min-w-0">
-      <div className="flex items-center gap-3 min-w-0">
-        <span className="w-10 h-10 rounded-full bg-white border border-[#E8DFD8] text-[#510601] text-sm font-bold flex items-center justify-center shrink-0">
-          {initialOf(name)}
-        </span>
-        <div className="min-w-0">
-          <div className="text-sm font-bold text-[#180200] truncate">{name}</div>
-          {number && <div className="text-[11px] font-mono text-[#863221] truncate">{number}</div>}
-        </div>
-      </div>
-      <span className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-white border border-[#E8DFD8] text-[#510601] shrink-0">{relation}</span>
-    </div>
-  );
-}
 
 function OverviewTab({ id }) {
   const state = useSection(id, 'overview');

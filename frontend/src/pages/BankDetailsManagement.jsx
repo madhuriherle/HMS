@@ -1,6 +1,5 @@
 import FilterToggle from '../components/FilterToggle';
 import React, { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import {
   Plus,
@@ -13,11 +12,9 @@ import {
   CheckCircle2,
   X,
   AlertCircle,
-  AlertTriangle,
   RefreshCw,
-  Copy,
   Check,
-  SlidersHorizontal
+  SlidersHorizontal,
 } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';
@@ -36,15 +33,6 @@ export default function BankDetailsManagement() {
 
   // Dropdown options and bank details come from the Bank master / existing payment modes
   const AVAILABLE_BANK_ACCOUNTS = useMemo(() => [...new Set(banks.map((b) => b.name_en))], [banks]);
-  const BANK_DETAILS_LOOKUP = useMemo(() => {
-    const map = {};
-    banks.forEach((b) => {
-      if (!map[b.name_en]) {
-        map[b.name_en] = { branch: b.branch_name || '', ifscCode: b.ifsc_code || '', accountNumber: b.account_number || '' };
-      }
-    });
-    return map;
-  }, [banks]);
   const AVAILABLE_PAYMENT_MODES = useMemo(
     () => [...new Set(paymentConfigs.map((c) => c.paymentMode).filter(Boolean))],
     [paymentConfigs]
@@ -59,7 +47,7 @@ export default function BankDetailsManagement() {
   const [pageSize, setPageSize] = useState(10);
 
   // Copied helper
-  const [copiedId, setCopiedId] = useState(null);
+  const [] = useState(null);
 
   // Modal States
   const [isAddEditOpen, setIsAddEditOpen] = useState(false);
@@ -174,13 +162,6 @@ export default function BankDetailsManagement() {
     return filteredData.slice(start, start + pageSize);
   }, [filteredData, currentPage, pageSize]);
 
-  const handleCopyText = (id, text) => {
-    if (!text) return;
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-    showToast('Copied to clipboard.');
-  };
 
   // ----------------------------------------------------
   // ADD / EDIT MODAL HANDLERS
@@ -243,17 +224,6 @@ export default function BankDetailsManagement() {
     }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    let finalValue = value;
-    if (name === 'ifscCode') {
-      finalValue = value.toUpperCase();
-    }
-    setFormData((prev) => ({ ...prev, [name]: finalValue }));
-    if (formErrors[name]) {
-      setFormErrors((prev) => ({ ...prev, [name]: '' }));
-    }
-  };
 
   // Preview what the display label will be
   const previewLabel = useMemo(() => {

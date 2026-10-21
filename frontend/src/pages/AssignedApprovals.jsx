@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ChevronLeft, ChevronRight, Check, Eye, Pencil } from 'lucide-react';
+import { Search, Check, Eye, Pencil } from 'lucide-react';
 import api from '../api';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';

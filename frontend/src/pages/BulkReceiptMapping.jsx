@@ -1,24 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import Pager from '../components/Pager';
 import FilterToggle from '../components/FilterToggle';
 import { Link } from 'react-router-dom';
-import {
-  Link2,
-  CheckCircle2,
-  AlertTriangle,
-  Search,
-  CheckSquare,
-  Loader2,
-  Check,
-  User,
-  CreditCard,
-  Building,
-  RefreshCw,
-  Sparkles,
-  Layers,
-  Filter,
-  X
-} from 'lucide-react';
+import { CheckCircle2, Search, Loader2, Sparkles, Filter, X } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';
 import PermissionGate from '../components/PermissionGate';
@@ -280,19 +264,8 @@ export default function BulkReceiptMapping() {
   };
 
   // Calculate statistics
-  const exactMatchCount = useMemo(() => {
-    return candidates.filter((c) => c.match_type === 'EXACT_NUMBER').length;
-  }, [candidates]);
 
-  const matchedAmount = useMemo(() => {
-    return candidates
-      .filter((c) => c.matched_member)
-      .reduce((sum, c) => sum + (c.net_amount || 0), 0);
-  }, [candidates]);
 
-  const totalAmount = useMemo(() => {
-    return candidates.reduce((sum, c) => sum + (c.net_amount || 0), 0);
-  }, [candidates]);
 
   return (
     <PermissionGate required={['receipts.tracking.read', 'receipts.read']} title="Access Restricted" message="You need permission to track receipts to access Bulk Mapping.">

@@ -1,7 +1,7 @@
 from typing import Any, Optional, Union
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Query
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 from api import deps
 from models.users import User
@@ -24,7 +24,11 @@ def _event_variables(event: Event) -> dict:
     """Standard {{placeholders}} for event notifications."""
     return {
         "event_title": event.title or "",
-        "event_date": event.event_date.isoformat() if event.event_date else "",
+        "event_date": (
+            f"{event.event_date.isoformat()} to {event.end_date.isoformat()}"
+            if event.event_date and event.end_date and event.end_date != event.event_date
+            else (event.event_date.isoformat() if event.event_date else "")
+        ),
         "location": event.location or "",
     }
 
@@ -44,7 +48,7 @@ def read_events(
     from core.sorting import sort_query
     q = db.query(Event).filter(Event.is_deleted == False)
     if upcoming_only:
-        q = q.filter(Event.event_date >= date.today())
+        q = q.filter(func.coalesce(Event.end_date, Event.event_date) >= date.today())
     if search:
         like = f"%{search}%"
         q = q.filter(or_(Event.title.ilike(like), Event.location.ilike(like)))
@@ -66,14 +70,14 @@ def read_upcoming_events(
     from datetime import date
     events = (
         db.query(Event)
-        .filter(Event.is_deleted == False, Event.event_date >= date.today())
+        .filter(Event.is_deleted == False, func.coalesce(Event.end_date, Event.event_date) >= date.today())
         .order_by(Event.event_date)
         .limit(min(limit, 50))
         .all()
     )
     return {"total": len(events), "data": [
         {
-            "id": e.id, "title": e.title, "event_date": e.event_date,
+            "id": e.id, "title": e.title, "event_date": e.event_date, "end_date": e.end_date,
             "location": e.location, "invitation_file_path": e.invitation_file_path,
         } for e in events
     ]}
@@ -128,6 +132,7 @@ def read_event_detail(
             "title": event.title,
             "description": event.description,
             "event_date": event.event_date,
+            "end_date": event.end_date,
             "location": event.location,
             "invitation_file_path": event.invitation_file_path,
         },

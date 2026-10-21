@@ -6,14 +6,12 @@ import {
   Download,
   CheckCircle2,
   AlertTriangle,
-  AlertCircle,
-  Users,
   Loader2,
   RefreshCw,
   FileText,
   Check,
   X,
-  History
+  History,
 } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';

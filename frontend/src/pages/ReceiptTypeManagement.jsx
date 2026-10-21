@@ -1,6 +1,5 @@
 import FilterToggle from '../components/FilterToggle';
 import React, { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import {
   FileText,
@@ -10,7 +9,6 @@ import {
   Trash2,
   ChevronRight,
   ChevronDown,
-  ChevronUp,
   GripVertical,
   ChevronLeft,
   CheckCircle2,
@@ -18,7 +16,7 @@ import {
   AlertCircle,
   AlertTriangle,
   RefreshCw,
-  Layers
+  Layers,
 } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';

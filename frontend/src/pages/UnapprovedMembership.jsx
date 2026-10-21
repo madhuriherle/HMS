@@ -2,56 +2,38 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import useSort from '../hooks/useSort';
 import Pager from '../components/Pager';
 import SortTh from '../components/SortTh';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
 import DateInput from '../components/DateInput';
 import {
-  UserCheck,
   User,
   Search,
   Eye,
   CheckCircle2,
   X,
   AlertCircle,
-  AlertTriangle,
   MapPin,
   Phone,
-  Mail,
-  Calendar,
-  Layers,
   Check,
-  Filter,
   RefreshCw,
-  Award,
-  Clock,
   FileText,
-  Link as LinkIcon,
   Link2,
   Loader2,
-  ChevronRight,
-  ChevronLeft,
-  ShieldAlert,
-  Sparkles,
   ArrowRight,
   XCircle,
-  CheckSquare,
   LayoutGrid,
   List,
   Download,
-  RotateCcw
+  RotateCcw,
 } from 'lucide-react';
 import api from '../api';
 import { formatDate } from '../utils/dateUtils';
 import MemberApplicationDetails from '../components/MemberApplicationDetails';
 import { askReason } from '../utils/dialogs';
 import { notify } from '../utils/notify';
-import {
-  loadUnapprovedPage,
-  loadMembershipTypes,
-  loadLocations
-} from '../utils/serverData';
+import { loadUnapprovedPage, loadMembershipTypes, loadLocations } from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
@@ -66,21 +48,7 @@ import { fetchReceiptRow } from '../utils/apiAdapters';
 // box (often the applicant's own id, since an applicant has no membership number yet). These helpers
 // only rank and label such receipts; mapping always stays a human click.
 // ----------------------------------------------------
-const digitsOnly = (value) => String(value ?? '').replace(/\D/g, '');
-const flatText = (value) => String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
-const receiptMatchScore = (candidate, member) => {
-  if (!candidate || !member) return 0;
-  let score = 0;
-  const memberMobile = digitsOnly(member.mobile || member.mobileNumber);
-  if (memberMobile && digitsOnly(candidate.payer_mobile) === memberMobile) score += 4;
-  if (flatText(candidate.payer_membership_no) === String(member.id)) score += 3;
-  const memberNumber = flatText(member.membershipNumber);
-  if (memberNumber && flatText(candidate.payer_membership_no) === memberNumber) score += 3;
-  const memberName = flatText(member.fullName || member.name);
-  if (memberName && flatText(candidate.payer_name) === memberName) score += 2;
-  return score;
-};
 
 // assignedOnly: the final-approval queue (members whose receipt is already assigned)
 export default function UnapprovedMembership({ assignedOnly = false }) {
@@ -94,7 +62,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
   const [counts, setCounts] = useState({ with_receipt: 0, without_receipt: 0 });
-  const [loadingPage, setLoadingPage] = useState(true);
+  const [, setLoadingPage] = useState(true);
   const [membershipTypes, setMembershipTypes] = useState([]);
   const [states, setStates] = useState([]);
   const [districts, setDistricts] = useState([]);
@@ -175,7 +143,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   }, []);
 
   // Toast feedback
-  const [toastMessage, setToastMessage] = useState(null);
+  const [toastMessage] = useState(null);
   const showToast = (message, type = 'success') => {
     notify(message, type);
   };
@@ -284,7 +252,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     return st ? districts.filter((d) => d.stateId === st.id) : districts;
   }, [districts, states, stateFilter]);
 
-  const filteredList = unapprovedMembers; // the server already searched, filtered, sorted and paged them
   const paginatedList = unapprovedMembers;
 
   // Checkbox helpers
@@ -598,9 +565,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   };
 
   // Metric counts
-  const countTotal = counts.with_receipt + counts.without_receipt;
-  const countPendingReceipt = counts.without_receipt;
-  const countAssigned = counts.with_receipt;
 
   useSwalConfirm(
     validationBlockDialog,

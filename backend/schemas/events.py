@@ -1,6 +1,6 @@
 from typing import Optional
 from datetime import datetime, date
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 # Guests attend; honoured persons are felicitated on stage.
 VALID_PARTICIPANT_TYPES = {"GUEST", "HONOURED"}
@@ -10,8 +10,15 @@ class EventBase(BaseModel):
     title: str
     description: Optional[str] = None
     event_date: date
+    end_date: Optional[date] = None
     location: Optional[str] = None
     invitation_file_path: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _end_not_before_start(self):
+        if self.end_date and self.end_date < self.event_date:
+            raise ValueError("End date cannot be before the event date")
+        return self
 
 class EventCreate(EventBase):
     pass
@@ -20,8 +27,15 @@ class EventUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     event_date: Optional[date] = None
+    end_date: Optional[date] = None
     location: Optional[str] = None
     invitation_file_path: Optional[str] = None
+
+    @model_validator(mode="after")
+    def _end_not_before_start(self):
+        if self.end_date and self.event_date and self.end_date < self.event_date:
+            raise ValueError("End date cannot be before the event date")
+        return self
 
 class EventInDBBase(EventBase):
     id: int

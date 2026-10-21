@@ -1,25 +1,17 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Link, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
   User,
-  ChevronRight,
   ChevronLeft,
-  Check,
   CheckCircle2,
   AlertCircle,
-  Phone,
-  Calendar,
-  Building,
-  MapPin,
   Save,
-  ArrowLeft,
-  Tag,
   Plus,
   Trash2,
   Search,
   Users,
   Heart,
-  Printer
+  Printer,
 } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';
@@ -30,7 +22,7 @@ import {
   loadMembershipTypes,
   loadGothras,
   loadQualifications,
-  loadPaymentModeConfigs
+  loadPaymentModeConfigs,
 } from '../utils/serverData';
 import { validateInternationalPhone, maxPhoneDigits } from '../utils/phoneValidation';
 import useLists, { useCountryCodes } from '../hooks/useLists';
@@ -42,7 +34,6 @@ import PageTitle from '../components/PageTitle';
 import OptionPicker from '../components/OptionPicker';
 import useAuth from '../hooks/useAuth';
 import useRules, { hasDigits } from '../hooks/useRules';
-import { formatMoney } from '../utils/money';
 import { memberName } from '../utils/memberName';
 
 const DEFAULT_CATEGORY = 'Only Havyaka Mahasabha Membership';
@@ -78,7 +69,6 @@ export default function RegisterNewMember() {
   const NAME_TITLES = (rules?.name_titles && rules.name_titles.length > 2)
     ? rules.name_titles
     : ['SRI.', 'SMT.', 'KUMARI', 'DR.', 'PROF.', 'PANDIT', 'MS.'];
-  const CATEGORY_OPTIONS = rules?.membership_type_categories || [];
   const minAge = rules?.member?.min_age ?? 0;
 
   // Mode: add (/register), edit (/edit/:id), view (/view/:id)
@@ -145,11 +135,11 @@ export default function RegisterNewMember() {
 
   // The member being viewed / edited (read from the server)
   const [targetMember, setTargetMember] = useState(null);
-  const [loadingMember, setLoadingMember] = useState(Boolean(params.id));
+  const [, setLoadingMember] = useState(Boolean(params.id));
   const [photoFile, setPhotoFile] = useState(null);
 
   // Form tab: 'membershipDetails' | 'paymentInfo'
-  const [activeFormSection, setActiveFormSection] = useState('membershipDetails');
+  const [] = useState('membershipDetails');
   const fileInputRef = useRef(null);
   const pinWrapperRef = useRef(null);
   const [saving, setSaving] = useState(false);
@@ -511,20 +501,7 @@ export default function RegisterNewMember() {
   // The amount is the price of the membership type chosen in step 1, so it is not typed here (a type with
   // no price, such as an honorary one, still lets the amount be entered). The receipt date of a new registration is today.
   const chosenType = membershipTypes.find((mt) => String(mt.id) === String(formData.membershipTypeId));
-  const amountIsFixed = !isViewMode && Number(chosenType?.currentPrice) > 0;
 
-  const handleMembershipTypeSelect = (typeId) => {
-    const tObj = membershipTypes.find((mt) => String(mt.id) === String(typeId));
-    setFormData((prev) => ({
-      ...prev,
-      membershipTypeId: tObj ? tObj.id : '',
-      membershipType: tObj ? tObj.name : '',
-      amount: tObj ? String(tObj.currentPrice || '') : prev.amount
-    }));
-    if (formErrors.membershipTypeId) {
-      setFormErrors((prev) => ({ ...prev, membershipTypeId: '' }));
-    }
-  };
 
   const handleMobileCountryChange = ({ dialCode, countryIso }) => {
     setFormData((prev) => ({
@@ -640,17 +617,6 @@ export default function RegisterNewMember() {
   };
 
   // the PIN of the different postal address fills its own place, taluk, district and state
-  const handleMagPinChange = async (val) => {
-    const clean = val.replace(/\D/g, '').slice(0, 6);
-    setFormData((prev) => ({ ...prev, magPin: clean }));
-    if (clean.length !== 6) return;
-    const found = await lookupPin(clean).catch(() => ({ found: false }));
-    if (found.found) {
-      setFormData((prev) => (prev.magPin === clean
-        ? { ...prev, magLocality: prev.magLocality || found.area || '', magTaluk: found.talukName || '', magDistrict: found.districtName || '', magState: found.stateName || '' }
-        : prev));
-    }
-  };
 
   const handlePinChange = async (val) => {
     const cleanVal = val.replace(/\D/g, '').slice(0, 6);
@@ -738,7 +704,6 @@ export default function RegisterNewMember() {
   const validateForm = () => {
     const errors = {};
     const cleanName = formData.name.trim();
-    const cleanFather = (formData.fatherName || formData.fatherHusbandName || '').trim();
     const cleanAadhar = formData.aadharNumber.trim();
     const cleanAddress = formData.address.trim();
     const cleanPin = formData.postalCode.trim();
@@ -811,18 +776,6 @@ export default function RegisterNewMember() {
   };
 
   // Moving to the Payment tab (Next button or the tab header) needs step 1 to be complete
-  const goToPaymentStep = () => {
-    if (isViewMode || validateForm()) {
-      setActiveFormSection('paymentInfo');
-      return;
-    }
-    showToast('Please fill the required fields marked with * before moving to Payment Information.', 'error');
-    // bring the first missing field into view once its error message has rendered
-    window.setTimeout(() => {
-      const firstError = document.querySelector('p.text-red-600');
-      if (firstError) firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 100);
-  };
 
   // ----------------------------------------------------
   // FAMILY LOOKUP & CHILDREN HANDLERS
@@ -1296,7 +1249,6 @@ export default function RegisterNewMember() {
                           <input
                             type="text"
                             maxLength={30}
-                            placeholder="Specify relation"
                             value={formData.behalfOtherText}
                             onChange={(e) => setFormData({ ...formData, behalfOtherText: e.target.value })}
                             className="flex-1 min-w-0 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
@@ -1410,7 +1362,12 @@ export default function RegisterNewMember() {
                     <select
                       value={formData.gender}
                       onChange={(e) => {
-                        setFormData({ ...formData, gender: e.target.value });
+                        const g = e.target.value;
+                        const t = formData.nameTitle;
+                        // keep the title in step with the gender, but leave DR. / PROF. / PANDIT alone
+                        const nameTitle = g === 'Female' && t === 'SRI.' ? 'MS.'
+                          : g === 'Male' && ['MS.', 'SMT.', 'KUMARI'].includes(t) ? 'SRI.' : t;
+                        setFormData({ ...formData, gender: g, nameTitle });
                         if (formErrors.gender) setFormErrors({ ...formErrors, gender: '' });
                       }}
                       className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer ${
@@ -1455,7 +1412,6 @@ export default function RegisterNewMember() {
                     <input
                       type="text"
                       maxLength={12}
-                      placeholder="12-digit Aadhar"
                       value={formData.aadharNumber}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
@@ -1847,7 +1803,6 @@ export default function RegisterNewMember() {
                           <div className="flex gap-2">
                             <input
                               type="text"
-                              placeholder="e.g. HMS-00123"
                               value={formData.fatherMembershipNo}
                               onChange={(e) => setFormData({ ...formData, fatherMembershipNo: e.target.value })}
                               className="flex-1 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
@@ -1897,7 +1852,6 @@ export default function RegisterNewMember() {
                           <div className="flex gap-2">
                             <input
                               type="text"
-                              placeholder="e.g. HMS-00124"
                               value={formData.motherMembershipNo}
                               onChange={(e) => setFormData({ ...formData, motherMembershipNo: e.target.value })}
                               className="flex-1 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
@@ -1994,7 +1948,6 @@ export default function RegisterNewMember() {
                           <div className="flex gap-2">
                             <input
                               type="text"
-                              placeholder="e.g. HMS-00125"
                               value={formData.spouseMembershipNo}
                               onChange={(e) => setFormData({ ...formData, spouseMembershipNo: e.target.value })}
                               className="flex-1 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"

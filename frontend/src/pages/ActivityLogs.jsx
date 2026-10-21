@@ -7,16 +7,9 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  Calendar,
-  User as UserIcon,
   RefreshCw,
   Eye,
   Filter,
-  ChevronLeft,
-  ChevronRight,
-  Shield,
-  Clock,
-  Laptop
 } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';

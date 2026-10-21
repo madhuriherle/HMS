@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import api from '../api';
 import { notify } from '../utils/notify';
 import useAuth from '../hooks/useAuth';
@@ -14,7 +13,6 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
-  ChevronRight,
   Upload,
   Image as ImageIcon,
   Trash2,
@@ -27,15 +25,8 @@ import {
   FileText,
   ShieldCheck,
   Eye,
-  Info,
-  Layers,
-  Sparkles
 } from 'lucide-react';
-import {
-  EMPTY_ORGANISATION_SETTINGS,
-  settingsFromApi,
-  settingsToApi
-} from '../utils/organisationStore';
+import { EMPTY_ORGANISATION_SETTINGS, settingsFromApi, settingsToApi } from '../utils/organisationStore';
 import { lookupPin } from '../utils/serverData';
 import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
 import { useList } from '../hooks/useLists';

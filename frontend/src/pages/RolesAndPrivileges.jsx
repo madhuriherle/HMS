@@ -1,7 +1,6 @@
 import FilterToggle from '../components/FilterToggle';
 import React, { useState, useMemo } from 'react';
 import { applyBulk, stateOf, toggleOne } from '../utils/privilegeSelection';
-import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import {
   Shield,
@@ -11,26 +10,17 @@ import {
   Pencil,
   Trash2,
   Eye,
-  Power,
   ChevronRight,
   ChevronLeft,
   CheckCircle2,
   X,
   AlertCircle,
-  AlertTriangle,
   RefreshCw,
   Users,
-  Key,
-  CheckSquare,
   Check,
   Save,
   Minus,
-  Square,
-  Lock,
-  Calendar,
   Layers,
-  FileText,
-  Clock
 } from 'lucide-react';
 import api from '../api';
 import { formatDate } from '../utils/dateUtils';
@@ -45,12 +35,12 @@ export default function RolesAndPrivileges() {
   // Master state
   const [roles, setRoles] = useState([]);
   
-  const [allPrivileges, setAllPrivileges] = useState([]);
+  const [, setAllPrivileges] = useState([]);
   const [allPrivilegeIds, setAllPrivilegeIds] = useState([]);
   const [privilegeRows, setPrivilegeRows] = useState([]); // module / sub-module rows for the privilege table
   const [disabledPrivilegeIds, setDisabledPrivilegeIds] = useState([]); // privileges of modules that are switched off (not built yet)
 
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
 
   const errDetail = (err, fallback) => {
     const d = err?.response?.data?.detail;
@@ -213,13 +203,6 @@ export default function RolesAndPrivileges() {
   // ----------------------------------------------------
   // SUMMARY METRICS
   // ----------------------------------------------------
-  const summaryStats = useMemo(() => {
-    const total = roles.length;
-    const active = roles.filter(r => isRoleActive(r)).length;
-    const inactive = roles.filter(r => !isRoleActive(r)).length;
-    const totalAssignedUsers = roles.reduce((acc, r) => acc + (r.usersCount || 0), 0);
-    return { total, active, inactive, totalAssignedUsers };
-  }, [roles]);
 
   // ----------------------------------------------------
   // SEARCH & FILTERING
@@ -490,13 +473,6 @@ export default function RolesAndPrivileges() {
     });
   };
 
-  const handleToggleModulePrivileges = (ids) => {
-    setSelectedPrivileges(prev => {
-      const allSelected = ids.every(id => prev.includes(id));
-      if (allSelected) return prev.filter(id => !ids.includes(id));
-      return Array.from(new Set([...prev, ...ids]));
-    });
-  };
 
   const handleMasterToggleAll = () => {
     setSelectedPrivileges(prev =>
@@ -504,19 +480,6 @@ export default function RolesAndPrivileges() {
     );
   };
 
-  const filteredPrivilegeGroups = useMemo(() => {
-    const q = privilegeSearch.toLowerCase().trim();
-    if (!q) return allPrivileges;
-    return allPrivileges
-      .map(g => ({
-        ...g,
-        privileges: g.privileges.filter(p =>
-          p.name.toLowerCase().includes(q) ||
-          (p.description || '').toLowerCase().includes(q)
-        ),
-      }))
-      .filter(g => g.module.toLowerCase().includes(q) || g.privileges.length > 0);
-  }, [allPrivileges, privilegeSearch]);
 
   const handleSavePrivileges = async () => {
     if (!privilegeTargetRole || savingPrivileges) return;

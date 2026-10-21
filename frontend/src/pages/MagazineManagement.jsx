@@ -29,8 +29,6 @@ import {
   Eye,
   Printer,
   Download,
-  ChevronLeft,
-  ChevronRight,
   Play,
   Pause,
   Undo2,
@@ -83,7 +81,6 @@ function Chip({ value }) {
 const INPUT = 'w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] rounded-lg text-sm text-[#180200] focus:outline-none';
 const LABEL = 'block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5';
 const BTN_PRIMARY = 'inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#510601] hover:bg-[#3D0400] text-white text-sm font-bold rounded-xl shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
-const BTN_OUTLINE = 'inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg border border-[#E8DFD8] transition-colors cursor-pointer';
 
 function FieldError({ children }) {
   if (!children) return null;
@@ -258,7 +255,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
   const [rows, setRows] = useState([]);       // ONE page of recipients (at most 200)
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
-  const [summary, setSummary] = useState({ total: 0, active: 0, paused: 0, stopped: 0 });
+  const [, setSummary] = useState({ total: 0, active: 0, paused: 0, stopped: 0 });
   const [loadingRows, setLoadingRows] = useState(true);
   const [search, setSearch] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false); // the filters are shown only when the filter icon is clicked
@@ -335,7 +332,6 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
     }
   };
 
-  const stats = { total: summary.total, active: summary.active, paused: summary.paused, stopped: summary.stopped };
   const subscriptions = rows.filter((r) => r.subscription).map((r) => r.subscription);
 
   const changeStatus = async (sub, delivery_status) => {
@@ -758,7 +754,6 @@ function SubscriptionForm({ editing, memberName, onClose, onSaved }) {
               rows={2}
               value={form.address_override}
               onChange={(e) => setForm((f) => ({ ...f, address_override: e.target.value }))}
-              placeholder="Leave blank to use the member's own address"
               className={INPUT}
             />
           </div>
@@ -992,7 +987,6 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete, subscriptio
               ) : (
                 rows.map((p) => {
                   const isOpen = !p.pause_end_date;
-                  const isActive = p.pause_start_date <= today() && (isOpen || p.pause_end_date >= today());
                   return (
                     <tr key={p.id} className="hover:bg-amber-50/40 transition-colors">
                       <td className="px-4 py-3.5 font-semibold text-gray-900">{subLabel(p.subscription_id)}</td>
@@ -1115,7 +1109,6 @@ function PauseForm({ editing, subOptions, presetSubscriptionId, onClose, onSaved
               <DateInput
                 value={form.pause_start_date}
                 onChange={(e) => setForm((f) => ({ ...f, pause_start_date: e.target.value }))}
-                placeholder="DD-MM-YYYY"
                 className="border border-[#E8DFD8] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
               />
             </div>
@@ -1124,7 +1117,6 @@ function PauseForm({ editing, subOptions, presetSubscriptionId, onClose, onSaved
               <DateInput
                 value={form.pause_end_date}
                 onChange={(e) => setForm((f) => ({ ...f, pause_end_date: e.target.value }))}
-                placeholder="Leave open"
                 className="border border-[#E8DFD8] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
               />
               <FieldError>{errors.pause_end_date}</FieldError>
@@ -1358,7 +1350,6 @@ function ReturnForm({ subOptions, presetSubscriptionId, onClose, onSaved }) {
               <DateInput
                 value={form.return_date}
                 onChange={(e) => setForm((f) => ({ ...f, return_date: e.target.value }))}
-                placeholder="DD-MM-YYYY"
                 className="border border-[#E8DFD8] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
               />
             </div>
@@ -1847,7 +1838,7 @@ function NonMemberSettingModal({ recipient, onClose, onSaved }) {
               rows={2}
               value={form.address_override}
               onChange={(e) => setForm((f) => ({ ...f, address_override: e.target.value }))}
-              placeholder={`Leave blank to use registered address: ${recipient.address || 'None'}`}
+              
               className={INPUT}
             />
             {recipient.address && (

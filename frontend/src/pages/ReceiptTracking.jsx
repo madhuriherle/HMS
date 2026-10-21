@@ -1,29 +1,20 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import useSort from '../hooks/useSort';
 import SortTh from '../components/SortTh';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
 import {
-  ChevronRight,
   Search,
   Eye,
   Pencil,
   Trash2,
   CheckCircle2,
   AlertCircle,
-  AlertTriangle,
   X,
   FileSpreadsheet,
-  User,
   Phone,
   Calendar,
-  Award,
-  Check,
-  RotateCcw,
-  FileText,
-  Building,
-  CreditCard
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import { isReceiptUnmapped } from '../utils/displayHelpers';
@@ -33,7 +24,6 @@ import useSwalConfirm from '../hooks/useSwalConfirm';
 import api from '../api';
 import { formatDate } from '../utils/dateUtils';
 import { apiErrorMessage } from '../utils/apiError';
-import { askForm, askReason, confirmYesNo } from '../utils/dialogs';
 import { notify } from '../utils/notify';
 import { fetchReceiptPage } from '../utils/apiAdapters';
 import Pager from '../components/Pager';
@@ -66,21 +56,6 @@ const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
 // Helper to format date string (YYYY-MM-DD to DD-MM-YYYY)
 // Helper for number to words (Indian Numbering System)
-const numberToWords = (num) => {
-  if (!num || isNaN(num) || num <= 0) return '';
-  const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen '];
-  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-
-  const n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
-  if (!n) return '';
-  let str = '';
-  str += (Number(n[1]) !== 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';
-  str += (Number(n[2]) !== 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : '';
-  str += (Number(n[3]) !== 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : '';
-  str += (Number(n[4]) !== 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : '';
-  str += (Number(n[5]) !== 0) ? ((str !== '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
-  return str.trim() + ' Rupees Only';
-};
 
 // the status names and chip colours come from the server (receipt_statuses in GET /meta/lists)
 // What a receipt line is called: the sub type the clerk picked, else the particular itself
@@ -387,51 +362,9 @@ export default function ReceiptTracking() {
   // ----------------------------------------------------
   // RECEIPT ACTIONS (all server calls): refund, cancel
   // ----------------------------------------------------
-  const isPendingApproval = (data) => Boolean(data && (data.approval_request_id || data.status === 'PENDING'));
 
-  const afterReceiptAction = async (data, doneMessage, pendingMessage) => {
-    showToast(isPendingApproval(data) ? pendingMessage : doneMessage);
-    setViewingReceipt(null);
-    await reloadData();
-  };
 
-  const handleRefundReceipt = async (receipt) => {
-    const v = await askForm({
-      title: `Refund receipt ${receipt.receiptNumber}`,
-      confirmText: 'Record refund',
-      fields: [
-        { name: 'amount', label: 'Refund amount', type: 'number', required: true, value: receipt.amount },
-        { name: 'reference', label: 'Refund reference (optional)' }
-      ]
-    });
-    if (!v) return;
-    try {
-      const { data } = await api.post(`/receipts/${receipt.id}/refund`, {
-        amount: v.amount,
-        status: 'PENDING',
-        refund_reference: v.reference || null
-      });
-      await afterReceiptAction(data, 'Refund recorded.', 'Refund submitted for approval.');
-    } catch (error) {
-      showToast(error.response?.data?.detail || 'Error recording the refund', 'error');
-    }
-  };
 
-  const handleCancelReceipt = async (receipt) => {
-    const reason = await askReason({
-      title: `Cancel receipt ${receipt.receiptNumber}?`,
-      text: 'A cancelled receipt stays on record but no longer counts as paid.',
-      confirmText: 'Yes, cancel receipt',
-      danger: true
-    });
-    if (!reason) return;
-    try {
-      const { data } = await api.post(`/receipts/${receipt.id}/cancel`, { reason });
-      await afterReceiptAction(data, 'Receipt cancelled.', 'Cancellation submitted for approval.');
-    } catch (error) {
-      showToast(error.response?.data?.detail || 'Error cancelling the receipt', 'error');
-    }
-  };
 
   const deleteInFlight = useRef(false);
 

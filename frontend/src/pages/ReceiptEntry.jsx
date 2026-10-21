@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { useLocation, useNavigate, useParams, Link } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ParticularPicker, { lineKey as particularLineKey } from '../components/ParticularPicker';
 import {
   ChevronRight,
@@ -11,24 +11,13 @@ import {
   RotateCcw,
   Save,
   Users,
-  Info,
   Search,
   Eye,
   FileText,
   MapPin,
   Phone,
-  Tag,
-  Building,
-  Heart,
-  Briefcase,
-  Award,
-  Calendar,
-  Layers,
-  CreditCard,
-  Hash,
   Plus,
   Trash2,
-  Coins
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import PermissionGate from '../components/PermissionGate';
@@ -48,9 +37,8 @@ import {
   loadMembershipTypes,
   loadPaymentModeConfigs,
   loadLocations,
-  // (no PIN list on this screen: members arrive with their place)
 } from '../utils/serverData';
-import useRules, { hasDigits, matchesPattern, mobileProblem } from '../hooks/useRules';
+import useRules, { matchesPattern, mobileProblem } from '../hooks/useRules';
 import { formatMoney } from '../utils/money';
 
 import ModalFooter from '../components/ModalFooter';
@@ -71,7 +59,6 @@ const ageFrom = (iso) => {
 };
 
 // What to show for a member's number: the real membership number (given on approval), else their application ID.
-const numberTag = (m) => (m.membershipNumber ? `${m.membershipNumber}` : `ID ${m.registrationNumber || m.id}`);
 
 const toEntryMember = (m, loc) => {
   const pin = { postalCode: m.pincode || '', area: m.post_office_name || '' }; // the server sends the place with the member
@@ -183,7 +170,7 @@ export default function ReceiptEntry() {
   const [rightLoading, setRightLoading] = useState(false);
   const [bottomLoading, setBottomLoading] = useState(false);
   const [selectedMemberReceipts, setSelectedMemberReceipts] = useState([]); // receipts of the member picked
-  const [membershipTypes, setMembershipTypes] = useState([]);
+  const [, setMembershipTypes] = useState([]);
   const [paymentModeConfigs, setPaymentModeConfigs] = useState([]);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [], postalCodes: [] });
   const [saving, setSaving] = useState(false);
@@ -192,7 +179,6 @@ export default function ReceiptEntry() {
   const lookupLocationByPin = () => ({ found: false }); // members arrive with their place already; no PIN list is needed here
 
   // Whether the picked member already has a receipt linked (the server's receipt links, read for that one member)
-  const isMemberReceiptAssigned = (m) => Boolean(m) && Boolean(selectedMember) && String(m.id) === String(selectedMember.id) && selectedMemberReceipts.length > 0;
   const findMatchingReceiptForMember = (m) =>
     m && selectedMember && String(m.id) === String(selectedMember.id) ? selectedMemberReceipts[0] || null : null;
 
@@ -229,13 +215,13 @@ export default function ReceiptEntry() {
 
   // Selected Member State & Lookup State
   const [selectedMember, setSelectedMember] = useState(null);
-  const [lookupMembershipNo, setLookupMembershipNo] = useState('');
+  const [, setLookupMembershipNo] = useState('');
   const [numberCheck, setNumberCheck] = useState(null); // is the typed receipt number free in its financial year?
-  const [lookupError, setLookupError] = useState('');
+  const [, setLookupError] = useState('');
   // "who is this membership number?" answer from the server, shown under the Membership No. box
   const [numberLookup, setNumberLookup] = useState({ status: 'idle', number: '', matches: [] });
   const lookupSeq = useRef(0);
-  const [matchedExistingReceipt, setMatchedExistingReceipt] = useState(null);
+  const [, setMatchedExistingReceipt] = useState(null);
 
   // Search and pagination state for Right-Side Membership List Table
   const [rightSearchQuery, setRightSearchQuery] = useState('');
@@ -700,30 +686,6 @@ export default function ReceiptEntry() {
   };
 
   // "Use this member" on the lookup card: link the receipt to the member / applicant that was found
-  const handleUseLookedUpMember = async (match) => {
-    let mem = null;
-    try {
-      const { data } = await api.get(`/members/${match.id}`); // the full record, when this login may read it
-      mem = toEntryMember(data, locations);
-    } catch (_) {
-      mem = null;
-    }
-    if (!mem) {
-      mem = {
-        id: match.id,
-        fullName: match.name,
-        name: match.name,
-        mobile: match.mobile || '',
-        membershipNumber: match.membership_number || match.member_code || '',
-        registrationNumber: match.registration_number,
-        membershipType: match.membership_type || '',
-        districtName: match.district || '',
-        status: match.member_status === 'ACTIVE' ? 'Active' : 'Inactive',
-      };
-    }
-    if (match.kind === 'applicant') handleAssignFromUnapproved(mem);
-    else handleAssignFromMembership(mem);
-  };
 
   // "ASSIGN TO RECEIPT" FROM BOTTOM UNAPPROVED MEMBERS TABLE (FLOW 1)
   const handleAssignFromUnapproved = (member) => {
@@ -1059,7 +1021,6 @@ export default function ReceiptEntry() {
       return;
     }
 
-    const isAssignmentFlow = entrySource === 'unapproved-assignment' || entrySource === 'membership-assignment';
 
     let targetMember = selectedMember;
     if (!targetMember && formData.membershipNo.trim()) {
@@ -2024,7 +1985,7 @@ export default function ReceiptEntry() {
                       value={formData.transactionId}
                       onChange={handleInputChange}
                       disabled={!formData.paymentMode || formData.paymentMode.toLowerCase() === 'cash'}
-                      placeholder={!formData.paymentMode || formData.paymentMode.toLowerCase() === 'cash' ? '' : 'e.g. UTR / Cheque'}
+                      
                       className={`w-full px-3 py-2 rounded-xl text-xs sm:text-sm font-mono text-[#180200] focus:outline-none focus:bg-white transition-colors ${!formData.paymentMode || formData.paymentMode.toLowerCase() === 'cash'
                         ? 'bg-[#FAF7F2]/50 text-[#863221]/50 cursor-not-allowed border border-[#E8DFD8]/80'
                         : formErrors.transactionId

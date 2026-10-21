@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
-import { Download, Trash2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Download, Trash2, AlertTriangle } from 'lucide-react';
 import api from '../api';
 import PermissionGate from '../components/PermissionGate';
 import PageTitle from '../components/PageTitle';

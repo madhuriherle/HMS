@@ -1,4 +1,4 @@
-import { parsePhoneNumberFromString, isValidPhoneNumber, isPossiblePhoneNumber } from 'libphonenumber-js';
+import { parsePhoneNumberFromString, isPossiblePhoneNumber } from 'libphonenumber-js';
 import { currentLists } from '../hooks/useLists';
 
 /**

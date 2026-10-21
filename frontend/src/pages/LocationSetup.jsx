@@ -1,12 +1,9 @@
 import FilterToggle from '../components/FilterToggle';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import {
-  MapPin,
   Building,
   Layers,
-  FileText,
   Plus,
   Search,
   Pencil,
@@ -17,12 +14,10 @@ import {
   X,
   AlertCircle,
   AlertTriangle,
-  RefreshCw,
   Upload,
   Download,
   Filter,
   Check,
-  Info
 } from 'lucide-react';
 import api from '../api';
 import { askForm, confirmYesNo } from '../utils/dialogs';
@@ -297,13 +292,9 @@ export default function LocationSetup() {
   }, [isPostalModalOpen, postalFormData.districtId]);
 
 
-  const persistStates = () => { fetchMasters(); };
-  const persistDistricts = () => { fetchMasters(); };
-  const persistTaluks = () => { fetchMasters(); };
-  const persistPostalCodes = () => { fetchMasters(); };
 
   // Toast feedback
-  const [toastMessage, setToastMessage] = useState(null);
+  const [toastMessage] = useState(null);
   const showToast = (message, type = 'success') => {
     notify(message, type);
   };
@@ -528,7 +519,7 @@ export default function LocationSetup() {
   const [importFile, setImportFile] = useState(null);
   const [importPreviewRows, setImportPreviewRows] = useState([]);
   const [importSummary, setImportSummary] = useState(null);
-  const [isProcessingImport, setIsProcessingImport] = useState(false);
+  const [, setIsProcessingImport] = useState(false);
   const fileInputRef = useRef(null);
 
   // Filtered districts for Add/Edit PIN modal based on selected state
@@ -1583,7 +1574,6 @@ export default function LocationSetup() {
                     type="text"
                     inputMode="numeric"
                     maxLength={6}
-                    placeholder="e.g. 560001"
                     value={postalPincodeFilter}
                     onChange={(e) => {
                       setPostalPincodeFilter(e.target.value.replace(/\D/g, ''));

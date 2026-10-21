@@ -8,6 +8,8 @@ class Event(AuditMixin, Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=True)
     event_date: Mapped[Date] = mapped_column(Date, nullable=False)
+    # Last day of a multi-day event; empty means a one-day event
+    end_date: Mapped[Date] = mapped_column(Date, nullable=True)
     location: Mapped[str] = mapped_column(String(255), nullable=True)
     invitation_file_path: Mapped[str] = mapped_column(Text, nullable=True)
 

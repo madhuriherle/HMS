@@ -1,12 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import {
-  ChevronDown,
-  ChevronRight,
-  Circle,
-  List,
-  X
-} from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, List, X } from 'lucide-react';
 import { MENU_ICONS } from '../utils/menuIcons';
 import clsx from 'clsx';
 import api from '../api';

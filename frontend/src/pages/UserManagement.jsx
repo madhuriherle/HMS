@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import useSort from '../hooks/useSort';
 import SortTh from '../components/SortTh';
-import { Link } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
@@ -12,14 +11,11 @@ import {
   Pencil,
   Trash2,
   Eye,
-  Power,
   ChevronRight,
   ChevronLeft,
   CheckCircle2,
   X,
   AlertCircle,
-  AlertTriangle,
-  RefreshCw,
   Mail,
   Phone,
   Shield,
@@ -27,11 +23,7 @@ import {
   Lock,
   EyeOff,
   User,
-  Calendar,
-  Clock,
   Check,
-  Layers,
-  FileText
 } from 'lucide-react';
 import api from '../api';
 import { formatDate, formatDateTime } from '../utils/dateUtils';
@@ -62,8 +54,8 @@ export default function UserManagement() {
   // Master state
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [allPrivileges, setAllPrivileges] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [allPrivileges] = useState([]);
+  const [, setLoading] = useState(true);
 
   const { sort, toggle: toggleSort, params: sortParams } = useSort();
   const firstLoad = useRef(true);
@@ -170,13 +162,6 @@ export default function UserManagement() {
   // ----------------------------------------------------
   // SUMMARY METRICS
   // ----------------------------------------------------
-  const summaryStats = useMemo(() => {
-    const total = users.length;
-    const active = users.filter(u => isUserActive(u)).length;
-    const inactive = users.filter(u => !isUserActive(u)).length;
-    const uniqueRolesCount = new Set(users.map(u => u.role_id ?? u.roleId)).size;
-    return { total, active, inactive, uniqueRolesCount };
-  }, [users]);
 
   // ----------------------------------------------------
   // SEARCH & FILTERING
@@ -640,12 +625,6 @@ export default function UserManagement() {
                   const userRoleId = user.role_id ?? user.roleId;
                   const roleObj = getRoleById(userRoleId);
                   const displayName = user.name || user.fullName || '';
-                  const initials = displayName
-                    .split(' ')
-                    .map(n => n[0])
-                    .join('')
-                    .toUpperCase()
-                    .slice(0, 2) || 'U';
                   const isActive = isUserActive(user);
                   const rowRank = user.role_rank_level ?? roleObj?.rank_level;
                   const isRankLocked = rowRank != null && !sameRankOk(rowRank);

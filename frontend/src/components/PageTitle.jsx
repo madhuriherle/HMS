@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useSyncExternalStore } from 'react';
+import React, { createContext, useEffect, useSyncExternalStore } from 'react';
 import { useLocation } from 'react-router-dom';
 
 const SLOT_ID = 'page-title-slot';

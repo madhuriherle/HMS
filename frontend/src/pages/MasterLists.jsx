@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import api from '../api';
 import PermissionGate from '../components/PermissionGate';
 import SearchFilterBar from '../components/SearchFilterBar';

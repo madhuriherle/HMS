@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Calendar,
-  Clock,
   MapPin,
   Plus,
   Pencil,
@@ -9,17 +8,13 @@ import {
   FileText,
   Upload,
   Send,
-  UserCheck,
   Award,
   Search,
-  ExternalLink,
   Users,
   CheckCircle2,
-  AlertCircle,
   X,
   Loader2,
-  Eye,
-  Download
+  Download,
 } from 'lucide-react';
 import api from '../api';
 import useAuth from '../hooks/useAuth';
@@ -69,7 +64,7 @@ export default function EventsManagement() {
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [eventDetail, setEventDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detailTab, setDetailTab] = useState('participants'); // 'participants' | 'invitation'
+  const [, setDetailTab] = useState('participants'); // 'participants' | 'invitation'
 
   // ── Participant Modal (Add / Edit Guest or Honoured Person) ────
   const [participantModalOpen, setParticipantModalOpen] = useState(false);
@@ -180,6 +175,7 @@ export default function EventsManagement() {
     setEventForm({
       title: '',
       event_date: '',
+      end_date: '',
       location: '',
       description: '',
     });
@@ -191,6 +187,7 @@ export default function EventsManagement() {
     setEventForm({
       title: eventItem.title || '',
       event_date: eventItem.event_date || '',
+      end_date: eventItem.end_date || '',
       location: eventItem.location || '',
       description: eventItem.description || '',
     });
@@ -208,12 +205,18 @@ export default function EventsManagement() {
       return;
     }
 
+    if (eventForm.end_date && eventForm.end_date < eventForm.event_date) {
+      notify('The last day cannot be before the first day.', 'error');
+      return;
+    }
+
     setSavingEvent(true);
     try {
       if (editingEvent) {
         await api.put(`/events/${editingEvent.id}`, {
           title: eventForm.title.trim(),
           event_date: eventForm.event_date,
+          end_date: eventForm.end_date || null,
           location: eventForm.location.trim() || null,
           description: eventForm.description.trim() || null,
         });
@@ -222,6 +225,7 @@ export default function EventsManagement() {
         await api.post('/events/', {
           title: eventForm.title.trim(),
           event_date: eventForm.event_date,
+          end_date: eventForm.end_date || null,
           location: eventForm.location.trim() || null,
           description: eventForm.description.trim() || null,
         });
@@ -614,13 +618,13 @@ export default function EventsManagement() {
                 </thead>
                 <tbody className="divide-y divide-[#E8DFD8]">
                   {events.map((e) => {
-                    const isUpcoming = e.event_date && e.event_date >= getTodayISODate();
+                    const isUpcoming = e.event_date && (e.end_date || e.event_date) >= getTodayISODate();
                     return (
                       <tr key={e.id} className="hover:bg-[#FAF7F2]/50 transition-colors">
                         <td className="px-4 py-3 whitespace-nowrap align-top">
                           <div className="flex items-center gap-1.5 font-medium text-[#180200]">
                             <Calendar className="w-3.5 h-3.5 text-[#510601]" />
-                            <span>{e.event_date ? formatDate(e.event_date) : '—'}</span>
+                            <span>{e.event_date ? formatDate(e.event_date) : '—'}{e.end_date && e.end_date !== e.event_date ? ` to ${formatDate(e.end_date)}` : ''}</span>
                           </div>
                           <span
                             className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
@@ -671,29 +675,29 @@ export default function EventsManagement() {
                               type="button"
                               onClick={() => openDetailModal(e)}
                               className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-[#FAF7F2] hover:bg-[#E8DFD8] text-[#510601] font-semibold rounded-lg text-xs transition-colors cursor-pointer"
-                              title="View details & participants"
+                              title="Add guests and honoured persons, and send the event notification"
                             >
-                              <Eye className="w-3.5 h-3.5" />
-                              <span>Manage</span>
+                              <Users className="w-3.5 h-3.5" />
+                              <span>Guests &amp; Send</span>
                             </button>
                             {canWrite && (
                               <button
                                 type="button"
                                 onClick={() => openEditModal(e)}
-                                className="p-1.5 text-[#863221] hover:text-[#510601] hover:bg-[#FAF7F2] rounded-lg transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-[#FAF7F2] hover:bg-[#E8DFD8] text-[#510601] font-semibold rounded-lg text-xs transition-colors cursor-pointer"
                                 title="Edit event"
                               >
-                                <Pencil className="w-4 h-4" /><span>Edit</span>
+                                <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
                               </button>
                             )}
                             {canDelete && (
                               <button
                                 type="button"
                                 onClick={() => handleDeleteEvent(e)}
-                                className="p-1.5 text-[#ED4636] hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-red-50 hover:bg-red-100 text-[#ED4636] font-semibold rounded-lg text-xs transition-colors cursor-pointer"
                                 title="Delete event"
                               >
-                                <Trash2 className="w-4 h-4" /><span>Delete</span>
+                                <Trash2 className="w-3.5 h-3.5" /><span>Delete</span>
                               </button>
                             )}
                           </div>
@@ -747,7 +751,6 @@ export default function EventsManagement() {
                   required
                   value={eventForm.title}
                   onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
-                  placeholder="e.g. Annual Havyaka Mahasammelana"
                   className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
                 />
               </div>
@@ -759,8 +762,17 @@ export default function EventsManagement() {
                 <DateInput
                   value={eventForm.event_date}
                   onChange={(e) => setEventForm({ ...eventForm, event_date: e.target.value })}
-                  placeholder="DD-MM-YYYY"
                   required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
+                  Last Day
+                </label>
+                <DateInput
+                  value={eventForm.end_date}
+                  onChange={(e) => setEventForm({ ...eventForm, end_date: e.target.value })}
                 />
               </div>
 
@@ -772,7 +784,6 @@ export default function EventsManagement() {
                   type="text"
                   value={eventForm.location}
                   onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
-                  placeholder="e.g. Mahasabha Bhavana, Malleshwaram, Bengaluru"
                   className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
                 />
               </div>
@@ -785,7 +796,6 @@ export default function EventsManagement() {
                   rows={3}
                   value={eventForm.description}
                   onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
-                  placeholder="Brief agenda, special instructions, or details..."
                   className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
                 />
               </div>
@@ -837,7 +847,7 @@ export default function EventsManagement() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-sm text-[#180200] font-semibold">
                         <Calendar className="w-4 h-4 text-[#510601]" />
-                        <span>Date: {eventDetail.event.event_date ? formatDate(eventDetail.event.event_date) : '—'}</span>
+                        <span>Date: {eventDetail.event.event_date ? formatDate(eventDetail.event.event_date) : '—'}{eventDetail.event.end_date && eventDetail.event.end_date !== eventDetail.event.event_date ? ` to ${formatDate(eventDetail.event.end_date)}` : ''}</span>
                       </div>
                       {eventDetail.event.location && (
                         <div className="flex items-center gap-2 text-xs text-[#863221]">
@@ -991,7 +1001,7 @@ export default function EventsManagement() {
                                     <button
                                       type="button"
                                       onClick={() => openEditParticipant(h)}
-                                      className="p-1 text-[#863221] hover:text-[#510601] transition-colors"
+                                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-[#510601] bg-[#FAF7F2] hover:bg-[#E8DFD8] rounded-lg transition-colors cursor-pointer"
                                       title="Edit"
                                     >
                                       <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
@@ -1001,7 +1011,7 @@ export default function EventsManagement() {
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteParticipant(h.id, h.name)}
-                                      className="p-1 text-[#ED4636] hover:text-red-700 transition-colors"
+                                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-[#ED4636] bg-red-50 hover:bg-red-100 rounded-lg transition-colors cursor-pointer"
                                       title="Remove"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" /><span>Remove</span>
@@ -1050,7 +1060,7 @@ export default function EventsManagement() {
                                     <button
                                       type="button"
                                       onClick={() => openEditParticipant(g)}
-                                      className="p-1 text-[#863221] hover:text-[#510601] transition-colors"
+                                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-[#510601] bg-[#FAF7F2] hover:bg-[#E8DFD8] rounded-lg transition-colors cursor-pointer"
                                       title="Edit"
                                     >
                                       <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
@@ -1060,7 +1070,7 @@ export default function EventsManagement() {
                                     <button
                                       type="button"
                                       onClick={() => handleDeleteParticipant(g.id, g.name)}
-                                      className="p-1 text-[#ED4636] hover:text-red-700 transition-colors"
+                                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-[#ED4636] bg-red-50 hover:bg-red-100 rounded-lg transition-colors cursor-pointer"
                                       title="Remove"
                                     >
                                       <Trash2 className="w-3.5 h-3.5" /><span>Remove</span>
@@ -1281,7 +1291,6 @@ export default function EventsManagement() {
                   required
                   value={participantForm.participant_name}
                   onChange={(e) => setParticipantForm({ ...participantForm, participant_name: e.target.value })}
-                  placeholder="e.g. Sri Shankara Bhat"
                   className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
                 />
               </div>
@@ -1295,11 +1304,6 @@ export default function EventsManagement() {
                   type="text"
                   value={participantForm.participant_role}
                   onChange={(e) => setParticipantForm({ ...participantForm, participant_role: e.target.value })}
-                  placeholder={
-                    participantForm.participant_type === 'HONOURED'
-                      ? 'e.g. Felicitated for Veda Vidwan Award'
-                      : 'e.g. Chief Guest / Keynote Speaker'
-                  }
                   className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
                 />
               </div>

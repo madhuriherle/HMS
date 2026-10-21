@@ -24,6 +24,7 @@ import Modal from '../components/Modal';
 import ModalFooter from '../components/ModalFooter';
 import { formatDate } from '../utils/dateUtils';
 import { notify } from '../utils/notify';
+import { memberName } from '../utils/memberName';
 import { loadLocations, loadMembershipTypes } from '../utils/serverData';
 
 const TABS = [
@@ -159,6 +160,7 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [templates, setTemplates] = useState([]);
+  const [csvFile, setCsvFile] = useState(null);
 
   // Filter & Search & Pagination states
   const [searchQuery, setSearchQuery] = useState('');
@@ -199,7 +201,8 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
 
   const loadTemplates = useCallback(async () => {
     try {
-      const res = await api.get('/notifications/templates', { params: { limit: 100 } });
+      // only provider-approved templates can be sent
+      const res = await api.get('/notifications/templates', { params: { limit: 100, approval_status: 'APPROVED' } });
       setTemplates(Array.isArray(res.data) ? res.data : (res.data?.data || []));
     } catch (_) {}
   }, []);
@@ -220,6 +223,22 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
     }
 
     try {
+      if (formData.target_audience === 'CSV') {
+        if (!csvFile) {
+          notify('Choose the CSV file with a "mobile" column.', 'error');
+          return;
+        }
+        const body = new FormData();
+        body.append('file', csvFile);
+        await api.post('/notifications/campaigns/csv', body, {
+          params: { campaign_name: formData.campaign_name.trim(), template_id: Number(formData.template_id) },
+        });
+        notify('Campaign created from the CSV. Press Send on it to dispatch.', 'success');
+        setCsvFile(null);
+        setModalOpen(false);
+        loadCampaigns();
+        return;
+      }
       const filters = {};
       if (formData.district_id) filters.district_id = Number(formData.district_id);
       if (formData.taluk_id) filters.taluk_id = Number(formData.taluk_id);
@@ -518,7 +537,6 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
               type="text"
               value={formData.campaign_name}
               onChange={(e) => setFormData({ ...formData, campaign_name: e.target.value })}
-              placeholder="e.g. Annual General Body Meeting Announcement"
               className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
             />
           </div>
@@ -563,10 +581,25 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
               <option value="ALL_APPROVED">All Approved Members</option>
               <option value="UNAPPROVED">Unapproved / Pending Applicants</option>
               <option value="ALL">All Registered Records</option>
+              <option value="CSV">Upload a CSV of mobile numbers</option>
             </select>
           </div>
 
-          <div className="border-t border-[#E8DFD8] pt-3">
+          {formData.target_audience === 'CSV' && (
+            <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-3 space-y-1">
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                className="text-xs"
+              />
+              <p className="text-[11px] text-[#863221]">
+                The first row must have a column named <b>mobile</b>. Any other column, such as name, fills the template tag with the same name. Repeated numbers are sent once.
+              </p>
+            </div>
+          )}
+
+          <div className={`border-t border-[#E8DFD8] pt-3 ${formData.target_audience === 'CSV' ? 'hidden' : ''}`}>
             <span className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-2">Optional Geographic / Category Filters</span>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div>
@@ -999,7 +1032,6 @@ function TemplatesTab({ canWrite, canDelete }) {
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g. Receipt Confirmation"
                 className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
               />
             </div>
@@ -1009,7 +1041,6 @@ function TemplatesTab({ canWrite, canDelete }) {
                 type="text"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                placeholder="e.g. RECEIPT_CONFIRM"
                 className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] font-mono focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
               />
             </div>
@@ -1060,7 +1091,6 @@ function TemplatesTab({ canWrite, canDelete }) {
                 type="text"
                 value={formData.subject}
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                placeholder="Important Notice from Akhila Havyaka Mahasabha"
                 className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
               />
             </div>
@@ -1087,7 +1117,7 @@ function TemplatesTab({ canWrite, canDelete }) {
               rows={5}
               value={formData.body}
               onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-              placeholder="ನಮಸ್ಕಾರ {{name}}, ಅಖಿಲ ಹವ್ಯಕ ಮಹಾಸಭಾದಿಂದ ಪ್ರಕಟಣೆ..."
+              
               className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
             />
           </div>
@@ -1101,119 +1131,140 @@ function TemplatesTab({ canWrite, canDelete }) {
 // 3. QUICK SEND (a popup on the Send Messages page)
 // ==============================================================
 function QuickSendModal({ isOpen, onClose, canWrite }) {
-  const [channel, setChannel] = useState('WHATSAPP');
-  const [recipient, setRecipient] = useState('');
-  const [templateId, setTemplateId] = useState('');
-  const [message, setMessage] = useState('');
+  // Step 1 pick the member, step 2 pick an approved template, step 3 check the preview and send (WhatsApp).
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [member, setMember] = useState(null);
   const [templates, setTemplates] = useState([]);
+  const [templateId, setTemplateId] = useState('');
+  const [extra, setExtra] = useState({}); // values for placeholders the member record cannot fill
   const [sending, setSending] = useState(false);
 
+  const STANDARD = ['name', 'full_name_kn', 'member_code', 'mobile'];
+
   useEffect(() => {
+    if (!isOpen) return;
+    setQuery(''); setResults([]); setMember(null); setTemplateId(''); setExtra({});
     (async () => {
       try {
-        const res = await api.get('/notifications/templates', { params: { limit: 100 } });
-        setTemplates(Array.isArray(res.data) ? res.data : (res.data?.data || []));
-      } catch (_) {}
+        const res = await api.get('/notifications/templates', { params: { limit: 100, approval_status: 'APPROVED' } });
+        setTemplates((Array.isArray(res.data) ? res.data : (res.data?.data || [])).filter((t) => t.status !== false));
+      } catch (_) { setTemplates([]); }
     })();
-  }, []);
+  }, [isOpen]);
 
-  const handleTemplateSelect = (id) => {
-    setTemplateId(id);
-    const t = templates.find((x) => String(x.id) === String(id));
-    if (t) {
-      setChannel(t.channel || 'WHATSAPP');
-      setMessage(t.body || '');
+  const search = async (q) => {
+    setQuery(q);
+    if (!q || q.trim().length < 2) { setResults([]); return; }
+    setSearching(true);
+    try {
+      const res = await api.get('/members/', { params: { search: q.trim(), limit: 8 } });
+      setResults(res.data?.data || res.data || []);
+    } catch (_) {
+      setResults([]);
+    } finally {
+      setSearching(false);
     }
   };
 
+  const template = templates.find((t) => String(t.id) === String(templateId));
+  const placeholders = template ? [...new Set([...(template.content || '').matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]))] : [];
+  const askFor = placeholders.filter((p) => !STANDARD.includes(p));
+  const values = member ? {
+    name: memberName(member) || '',
+    full_name_kn: member.full_name_kn || '',
+    member_code: member.membership_number || member.member_code || '',
+    mobile: member.mobile || '',
+    ...extra,
+  } : {};
+  const preview = template
+    ? (template.content || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => (values[k] !== undefined && values[k] !== '' ? values[k] : `{{${k}}}`))
+    : '';
+  const ready = member && member.mobile && template && askFor.every((k) => String(extra[k] || '').trim());
+
   const handleSend = async (e) => {
     e?.preventDefault?.();
-    if (!recipient.trim() || !message.trim()) {
-      notify('Recipient number/email and message body are required.', 'error');
-      return;
-    }
-
+    if (!ready) return;
     setSending(true);
     try {
-      await api.post('/notifications/send-individual', {
-        channel,
-        destination: recipient.trim(),
-        message: message.trim(),
-        template_id: templateId ? Number(templateId) : undefined,
+      await api.post('/notifications/send-individual', askFor.length ? { ...extra } : {}, {
+        params: { member_id: member.id, template_id: template.id },
       });
-      notify('Message sent successfully.', 'success');
-      setRecipient('');
-      setMessage('');
-      setTemplateId('');
+      notify('Message queued for WhatsApp.', 'success');
       onClose();
     } catch (err) {
-      console.error('Failed to send message:', err);
-      notify(err.response?.data?.detail || 'Failed to dispatch message.', 'error');
+      if (err.response?.data?.detail) notify(err.response.data.detail, 'error');
     } finally {
       setSending(false);
     }
   };
 
+  const label = 'block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1';
+  const field = 'w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]';
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Quick Send Direct Message">
+    <Modal isOpen={isOpen} onClose={onClose} title="Quick Send - WhatsApp message to a member">
       <form onSubmit={handleSend} className="flex-1 flex flex-col justify-between">
-        <div className="p-6 space-y-4 flex-1 overflow-y-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Communication Channel</label>
-              <select
-                value={channel}
-                onChange={(e) => setChannel(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
-              >
-                <option value="WHATSAPP">WhatsApp</option>
-                <option value="SMS">SMS</option>
-                <option value="EMAIL">Email</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Load Template (Optional)</label>
-              <select
-                value={templateId}
-                onChange={(e) => handleTemplateSelect(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] cursor-pointer"
-              >
-                <option value="">Draft custom message...</option>
-                {templates
-                  .filter((t) => t.channel === channel)
-                  .map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-              </select>
-            </div>
+        <div className="p-6 space-y-5 flex-1 overflow-y-auto">
+          <div>
+            <label className={label}>1 · Member *</label>
+            {member ? (
+              <div className="flex items-center justify-between gap-3 px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs">
+                <span className="text-[#180200] font-semibold">
+                  {memberName(member) || member.full_name_kn}
+                  <span className="font-normal text-[#863221]"> · {member.membership_number || member.member_code || '-'} · {member.mobile || 'no mobile'}</span>
+                </span>
+                <button type="button" onClick={() => setMember(null)} className="text-[#510601] font-semibold cursor-pointer">Change</button>
+              </div>
+            ) : (
+              <>
+                <input type="text" value={query} onChange={(e) => search(e.target.value)} placeholder="Search by name, mobile or membership number" className={field} />
+                {searching && <p className="text-[11px] text-[#863221] mt-1">Searching...</p>}
+                {results.length > 0 && (
+                  <div className="mt-1 border border-[#E8DFD8] rounded-xl divide-y divide-[#E8DFD8] max-h-44 overflow-y-auto">
+                    {results.map((m) => (
+                      <button key={m.id} type="button" onClick={() => { setMember(m); setResults([]); }} className="w-full text-left px-3 py-2 text-xs hover:bg-[#FAF7F2] cursor-pointer">
+                        <span className="font-semibold text-[#180200]">{memberName(m) || m.full_name_kn}</span>
+                        <span className="text-[#863221]"> · {m.membership_number || m.member_code || '-'} · {m.mobile || 'no mobile'}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+            {member && !member.mobile && <p className="text-[11px] text-[#ED4636] mt-1">This member has no mobile number, so a message cannot be sent.</p>}
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">
-              Recipient {channel === 'EMAIL' ? 'Email Address' : 'Mobile Number'} *
-            </label>
-            <input
-              type="text"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              placeholder={channel === 'EMAIL' ? 'user@example.com' : '9876543210'}
-              className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
-            />
+            <label className={label}>2 · Approved template *</label>
+            <select value={templateId} onChange={(e) => { setTemplateId(e.target.value); setExtra({}); }} disabled={!member} className={`${field} cursor-pointer disabled:opacity-50`}>
+              <option value="">{member ? 'Choose a template...' : 'Pick the member first'}</option>
+              {templates.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
+            </select>
+            {templates.length === 0 && <p className="text-[11px] text-[#863221] mt-1">No approved templates yet. Templates must be approved before they can be sent.</p>}
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-[#863221] uppercase tracking-wider mb-1">Message Body *</label>
-            <textarea
-              rows={5}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type your communication message here..."
-              className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
-            />
-          </div>
+          {askFor.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {askFor.map((k) => (
+                <div key={k}>
+                  <label className={label}>{k.replace(/_/g, ' ')} *</label>
+                  <input type="text" value={extra[k] || ''} onChange={(e) => setExtra({ ...extra, [k]: e.target.value })} className={field} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {template && (
+            <div>
+              <label className={label}>3 · Preview</label>
+              <div className="px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] whitespace-pre-wrap">{preview}</div>
+              <p className="text-[11px] text-[#863221] mt-1">Goes to {member?.mobile || '-'} on WhatsApp. For a number that is not a member, use Send Messages.</p>
+            </div>
+          )}
         </div>
-        <ModalFooter onCancel={onClose} busy={sending} disabled={!canWrite} submitLabel="Send Message" />
+        <ModalFooter onCancel={onClose} busy={sending} disabled={!canWrite || !ready} submitLabel="Send on WhatsApp" />
       </form>
     </Modal>
   );
@@ -1455,7 +1506,6 @@ function InboxTab({ canWrite }) {
               type="text"
               value={broadcastBody.title}
               onChange={(e) => setBroadcastBody({ ...broadcastBody, title: e.target.value })}
-              placeholder="e.g. System Maintenance Notice"
               className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
             />
           </div>
@@ -1476,7 +1526,6 @@ function InboxTab({ canWrite }) {
               rows={4}
               value={broadcastBody.body}
               onChange={(e) => setBroadcastBody({ ...broadcastBody, body: e.target.value })}
-              placeholder="Enter announcement details..."
               className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
             />
           </div>
