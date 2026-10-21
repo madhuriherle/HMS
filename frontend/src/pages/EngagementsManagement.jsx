@@ -38,6 +38,7 @@ import PageActions, { PageActionsSlot } from '../components/PageActions';
 import PageTitle from '../components/PageTitle';
 import { formatDate } from '../utils/dateUtils';
 import { notify } from '../utils/notify';
+import { askReason } from '../utils/dialogs';
 import Swal from 'sweetalert2';
 import { memberName } from '../utils/memberName';
 
@@ -118,20 +119,11 @@ function AffiliationsView({ canWrite, canDelete }) {
   });
   const [saving, setSaving] = useState(false);
 
-  // Contacts modal
-  const [contactsModalOpen, setContactsModalOpen] = useState(false);
-  const [activeAffForContacts, setActiveAffForContacts] = useState(null);
-  const [contacts, setContacts] = useState([]);
+  // The contacts are rows inside the same form: one Save writes the group and its contacts
+  const [contactRows, setContactRows] = useState([]); // { key, id (null = new), name, designation, mobile, email }
+  const [originalContacts, setOriginalContacts] = useState([]); // what the server had when the form opened
   const [loadingContacts, setLoadingContacts] = useState(false);
-  const [contactFormOpen, setContactFormOpen] = useState(false);
-  const [editingContact, setEditingContact] = useState(null);
-  const [contactForm, setContactForm] = useState({
-    name: '',
-    mobile: '',
-    email: '',
-    designation: '',
-  });
-  const [savingContact, setSavingContact] = useState(false);
+  const blankRow = () => ({ key: `n${Date.now()}${Math.random()}`, id: null, name: '', designation: '', mobile: '', email: '' });
 
   const loadAffiliations = useCallback(async () => {
     setLoading(true);
@@ -166,47 +158,100 @@ function AffiliationsView({ canWrite, canDelete }) {
 
   const openAddModal = () => {
     setEditingAff(null);
-    setFormData({
-      group_name: '',
-      contact_person: '',
-      contact_number: '',
-      address: '',
-      magazine_enabled: true,
-    });
+    setFormData({ group_name: '', address: '', magazine_enabled: true });
+    setContactRows([blankRow()]);
+    setOriginalContacts([]);
     setFormModalOpen(true);
   };
 
-  const openEditModal = (aff) => {
+  const openEditModal = async (aff) => {
     setEditingAff(aff);
-    setFormData({
-      group_name: aff.group_name || '',
-      contact_person: aff.contact_person || '',
-      contact_number: aff.contact_number || '',
-      address: aff.address || '',
-      magazine_enabled: aff.magazine_enabled !== false,
-    });
+    setFormData({ group_name: aff.group_name || '', address: aff.address || '', magazine_enabled: aff.magazine_enabled !== false });
+    setContactRows([]);
+    setOriginalContacts([]);
     setFormModalOpen(true);
+    setLoadingContacts(true);
+    try {
+      const res = await api.get(`/engagements/affiliations/${aff.id}/contacts`);
+      const list = res.data?.data || [];
+      setOriginalContacts(list);
+      if (list.length > 0) {
+        setContactRows(list.map((c) => ({ key: `c${c.id}`, id: c.id, name: c.name || '', designation: c.designation || '', mobile: c.mobile || '', email: c.email || '' })));
+      } else if (aff.contact_person || aff.contact_number) {
+        // an older group kept its one contact on the group itself: show it as the first row, saved with the form
+        setContactRows([{ ...blankRow(), name: aff.contact_person || '', mobile: aff.contact_number || '' }]);
+      } else {
+        setContactRows([blankRow()]);
+      }
+    } catch (err) {
+      notify('Could not load the contacts of this group.', 'error');
+      setContactRows([blankRow()]);
+    } finally {
+      setLoadingContacts(false);
+    }
   };
 
+  const updateRow = (key, field, value) =>
+    setContactRows((rows) => rows.map((r) => (r.key === key ? { ...r, [field]: value } : r)));
+  const removeRow = (key) =>
+    setContactRows((rows) => (rows.length > 1 ? rows.filter((r) => r.key !== key) : [blankRow()]));
+
+  // One Save: the group first, then its contacts (new ones added, changed ones updated, removed ones deleted).
+  // The first contact row is the group's main contact (shown in the list and used for labels / messages).
   const handleSaveAffiliation = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (!formData.group_name.trim()) {
       notify('Group Name is required.', 'error');
       return;
     }
+    const rows = contactRows.filter((r) => [r.name, r.designation, r.mobile, r.email].some((v) => String(v).trim()));
+    if (rows.some((r) => !r.name.trim())) {
+      notify('Every contact needs a name.', 'error');
+      return;
+    }
+    const reason = await askReason({
+      title: editingAff ? 'Update this affiliate group?' : 'Save this affiliate group?',
+      text: 'The group and its contacts are saved together.',
+      confirmText: editingAff ? 'Yes, update' : 'Yes, save'
+    });
+    if (!reason) return;
+    const opts = { params: { reason } };
     setSaving(true);
     try {
-      if (editingAff) {
-        await api.put(`/engagements/affiliations/${editingAff.id}`, formData);
-        notify('Affiliation updated.', 'success');
+      const main = rows[0];
+      const body = {
+        ...formData,
+        contact_person: main ? main.name.trim() : '',
+        contact_number: main ? main.mobile.trim() : ''
+      };
+      const { data: saved } = editingAff
+        ? await api.put(`/engagements/affiliations/${editingAff.id}`, body, opts)
+        : await api.post('/engagements/affiliations', body, opts);
+      const affId = saved?.id || editingAff?.id;
+      if (!affId) {
+        // the change went for approval: the contacts can only be added once the group exists
+        notify('Submitted for approval. Add the contacts after it is approved.', 'success');
       } else {
-        await api.post('/engagements/affiliations', formData);
-        notify('Affiliation added.', 'success');
+        const keep = new Set(rows.filter((r) => r.id).map((r) => r.id));
+        for (const old of originalContacts) {
+          if (!keep.has(old.id)) await api.delete(`/engagements/affiliations/${affId}/contacts/${old.id}`, opts);
+        }
+        for (const r of rows) {
+          const payload = { name: r.name.trim(), designation: r.designation.trim(), mobile: r.mobile.trim(), email: r.email.trim() };
+          if (!r.id) {
+            await api.post(`/engagements/affiliations/${affId}/contacts`, payload, opts);
+          } else {
+            const was = originalContacts.find((c) => c.id === r.id) || {};
+            const changed = ['name', 'designation', 'mobile', 'email'].some((k) => (was[k] || '') !== payload[k]);
+            if (changed) await api.put(`/engagements/affiliations/${affId}/contacts/${r.id}`, payload, opts);
+          }
+        }
+        notify(editingAff ? 'Affiliate group updated.' : 'Affiliate group added.', 'success');
       }
       setFormModalOpen(false);
       loadAffiliations();
     } catch (err) {
-      notify(err.response?.data?.detail || 'Failed to save affiliation.', 'error');
+      notify(err.response?.data?.detail || 'Failed to save the affiliate group.', 'error');
     } finally {
       setSaving(false);
     }
@@ -248,74 +293,6 @@ function AffiliationsView({ canWrite, canDelete }) {
       loadAffiliations();
     } catch (err) {
       notify('Failed to update magazine delivery setting.', 'error');
-    }
-  };
-
-  // Contacts
-  const openContactsModal = async (aff) => {
-    setActiveAffForContacts(aff);
-    setContactsModalOpen(true);
-    setLoadingContacts(true);
-    try {
-      const res = await api.get(`/engagements/affiliations/${aff.id}/contacts`);
-      setContacts(res.data?.data || []);
-    } catch {
-      setContacts([]);
-    } finally {
-      setLoadingContacts(false);
-    }
-  };
-
-  const openAddContact = () => {
-    setEditingContact(null);
-    setContactForm({ name: '', mobile: '', email: '', designation: '' });
-    setContactFormOpen(true);
-  };
-
-  const openEditContact = (c) => {
-    setEditingContact(c);
-    setContactForm({
-      name: c.name || '',
-      mobile: c.mobile || '',
-      email: c.email || '',
-      designation: c.designation || '',
-    });
-    setContactFormOpen(true);
-  };
-
-  const handleSaveContact = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
-    if (!contactForm.name.trim()) {
-      notify('Contact name is required.', 'error');
-      return;
-    }
-    setSavingContact(true);
-    try {
-      if (editingContact) {
-        await api.put(`/engagements/affiliations/${activeAffForContacts.id}/contacts/${editingContact.id}`, contactForm);
-        notify('Contact updated.', 'success');
-      } else {
-        await api.post(`/engagements/affiliations/${activeAffForContacts.id}/contacts`, contactForm);
-        notify('Contact added.', 'success');
-      }
-      setContactFormOpen(false);
-      const res = await api.get(`/engagements/affiliations/${activeAffForContacts.id}/contacts`);
-      setContacts(res.data?.data || []);
-    } catch (err) {
-      notify(err.response?.data?.detail || 'Failed to save contact.', 'error');
-    } finally {
-      setSavingContact(false);
-    }
-  };
-
-  const handleDeleteContact = async (c) => {
-    try {
-      await api.delete(`/engagements/affiliations/${activeAffForContacts.id}/contacts/${c.id}`);
-      notify('Contact deleted.', 'success');
-      const res = await api.get(`/engagements/affiliations/${activeAffForContacts.id}/contacts`);
-      setContacts(res.data?.data || []);
-    } catch (err) {
-      notify('Failed to delete contact.', 'error');
     }
   };
 
@@ -411,15 +388,6 @@ function AffiliationsView({ canWrite, canDelete }) {
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       <div className="inline-flex items-center gap-1.5 justify-end">
-                        <button
-                          type="button"
-                          onClick={() => openContactsModal(a)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#FAF7F2] hover:bg-[#E8DFD8] text-[#510601] font-semibold rounded-lg text-xs transition-colors cursor-pointer"
-                          title="Manage Contacts"
-                        >
-                          <Phone className="w-3 h-3" />
-                          <span>Contacts</span>
-                        </button>
                         {canWrite && (
                           <button
                             type="button"
@@ -463,9 +431,9 @@ function AffiliationsView({ canWrite, canDelete }) {
         )}
       </div>
 
-      {/* Modal: Add / Edit Affiliation */}
+      {/* Modal: Add / Edit Affiliate Group (the group and its contacts, one Save) */}
       <Modal isOpen={formModalOpen} onClose={() => setFormModalOpen(false)}>
-        <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
+        <div className="bg-white rounded-2xl max-w-3xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
           <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <h3 className="text-base font-bold text-[#180200]">
               {editingAff ? 'Edit Affiliate Group' : 'Add Affiliate Group'}
@@ -478,67 +446,101 @@ function AffiliationsView({ canWrite, canDelete }) {
               <X className="w-5 h-5" />
             </button>
           </div>
-          <form onSubmit={handleSaveAffiliation} className="p-6 space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                Group Name <span className="text-[#ED4636]">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={formData.group_name}
-                onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
-                placeholder="e.g. Uttara Kannada Havyaka Parishat"
-                className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                Primary Contact Person
-              </label>
-              <input
-                type="text"
-                value={formData.contact_person}
-                onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-                placeholder="e.g. Sri Krishna Hegde"
-                className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                Contact Phone / Mobile
-              </label>
-              <input
-                type="text"
-                value={formData.contact_number}
-                onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
-                placeholder="e.g. 9845012345"
-                className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                Address
-              </label>
-              <textarea
-                rows={3}
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Delivery / correspondence address..."
-                className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
-              />
-            </div>
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="aff_mag_en"
-                checked={formData.magazine_enabled}
-                onChange={(e) => setFormData({ ...formData, magazine_enabled: e.target.checked })}
-                className="accent-[#510601] w-4 h-4 rounded"
-              />
-              <label htmlFor="aff_mag_en" className="text-xs font-bold text-[#180200] cursor-pointer">
-                Enable Magazine Delivery for this Affiliate (Included in label print)
-              </label>
+          <form onSubmit={handleSaveAffiliation} className="flex-1 min-h-0 flex flex-col">
+            <div className="p-6 space-y-5 flex-1 overflow-y-auto">
+              {/* Step 1: the group */}
+              <div className="space-y-4">
+                <p className="text-[11px] font-bold text-[#863221] uppercase tracking-wider">1 · Group details</p>
+                <div>
+                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
+                    Group Name <span className="text-[#ED4636]">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.group_name}
+                    onChange={(e) => setFormData({ ...formData, group_name: e.target.value })}
+                    placeholder="e.g. Uttara Kannada Havyaka Parishat"
+                    className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
+                    Address
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formData.address}
+                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    placeholder="Delivery / correspondence address..."
+                    className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="aff_mag_en"
+                    checked={formData.magazine_enabled}
+                    onChange={(e) => setFormData({ ...formData, magazine_enabled: e.target.checked })}
+                    className="accent-[#510601] w-4 h-4 rounded"
+                  />
+                  <label htmlFor="aff_mag_en" className="text-xs font-bold text-[#180200] cursor-pointer">
+                    Send the magazine to this group (included in label print)
+                  </label>
+                </div>
+              </div>
+
+              {/* Step 2: the people who represent it */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] font-bold text-[#863221] uppercase tracking-wider">2 · Contact persons</p>
+                  <button
+                    type="button"
+                    onClick={() => setContactRows((rows) => [...rows, blankRow()])}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#510601] text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add another contact</span>
+                  </button>
+                </div>
+                <p className="text-[11px] text-[#863221]">The first contact is the group's main contact (shown in the list).</p>
+                {loadingContacts ? (
+                  <div className="py-6 text-center text-xs text-[#863221]">
+                    <Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-[#510601]" />
+                    Loading contacts...
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {contactRows.map((r, i) => (
+                      <div key={r.key} className="grid grid-cols-1 sm:grid-cols-[1.3fr_1fr_1fr_1.3fr_auto] gap-2 items-center">
+                        {[
+                          ['name', i === 0 ? 'Name * (main)' : 'Name *', 'text'],
+                          ['designation', 'Designation', 'text'],
+                          ['mobile', 'Mobile', 'text'],
+                          ['email', 'Email', 'email']
+                        ].map(([field, placeholder, type]) => (
+                          <input
+                            key={field}
+                            type={type}
+                            value={r[field]}
+                            onChange={(e) => updateRow(r.key, field, e.target.value)}
+                            placeholder={placeholder}
+                            className="w-full h-9 px-3 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
+                          />
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => removeRow(r.key)}
+                          className="h-9 w-9 flex items-center justify-center text-[#ED4636] hover:bg-red-50 rounded-xl cursor-pointer"
+                          title="Remove this contact"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <ModalFooter
               inForm
@@ -548,185 +550,6 @@ function AffiliationsView({ canWrite, canDelete }) {
               busy={saving}
               onSubmit={handleSaveAffiliation}
               onCancel={() => setFormModalOpen(false)}
-            />
-          </form>
-        </div>
-      </Modal>
-
-      {/* Modal: Affiliate Contacts List */}
-      <Modal isOpen={contactsModalOpen} onClose={() => setContactsModalOpen(false)}>
-        <div className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
-            <h3 className="text-base font-bold text-[#180200]">
-              Contacts: {activeAffForContacts?.group_name}
-            </h3>
-            <button
-              type="button"
-              onClick={() => setContactsModalOpen(false)}
-              className="p-1.5 rounded-lg text-[#863221] hover:bg-white transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div className="p-6 space-y-4 flex-1 overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-[#863221]">
-                Persons representing this affiliate group
-              </p>
-              {canWrite && (
-                <button
-                  type="button"
-                  onClick={openAddContact}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Contact</span>
-                </button>
-              )}
-            </div>
-
-            {loadingContacts ? (
-              <div className="py-8 text-center text-xs text-[#863221]">
-                <Loader2 className="w-5 h-5 animate-spin mx-auto mb-1 text-[#510601]" />
-                Loading contacts...
-              </div>
-            ) : contacts.length === 0 ? (
-              <div className="py-8 text-center text-xs text-[#863221] bg-[#FAF7F2] rounded-xl border border-[#E8DFD8]">
-                No contact persons added yet.
-              </div>
-            ) : (
-              <div className="border border-[#E8DFD8] rounded-xl overflow-hidden">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-                    <tr>
-                      <th className="px-3 py-2">Name</th>
-                      <th className="px-3 py-2">Designation</th>
-                      <th className="px-3 py-2">Mobile</th>
-                      <th className="px-3 py-2">Email</th>
-                      <th className="px-3 py-2 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E8DFD8]">
-                    {contacts.map((c) => (
-                      <tr key={c.id} className="hover:bg-[#FAF7F2]/40">
-                        <td className="px-3 py-2 font-semibold text-[#180200]">{c.name}</td>
-                        <td className="px-3 py-2 text-[#863221]">{c.designation || '—'}</td>
-                        <td className="px-3 py-2 text-[#180200]">{c.mobile || '—'}</td>
-                        <td className="px-3 py-2 text-[#863221]">{c.email || '—'}</td>
-                        <td className="px-3 py-2 text-right">
-                          <div className="inline-flex items-center gap-1">
-                            {canWrite && (
-                              <button
-                                type="button"
-                                onClick={() => openEditContact(c)}
-                                className="p-1 text-[#863221] hover:text-[#510601]"
-                              >
-                                <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
-                              </button>
-                            )}
-                            {canDelete && (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteContact(c)}
-                                className="p-1 text-[#ED4636] hover:text-red-700"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" /><span>Delete</span>
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-          <div className="px-6 h-14 shrink-0 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-end">
-            <button
-              type="button"
-              onClick={() => setContactsModalOpen(false)}
-              className="px-4 py-2 border border-[#E8DFD8] bg-white text-[#180200] text-xs font-semibold rounded-xl hover:bg-[#FAF7F2]"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Modal: Add / Edit Contact Form */}
-      <Modal isOpen={contactFormOpen} onClose={() => setContactFormOpen(false)}>
-        <div className="bg-white rounded-2xl max-w-md w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
-            <h3 className="text-base font-bold text-[#180200]">
-              {editingContact ? 'Edit Contact' : 'Add Contact Person'}
-            </h3>
-            <button
-              type="button"
-              onClick={() => setContactFormOpen(false)}
-              className="p-1.5 rounded-lg text-[#863221] hover:bg-white transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <form onSubmit={handleSaveContact} className="p-6 space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                Name <span className="text-[#ED4636]">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                value={contactForm.name}
-                onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-                placeholder="Full Name"
-                className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                Designation
-              </label>
-              <input
-                type="text"
-                value={contactForm.designation}
-                onChange={(e) => setContactForm({ ...contactForm, designation: e.target.value })}
-                placeholder="e.g. President / Secretary"
-                className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                Mobile Number
-              </label>
-              <input
-                type="text"
-                value={contactForm.mobile}
-                onChange={(e) => setContactForm({ ...contactForm, mobile: e.target.value })}
-                placeholder="10 digit mobile"
-                className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                Email
-              </label>
-              <input
-                type="email"
-                value={contactForm.email}
-                onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                placeholder="Email address"
-                className="w-full px-3 py-2 text-sm bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
-              />
-            </div>
-            <ModalFooter
-              inForm
-              kind={editingContact ? 'edit' : 'add'}
-              submitLabel={editingContact ? 'Update' : 'Save'}
-              busyLabel={editingContact ? 'Updating...' : 'Saving...'}
-              busy={savingContact}
-              onSubmit={handleSaveContact}
-              onCancel={() => setContactFormOpen(false)}
             />
           </form>
         </div>
@@ -884,7 +707,7 @@ function AssociatesView({ canWrite, canDelete }) {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Register Associate</span>
+            <span>Add Associate</span>
           </button></PageActions>
         )}
       
@@ -1018,7 +841,7 @@ function AssociatesView({ canWrite, canDelete }) {
         <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <h3 className="text-base font-bold text-[#180200]">
-              {editingAssoc ? 'Edit Associate' : 'Register New Associate'}
+              {editingAssoc ? 'Edit Associate' : 'Add Associate'}
             </h3>
             <button
               type="button"
@@ -1113,7 +936,7 @@ function AssociatesView({ canWrite, canDelete }) {
                 className="accent-[#510601] w-4 h-4 rounded"
               />
               <label htmlFor="assoc_mag_en" className="text-xs font-bold text-[#180200] cursor-pointer">
-                Enable Magazine Delivery for this Associate (Included in label print)
+                Send the magazine to this associate (included in label print)
               </label>
             </div>
             <ModalFooter
@@ -1393,7 +1216,7 @@ function PressMediaView({ canWrite, canDelete }) {
         <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col">
           <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
             <h3 className="text-base font-bold text-[#180200]">
-              {editingPress ? 'Edit Press/Media' : 'Add Press/Media'}
+              {editingPress ? 'Edit Press / Media' : 'Add Press / Media'}
             </h3>
             <button
               type="button"
@@ -1476,7 +1299,7 @@ function PressMediaView({ canWrite, canDelete }) {
                 className="accent-[#510601] w-4 h-4 rounded"
               />
               <label htmlFor="press_mag_en" className="text-xs font-bold text-[#180200] cursor-pointer">
-                Enable Magazine Delivery for this Press (Included in label print)
+                Send the magazine to this press / media contact (included in label print)
               </label>
             </div>
             <ModalFooter
@@ -1717,6 +1540,68 @@ function CommitteeView({ canWrite, canDelete }) {
     }
   };
 
+  // Categories, sub-categories and terms are managed in their own lists (website switch, edit, delete)
+  const [subDraft, setSubDraft] = useState({ categoryId: null, name_en: '', name_kn: '' });
+  const failMsg = (err, fallback) => notify(err.response?.data?.detail || fallback, 'error');
+  const toggleCategoryWebsite = async (c) => {
+    try {
+      await api.put(`/engagements/committee/categories/${c.id}`, { display_on_website: !c.display_on_website });
+      notify(`${c.name_en} is ${c.display_on_website ? 'hidden from' : 'shown on'} the website.`, 'success');
+      loadMasters();
+    } catch (err) { failMsg(err, 'Could not change the website setting.'); }
+  };
+  const startEditCategory = (c) => {
+    setEditingCat(c);
+    setCatForm({ name_en: c.name_en || '', name_kn: c.name_kn || '', display_on_website: c.display_on_website !== false });
+  };
+  const deleteCategory = async (c) => {
+    try {
+      await api.delete(`/engagements/committee/categories/${c.id}`);
+      notify('Category deleted.', 'success');
+      loadMasters();
+    } catch (err) { failMsg(err, 'Could not delete the category.'); }
+  };
+  const addSubcategory = async () => {
+    if (!subDraft.name_en.trim()) { notify('Sub-category name is required.', 'error'); return; }
+    try {
+      await api.post('/engagements/committee/subcategories', {
+        category_id: subDraft.categoryId, name_en: subDraft.name_en.trim(), name_kn: subDraft.name_kn.trim() || null, display_on_website: true
+      });
+      notify('Sub-category added.', 'success');
+      setSubDraft({ categoryId: null, name_en: '', name_kn: '' });
+      loadMasters();
+    } catch (err) { failMsg(err, 'Could not add the sub-category.'); }
+  };
+  const deleteSubcategory = async (sub) => {
+    try {
+      await api.delete(`/engagements/committee/subcategories/${sub.id}`);
+      notify('Sub-category deleted.', 'success');
+      loadMasters();
+    } catch (err) { failMsg(err, 'Could not delete the sub-category.'); }
+  };
+  const startEditTerm = (t) => {
+    setEditingTerm(t);
+    setTermForm({ term_name: t.term_name || '', start_date: t.start_date || '', end_date: t.end_date || '', is_current: !!t.is_current });
+  };
+  const makeTermCurrent = async (t) => {
+    try {
+      await api.put(`/engagements/committee/terms/${t.id}`, { is_current: true });
+      notify(`${t.term_name} is now the current term.`, 'success');
+      loadMasters();
+    } catch (err) { failMsg(err, 'Could not change the current term.'); }
+  };
+  const deleteTerm = async (t) => {
+    try {
+      await api.delete(`/engagements/committee/terms/${t.id}`);
+      notify('Term deleted.', 'success');
+      loadMasters();
+    } catch (err) { failMsg(err, 'Could not delete the term.'); }
+  };
+  const readyForMembers = categories.length > 0 && terms.length > 0;
+  const needFirst = categories.length === 0 && terms.length === 0
+    ? 'Add a category and a term first (steps 1 and 2).'
+    : categories.length === 0 ? 'Add a category first (step 1).' : 'Add a term first (step 2).';
+
   // Category save
   const handleSaveCategory = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
@@ -1733,7 +1618,8 @@ function CommitteeView({ canWrite, canDelete }) {
         await api.post('/engagements/committee/categories', catForm);
         notify('Category created.', 'success');
       }
-      setCatModalOpen(false);
+      setEditingCat(null);
+      setCatForm({ name_en: '', name_kn: '', display_on_website: true });
       loadMasters();
     } catch (err) {
       notify(err.response?.data?.detail || 'Failed to save category.', 'error');
@@ -1758,7 +1644,8 @@ function CommitteeView({ canWrite, canDelete }) {
         await api.post('/engagements/committee/terms', termForm);
         notify('Term created.', 'success');
       }
-      setTermModalOpen(false);
+      setEditingTerm(null);
+      setTermForm({ term_name: '', start_date: '', end_date: '', is_current: false });
       loadMasters();
     } catch (err) {
       notify(err.response?.data?.detail || 'Failed to save term.', 'error');
@@ -1771,47 +1658,45 @@ function CommitteeView({ canWrite, canDelete }) {
     <div className="space-y-4">
       {/* Controls & Filter Bar */}
       <PageActions><FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={(selectedCategoryFilter !== 'ALL' ? 1 : 0) + (selectedTermFilter !== 'ALL' ? 1 : 0)} /></PageActions>
-        <div className="flex items-center gap-2">
-          {canWrite && (
-            <>
-              <PageActions><button
-                type="button"
-                onClick={() => {
-                  setEditingCat(null);
-                  setCatForm({ name_en: '', name_kn: '', display_on_website: true });
-                  setCatModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#FAF7F2] hover:bg-[#E8DFD8] text-[#180200] text-xs font-semibold rounded-xl border border-[#E8DFD8] transition-colors cursor-pointer"
-              >
-                <Layers className="w-3.5 h-3.5 text-[#510601]" />
-                <span>Manage Categories</span>
-              </button></PageActions>
+        {canWrite && (
+          <PageActions><button
+            type="button"
+            onClick={openAddMember}
+            disabled={!readyForMembers}
+            title={readyForMembers ? 'Add a committee member' : needFirst}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Member</span>
+          </button></PageActions>
+        )}
 
-              <PageActions><button
+      {/* The three steps, in order */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {[
+          { n: 1, title: 'Categories', sub: `${categories.length} categor${categories.length === 1 ? 'y' : 'ies'}, ${subcategories.length} sub-categor${subcategories.length === 1 ? 'y' : 'ies'}`, icon: Layers, open: () => { setEditingCat(null); setCatForm({ name_en: '', name_kn: '', display_on_website: true }); setCatModalOpen(true); }, action: 'Manage' },
+          { n: 2, title: 'Terms', sub: terms.find((t) => t.is_current) ? `Current: ${terms.find((t) => t.is_current).term_name}` : `${terms.length} term${terms.length === 1 ? '' : 's'}, none current`, icon: Calendar, open: () => { setEditingTerm(null); setTermForm({ term_name: '', start_date: '', end_date: '', is_current: false }); setTermModalOpen(true); }, action: 'Manage' },
+          { n: 3, title: 'Members', sub: readyForMembers ? `${committeeMembers.length} on this list` : needFirst, icon: Users, open: openAddMember, action: 'Add Member', disabled: !readyForMembers }
+        ].map((step) => (
+          <div key={step.n} className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex items-center gap-3">
+            <span className="w-8 h-8 shrink-0 rounded-full bg-[#510601] text-white text-sm font-bold flex items-center justify-center">{step.n}</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-[#180200] flex items-center gap-1.5"><step.icon className="w-4 h-4 text-[#510601]" />{step.title}</p>
+              <p className="text-[11px] text-[#863221] truncate" title={step.sub}>{step.sub}</p>
+            </div>
+            {canWrite && (
+              <button
                 type="button"
-                onClick={() => {
-                  setEditingTerm(null);
-                  setTermForm({ term_name: '', start_date: '', end_date: '', is_current: false });
-                  setTermModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-[#FAF7F2] hover:bg-[#E8DFD8] text-[#180200] text-xs font-semibold rounded-xl border border-[#E8DFD8] transition-colors cursor-pointer"
+                onClick={step.open}
+                disabled={step.disabled}
+                className="px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#E8DFD8] border border-[#E8DFD8] text-[#510601] text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <Calendar className="w-3.5 h-3.5 text-[#510601]" />
-                <span>Manage Terms</span>
-              </button></PageActions>
-
-              <PageActions><button
-                type="button"
-                onClick={openAddMember}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Member</span>
-              </button></PageActions>
-            </>
-          )}
-        </div>
-      
+                {step.action}
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
 
       {filtersOpen && (
         <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center gap-3">
@@ -2164,192 +2049,233 @@ function CommitteeView({ canWrite, canDelete }) {
         </div>
       </Modal>
 
-      {/* Modal: Category Setup */}
+      {/* Modal: Category Setup (step 1) */}
       <Modal isOpen={catModalOpen} onClose={() => setCatModalOpen(false)}>
-        <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="bg-white rounded-2xl max-w-2xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
           <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
-            <h3 className="text-base font-bold text-[#180200]">Committee Categories</h3>
-            <button
-              type="button"
-              onClick={() => setCatModalOpen(false)}
-              className="p-1.5 rounded-lg text-[#863221] hover:bg-white transition-colors"
-            >
+            <h3 className="text-base font-bold text-[#180200]">Step 1 · Categories and sub-categories</h3>
+            <button type="button" onClick={() => setCatModalOpen(false)} className="p-1.5 rounded-lg text-[#863221] hover:bg-white transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
           <div className="p-6 space-y-4 flex-1 overflow-y-auto">
-            {/* Existing categories list */}
             <div className="space-y-2">
-              <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wider">
-                Current Categories ({categories.length})
-              </h4>
-              <div className="border border-[#E8DFD8] rounded-xl divide-y divide-[#E8DFD8] max-h-48 overflow-y-auto">
-                {categories.map((c) => (
-                  <div key={c.id} className="p-2.5 flex items-center justify-between text-xs hover:bg-[#FAF7F2]">
-                    <div>
-                      <p className="font-semibold text-[#180200]">{c.name_en}</p>
-                      {c.name_kn && <p className="text-[11px] text-[#863221]">{c.name_kn}</p>}
+              <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wider">Categories ({categories.length})</h4>
+              {categories.length === 0 && (
+                <p className="text-xs text-[#863221] bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-3">No category yet. Add the first one below.</p>
+              )}
+              <div className="border border-[#E8DFD8] rounded-xl divide-y divide-[#E8DFD8]">
+                {categories.map((c) => {
+                  const subs = subcategories.filter((x) => String(x.category_id) === String(c.id));
+                  return (
+                    <div key={c.id} className="p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2 text-xs">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-[#180200]">{c.name_en}</p>
+                          {c.name_kn && <p className="text-[11px] text-[#863221]">{c.name_kn}</p>}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            disabled={!canWrite}
+                            onClick={() => toggleCategoryWebsite(c)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer ${c.display_on_website ? 'bg-emerald-100 text-emerald-800' : 'bg-[#FAF7F2] text-[#863221] border border-[#E8DFD8]'}`}
+                            title="Show or hide this category on the website"
+                          >
+                            {c.display_on_website ? 'On website' : 'Hidden'}
+                          </button>
+                          {canWrite && (
+                            <button type="button" onClick={() => startEditCategory(c)} className="p-1.5 text-[#863221] hover:text-[#510601] rounded-lg cursor-pointer" title="Edit">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button type="button" onClick={() => deleteCategory(c)} className="p-1.5 text-[#ED4636] hover:bg-red-50 rounded-lg cursor-pointer" title="Delete (only when no member is in it)">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 pl-3 border-l-2 border-[#E8DFD8]">
+                        {subs.map((sub) => (
+                          <span key={sub.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-full text-[11px] text-[#180200]">
+                            {sub.name_en}{sub.name_kn ? ` (${sub.name_kn})` : ''}
+                            {canDelete && (
+                              <button type="button" onClick={() => deleteSubcategory(sub)} className="text-[#ED4636] cursor-pointer" title="Remove sub-category">
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </span>
+                        ))}
+                        {canWrite && (subDraft.categoryId === c.id ? (
+                          <span className="inline-flex items-center gap-1">
+                            <input
+                              autoFocus
+                              value={subDraft.name_en}
+                              onChange={(e) => setSubDraft({ ...subDraft, name_en: e.target.value })}
+                              placeholder="Sub-category (English)"
+                              className="h-7 px-2 text-[11px] border border-[#E8DFD8] rounded-lg focus:outline-none focus:border-[#510601]"
+                            />
+                            <input
+                              value={subDraft.name_kn}
+                              onChange={(e) => setSubDraft({ ...subDraft, name_kn: e.target.value })}
+                              placeholder="ಕನ್ನಡ"
+                              className="h-7 w-28 px-2 text-[11px] border border-[#E8DFD8] rounded-lg focus:outline-none focus:border-[#510601]"
+                            />
+                            <button type="button" onClick={addSubcategory} className="h-7 px-2 bg-[#510601] text-white text-[11px] font-semibold rounded-lg cursor-pointer">Add</button>
+                            <button type="button" onClick={() => setSubDraft({ categoryId: null, name_en: '', name_kn: '' })} className="h-7 px-1.5 text-[#863221] cursor-pointer"><X className="w-3.5 h-3.5" /></button>
+                          </span>
+                        ) : (
+                          <button type="button" onClick={() => setSubDraft({ categoryId: c.id, name_en: '', name_kn: '' })} className="inline-flex items-center gap-0.5 px-2 py-0.5 border border-dashed border-[#863221]/50 text-[#863221] hover:text-[#510601] rounded-full text-[11px] cursor-pointer">
+                            <Plus className="w-3 h-3" />Sub-category
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <span className="text-[10px] text-[#863221]/70">
-                      {c.display_on_website ? 'Website: Yes' : 'Website: No'}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
-            {/* Add New Category Form */}
-            <form onSubmit={handleSaveCategory} className="border-t border-[#E8DFD8] pt-4 space-y-3">
-              <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wider">
-                Add New Category
-              </h4>
-              <div>
-                <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                  Category Name (English) <span className="text-[#ED4636]">*</span>
+            {canWrite && (
+              <form onSubmit={handleSaveCategory} className="border-t border-[#E8DFD8] pt-4 space-y-3">
+                <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wider">
+                  {editingCat ? `Edit category: ${editingCat.name_en}` : 'Add a category'}
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input
+                    type="text"
+                    required
+                    value={catForm.name_en}
+                    onChange={(e) => setCatForm({ ...catForm, name_en: e.target.value })}
+                    placeholder="Name (English) *  e.g. Bangalore Region"
+                    className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
+                  />
+                  <input
+                    type="text"
+                    value={catForm.name_kn}
+                    onChange={(e) => setCatForm({ ...catForm, name_kn: e.target.value })}
+                    placeholder="ಹೆಸರು (ಕನ್ನಡ)  e.g. ಬೆಂಗಳೂರು ಕ್ಷೇತ್ರ"
+                    className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-xs font-bold text-[#180200] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={catForm.display_on_website}
+                    onChange={(e) => setCatForm({ ...catForm, display_on_website: e.target.checked })}
+                    className="accent-[#510601] w-4 h-4 rounded"
+                  />
+                  Show this category on the website
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={catForm.name_en}
-                  onChange={(e) => setCatForm({ ...catForm, name_en: e.target.value })}
-                  placeholder="e.g. Bangalore Region / Executive Council"
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                  Category Name (Kannada)
-                </label>
-                <input
-                  type="text"
-                  value={catForm.name_kn}
-                  onChange={(e) => setCatForm({ ...catForm, name_kn: e.target.value })}
-                  placeholder="e.g. ಬೆಂಗಳೂರು ಕ್ಷೇತ್ರ"
-                  className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="cat_web_disp"
-                  checked={catForm.display_on_website}
-                  onChange={(e) => setCatForm({ ...catForm, display_on_website: e.target.checked })}
-                  className="accent-[#510601] w-4 h-4 rounded"
-                />
-                <label htmlFor="cat_web_disp" className="text-xs font-bold text-[#180200] cursor-pointer">
-                  Display on website
-                </label>
-              </div>
-              <button
-                type="submit"
-                disabled={savingCat}
-                className="w-full py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
-              >
-                {savingCat ? 'Saving...' : 'Add Category'}
-              </button>
-            </form>
+                <div className="flex gap-2">
+                  <button type="submit" disabled={savingCat} className="flex-1 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-bold rounded-xl cursor-pointer disabled:opacity-40">
+                    {savingCat ? 'Saving...' : editingCat ? 'Update Category' : 'Add Category'}
+                  </button>
+                  {editingCat && (
+                    <button type="button" onClick={() => { setEditingCat(null); setCatForm({ name_en: '', name_kn: '', display_on_website: true }); }} className="px-4 py-2 border border-[#E8DFD8] bg-white text-[#180200] text-xs font-semibold rounded-xl cursor-pointer">
+                      Cancel edit
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
+          </div>
+          <div className="px-6 h-14 shrink-0 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
+            <span className="text-[11px] text-[#863221]">Next: step 2, the term.</span>
+            <button type="button" onClick={() => setCatModalOpen(false)} className="px-4 py-2 border border-[#E8DFD8] bg-white text-[#180200] text-xs font-semibold rounded-xl hover:bg-[#FAF7F2] cursor-pointer">Done</button>
           </div>
         </div>
       </Modal>
 
-      {/* Modal: Term Setup */}
+      {/* Modal: Term Setup (step 2) */}
       <Modal isOpen={termModalOpen} onClose={() => setTermModalOpen(false)}>
-        <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+        <div className="bg-white rounded-2xl max-w-xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
           <div className="flex items-center justify-between px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl">
-            <h3 className="text-base font-bold text-[#180200]">Committee Terms</h3>
-            <button
-              type="button"
-              onClick={() => setTermModalOpen(false)}
-              className="p-1.5 rounded-lg text-[#863221] hover:bg-white transition-colors"
-            >
+            <h3 className="text-base font-bold text-[#180200]">Step 2 · Committee terms</h3>
+            <button type="button" onClick={() => setTermModalOpen(false)} className="p-1.5 rounded-lg text-[#863221] hover:bg-white transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
           <div className="p-6 space-y-4 flex-1 overflow-y-auto">
-            {/* Existing terms list */}
             <div className="space-y-2">
-              <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wider">
-                Current Terms ({terms.length})
-              </h4>
-              <div className="border border-[#E8DFD8] rounded-xl divide-y divide-[#E8DFD8] max-h-48 overflow-y-auto">
+              <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wider">Terms ({terms.length})</h4>
+              {terms.length === 0 && (
+                <p className="text-xs text-[#863221] bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-3">No term yet. Add the first one below.</p>
+              )}
+              <div className="border border-[#E8DFD8] rounded-xl divide-y divide-[#E8DFD8]">
                 {terms.map((t) => (
-                  <div key={t.id} className="p-2.5 flex items-center justify-between text-xs hover:bg-[#FAF7F2]">
-                    <div>
+                  <div key={t.id} className="p-2.5 flex items-center justify-between gap-2 text-xs hover:bg-[#FAF7F2]">
+                    <div className="min-w-0">
                       <p className="font-semibold text-[#180200]">{t.term_name}</p>
-                      <p className="text-[11px] text-[#863221]">
-                        {t.start_date || '—'} to {t.end_date || '—'}
-                      </p>
+                      <p className="text-[11px] text-[#863221]">{t.start_date ? formatDate(t.start_date) : '—'} to {t.end_date ? formatDate(t.end_date) : '—'}</p>
                     </div>
-                    {t.is_current && (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                        Current Term
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {t.is_current ? (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">Current</span>
+                      ) : canWrite && (
+                        <button type="button" onClick={() => makeTermCurrent(t)} className="px-2 py-0.5 border border-[#E8DFD8] text-[#510601] text-[10px] font-bold rounded-full cursor-pointer" title="Make this the current term">
+                          Make current
+                        </button>
+                      )}
+                      {canWrite && (
+                        <button type="button" onClick={() => startEditTerm(t)} className="p-1.5 text-[#863221] hover:text-[#510601] rounded-lg cursor-pointer" title="Edit">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button type="button" onClick={() => deleteTerm(t)} className="p-1.5 text-[#ED4636] hover:bg-red-50 rounded-lg cursor-pointer" title="Delete (only when no member is in it)">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Add New Term Form */}
-            <form onSubmit={handleSaveTerm} className="border-t border-[#E8DFD8] pt-4 space-y-3">
-              <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wider">
-                Add New Term
-              </h4>
-              <div>
-                <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                  Term Name <span className="text-[#ED4636]">*</span>
-                </label>
+            {canWrite && (
+              <form onSubmit={handleSaveTerm} className="border-t border-[#E8DFD8] pt-4 space-y-3">
+                <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wider">
+                  {editingTerm ? `Edit term: ${editingTerm.term_name}` : 'Add a term'}
+                </h4>
                 <input
                   type="text"
                   required
                   value={termForm.term_name}
                   onChange={(e) => setTermForm({ ...termForm, term_name: e.target.value })}
-                  placeholder="e.g. 2024–2027 Term"
+                  placeholder="Term name *  e.g. 2024–2027"
                   className="w-full px-3 py-2 text-xs bg-white border border-[#E8DFD8] rounded-xl text-[#180200] focus:outline-none focus:border-[#510601]"
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                    Start Date
-                  </label>
-                  <DateInput
-                    value={termForm.start_date}
-                    onChange={(e) => setTermForm({ ...termForm, start_date: e.target.value })}
-                    placeholder="DD-MM-YYYY"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <DateInput value={termForm.start_date} onChange={(e) => setTermForm({ ...termForm, start_date: e.target.value })} placeholder="Start date" />
+                  <DateInput value={termForm.end_date} onChange={(e) => setTermForm({ ...termForm, end_date: e.target.value })} placeholder="End date" />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1">
-                    End Date
-                  </label>
-                  <DateInput
-                    value={termForm.end_date}
-                    onChange={(e) => setTermForm({ ...termForm, end_date: e.target.value })}
-                    placeholder="DD-MM-YYYY"
+                <label className="flex items-center gap-2 text-xs font-bold text-[#180200] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={termForm.is_current}
+                    onChange={(e) => setTermForm({ ...termForm, is_current: e.target.checked })}
+                    className="accent-[#510601] w-4 h-4 rounded"
                   />
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="term_is_curr"
-                  checked={termForm.is_current}
-                  onChange={(e) => setTermForm({ ...termForm, is_current: e.target.checked })}
-                  className="accent-[#510601] w-4 h-4 rounded"
-                />
-                <label htmlFor="term_is_curr" className="text-xs font-bold text-[#180200] cursor-pointer">
-                  Mark as Current Active Term
+                  This is the current term
                 </label>
-              </div>
-              <button
-                type="submit"
-                disabled={savingTerm}
-                className="w-full py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer disabled:opacity-40"
-              >
-                {savingTerm ? 'Saving...' : 'Add Term'}
-              </button>
-            </form>
+                <div className="flex gap-2">
+                  <button type="submit" disabled={savingTerm} className="flex-1 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-bold rounded-xl cursor-pointer disabled:opacity-40">
+                    {savingTerm ? 'Saving...' : editingTerm ? 'Update Term' : 'Add Term'}
+                  </button>
+                  {editingTerm && (
+                    <button type="button" onClick={() => { setEditingTerm(null); setTermForm({ term_name: '', start_date: '', end_date: '', is_current: false }); }} className="px-4 py-2 border border-[#E8DFD8] bg-white text-[#180200] text-xs font-semibold rounded-xl cursor-pointer">
+                      Cancel edit
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
+          </div>
+          <div className="px-6 h-14 shrink-0 border-t border-[#E8DFD8] bg-[#FAF7F2] flex items-center justify-between">
+            <span className="text-[11px] text-[#863221]">Next: step 3, add the members.</span>
+            <button type="button" onClick={() => setTermModalOpen(false)} className="px-4 py-2 border border-[#E8DFD8] bg-white text-[#180200] text-xs font-semibold rounded-xl hover:bg-[#FAF7F2] cursor-pointer">Done</button>
           </div>
         </div>
       </Modal>

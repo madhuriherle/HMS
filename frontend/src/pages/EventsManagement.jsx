@@ -832,6 +832,7 @@ export default function EventsManagement() {
               <div className="p-6 space-y-6 flex-1 overflow-y-auto">
                 {/* Event Summary Box */}
                 <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-4">
+                  <p className="text-[11px] font-bold text-[#863221] uppercase tracking-wider mb-2">1 · Event details <span className="normal-case font-normal">(saved; change them with Edit in the events list)</span></p>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 text-sm text-[#180200] font-semibold">
@@ -846,20 +847,6 @@ export default function EventsManagement() {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {/* Send Notification Button */}
-                      {canNotify && (
-                        <button
-                          type="button"
-                          onClick={openNotifyModal}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#3D705C] hover:bg-[#2d5445] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
-                          title="WhatsApp all linked participants & members"
-                        >
-                          <Send className="w-3.5 h-3.5" />
-                          <span>Send Notification</span>
-                        </button>
-                      )}
-                    </div>
                   </div>
 
                   {eventDetail.event.description && (
@@ -875,7 +862,7 @@ export default function EventsManagement() {
                     <div>
                       <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wider flex items-center gap-1.5">
                         <FileText className="w-4 h-4 text-[#510601]" />
-                        <span>Invitation Copy</span>
+                        <span>2 · Invitation copy</span>
                       </h4>
                       <p className="text-[11px] text-[#863221] mt-0.5">
                         Official circular, pamphlet, or invitation card for this event
@@ -931,7 +918,7 @@ export default function EventsManagement() {
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E8DFD8] pb-2">
                     <div>
                       <h4 className="text-sm font-bold text-[#180200]">
-                        Guests & Honourable Persons
+                        3 · Guests & honourable persons
                       </h4>
                       <p className="text-xs text-[#863221]">
                         When linked to a Havyaka Member, this event automatically appears on their profile screen.
@@ -1088,6 +1075,33 @@ export default function EventsManagement() {
                     </div>
                   )}
                 </div>
+
+                {/* Step 4: tell the people */}
+                {canNotify && (
+                  <div className="bg-white border border-[#E8DFD8] rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-xs font-bold text-[#180200] uppercase tracking-wider flex items-center gap-1.5">
+                        <Send className="w-4 h-4 text-[#510601]" />
+                        <span>4 · Send notification</span>
+                      </h4>
+                      <p className="text-[11px] text-[#863221] mt-0.5">
+                        {((eventDetail.guests || []).length + (eventDetail.honoured || []).length) > 0
+                          ? 'WhatsApp the guests, honoured persons and linked members, once the list above is complete.'
+                          : 'Add the guests and honoured persons first (step 3), then send.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={openNotifyModal}
+                      disabled={((eventDetail.guests || []).length + (eventDetail.honoured || []).length) === 0}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#3D705C] hover:bg-[#2d5445] text-white text-xs font-semibold rounded-lg shadow-sm transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                      title="WhatsApp all linked participants & members"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>Send Notification</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ) : null}
 
