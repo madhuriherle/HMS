@@ -60,6 +60,8 @@ def activate_member(db: Session, member: Member, *, activated_by: int, reason: O
     """Apply the activation mutations. Does NOT commit — the caller owns the
     transaction (and, for the WhatsApp activation message, the background
     task queue)."""
+    if member.approval_status == "REJECTED":
+        raise HTTPException(409, f"{member.display_name or 'This applicant'} was rejected in the meeting: re-open the application first")
     gaps = approval_gaps(member)
     if gaps:
         name = member.display_name or f"Member {member.id}"

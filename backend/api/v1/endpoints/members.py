@@ -50,6 +50,8 @@ def read_members(
     no_membership_type: bool = False,   # members who have not reached any type yet
     receipt_assigned: Optional[bool] = None,   # True: has a receipt mapped; False: none yet
     with_receipt: bool = False,         # carry each member's latest receipt and the with / without counts
+    exported: Optional[bool] = None,    # True: only applicants that were on a meeting PDF; False: never exported
+    exported_on: Optional[date] = None, # only applicants that were on a meeting PDF exported that day
 ) -> Any:
     """Retrieve members with optional filters and search (offline + online). Newest first unless sort_by is given.
     At most 200 per request (rule 10.6); the search and the filters run on every member, the page is a slice."""
@@ -121,6 +123,13 @@ def read_members(
             Member.pincode_id.in_(db.query(PostalCode.id).filter(PostalCode.pincode.ilike(f"%{search}%"))),
         ))
 
+    if exported is not None or exported_on:
+        from models.members import MemberMeetingExport
+        on_pdf = db.query(MemberMeetingExport.member_id).filter(MemberMeetingExport.is_deleted == False)  # noqa: E712
+        if exported_on:
+            on_pdf = on_pdf.filter(MemberMeetingExport.exported_on == exported_on)
+        query = query.filter(Member.id.notin_(on_pdf) if (exported is False and not exported_on) else Member.id.in_(on_pdf))
+
     summary = None
     if with_receipt or receipt_assigned is not None:
         from models.receipts import Receipt, ReceiptAllocation
@@ -147,6 +156,7 @@ def read_members(
     _attach_membership_types(db, result["data"])
     if with_receipt:
         _attach_latest_receipts(db, result["data"])
+        _attach_meeting_info(db, result["data"])
         result["summary"] = summary
     return result
 
@@ -203,6 +213,31 @@ def read_label_list(
     result = paginate(q, page, limit, serializer=lambda row: {**_to_plain(row[0], set()), "last_receipt_date": row[1].isoformat() if row[1] else None})
     _attach_membership_types(db, result["data"])
     return result
+
+
+def _attach_meeting_info(db: Session, rows: list) -> None:
+    """Each listed applicant carries the day of their latest meeting PDF (None when never exported), and for a
+    rejected one the reason and day of the latest Disagree."""
+    from models.members import MemberMeetingExport
+    ids = [r.get("id") for r in rows if isinstance(r, dict) and r.get("id")]
+    last, rejected = {}, {}
+    if ids:
+        for member_id, day in (
+            db.query(MemberMeetingExport.member_id, func.max(MemberMeetingExport.exported_on))
+            .filter(MemberMeetingExport.member_id.in_(ids), MemberMeetingExport.is_deleted == False)  # noqa: E712
+            .group_by(MemberMeetingExport.member_id).all()
+        ):
+            last[member_id] = day.isoformat()
+        for h in (
+            db.query(MemberApprovalHistory)
+            .filter(MemberApprovalHistory.member_id.in_(ids), MemberApprovalHistory.action == "REJECT")
+            .order_by(MemberApprovalHistory.id.asc()).all()
+        ):
+            rejected[h.member_id] = {"reason": h.reason, "on": h.acted_at.date().isoformat() if h.acted_at else None}
+    for r in rows:
+        if isinstance(r, dict):
+            r["last_exported_on"] = last.get(r.get("id"))
+            r["rejection"] = rejected.get(r.get("id"))
 
 
 def _attach_latest_receipts(db: Session, rows: list) -> None:
@@ -1155,6 +1190,135 @@ def approve_member(
     # not fail when it is missing or the member has no mobile number.
     _queue_activation_notification(db, background_tasks, member, activated_by=current_user.id)
     return member
+
+
+@router.put("/{id}/reject")
+def reject_member(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.unapproved.write")),
+    id: int,
+    reason: str = Query(..., min_length=1, description="Why the meeting said Disagree"),
+) -> Any:
+    """Disagree in the meeting: the applicant becomes REJECTED (never gets a membership number). Their receipts go
+    back to Unassigned so they can be mapped to someone else. /reopen brings them back to Unapproved."""
+    member = crud_members.member.get(db=db, id=id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    if member.approval_status != "UNAPPROVED":
+        raise HTTPException(status_code=409, detail=f"Only an unapproved applicant can be rejected (this one is {member.approval_status})")
+    from services import receipt_status
+    now = datetime.now(timezone.utc)
+    unassigned = receipt_status.unassign_member_receipts(db, id, current_user.id, at=now)
+    member.approval_status = "REJECTED"
+    member.updated_by = current_user.id
+    db.add(MemberApprovalHistory(
+        member_id=id, action="REJECT", old_status="UNAPPROVED", new_status="REJECTED",
+        reason=reason.strip(), acted_by=current_user.id, acted_at=now, created_by=current_user.id,
+    ))
+    db.commit()
+    return {"message": "Application rejected", "member_id": id, "unassigned_receipts": unassigned}
+
+
+@router.put("/{id}/reopen")
+def reopen_member(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.unapproved.write")),
+    id: int,
+    reason: str = Query(..., min_length=1, description="Why the application is taken up again"),
+) -> Any:
+    """A rejected applicant goes back to Unapproved, to be assigned a receipt and decided on again."""
+    member = crud_members.member.get(db=db, id=id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    if member.approval_status != "REJECTED":
+        raise HTTPException(status_code=409, detail="Only a rejected applicant can be re-opened")
+    now = datetime.now(timezone.utc)
+    member.approval_status = "UNAPPROVED"
+    member.updated_by = current_user.id
+    db.add(MemberApprovalHistory(
+        member_id=id, action="REOPEN", old_status="REJECTED", new_status="UNAPPROVED",
+        reason=reason.strip(), acted_by=current_user.id, acted_at=now, created_by=current_user.id,
+    ))
+    db.commit()
+    return {"message": "Application re-opened", "member_id": id}
+
+
+class MeetingExportBody(pydantic.BaseModel):
+    member_ids: List[int] = pydantic.Field(min_length=1, max_length=5000)
+
+
+@router.post("/meeting-export")
+def export_meeting_pdf(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.unapproved.read")),
+    body: MeetingExportBody,
+) -> Any:
+    """The PDF the committee takes to the meeting: one row per unapproved applicant given, with an empty Decision
+    column. Every applicant on it is logged with today's date (the screens filter on that). Nothing is blocked."""
+    import uuid
+    from fastapi.responses import Response
+    from fpdf import FPDF
+    from fpdf.enums import Align
+    from core.pagination import _to_plain
+    from models.members import MemberMeetingExport
+
+    members = (
+        db.query(Member)
+        .filter(Member.id.in_(set(body.member_ids)), Member.is_deleted == False, Member.approval_status == "UNAPPROVED")  # noqa: E712
+        .order_by(Member.created_at.asc(), Member.id.asc()).all()
+    )
+    if not members:
+        raise HTTPException(status_code=404, detail="None of these applicants is awaiting approval")
+    rows = [_to_plain(m, set()) for m in members]
+    _attach_membership_types(db, rows)
+    _attach_latest_receipts(db, rows)
+
+    today = date.today()
+    ref = uuid.uuid4().hex[:20]
+    for m in members:
+        db.add(MemberMeetingExport(member_id=m.id, exported_on=today, export_ref=ref, created_by=current_user.id))
+    db.commit()
+
+    fonts = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))), "assets", "fonts")
+    pdf = FPDF(orientation="L", unit="mm", format="A4")
+    pdf.set_title(f"Applicants for the meeting {today:%d-%m-%Y}")
+    pdf.add_font("Mtg", "", os.path.join(fonts, "NotoSans-Regular.ttf"))
+    pdf.add_font("Mtg", "B", os.path.join(fonts, "NotoSans-Bold.ttf"))
+    pdf.add_font("MtgKn", "", os.path.join(fonts, "NotoSansKannada-Regular.ttf"))
+    pdf.add_font("MtgKn", "B", os.path.join(fonts, "NotoSansKannada-Bold.ttf"))
+    pdf.set_fallback_fonts(["MtgKn"])
+    pdf.set_text_shaping(True)
+    pdf.set_margins(10, 10, 10)
+    pdf.set_auto_page_break(True, margin=12)
+    pdf.add_page()
+    pdf.set_font("Mtg", "B", 14)
+    pdf.cell(0, 8, f"Applicants for approval - meeting list ({today:%d-%m-%Y})", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Mtg", "", 9)
+    pdf.cell(0, 6, f"{len(rows)} applicant{'s' if len(rows) != 1 else ''}. Decision: tick Agree or Disagree.", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
+    pdf.set_font("Mtg", "", 8.5)
+    with pdf.table(col_widths=(10, 14, 62, 28, 34, 44, 34, 51), text_align=Align.L, line_height=5.2) as table:
+        head = table.row()
+        for h in ("#", "ID", "Name", "Mobile", "Membership", "Place", "Receipt", "Decision"):
+            head.cell(h)
+        for i, r in enumerate(rows, 1):
+            name = r.get("full_name_en") or " ".join(p for p in (r.get("first_name_en"), r.get("middle_name_en"), r.get("last_name_en")) if p)
+            if r.get("full_name_kn"):
+                name = f"{name}\n{r['full_name_kn']}"
+            place = ", ".join(str(x) for x in (r.get("city") or r.get("locality"), r.get("district_name")) if x)
+            rc = r.get("receipt")
+            receipt = f"{rc['receipt_number']}\n{rc['receipt_date'] or ''}" if rc else "Not assigned"
+            row = table.row()
+            for v in (str(i), str(r["id"]), name, r.get("mobile") or "-", r.get("membership_type") or "-", place or "-", receipt,
+                      "[  ] Agree     [  ] Disagree"):
+                row.cell(v)
+    return Response(
+        content=bytes(pdf.output()), media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="meeting-list-{today:%Y-%m-%d}.pdf"', "X-Export-Date": today.isoformat()},
+    )
 
 
 def _queue_activation_notification(

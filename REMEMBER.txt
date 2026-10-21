@@ -704,6 +704,14 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
       merged into Stopped); stopping or starting on the Magazine page also sets the member's magazine_needed, and
       deleting a subscription sets it to No. A member's Yes at registration starts the subscription at FINAL APPROVAL
       (services/member_activation.py), not at registration or at receipt assignment.
+15.26 MEETING PDF AND AGREE / DISAGREE (migration 0092). Unapproved Membership has Export PDF: it lists every applicant the
+      current search and filters give (all pages), POST /members/meeting-export, and logs each one in
+      member_meeting_exports with today's date. Nothing is blocked by it: Agree stays available for everyone; the
+      "Only exported" filter (and an exported-on date) just shows the list that went to the meeting. Agree = the normal
+      approve. Disagree = PUT /members/{id}/reject (reason required): approval_status becomes REJECTED, the applicant's
+      receipts go back to Unassigned, the reason is kept in member_approval_history (action REJECT). A rejected
+      applicant never gets a membership number (approve refuses with 409) and is listed under the Rejected status
+      filter; Re-open (PUT /members/{id}/reopen, reason required) puts them back to UNAPPROVED. Disagree no longer deletes.
 
 ================================================================================
 

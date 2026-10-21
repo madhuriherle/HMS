@@ -38,7 +38,9 @@ import {
   XCircle,
   CheckSquare,
   LayoutGrid,
-  List
+  List,
+  Download,
+  RotateCcw
 } from 'lucide-react';
 import api from '../api';
 import { formatDate } from '../utils/dateUtils';
@@ -99,6 +101,18 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
   const { sort, toggle: toggleSort, params: sortParams } = useSort();
   const requestSeq = useRef(0);
+  // Disagree puts an applicant under Rejected; Re-open brings them back. The meeting PDF logs who was on it.
+  const [statusFilter, setStatusFilter] = useState('UNAPPROVED'); // UNAPPROVED | REJECTED
+  const [exportFilter, setExportFilter] = useState('ALL'); // ALL | EXPORTED | NOT_EXPORTED
+  const [exportedOn, setExportedOn] = useState(''); // a day: only those on the PDF exported that day
+  const [exporting, setExporting] = useState(false);
+  const meetingParams = () => {
+    const extra = { approval_status: statusFilter };
+    if (exportedOn) extra.exported_on = exportedOn;
+    else if (exportFilter === 'EXPORTED') extra.exported = true;
+    else if (exportFilter === 'NOT_EXPORTED') extra.exported = false;
+    return extra;
+  };
   // what the server is asked for: the page, the search, the filters and the sort. They run on every applicant in the
   // database; this screen only holds the page it shows (rule 10.6).
   const loadPage = async () => {
@@ -121,6 +135,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
       }
       if (receiptStatusFilter === 'Assigned') params.receipt_assigned = true;
       if (receiptStatusFilter === 'Pending') params.receipt_assigned = false;
+      Object.assign(params, meetingParams());
       const result = await loadUnapprovedPage(params);
       if (seq !== requestSeq.current) return; // a newer request is on its way
       setUnapprovedMembers(result.rows);
@@ -179,7 +194,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
   // the page is read again whenever the page, the search, a filter or the sort changes (default: newest first)
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const filterKey = [debouncedSearch, typeFilter, stateFilter, districtFilter, receiptStatusFilter, sort.by, sort.dir].join('|');
+  const filterKey = [debouncedSearch, typeFilter, stateFilter, districtFilter, receiptStatusFilter, statusFilter, exportFilter, exportedOn, sort.by, sort.dir].join('|');
   const mastersReady = membershipTypes.length > 0 || states.length > 0;
   useEffect(() => {
     loadPage();
@@ -309,6 +324,9 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     setStateFilter('ALL');
     setDistrictFilter('ALL');
     setReceiptStatusFilter('ALL');
+    setStatusFilter('UNAPPROVED');
+    setExportFilter('ALL');
+    setExportedOn('');
     setCurrentPage(1);
   };
 
@@ -446,26 +464,86 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     setApproveDialog(member);
   };
 
-  // Reject = remove the application (the server records the reason)
+  // Disagree = the meeting said no: the applicant moves under Rejected (the server records the reason and frees the receipt)
   const handleReject = async (member) => {
     const reason = await askReason({
-      title: `Reject ${member.fullName || member.name}?`,
-      text: 'The application is removed from the unapproved list.',
-      confirmText: 'Yes, reject',
+      title: `Disagree on ${member.fullName || member.name}?`,
+      text: 'The application moves to Rejected. Its receipt goes back to Unassigned. It can be re-opened later.',
+      confirmText: 'Yes, disagree',
       danger: true
     });
     if (!reason) return;
     try {
-      const { data } = await api.delete(`/members/${member.id}`, { params: { reason, mode: 'SOFT' } });
-      showToast(
-        data?.status === 'PENDING'
-          ? `Rejection of ${member.fullName || member.name} submitted for approval.`
-          : `Application of ${member.fullName || member.name} rejected.`
-      );
+      await api.put(`/members/${member.id}/reject`, null, { params: { reason } });
+      showToast(`Application of ${member.fullName || member.name} rejected.`);
       if (viewingMember) setViewingMember(null);
       await reloadData();
     } catch (error) {
       showToast(error.response?.data?.detail || 'Error rejecting the application', 'error');
+    }
+  };
+
+  // Re-open = a rejected applicant goes back to Unapproved, to be assigned a receipt and decided on again
+  const handleReopen = async (member) => {
+    const reason = await askReason({
+      title: `Re-open ${member.fullName || member.name}?`,
+      text: 'The application goes back to Unapproved Membership.',
+      confirmText: 'Yes, re-open'
+    });
+    if (!reason) return;
+    try {
+      await api.put(`/members/${member.id}/reopen`, null, { params: { reason } });
+      showToast(`Application of ${member.fullName || member.name} re-opened.`);
+      await reloadData();
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Error re-opening the application', 'error');
+    }
+  };
+
+  // The PDF for the meeting: every applicant the current search and filters give (not only this page). The server
+  // logs each one with today's date, which the Exported filter then uses.
+  const handleExportPdf = async () => {
+    if (exporting || total === 0) return;
+    setExporting(true);
+    try {
+      const base = { limit: 200, ...sortParams };
+      if (debouncedSearch.trim()) base.search = debouncedSearch.trim();
+      if (typeFilter !== 'ALL') {
+        const type = membershipTypes.find((mt) => mt.name.toLowerCase() === typeFilter.toLowerCase());
+        if (type) base.membership_type_id = type.id;
+      }
+      if (stateFilter !== 'ALL') {
+        const st = states.find((x) => x.name.toLowerCase() === stateFilter.toLowerCase());
+        if (st) base.state_id = st.id;
+      }
+      if (districtFilter !== 'ALL') {
+        const d = districts.find((x) => x.name.toLowerCase() === districtFilter.toLowerCase());
+        if (d) base.district_id = d.id;
+      }
+      if (receiptStatusFilter === 'Assigned') base.receipt_assigned = true;
+      if (receiptStatusFilter === 'Pending') base.receipt_assigned = false;
+      Object.assign(base, meetingParams());
+      const ids = [];
+      for (let page = 1; page <= pages; page += 1) {
+        const result = await loadUnapprovedPage({ ...base, page });
+        result.rows.forEach((m) => ids.push(m.id));
+        if (result.rows.length === 0) break;
+      }
+      const { data, headers } = await api.post('/members/meeting-export', { member_ids: ids }, { responseType: 'blob', params: { reason: 'Meeting PDF exported' } });
+      const url = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `meeting-list-${headers['x-export-date'] || new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast(`${ids.length} applicant${ids.length === 1 ? '' : 's'} exported for the meeting.`);
+      await reloadData();
+    } catch (error) {
+      showToast(error.response?.data?.detail || 'Could not export the meeting list.', 'error');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -539,9 +617,9 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     approveDialog,
     () => setApproveDialog(null),
     (d) => ({
-      title: 'Approve membership?',
-      text: `Approve ${d.fullName || d.name} (${d.membershipType})? The member moves to the Membership List.`,
-      confirmText: 'Yes, approve',
+      title: 'Agree to the membership?',
+      text: `Agree to ${d.fullName || d.name} (${d.membershipType})? The member is approved and moves to the Membership List.`,
+      confirmText: 'Yes, agree',
     }),
     handleConfirmApproval
   );
@@ -560,6 +638,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           setCurrentPage(1);
         }}
         activeFiltersCount={
+          (statusFilter !== 'UNAPPROVED' ? 1 : 0) +
+          (exportFilter !== 'ALL' || exportedOn ? 1 : 0) +
           (typeFilter !== 'ALL' ? 1 : 0) +
           (stateFilter !== 'ALL' ? 1 : 0) +
           (districtFilter !== 'ALL' ? 1 : 0) +
@@ -569,6 +649,18 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
         rightSlot={
           (
             <div className="flex items-center gap-2 flex-wrap">
+              {statusFilter === 'UNAPPROVED' && (
+                <button
+                  type="button"
+                  onClick={handleExportPdf}
+                  disabled={exporting || total === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#510601] text-xs font-bold rounded-xl transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Download the listed applicants as a PDF for the meeting; they are marked as exported today"
+                >
+                  {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                  <span>Export PDF</span>
+                </button>
+              )}
               <span className="text-xs font-bold text-[#510601] bg-[#FAF7F2] px-2.5 py-1.5 rounded-lg border border-[#E8DFD8]">
                 {selectedIds.size} selected
               </span>
@@ -578,10 +670,10 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                     type="button"
                     onClick={handleBulkApprove}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-[#510601] hover:bg-[#863221] text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-40"
-                    title="Approve selected members"
+                    title="Agree to the selected applicants"
                   >
                     <Check className="w-3.5 h-3.5" />
-                    <span>Approve Selected</span>
+                    <span>Agree Selected</span>
                   </button>
                 )
               )}
@@ -600,6 +692,47 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           )
         }
       >
+        {/* 0. Pending or Rejected (the Assigned queue only holds applicants still to be decided) */}
+        {!assignedOnly && <FilterSelect
+          value={statusFilter}
+          onChange={(val) => {
+            setStatusFilter(val);
+            setSelectedIds(new Set());
+            setCurrentPage(1);
+          }}
+          options={[
+            { value: 'UNAPPROVED', label: 'Awaiting decision' },
+            { value: 'REJECTED', label: 'Rejected' }
+          ]}
+          widthClass="w-full sm:w-44"
+        />}
+
+        {/* Meeting PDF: only the applicants that were on an exported PDF, or on the one exported on a given day */}
+        {statusFilter === 'UNAPPROVED' && <FilterSelect
+          value={exportFilter}
+          onChange={(val) => {
+            setExportFilter(val);
+            if (val !== 'EXPORTED') setExportedOn('');
+            setCurrentPage(1);
+          }}
+          options={[
+            { value: 'ALL', label: 'All (exported or not)' },
+            { value: 'EXPORTED', label: 'Only exported' },
+            { value: 'NOT_EXPORTED', label: 'Not exported yet' }
+          ]}
+          widthClass="w-full sm:w-48"
+        />}
+        {statusFilter === 'UNAPPROVED' && exportFilter === 'EXPORTED' && (
+          <div className="w-full sm:w-40">
+            <DateInput
+              value={exportedOn}
+              onChange={(e) => { setExportedOn(e.target.value); setCurrentPage(1); }}
+              placeholder="Exported on"
+              className="w-full h-9 px-3 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]"
+            />
+          </div>
+        )}
+
         {/* 1. Membership Type */}
         <FilterSelect
           value={typeFilter}
@@ -692,9 +825,13 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                   <td colSpan={selectionMode ? 6 : 5} className="py-12 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center">
                       <CheckCircle2 className="w-8 h-8 text-[#3D705C]/50 mb-2" />
-                      <p className="font-semibold text-sm text-[#180200]">No unapproved memberships</p>
+                      <p className="font-semibold text-sm text-[#180200]">
+                        {statusFilter === 'REJECTED' ? 'No rejected applications' : 'No unapproved memberships'}
+                      </p>
                       <p className="text-xs text-[#863221] mt-1">
-                        All online registrations have been reviewed and approved.
+                        {statusFilter === 'REJECTED'
+                          ? 'Applicants the meeting disagreed on show here, and can be re-opened.'
+                          : 'All online registrations have been reviewed and approved.'}
                       </p>
                     </div>
                   </td>
@@ -716,7 +853,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           <input
                             type="checkbox"
                             checked={isSelected}
-                            disabled={!isAssigned}
+                            disabled={!isAssigned || statusFilter !== 'UNAPPROVED'}
                             title={isAssigned ? undefined : 'Assign a receipt first, then this applicant can be approved'}
                             onChange={() => handleToggleSelectRow(m.id)}
                             className="w-4 h-4 rounded border-[#E8DFD8] text-[#510601] focus:ring-[#510601] cursor-pointer accent-[#510601] disabled:opacity-30 disabled:cursor-not-allowed"
@@ -730,6 +867,16 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                         <div className="text-[11px] text-[#863221] mt-0.5 font-mono">
                           ID: {m.id} · {m.registrationSource || '—'}
                         </div>
+                        {m.last_exported_on && (
+                          <div className="text-[10px] text-[#863221] mt-0.5" title="The latest meeting PDF this applicant was on">
+                            On meeting PDF · {formatDate(m.last_exported_on)}
+                          </div>
+                        )}
+                        {statusFilter === 'REJECTED' && m.rejection && (
+                          <div className="text-[10px] text-[#9B2C2C] mt-0.5 max-w-[240px]">
+                            Rejected{m.rejection.on ? ` ${formatDate(m.rejection.on)}` : ''}: {m.rejection.reason}
+                          </div>
+                        )}
                       </td>
 
                       {/* Contact Info */}
@@ -757,7 +904,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex flex-wrap items-center justify-end gap-1.5">
                           {/* 1. Assign to Receipt Action */}
-                          <button
+                          {statusFilter === 'UNAPPROVED' && <button
                             type="button"
                             onClick={() => (isAssigned && m.receipt ? openAssignedReceipt(m) : openAssignReceipt(m))}
                             className="btn-act"
@@ -769,7 +916,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           >
                             <FileText className="w-3.5 h-3.5 shrink-0" />
                             <span>{isAssigned ? 'Receipt' : 'Assign Receipt'}</span>
-                          </button>
+                          </button>}
 
                           {/* 2. View Action */}
                           <button
@@ -783,7 +930,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           </button>
 
                           {/* Edit is its own action, not part of View */}
-                          {hasPermission('members.list.write') && (
+                          {statusFilter === 'UNAPPROVED' && hasPermission('members.list.write') && (
                             <button
                               type="button"
                               onClick={() => navigate(`/dashboard/membership/edit/${m.id}`, { state: { returnPath: '/dashboard/membership/unapproved' } })}
@@ -795,7 +942,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           )}
 
                           {/* 3. Approve Action */}
-                          {hasPermission('members.unapproved.write') && (
+                          {statusFilter === 'UNAPPROVED' && hasPermission('members.unapproved.write') && (
                             <button
                               type="button"
                               onClick={() => handleInitiateApprove(m)}
@@ -804,25 +951,38 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                                 !hasPermission('members.unapproved.write')
                                   ? 'Requires members.unapproved.write permission'
                                   : isAssigned
-                                    ? 'Approve membership and transfer to Membership List'
+                                    ? 'Agree: approve the membership and move it to the Membership List'
                                     : 'Requires Receipt to be Assigned first'
                               }
                             >
                               <Check className="w-3.5 h-3.5 shrink-0" />
-                              <span>Approve</span>
+                              <span>Agree</span>
                             </button>
                           )}
 
                           {/* 4. Reject Action */}
-                          {hasPermission('members.list.delete') && (
+                          {statusFilter === 'UNAPPROVED' && hasPermission('members.unapproved.write') && (
                             <button
                               type="button"
                               onClick={() => handleReject(m)}
                               className="btn-act btn-act-danger"
-                              title={'Reject this application'}
+                              title={'Disagree: reject this application'}
                             >
                               <XCircle className="w-3.5 h-3.5 shrink-0" />
-                              <span>Reject</span>
+                              <span>Disagree</span>
+                            </button>
+                          )}
+
+                          {/* 5. Re-open a rejected application */}
+                          {statusFilter === 'REJECTED' && hasPermission('members.unapproved.write') && (
+                            <button
+                              type="button"
+                              onClick={() => handleReopen(m)}
+                              className="btn-act"
+                              title="Put this application back under Unapproved Membership"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                              <span>Re-open</span>
                             </button>
                           )}
                         </div>

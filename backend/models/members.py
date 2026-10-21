@@ -151,6 +151,15 @@ class MemberApprovalHistory(AuditMixin, Base):
     acted_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
     acted_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
 
+class MemberMeetingExport(AuditMixin, Base):
+    """One applicant on one meeting PDF. The Unapproved / Assigned screens filter on these rows ("Only exported",
+    or exported on a given day) so the committee sees exactly the list that went to the meeting."""
+    __tablename__ = "member_meeting_exports"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=False, index=True)
+    exported_on: Mapped[Date] = mapped_column(Date, nullable=False, index=True)
+    export_ref: Mapped[str] = mapped_column(String(40), nullable=False)  # one value per PDF, shared by its rows
+
 class MemberProfileChangeRequest(AuditMixin, Base):
     __tablename__ = "member_profile_change_requests"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
