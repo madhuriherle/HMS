@@ -157,6 +157,7 @@ export default function RegisterNewMember() {
     nameTitle: 'SRI.',
     name: '',
     nameKn: '',
+    email: '',
     fatherHusbandName: '',
     fatherName: '',
     fatherMembershipNo: '',
@@ -303,6 +304,7 @@ export default function RegisterNewMember() {
           nameTitle: m.name_title || (gender === 'Female' ? 'MS.' : 'SRI.'),
           name: memberName(m),
           nameKn: m.full_name_kn || '',
+          email: m.email || '',
           fatherHusbandName: m.father_name || m.father_husband_name || '',
           fatherName: m.father_name || m.father_husband_name || '',
           fatherMembershipNo: m.father_membership_number || '',
@@ -711,6 +713,13 @@ export default function RegisterNewMember() {
     if (!cleanName) {
       errors.name = 'Member Name is required';
     }
+    if (!formData.nameKn.trim()) {
+      errors.nameKn = 'Name in Kannada is required';
+    }
+    const cleanEmail = (formData.email || '').trim();
+    if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      errors.email = 'Enter a valid email address';
+    }
 
     // a magazine posted to a different address needs that address
     if (formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' && formData.magazineDeliveryChoice === 'DIFFERENT' && !formData.magLine.trim()) {
@@ -739,9 +748,7 @@ export default function RegisterNewMember() {
       }
     }
 
-    if (!formData.birthDate) {
-      errors.birthDate = 'Date of Birth is required';
-    } else {
+    if (formData.birthDate) {
       const parsedDob = parseDobToDate(formData.birthDate);
       if (!parsedDob) {
         errors.birthDate = 'Please enter a valid Date of Birth';
@@ -857,6 +864,7 @@ export default function RegisterNewMember() {
       middle_name_en: parts.length > 2 ? parts.slice(1, -1).join(' ') : null,
       last_name_en: parts.length > 1 ? parts[parts.length - 1] : null,
       full_name_kn: (formData.nameKn || '').trim() || null,
+      email: (formData.email || '').trim() || null,
       father_husband_name: (formData.fatherName || formData.spouseName || formData.fatherHusbandName || '').trim() || null,
       father_name: (formData.fatherName || formData.fatherHusbandName || '').trim() || null,
       father_membership_number: (formData.fatherMembershipNo || '').trim() || null,
@@ -1128,7 +1136,7 @@ export default function RegisterNewMember() {
                       {/* Date of Birth */}
                       <div className="sm:col-span-3">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
-                          Date of Birth: <span className="text-red-600">*</span>
+                          Date of Birth:
                         </label>
                         <DateInput
                           disabled={isViewMode}
@@ -1301,25 +1309,45 @@ export default function RegisterNewMember() {
                       </div>
                     </div>
 
-                    {/* Kannada name (hidden for now) */}
-                    {SHOW_KANNADA_FIELDS && (
+                    {/* Kannada name and email */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5 items-start">
-                      {SHOW_KANNADA_FIELDS && (
-                        <div>
-                          <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
-                            Name (Kannada):
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="ಹೆಸರು (Kannada)"
-                            value={formData.nameKn}
-                            onChange={(e) => setFormData({ ...formData, nameKn: e.target.value })}
-                            className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
-                          />
-                        </div>
-                      )}
+                      <div>
+                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                          Name (Kannada): <span className="text-red-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          lang="kn"
+                          placeholder="ಹೆಸರು (ಕನ್ನಡ)"
+                          disabled={isViewMode}
+                          value={formData.nameKn}
+                          onChange={(e) => {
+                            setFormData({ ...formData, nameKn: e.target.value });
+                            if (formErrors.nameKn) setFormErrors((prev) => ({ ...prev, nameKn: '' }));
+                          }}
+                          className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                            formErrors.nameKn ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
+                          }`}
+                        />
+                        {formErrors.nameKn && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.nameKn}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">Email Address:</label>
+                        <input
+                          type="email"
+                          disabled={isViewMode}
+                          value={formData.email}
+                          onChange={(e) => {
+                            setFormData({ ...formData, email: e.target.value });
+                            if (formErrors.email) setFormErrors((prev) => ({ ...prev, email: '' }));
+                          }}
+                          className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                            formErrors.email ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
+                          }`}
+                        />
+                        {formErrors.email && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.email}</p>}
+                      </div>
                     </div>
-                    )}
                   </div>
                 </div>
 

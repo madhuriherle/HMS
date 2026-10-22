@@ -2399,7 +2399,26 @@ def _profile_family(db: Session, member: Member) -> dict:
     }
 
 
-def _profile_membership(db: Session, member: Member) -> dict:
+def _actor_namer(db: Session, current_user: User):
+    """id -> name of the user who did something, for the profile tabs. An account ranked above the viewer shows as System."""
+    hidden = deps.stronger_user_ids(db, current_user)
+    cache: dict = {}
+
+    def name(uid):
+        if not uid:
+            return None
+        if uid in hidden:
+            return "System"
+        if uid not in cache:
+            u = db.query(User).filter(User.id == uid).first()
+            cache[uid] = (u.name or u.username) if u else None
+        return cache[uid]
+
+    return name
+
+
+def _profile_membership(db: Session, member: Member, actor=None) -> dict:
+    actor = actor or (lambda _uid: None)
     from models.masters import MembershipType
     from models.members import MembershipTypeHistory
     from services import membership_credit
@@ -2419,6 +2438,7 @@ def _profile_membership(db: Session, member: Member) -> dict:
             "id": m.id, "membership_type_id": t.id, "type_code": t.code, "type_name_en": t.name_en,
             "type_name_kn": t.name_kn, "membership_number": m.membership_number, "status": m.status,
             "applied_at": m.applied_at, "activated_at": m.activated_at, "expires_at": m.expires_at,
+            "family_membership_number": m.family_membership_number,
             "current_price": float(price.amount) if price else None,
         })
     names = {t.id: t.name_en for t in db.query(MembershipType).all()}
@@ -2428,15 +2448,27 @@ def _profile_membership(db: Session, member: Member) -> dict:
         .order_by(MembershipTypeHistory.changed_at.desc())
         .all()
     )
+    from models.receipts import Receipt
+
+    receipt_nos = {
+        r.id: r.receipt_number
+        for r in db.query(Receipt).filter(Receipt.id.in_([h.receipt_id for h in changes if h.receipt_id])).all()
+    } if any(h.receipt_id for h in changes) else {}
     return {
         "memberships": memberships,
+        "approval": {
+            "status": member.approval_status,
+            "registered_at": member.created_at, "registered_by": actor(member.created_by),
+            "approved_at": member.approved_at, "approved_by": actor(member.approved_by),
+        },
         "membership_credit": membership_credit.summary(db, mid),
         "type_changes": [
             {
                 "old_type": names.get(h.old_type_id), "new_type": names.get(h.new_type_id),
                 "old_price": float(h.old_price) if h.old_price is not None else None,
                 "new_price": float(h.new_price) if h.new_price is not None else None,
-                "receipt_id": h.receipt_id, "changed_at": h.changed_at, "reason": h.reason,
+                "receipt_id": h.receipt_id, "receipt_number": receipt_nos.get(h.receipt_id),
+                "changed_at": h.changed_at, "changed_by": actor(h.changed_by), "reason": h.reason,
             }
             for h in changes
         ],
@@ -2462,6 +2494,10 @@ def _profile_receipts(db: Session, member: Member, page: int, limit: int) -> dic
                 "receipt_type": r.receipt_type, "net_amount": float(r.net_amount),
                 "payment_status": r.payment_status, "payment_mode": r.payment_mode,
                 "allocated_amount": float(a.allocated_amount),
+                "transaction_reference": r.transaction_reference, "bank_account": r.bank_account,
+                "transaction_date": r.transaction_date, "cheque_number": r.cheque_number, "cheque_date": r.cheque_date,
+                "discount_amount": float(r.discount_amount or 0), "receipt_status": r.receipt_status,
+                "period_from_date": r.period_from_date, "period_to_date": r.period_to_date, "notes": r.notes,
             }
             for a, r in rows
         ],
@@ -2541,7 +2577,38 @@ def _issue_history(db: Session, sub) -> list:
     return build_subscription_history(db, sub)
 
 
-def _profile_magazine(db: Session, member: Member) -> dict:
+def _subscription_log(db: Session, member: Member, actor) -> list:
+    """When the magazine was started, stopped or restarted and its address changed, from the member activity log."""
+    from models.activity import MemberActivityLog
+
+    out = []
+    rows = (
+        db.query(MemberActivityLog)
+        .filter(MemberActivityLog.member_id == member.id, MemberActivityLog.is_deleted == False)  # noqa: E712
+        .order_by(MemberActivityLog.created_at.desc(), MemberActivityLog.id.desc())
+        .limit(500)
+        .all()
+    )
+    for r in rows:
+        d = r.details or {}
+        if d.get("entity_type") != "magazine_subscriptions":
+            continue
+        changes = d.get("changes") or {}
+        if r.action == "CREATE":
+            what = "Magazine subscription started"
+        elif "delivery_status" in changes:
+            c = changes["delivery_status"]
+            what = f"Delivery changed from {c.get('from') or '-'} to {c.get('to') or '-'}"
+        elif "address_override" in changes:
+            what = "Delivery address changed"
+        else:
+            continue
+        out.append({"at": r.created_at, "by": actor(r.user_id), "what": what, "reason": d.get("reason")})
+    return out
+
+
+def _profile_magazine(db: Session, member: Member, actor=None) -> dict:
+    actor = actor or (lambda _uid: None)
     from models.magazines import MagazineReturn, MagazineSubscription
     from models.members import MemberKycRequest
 
@@ -2565,6 +2632,7 @@ def _profile_magazine(db: Session, member: Member) -> dict:
         if ids else []
     )
     from models.magazines import MagazineDeliveryPause
+    from api.v1.endpoints.magazines import _member_label_address
 
     pauses = (
         db.query(MagazineDeliveryPause)
@@ -2586,19 +2654,24 @@ def _profile_magazine(db: Session, member: Member) -> dict:
         "magazine_delivery_address": getattr(member, "magazine_delivery_address", None),
         "magazine_kind": member.magazine_kind,
         "magazine_email": member.magazine_email,
+        "member_address": _member_label_address(member),
+        "subscription_log": _subscription_log(db, member, actor),
         "issues": [i for sub in subs for i in _issue_history(db, sub)],
         "subscriptions": [
-            {"id": x.id, "delivery_status": x.delivery_status, "address_override": x.address_override, "notes": x.notes}
+            {"id": x.id, "delivery_status": x.delivery_status, "address_override": x.address_override, "notes": x.notes,
+             "started_on": x.created_at, "started_by": actor(x.created_by)}
             for x in subs
         ],
         "pauses": [
             {"id": p.id, "subscription_id": p.subscription_id, "pause_start_date": p.pause_start_date,
-             "pause_end_date": p.pause_end_date, "reason": p.reason}
+             "pause_end_date": p.pause_end_date, "reason": p.reason,
+             "recorded_by": actor(p.created_by), "recorded_at": p.created_at}
             for p in pauses
         ],
         "returns": [
             {"id": r.id, "subscription_id": r.subscription_id, "issue_month_year": r.issue_month_year,
-             "return_date": r.return_date, "return_reason": r.return_reason, "follow_up_status": r.follow_up_status}
+             "return_date": r.return_date, "return_reason": r.return_reason, "follow_up_status": r.follow_up_status,
+             "recorded_by": actor(r.created_by), "recorded_at": r.created_at}
             for r in returns
         ],
         "services": [
@@ -2663,9 +2736,11 @@ def _profile_events(db: Session, member: Member) -> dict:
         .all()
     )
     return {
-        "events": [{"event_id": e.id, "title": e.title, "event_date": e.event_date, "role": l.role} for l, e in links],
+        "events": [{"event_id": e.id, "title": e.title, "event_date": e.event_date, "end_date": e.end_date,
+                    "location": e.location, "role": l.role} for l, e in links],
         "guests_and_honours": [
-            {"event_id": e.id, "event_title": e.title, "event_date": e.event_date, "location": e.location,
+            {"event_id": e.id, "event_title": e.title, "event_date": e.event_date, "end_date": e.end_date,
+             "location": e.location,
              "participant_type": p.participant_type, "role": p.participant_role,
              "honoured_as": p.participant_role if p.participant_type == "HONOURED" else None}
             for p, e in guests
@@ -2673,7 +2748,8 @@ def _profile_events(db: Session, member: Member) -> dict:
     }
 
 
-def _profile_history(db: Session, member: Member) -> dict:
+def _profile_history(db: Session, member: Member, actor=None) -> dict:
+    actor = actor or (lambda _uid: None)
     from models.members import MemberProfileHistory
 
     changes = (
@@ -2692,10 +2768,13 @@ def _profile_history(db: Session, member: Member) -> dict:
     return {
         "profile_changes": [
             {"field": h.field_name, "old_value": h.old_value, "new_value": h.new_value,
-             "changed_at": h.changed_at, "changed_by": h.changed_by}
+             "changed_at": h.changed_at, "changed_by": actor(h.changed_by)}
             for h in changes
         ],
-        "approvals": [{c.name: getattr(a, c.name) for c in MemberApprovalHistory.__table__.columns} for a in approvals],
+        "approvals": [
+            {**{c.name: getattr(a, c.name) for c in MemberApprovalHistory.__table__.columns}, "acted_by_name": actor(a.acted_by)}
+            for a in approvals
+        ],
     }
 
 
@@ -2777,6 +2856,8 @@ def read_member_profile_section(
         "family": _profile_family, "membership": _profile_membership, "magazine": _profile_magazine,
         "services": _profile_services, "events": _profile_events, "history": _profile_history,
     }
+    if section in ("membership", "magazine", "history"):
+        return builders[section](db, member, _actor_namer(db, current_user))
     return builders[section](db, member)
 
 

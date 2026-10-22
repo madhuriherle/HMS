@@ -324,7 +324,7 @@ def build_subscription_history(db: Session, sub: MagazineSubscription) -> list:
     issues: dict = {}
 
     labels = (
-        db.query(MagazineLabelBatch)
+        db.query(MagazineLabelBatch, MagazineLabelBatchItem)
         .join(MagazineLabelBatchItem, MagazineLabelBatchItem.label_batch_id == MagazineLabelBatch.id)
         .filter(
             MagazineLabelBatchItem.recipient_type == "MEMBER",
@@ -333,12 +333,13 @@ def build_subscription_history(db: Session, sub: MagazineSubscription) -> list:
             MagazineLabelBatch.is_deleted == False,  # noqa: E712
         ).order_by(MagazineLabelBatch.id).all()
     )
-    for batch in labels:
+    for batch, item in labels:
         issue = batch.issue_month_year
+        extra = {"batch_id": batch.id, "batch_name": batch.batch_name, "label_address": item.label_address}
         if batch.status == "SENT":
-            issues[issue] = {"result": "SENT", "date": batch.sent_date, "detail": batch.batch_name}
+            issues[issue] = {"result": "SENT", "date": batch.sent_date, "detail": batch.batch_name, **extra}
         elif issues.get(issue, {}).get("result") != "SENT":
-            issues[issue] = {"result": "LISTED", "date": batch.generation_date, "detail": "labels generated, not marked sent"}
+            issues[issue] = {"result": "LISTED", "date": batch.generation_date, "detail": "labels generated, not marked sent", **extra}
 
     today = date.today()
     for p in db.query(MagazineDeliveryPause).filter(
@@ -357,7 +358,15 @@ def build_subscription_history(db: Session, sub: MagazineSubscription) -> list:
     for r in db.query(MagazineReturn).filter(
         MagazineReturn.subscription_id == sub.id, MagazineReturn.is_deleted == False,  # noqa: E712
     ).all():
-        issues[r.issue_month_year] = {"result": "RETURNED", "date": r.return_date, "detail": r.return_reason or "returned"}
+        issues[r.issue_month_year] = {**issues.get(r.issue_month_year, {}), "result": "RETURNED", "date": r.return_date,
+                                      "detail": r.return_reason or "returned"}
+
+    # months since the subscription began that never reached a label list or a pause
+    if sub.created_at:
+        y, m = sub.created_at.year, sub.created_at.month
+        while (y, m) < (today.year, today.month):
+            issues.setdefault(f"{y}-{m:02d}", {"result": "NOT_LISTED", "date": None, "detail": "not on any label list"})
+            y, m = (y + 1, 1) if m == 12 else (y, m + 1)
 
     return [{"issue_month_year": k, **v} for k, v in sorted(issues.items(), reverse=True)]
 

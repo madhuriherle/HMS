@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   User,
@@ -555,6 +555,17 @@ function MembershipTab({ id }) {
       {(d) => (
         <div className="space-y-5">
           <CreditBanner credit={d.membership_credit} />
+          {d.approval && (
+            <Card icon={User} title="Registration & approval">
+              <dl className="divide-y divide-[#EFE6DE]/50 text-xs">
+                <Row label="Status">{d.approval.status}</Row>
+                <Row label="Registered on">{d.approval.registered_at ? formatDateTime(d.approval.registered_at) : '—'}</Row>
+                <Row label="Registered by">{d.approval.registered_by || '—'}</Row>
+                <Row label="Approved on">{d.approval.approved_at ? formatDateTime(d.approval.approved_at) : '—'}</Row>
+                <Row label="Approved by">{d.approval.approved_by || '—'}</Row>
+              </dl>
+            </Card>
+          )}
           <Card icon={CreditCard} title="Memberships">
             {d.memberships.length === 0 ? (
               <Empty>No membership yet.</Empty>
@@ -564,6 +575,7 @@ function MembershipTab({ id }) {
                   <div>
                     <div className="font-semibold text-[#180200]">{m.type_name_en}</div>
                     <div className="text-xs text-[#863221] font-mono">{m.membership_number || 'No number yet'}</div>
+                    {m.family_membership_number && <div className="text-[11px] text-[#863221]">Family no. {m.family_membership_number}</div>}
                     <div className="text-[11px] text-[#863221]">
                       {m.activated_at ? `Active from ${formatDate(m.activated_at)}` : m.applied_at ? `Applied ${formatDate(m.applied_at)}` : ''}
                     </div>
@@ -588,6 +600,8 @@ function MembershipTab({ id }) {
                       <b>{h.old_type || '—'}</b> → <b>{h.new_type || '—'}</b>
                       {h.new_price != null ? ` (${inr(h.new_price)})` : ''}
                       {h.reason ? ` — ${h.reason}` : ''}
+                      {h.receipt_number ? ` · Receipt ${h.receipt_number}` : ''}
+                      {h.changed_by ? ` · by ${h.changed_by}` : ''}
                     </span>
                     <span className="text-[#863221] whitespace-nowrap">{h.changed_at ? formatDate(h.changed_at) : ''}</span>
                   </div>
@@ -643,8 +657,20 @@ function ReceiptsTab({ id }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {d.data.map((r) => (
-                      <tr key={r.receipt_id} className="border-b last:border-b-0 border-[#E8DFD8]/60">
+                    {d.data.map((r) => {
+                      const bits = [
+                        r.transaction_reference && `Ref ${r.transaction_reference}`,
+                        r.bank_account && `Bank ${r.bank_account}`,
+                        r.cheque_number && `Cheque ${r.cheque_number}${r.cheque_date ? ` (${formatDate(r.cheque_date)})` : ''}`,
+                        r.transaction_date && `Paid on ${formatDate(r.transaction_date)}`,
+                        r.period_from_date && `Period ${formatDate(r.period_from_date)}${r.period_to_date ? ` to ${formatDate(r.period_to_date)}` : ''}`,
+                        r.discount_amount > 0 && `Discount ${inr(r.discount_amount)}`,
+                        r.receipt_status && `Receipt ${String(r.receipt_status).replace(/_/g, ' ').toLowerCase()}`,
+                        r.notes && `Note: ${r.notes}`,
+                      ].filter(Boolean);
+                      return (
+                      <Fragment key={r.receipt_id}>
+                      <tr className="border-b last:border-b-0 border-[#E8DFD8]/60">
                         <td className="py-2 pr-3 font-mono font-bold">{r.receipt_number}</td>
                         <td className="py-2 pr-3">{formatDate(r.receipt_date)}</td>
                         <td className="py-2 pr-3">{String(r.receipt_type || '').replace(/_/g, ' ')}</td>
@@ -665,7 +691,14 @@ function ReceiptsTab({ id }) {
                           </button>
                         </td>
                       </tr>
-                    ))}
+                      {bits.length > 0 && (
+                        <tr className="border-b last:border-b-0 border-[#E8DFD8]/60">
+                          <td colSpan={8} className="pb-2 pr-3 text-[11px] text-[#863221]">{bits.join(' · ')}</td>
+                        </tr>
+                      )}
+                      </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -726,28 +759,63 @@ function MagazineTab({ id }) {
                 />
               )}
               {d.magazine_email && <Field label="E-copy email" value={d.magazine_email} />}
-              {address && <div className="lg:col-span-2"><Field label="Delivery address" value={address} stack /></div>}
+              <div className="lg:col-span-2">
+                <Field label="Delivery address" value={address || d.member_address || 'No address on record'} stack />
+                {!address && d.member_address && <p className="text-[11px] text-[#863221] -mt-1 mb-2">Same as the member address (no separate delivery address set).</p>}
+              </div>
             </div>
-            {(d.issues || []).length > 0 && (
+            {(d.subscriptions || []).length > 0 && (
               <div className="mt-4">
-                <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mb-1">Delivery history</div>
+                <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mb-1">Subscription</div>
                 <div className="space-y-1 text-xs">
-                  {d.issues.map((i) => (
-                    <div key={i.issue_month_year} className="flex justify-between gap-3">
-                      <span>{i.issue_month_year} — {{ SENT: 'Sent', RETURNED: 'Returned', PAUSED: 'Paused', LISTED: 'On label list' }[i.result] || i.result}</span>
-                      <span className="text-[#863221] whitespace-nowrap">{[i.date ? formatDate(i.date) : '', i.detail].filter(Boolean).join(' · ')}</span>
+                  {d.subscriptions.map((sb) => (
+                    <div key={sb.id} className="flex justify-between gap-3">
+                      <span>{sb.delivery_status}{sb.notes ? ` — ${sb.notes}` : ''}</span>
+                      <span className="text-[#863221] whitespace-nowrap">
+                        {sb.started_on ? `Started ${formatDate(sb.started_on)}` : ''}{sb.started_by ? ` by ${sb.started_by}` : ''}
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-            {(d.pauses || []).length > 0 && (
+            <div className="mt-4">
+              <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mb-1">Start / stop history</div>
+              <div className="space-y-1 text-xs">
+                {(d.subscription_log || []).length === 0 && <p className="text-[#863221]/70">No changes recorded.</p>}
+                {(d.subscription_log || []).map((l, i) => (
+                  <div key={i} className="flex justify-between gap-3">
+                    <span>{l.what}{l.reason ? ` — ${l.reason}` : ''}{l.by ? ` · by ${l.by}` : ''}</span>
+                    <span className="text-[#863221] whitespace-nowrap">{l.at ? formatDateTime(l.at) : ''}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {(
+              <div className="mt-4">
+                <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mb-1">Delivery history</div>
+                <div className="space-y-1 text-xs">
+                  {(d.issues || []).length === 0 && <p className="text-[#863221]/70">No deliveries yet.</p>}
+                  {d.issues.map((i) => (
+                    <div key={i.issue_month_year}>
+                      <div className="flex justify-between gap-3">
+                        <span>{i.issue_month_year} — {{ SENT: 'Sent', RETURNED: 'Returned', PAUSED: 'Paused', LISTED: 'On label list', NOT_LISTED: 'Not listed' }[i.result] || i.result}</span>
+                        <span className="text-[#863221] whitespace-nowrap">{[i.date ? formatDate(i.date) : '', i.detail].filter(Boolean).join(' · ')}</span>
+                      </div>
+                      {i.label_address && <div className="text-[11px] text-[#863221] whitespace-pre-line pl-3">Label address: {i.label_address}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(
               <div className="mt-4">
                 <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mb-1">Delivery pauses</div>
                 <div className="space-y-1 text-xs">
+                  {(d.pauses || []).length === 0 && <p className="text-[#863221]/70">No pauses.</p>}
                   {d.pauses.map((p) => (
                     <div key={p.id} className="flex justify-between gap-3">
-                      <span>{p.reason || 'paused'}</span>
+                      <span>{p.reason || 'paused'}{p.recorded_by ? ` · by ${p.recorded_by}` : ''}</span>
                       <span className="text-[#863221] whitespace-nowrap">
                         {formatDate(p.pause_start_date)} – {p.pause_end_date ? formatDate(p.pause_end_date) : 'open'}
                       </span>
@@ -756,13 +824,14 @@ function MagazineTab({ id }) {
                 </div>
               </div>
             )}
-            {d.returns.length > 0 && (
+            {(
               <div className="mt-4">
                 <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider mb-1">Returned copies</div>
                 <div className="space-y-1 text-xs">
+                  {d.returns.length === 0 && <p className="text-[#863221]/70">No returns.</p>}
                   {d.returns.map((r) => (
                     <div key={r.id} className="flex justify-between gap-3">
-                      <span>{r.issue_month_year} — {r.return_reason || 'returned'}</span>
+                      <span>{r.issue_month_year} — {r.return_reason || 'returned'}{r.recorded_by ? ` · by ${r.recorded_by}` : ''}</span>
                       <span className="text-[#863221] whitespace-nowrap">{r.return_date ? formatDate(r.return_date) : ''} · {r.follow_up_status}</span>
                     </div>
                   ))}
@@ -1092,8 +1161,10 @@ function EventsTab({ id }) {
               <div className="space-y-1.5 text-sm">
                 {d.events.map((e, i) => (
                   <div key={i} className="flex justify-between gap-3">
-                    <span>{e.title}{e.role ? ` · ${e.role}` : ''}</span>
-                    <span className="text-xs text-[#863221] whitespace-nowrap">{e.event_date ? formatDate(e.event_date) : ''}</span>
+                    <span>{e.title}{e.role ? ` · ${e.role}` : ''}{e.location ? ` (${e.location})` : ''}</span>
+                    <span className="text-xs text-[#863221] whitespace-nowrap">
+                      {e.event_date ? formatDate(e.event_date) : ''}{e.end_date ? ` to ${formatDate(e.end_date)}` : ''}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1107,7 +1178,9 @@ function EventsTab({ id }) {
                 {d.guests_and_honours.map((g, i) => (
                   <div key={i} className="flex justify-between gap-3">
                     <span>{g.event_title} — {g.honoured_as || g.role || g.participant_type}{g.location ? ` (${g.location})` : ''}</span>
-                    <span className="text-xs text-[#863221] whitespace-nowrap">{g.event_date ? formatDate(g.event_date) : ''}</span>
+                    <span className="text-xs text-[#863221] whitespace-nowrap">
+                      {g.event_date ? formatDate(g.event_date) : ''}{g.end_date ? ` to ${formatDate(g.end_date)}` : ''}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1182,7 +1255,10 @@ function ActivityTab({ id }) {
                 {h.approvals.map((a, i) => (
                   <div key={`a${i}`} className="flex justify-between gap-3">
                     <span>
-                      {a.action || a.status || 'Approval'} {a.reason ? `— ${a.reason}` : ''}
+                      {a.action || a.status || 'Approval'}
+                      {a.old_status && a.new_status ? ` (${a.old_status} → ${a.new_status})` : ''}
+                      {a.reason ? ` — ${a.reason}` : ''}
+                      {a.acted_by_name ? ` · by ${a.acted_by_name}` : ''}
                     </span>
                     <span className="text-[#863221]">{a.acted_at ? formatDate(a.acted_at) : ''}</span>
                   </div>
@@ -1191,6 +1267,7 @@ function ActivityTab({ id }) {
                   <div key={`h${i}`} className="flex justify-between gap-3">
                     <span>
                       <b>{c.field}</b>: {String(c.old_value ?? '—')} → {String(c.new_value ?? '—')}
+                      {c.changed_by ? ` · by ${c.changed_by}` : ''}
                     </span>
                     <span className="text-[#863221]">{c.changed_at ? formatDate(c.changed_at) : ''}</span>
                   </div>

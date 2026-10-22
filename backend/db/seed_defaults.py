@@ -555,9 +555,8 @@ def seed_menu_pages(db) -> int:
 
 # ── personal master starter values ───────────────────────────
 GOTRA_VALUES = [
-    "Vasista", "Vishwamitra", "Kashyapa", "Aangiras",
-    "Goutama", "Jamadagni", "Bharadwaja", "Mouna Bharghava",
-    "Bhargava", "Atri", "Koushika", "Haritasa",
+    "AANGEERASA", "BAHRADWAJA", "BHARGAVA", "GENERAL", "GOWTAMA",
+    "JAMADAGNI", "KASHYAPA", "MOUNA BHARGAVA", "VASHISHTA", "VISHWAMITRA",
 ]
 
 QUALIFICATION_VALUES = [
