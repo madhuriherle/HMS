@@ -832,6 +832,42 @@ def member_import_history_detail(
     return _import_run_row(run, {u.id: (u.name or u.username)} if u else {}, detail=True)
 
 
+@router.get("/payment-mismatches")
+def payment_mismatches(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.list.read")),
+    page: int = 1,
+    limit: int = 50,
+) -> Any:
+    """Approved members whose payments fall short of the price of the type they joined with, as priced in their
+    joining era. An old receipt is probably missing: add it as an old (dummy) receipt on Receipt Entry."""
+    from models.masters import MembershipType
+    from services import membership_credit
+
+    checks = {k: v for k, v in membership_credit.payment_check_rows(db).items() if v["mismatch"]}
+    ids = sorted(checks, key=lambda m: -checks[m]["shortfall"])
+    total = len(ids)
+    page = max(page, 1)
+    limit = min(max(limit, 1), 200)
+    window = ids[(page - 1) * limit: page * limit]
+    members = {m.id: m for m in db.query(Member).filter(Member.id.in_(window)).all()} if window else {}
+    names = {t.id: t.name_en for t in db.query(MembershipType).all()}
+    rows = []
+    for mid in window:
+        m, c = members.get(mid), checks[mid]
+        if not m:
+            continue
+        rows.append({
+            "member_id": mid, "name": " ".join(p for p in (m.name_title, m.display_name) if p),
+            "membership_number": m.membership_number, "mobile": m.mobile,
+            "joined_type": names.get(c["start_type_id"]), "joined_on": c["joined_on"],
+            "era_price": c["era_price"], "era_from": c["era_from"], "era_to": c["era_to"],
+            "paid_in_era": c["paid_in_era"], "shortfall": c["shortfall"],
+        })
+    return {"total": total, "page": page, "limit": limit, "data": rows}
+
+
 @router.get("/{id}")
 def read_member(
     *,
@@ -1431,12 +1467,17 @@ def create_membership(
         raise HTTPException(status_code=400, detail="Unknown membership_type_id")
 
     now = datetime.now(timezone.utc)
+    began = now
+    if membership_in.member_since:
+        if membership_in.member_since > now.date():
+            raise HTTPException(status_code=400, detail="Member since cannot be in the future")
+        began = datetime.combine(membership_in.member_since, datetime.min.time(), tzinfo=timezone.utc)
     price = active_price(db, membership_in.membership_type_id)
     obj = MemberMembership(
         member_id=member.id,
         membership_type_id=membership_in.membership_type_id,
         price_id=price.id if price else None,
-        applied_at=now,
+        applied_at=began,
         status=membership_in.status,
         family_membership_number=membership_in.family_membership_number,
         created_by=current_user.id,
@@ -1444,7 +1485,7 @@ def create_membership(
     if member.approval_status == "APPROVED":
         from services.member_activation import membership_number_for
         obj.membership_number = membership_number_for(db, member)
-        obj.activated_at = now
+        obj.activated_at = began
     db.add(obj)
     db.commit()
     db.refresh(obj)
@@ -2443,6 +2484,17 @@ def _actor_namer(db: Session, current_user: User):
     return name
 
 
+def _payment_check_view(db: Session, member_id: int):
+    from models.masters import MembershipType
+    from services import membership_credit
+
+    c = membership_credit.payment_check_rows(db, [member_id]).get(member_id)
+    if not c:
+        return None
+    t = db.get(MembershipType, c["start_type_id"])
+    return {**c, "joined_type": t.name_en if t else None}
+
+
 def _profile_membership(db: Session, member: Member, actor=None) -> dict:
     actor = actor or (lambda _uid: None)
     from models.masters import MembershipType
@@ -2482,6 +2534,7 @@ def _profile_membership(db: Session, member: Member, actor=None) -> dict:
     } if any(h.receipt_id for h in changes) else {}
     return {
         "memberships": memberships,
+        "payment_check": _payment_check_view(db, mid),
         "approval": {
             "status": member.approval_status,
             "registered_at": member.created_at, "registered_by": actor(member.created_by),

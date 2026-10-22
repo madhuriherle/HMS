@@ -185,10 +185,19 @@ RULE 8: MEMBERSHIP TYPE AND CREDIT
 8.1  Only money paid for the membership counts toward a member's type: receipt types
      MEMBERSHIP and TYPE_CHANGE (setting membership_credit.receipt_types). Donations,
      P.Nidhi, scholarship, magazine and event receipts NEVER change the membership type.
-8.2  The type only moves UP automatically, never down (not on a refund, cancellation or
-     deleted receipt). Moving down is a manual, reviewed change.
+8.2  The type moves UP automatically when payments reach a higher type (today's prices). It moves
+     DOWN automatically only when money is taken away: a receipt deleted, cancelled, refunded or
+     un-assigned. Then, if the remaining payments no longer pay for the type held, the member goes
+     to the highest type those payments pay for, judged at the prices of the day they began
+     holding the type (joining day, or the day of the last change of type), never at today's
+     price. Nothing else lowers a type (not a price change, not a recalculation).
+8.2a A member whose payments fall short of the price of their joining era (an old receipt is
+     probably missing: see Membership List > Payment mismatches) is FROZEN: no automatic change
+     either way, and a removal of money does not lower them. Adding the missing receipt, even as an
+     Old receipt (dummy, number typed in the OLD- format from Number Formats), clears the flag and
+     the normal flow applies again.
 8.3  Deleting a receipt that is assigned to a member removes its allocation from the
-     member's history and lowers their credit; it does not change their type.
+     member's history and lowers their credit, and the type follows by rule 8.2.
 8.5  CREDIT COUNTS THE LINES, NOT THE WHOLE RECEIPT: the money that counts is the amount of
      the receipt's lines whose type is counted (Membership 500 + Donation 4500 counts 500),
      capped by what was allocated to the member. The order of the lines and the receipt's
@@ -196,8 +205,8 @@ RULE 8: MEMBERSHIP TYPE AND CREDIT
      receipt type.
 8.6  Editing a receipt re-checks the upgrade (a single allocation follows the credit lines).
      When a cancelled / deleted / refunded receipt or a removed allocation leaves the credit
-     below the price of the member's type, the type stays (8.2) and the approvers get an inbox
-     notice "Membership type needs review" to decide.
+     below the price of the member's type and nothing cheaper is paid for, the type stays and the
+     approvers get an inbox notice "Membership type needs review" to decide.
 8.7  A PARTICULAR SAYS FOR ITSELF WHAT IT IS - NEVER GUESS FROM ITS NAME. The MAIN particular carries two ticks
      (particulars.pays_for_membership, particulars.needs_description); its sub types follow it and carry
      neither (the server forces them off). When a receipt is saved each line copies "pays for membership" onto

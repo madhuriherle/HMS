@@ -260,7 +260,17 @@ def create_receipt(
     fy = receipt_numbers.financial_year_for(receipt_in.receipt_date)
     typed = (receipt_in.receipt_number or "").strip()
     from services import numbering
-    if typed and numbering.get_format(db, "RECEIPT").allow_manual:
+    if receipt_in.is_old_receipt:
+        # an old (dummy) receipt always carries a typed number in its own format, so it never looks like a real one
+        fmt = numbering.get_format(db, "OLD_RECEIPT")
+        lead = f"{fmt.prefix}{fmt.separator}" if fmt.prefix else ""
+        if not typed:
+            raise HTTPException(400, "Type the number of the old receipt")
+        if lead and not typed.upper().startswith(lead.upper()):
+            raise HTTPException(400, f'An old receipt number must start with "{lead}" (for example {numbering.render(fmt, receipt_in.receipt_date, fmt.start_value)})')
+        receipt_numbers.assert_number_free(db, fy, typed)
+        receipt_no = typed
+    elif typed and numbering.get_format(db, "RECEIPT").allow_manual:
         receipt_numbers.assert_number_free(db, fy, typed)
         receipt_no = typed
         numbering.note_used(db, "RECEIPT", typed, receipt_in.receipt_date)
@@ -505,6 +515,7 @@ def read_receipt_tracking(
             "cheque_number": r.cheque_number,
             "cheque_date": r.cheque_date,
             "is_renewal": r.is_renewal,
+            "is_old_receipt": r.is_old_receipt,
             "source": r.source,
             # Payee columns: a member (profile-linked) or an associate
             # (non-member donor). payee_type tells the UI which detail to open.
@@ -771,6 +782,29 @@ def next_receipt_number(
         "financial_year": fy,
         "receipt_number": receipt_numbers.next_receipt_number(db, on, consume=False),
         "allow_manual": numbering.get_format(db, "RECEIPT").allow_manual,
+    }
+
+
+@router.get("/old-number")
+def last_old_receipt_number(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Old (dummy) receipts are numbered by hand: show the last one entered and the format, so the next follows it."""
+    from services import numbering
+
+    fmt = numbering.get_format(db, "OLD_RECEIPT")
+    last = (
+        db.query(Receipt)
+        .filter(Receipt.is_old_receipt == True, Receipt.is_deleted == False)  # noqa: E712
+        .order_by(Receipt.id.desc())
+        .first()
+    )
+    return {
+        "last_number": last.receipt_number if last else None,
+        "last_date": last.receipt_date if last else None,
+        "prefix": f"{fmt.prefix}{fmt.separator}" if fmt.prefix else "",
+        "example": numbering.render(fmt, date.today(), fmt.start_value),
     }
 
 
@@ -1358,6 +1392,7 @@ def delete_receipt(
     if not receipt:
         raise HTTPException(404, "Receipt not found")
     removed_members = _allocated_member_ids(db, receipt.id)
+    frozen = membership_credit.frozen_members(db, removed_members)
     if allocated_total(db, receipt.id) > 0:
         if not force:
             raise InUseError(
@@ -1379,7 +1414,8 @@ def delete_receipt(
     members = removed_members
     removed = crud_receipts.receipt.remove(db, id=id, deleted_by=current_user.id)
     if members:
-        membership_credit.recompute_members(db, members, current_user.id)
+        db.flush()
+        membership_credit.after_money_removed(db, members, current_user.id, frozen)
         db.commit()
     review_msg = f"receipt {receipt.receipt_number} was deleted"
     if reason:
@@ -1493,12 +1529,13 @@ def remove_allocation(
     ).first()
     if not alloc:
         raise HTTPException(404, "Allocation not found")
+    frozen = membership_credit.frozen_members(db, [alloc.member_id])
     alloc.is_deleted = True
     alloc.deleted_by = current_user.id
     db.flush()
     receipt_status.refresh(db, receipt)
     if alloc.member_id:
-        membership_credit.recompute_members(db, [alloc.member_id], current_user.id)
+        membership_credit.after_money_removed(db, [alloc.member_id], current_user.id, frozen)
     db.commit()
     db.refresh(alloc)
     membership_credit.flag_for_review(db, [alloc.member_id], f"receipt {receipt.receipt_number} was un-assigned")
@@ -1520,6 +1557,7 @@ def cancel_receipt(
     if receipt_status.is_cancelled(receipt):
         raise HTTPException(400, "Receipt is already cancelled")
 
+    frozen = membership_credit.frozen_members(db, _allocated_member_ids(db, id))
     receipt.payment_status = "CANCELLED"
     receipt.receipt_status = "CANCELLED"
     receipt.updated_by = current_user.id
@@ -1530,9 +1568,10 @@ def cancel_receipt(
         created_by=current_user.id,
     )
     db.add(cancellation)
+    db.flush()   # the cancelled status must be seen when the payments are added up again
     member_ids = _allocated_member_ids(db, id)
     if member_ids:
-        membership_credit.recompute_members(db, member_ids, current_user.id)
+        membership_credit.after_money_removed(db, member_ids, current_user.id, frozen)
     db.commit()
     membership_credit.flag_for_review(db, _allocated_member_ids(db, id), f"receipt {receipt.receipt_number} was cancelled")
     return {"message": "Receipt cancelled successfully"}
@@ -1557,10 +1596,12 @@ def create_refund(
         refund_reference=payload.refund_reference,
         created_by=current_user.id,
     )
-    db.add(refund)
     refund_member_ids = _allocated_member_ids(db, id)
+    frozen = membership_credit.frozen_members(db, refund_member_ids)
+    db.add(refund)
+    db.flush()
     if refund_member_ids:
-        membership_credit.recompute_members(db, refund_member_ids, current_user.id)
+        membership_credit.after_money_removed(db, refund_member_ids, current_user.id, frozen)
     db.commit()
     db.refresh(refund)
     membership_credit.flag_for_review(db, _allocated_member_ids(db, id), f"receipt {receipt.receipt_number} was refunded")

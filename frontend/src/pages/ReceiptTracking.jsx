@@ -555,7 +555,7 @@ export default function ReceiptTracking() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-mono font-bold text-xs text-[#510601]">{receipt.receiptNumber}</div>
+                  <div className="font-mono font-bold text-xs text-[#510601]">{receipt.receiptNumber}{receipt.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide bg-amber-100 text-amber-800 border border-amber-200 align-middle" title="Old receipt added afterwards (dummy)">OLD</span>}</div>
                   <div className="text-sm font-bold text-[#180200] truncate">{receipt.name || '—'}</div>
                   <div className="text-[11px] text-[#863221]">
                     {formatDate(receipt.receiptDate)} · {receipt.paymentMode || '—'}
@@ -640,6 +640,7 @@ export default function ReceiptTracking() {
                       {/* Column 1: Receipt Number */}
                       <td className="py-3.5 px-4 font-mono font-bold text-xs">
                         <span className="text-[#510601] tracking-wider">{receipt.receiptNumber}</span>
+                        {receipt.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide bg-amber-100 text-amber-800 border border-amber-200 align-middle" title="Old receipt added afterwards (dummy)">OLD</span>}
                       </td>
 
                       {/* Column 2: Receipt Date */}

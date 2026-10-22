@@ -3,6 +3,7 @@ from sqlalchemy import text
 from sqlalchemy import Index, event
 from sqlalchemy import String, Integer, BigInteger, Boolean, DateTime, Date, Time, Numeric, Text, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import expression
 from models.base import Base, AuditMixin
 
 class Receipt(AuditMixin, Base):
@@ -37,6 +38,9 @@ class Receipt(AuditMixin, Base):
     # One visible status: UNASSIGNED | ASSIGNED | CANCELLED (see services/receipt_status.py).
     # payment_status keeps describing the money.
     receipt_status: Mapped[str] = mapped_column(String(20), default="UNASSIGNED", server_default="UNASSIGNED", nullable=False)
+    # An old receipt that was never entered, added afterwards so the member's payments add up. Its number is typed in
+    # (prefix from Number Formats > Old receipt number), never taken from the normal series.
+    is_old_receipt: Mapped[bool] = mapped_column(Boolean, default=False, server_default=expression.false(), nullable=False)
     # Optional period the receipt covers (a seva slot, a sponsorship year...). All four are optional.
     period_from_date: Mapped[Date] = mapped_column(Date, nullable=True)
     period_to_date: Mapped[Date] = mapped_column(Date, nullable=True)

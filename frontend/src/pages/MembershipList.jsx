@@ -26,6 +26,7 @@ import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import api from '../api';
 import { notify } from '../utils/notify';
+import { formatDate } from '../utils/dateUtils';
 import Pager from '../components/Pager';
 import { fetchMemberPage, normalizeMember } from '../utils/apiAdapters';
 import useRules from '../hooks/useRules';
@@ -176,6 +177,19 @@ export default function MembershipList() {
 
   // 5. Label Preview Modal
   const [isLabelPreviewOpen, setIsLabelPreviewOpen] = useState(false);
+  // members whose payments fall short of the price of their joining era (an old receipt is probably missing)
+  const [mismatchOpen, setMismatchOpen] = useState(false);
+  const [mismatch, setMismatch] = useState({ total: 0, data: [], loading: false });
+  const loadMismatch = () => {
+    setMismatch((m) => ({ ...m, loading: true }));
+    api
+      .get('/members/payment-mismatches', { params: { limit: 200 } })
+      .then(({ data }) => setMismatch({ total: data.total || 0, data: data.data || [], loading: false }))
+      .catch(() => setMismatch({ total: 0, data: [], loading: false }));
+  };
+  useEffect(() => {
+    loadMismatch();
+  }, []);
   const printContainerRef = useRef(null);
 
   // Active membership types available for new registrations
@@ -432,6 +446,16 @@ export default function MembershipList() {
               </Link>
             )}
             */}
+            {mismatch.total > 0 && (
+              <button
+                type="button"
+                onClick={() => setMismatchOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-red-50 border border-red-300 text-red-700 hover:bg-red-100 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs cursor-pointer shrink-0"
+                title="Members whose payments do not add up to the price of the year they joined. An old receipt is probably missing."
+              >
+                <span>Payment mismatches ({mismatch.total})</span>
+              </button>
+            )}
             {hasPermission('members.list.write') && (
               <button
                 type="button"
@@ -748,6 +772,53 @@ export default function MembershipList() {
       </div>
 
       {/* View Member Profile is handled on dedicated full-screen page /dashboard/membership/profile/:id */}
+
+      <Modal isOpen={mismatchOpen} onClose={() => setMismatchOpen(false)} title={`Payment mismatches (${mismatch.total})`} maxWidthClass="max-w-5xl">
+        <div className="p-5 space-y-3">
+          <p className="text-xs text-[#863221]">
+            These members paid less than the price of the year they joined (Membership Types &gt; price history). An old receipt is probably
+            missing, so their type is not changed until it is entered. Add it on Receipt Entry as an <b>Old receipt (dummy)</b> and map it to the member.
+          </p>
+          <div className="overflow-x-auto border border-[#E8DFD8] rounded-xl">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="bg-[#FAF7F2] text-[10px] uppercase tracking-wider text-[#863221]">
+                  <th className="py-2 px-3">Member</th>
+                  <th className="py-2 px-3">Joined</th>
+                  <th className="py-2 px-3 text-right">Price then</th>
+                  <th className="py-2 px-3 text-right">Paid then</th>
+                  <th className="py-2 px-3 text-right">Short by</th>
+                  <th className="py-2 px-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {mismatch.data.map((r) => (
+                  <tr key={r.member_id} className="border-t border-[#E8DFD8]/70">
+                    <td className="py-2 px-3">
+                      <div className="font-semibold text-[#180200]">{r.name || `ID ${r.member_id}`}</div>
+                      <div className="font-mono text-[11px] text-[#863221]">{r.membership_number || '-'} · {r.mobile || '-'}</div>
+                    </td>
+                    <td className="py-2 px-3">
+                      {r.joined_type}
+                      <div className="text-[11px] text-[#863221]">{r.joined_on ? formatDate(r.joined_on) : ''}</div>
+                    </td>
+                    <td className="py-2 px-3 text-right font-mono">{r.era_price}</td>
+                    <td className="py-2 px-3 text-right font-mono">{r.paid_in_era}</td>
+                    <td className="py-2 px-3 text-right font-mono font-bold text-red-700">{r.shortfall}</td>
+                    <td className="py-2 px-3 text-right whitespace-nowrap">
+                      <Link to={`/dashboard/membership/profile/${r.member_id}`} className="text-[#510601] font-semibold mr-3">Open</Link>
+                      <Link to="/dashboard/receipts/entry" className="text-[#510601] font-semibold">Add old receipt</Link>
+                    </td>
+                  </tr>
+                ))}
+                {mismatch.data.length === 0 && (
+                  <tr><td colSpan={6} className="py-6 text-center text-[#863221]">{mismatch.loading ? 'Loading...' : 'No mismatches.'}</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Modal>
 
       {/* ==================================================== */}
       {/* MODAL 3: LABEL PREVIEW & PRINT INTERFACE             */}

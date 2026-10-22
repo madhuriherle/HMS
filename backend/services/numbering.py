@@ -20,6 +20,7 @@ from models.system import NumberFormat, NumberSequence
 DOC_LABELS = {
     "MEMBER_CODE": "Membership number",  # the one permanent number a member gets at approval
     "RECEIPT": "Receipt number",
+    "OLD_RECEIPT": "Old (dummy) receipt number",  # typed in for an old receipt that was never entered
 }
 
 DATE_PARTS = {  # value -> label
@@ -69,6 +70,7 @@ DEFAULTS = {  # what the system produced before formats were configurable
     "MEMBER_CODE": Fmt("MEMBER_CODE", "HMS", "DATE_FULL", "-", 6, 1, "NEVER", "", True),
     "MEMBERSHIP_NO": Fmt("MEMBERSHIP_NO", "HMSM", "DATE_FULL", "-", 6, 1, "NEVER", "", True),
     "RECEIPT": Fmt("RECEIPT", "", "NONE", "", 4, 1, "FY", "", True),  # 0001, 0002 ... starting again each financial year
+    "OLD_RECEIPT": Fmt("OLD_RECEIPT", "OLD", "NONE", "-", 4, 1, "NEVER", "", True),  # OLD-0001, OLD-0002 ...
 }
 
 

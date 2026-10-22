@@ -136,6 +136,8 @@ class ReceiptBase(BaseModel):
 
 class ReceiptCreate(ReceiptBase):
     receipt_number: Optional[str] = None
+    # an old receipt entered afterwards (dummy): the number is typed in and must start with the old-receipt prefix
+    is_old_receipt: bool = False
     # Spoiled / void paper receipt: saved under its number with status CANCELLED. Only the number and date are needed;
     # whatever else was entered (payee, particulars, amounts, payment details) is kept on it, as with a receipt cancelled
     # later. It is never mapped to a member, and a cancelled receipt adds nothing to any total.
@@ -220,6 +222,7 @@ class ReceiptItemResponse(ReceiptItemBase):
     model_config = ConfigDict(from_attributes=True)
 
 class ReceiptInDBBase(ReceiptBase):
+    is_old_receipt: bool = False
     id: int
     receipt_number: str
     payment_status: str

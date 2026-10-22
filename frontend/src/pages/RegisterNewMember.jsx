@@ -160,6 +160,7 @@ export default function RegisterNewMember() {
     email: '',
     existingMember: false,
     existingNumber: '',
+    existingSince: '',
     fatherHusbandName: '',
     fatherName: '',
     fatherMembershipNo: '',
@@ -970,7 +971,10 @@ export default function RegisterNewMember() {
       }
       if (formData.existingMember) {
         // the membership starts now, with the type chosen on the form and the number typed in
-        await api.post(`/members/${data.id}/memberships`, { membership_type_id: Number(formData.membershipTypeId) });
+        await api.post(`/members/${data.id}/memberships`, {
+          membership_type_id: Number(formData.membershipTypeId),
+          ...(toISODate(formData.existingSince) ? { member_since: toISODate(formData.existingSince) } : {}),
+        });
         showToast(`Member "${formData.name.trim()}" added as an approved member (${formData.existingNumber.trim()}).`);
         navigate('/dashboard/membership/list');
         return;
@@ -1127,6 +1131,17 @@ export default function RegisterNewMember() {
                             </select>
                             {formErrors.existingType && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.existingType}</p>}
                           </div>
+                          <div>
+                            <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">Member Since:</label>
+                            <DateInput
+                              max={new Date().toISOString().slice(0, 10)}
+                              value={formData.existingSince}
+                              onChange={(e) => setFormData({ ...formData, existingSince: e.target.value })}
+                              name="existingSince"
+                              className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs"
+                            />
+                            <p className="text-[11px] text-stone-500 mt-1">The day they joined. Left empty, it is today. Their payments are checked against the price of that time.</p>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1171,7 +1186,7 @@ export default function RegisterNewMember() {
                     {/* Row 1: Name (Title + Full Name), DOB, and Age in a SINGLE LINE */}
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-x-4 gap-y-5 items-start">
                       {/* Member Name */}
-                      <div className="sm:col-span-4">
+                      <div className="sm:col-span-6">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           Member Name: <span className="text-red-600">*</span>
                         </label>
@@ -1210,7 +1225,7 @@ export default function RegisterNewMember() {
                       </div>
 
                       {/* Name in Kannada, beside the name */}
-                      <div className="sm:col-span-3">
+                      <div className="sm:col-span-6">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           Name (Kannada): <span className="text-red-600">*</span>
                         </label>
@@ -1231,8 +1246,12 @@ export default function RegisterNewMember() {
                         {formErrors.nameKn && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.nameKn}</p>}
                       </div>
 
+                    </div>
+
+                    {/* Row 1b: Date of Birth, Age and Email */}
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-x-4 gap-y-5 items-start">
                       {/* Date of Birth */}
-                      <div className="sm:col-span-3">
+                      <div className="sm:col-span-4">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           Date of Birth:
                         </label>
@@ -1263,6 +1282,24 @@ export default function RegisterNewMember() {
                           title="Worked out from the Date of Birth"
                           className="w-full px-3 py-2 bg-[#F3EEE8] border border-[#E8DFD8] rounded-lg text-xs sm:text-sm font-semibold text-[#510601] focus:outline-none shadow-2xs cursor-default"
                         />
+                      </div>
+
+                      {/* Email */}
+                      <div className="sm:col-span-6">
+                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">Email Address:</label>
+                        <input
+                          type="email"
+                          disabled={isViewMode}
+                          value={formData.email}
+                          onChange={(e) => {
+                            setFormData({ ...formData, email: e.target.value });
+                            if (formErrors.email) setFormErrors((prev) => ({ ...prev, email: '' }));
+                          }}
+                          className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                            formErrors.email ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
+                          }`}
+                        />
+                        {formErrors.email && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.email}</p>}
                       </div>
                     </div>
 
@@ -1404,26 +1441,6 @@ export default function RegisterNewMember() {
                             Same as mobile
                           </span>
                         </label>
-                      </div>
-                    </div>
-
-                    {/* Email */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5 items-start">
-                      <div>
-                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">Email Address:</label>
-                        <input
-                          type="email"
-                          disabled={isViewMode}
-                          value={formData.email}
-                          onChange={(e) => {
-                            setFormData({ ...formData, email: e.target.value });
-                            if (formErrors.email) setFormErrors((prev) => ({ ...prev, email: '' }));
-                          }}
-                          className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
-                            formErrors.email ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
-                          }`}
-                        />
-                        {formErrors.email && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.email}</p>}
                       </div>
                     </div>
                   </div>

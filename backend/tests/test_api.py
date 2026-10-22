@@ -6554,12 +6554,13 @@ def test_membership_credit_auto_upgrade_with_remaining_carried(client, admin_hea
     pay(700)
     assert credit()["remaining_amount"] == 700 and credit()["current_type"]["code"] == "LAD_MAHA"
 
-    # cancelling a receipt never downgrades; the summary just shows the shortfall
+    # cancelling a receipt lowers the type to what the remaining payments pay for
     assert client.post(f"/api/v1/receipts/{donation['id']}/cancel", headers=H, json={"reason": "bounced"}).status_code == 200
     c = credit()
-    assert c["credit_total"] == 2200 and c["current_type"]["code"] == "LAD_MAHA"
+    assert c["credit_total"] == 2200 and c["current_type"]["code"] == "LAD_POSHAKA"
+    # the recalculation only ever moves a member up
     recalc = client.post(f"/api/v1/members/{mid}/membership-credit/recalculate", headers=H).json()
-    assert recalc["changed"]["action"] == "DOWNGRADED" and recalc["changed"]["type"] == "LAD_POSHAKA"
+    assert recalc["changed"] is None and recalc["current_type"]["code"] == "LAD_POSHAKA"
 
     # allocating later (receipt first, member mapped afterwards) also upgrades
     m2 = _create_member(client, H, "9644444444", "Ladder Two")

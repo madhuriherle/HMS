@@ -261,6 +261,7 @@ export default function ReceiptEntry() {
     paymentReceivedDetails: '',
     description: '',
     isCancelled: false,
+    isOldReceipt: false,
     periodFromDate: '',
     periodToDate: '',
     periodFromTime: '',
@@ -505,6 +506,25 @@ export default function ReceiptEntry() {
   // RECEIPT NUMBER / DATE DEFAULTS (financial year 2026-27/0001 series)
   // ----------------------------------------------------
   const [financialYear, setFinancialYear] = useState('');
+  // an old (dummy) receipt: typed in the old-receipt format; the last one entered is shown to follow the sequence
+  const [oldInfo, setOldInfo] = useState(null);
+  const loadOldInfo = () =>
+    api
+      .get('/receipts/old-number')
+      .then(({ data }) => {
+        setOldInfo(data);
+        setFormData((prev) => ({ ...prev, receiptNumber: prev.receiptNumber || data.prefix || '' }));
+      })
+      .catch(() => setOldInfo(null));
+  const toggleOldReceipt = (checked) => {
+    setFormData((prev) => ({ ...prev, isOldReceipt: checked, receiptNumber: '' }));
+    setFormErrors((prev) => ({ ...prev, receiptNumber: '' }));
+    if (checked) loadOldInfo();
+    else {
+      setOldInfo(null);
+      loadReceiptDefaults(undefined, { keepDate: true });
+    }
+  };
   const numberTouched = useRef(false); // true once the user typed their own number
   const defaultsSeq = useRef(0);
 
@@ -1111,10 +1131,11 @@ export default function ReceiptEntry() {
       } else if (saveMode.current === 'new') {
         showToast(`Receipt ${receiptNo} saved. Ready for the next one.`, 'success');
         // keep the date and payment details for the next receipt of the batch
-        const keep = { receiptDate: formData.receiptDate, paymentMode: formData.paymentMode, bankAccount: formData.bankAccount };
+        const keep = { receiptDate: formData.receiptDate, paymentMode: formData.paymentMode, bankAccount: formData.bankAccount, isOldReceipt: formData.isOldReceipt };
         handleClearForm();
         setFormData((prev) => ({ ...prev, ...keep }));
-        loadReceiptDefaults(keep.receiptDate, { keepDate: true });
+        loadReceiptDefaults(keep.receiptDate, { keepDate: true, keepNumber: keep.isOldReceipt });
+        if (keep.isOldReceipt) loadOldInfo();
         await reloadData();
       } else {
         showToast(`Receipt ${receiptNo} saved successfully! Navigating to Receipt Tracking...`, 'success');
@@ -1122,7 +1143,10 @@ export default function ReceiptEntry() {
       }
     } catch (error) {
       console.error('Failed to save receipt.', error);
-      if (error.response?.status === 409 && /Receipt number/i.test(error.response?.data?.detail || '')) {
+      if (
+        (error.response?.status === 409 && /Receipt number/i.test(error.response?.data?.detail || '')) ||
+        (error.response?.status === 400 && /old receipt/i.test(error.response?.data?.detail || ''))
+      ) {
         setFormErrors((prev) => ({ ...prev, receiptNumber: error.response.data.detail }));
       }
 
@@ -1179,6 +1203,7 @@ export default function ReceiptEntry() {
       delete body.allocations;
       delete body.is_renewal; // editing never changes these
       delete body.is_cancelled;
+      delete body.is_old_receipt;
       delete body.source;
       await api.put(`/receipts/${editId}`, body);
 
@@ -1599,6 +1624,26 @@ export default function ReceiptEntry() {
 
               <div className="space-y-3">
 
+                {!isEdit && (
+                  <div>
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer select-none" title="An old payment that was never entered. Its number is typed in the old-receipt format.">
+                      <input
+                        type="checkbox"
+                        checked={formData.isOldReceipt}
+                        onChange={(e) => toggleOldReceipt(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded accent-[#510601] cursor-pointer"
+                      />
+                      <span className="text-[11px] font-semibold text-[#3D140C]">Old receipt (dummy)</span>
+                    </label>
+                    {formData.isOldReceipt && oldInfo && (
+                      <p className="text-[11px] text-[#863221] mt-1">
+                        Last old receipt: <b className="font-mono text-[#180200]">{oldInfo.last_number || 'none yet'}</b>
+                        {oldInfo.last_date ? ` (${formatDate(oldInfo.last_date)})` : ''} · Format: <span className="font-mono">{oldInfo.example}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 {/* Row 1: Receipt No & Receipt Date */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* 1. Receipt No (Manual Entry) */}
@@ -1627,7 +1672,7 @@ export default function ReceiptEntry() {
                     {!formErrors.receiptNumber && numberCheck && numberCheck.number === String(formData.receiptNumber || '').trim() && (
                       numberCheck.available ? (
                         // an available number in the usual format shows nothing; only a problem is shown
-                        numberCheck.matches_format ? null : (
+                        numberCheck.matches_format || formData.isOldReceipt ? null : (
                           <p className="text-[11px] text-amber-700 mt-1 font-medium">
                             Available, but not like the usual format (for example {numberCheck.example}). You can still save it.
                           </p>

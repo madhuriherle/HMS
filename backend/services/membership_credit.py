@@ -253,7 +253,7 @@ def flag_for_review(db: Session, member_ids, reason: str) -> int:
         who = " ".join(x for x in (member.name_title, member.display_name) if x) if member else f"Member {mid}"
         flagged += 1 if notify_approvers(
             db, "Membership type needs review",
-            f"{who}: credit is now {total} but their type costs {_d(price.amount)} ({reason}). The type was not lowered; review it.",
+            f"{who}: credit is now {total} but their type costs {_d(price.amount)} ({reason}). Review it.",
             {"member_id": mid, "kind": "MEMBERSHIP_CREDIT_REVIEW"},
         ) else 0
     return flagged
@@ -339,6 +339,11 @@ def apply_auto_upgrade(db: Session, member_id: int, acted_by: Optional[int]) -> 
     member = db.query(Member).filter(Member.id == member_id, Member.is_deleted == False).first()  # noqa: E712
     if not member:
         return None
+    # a payment that does not add up to the price of the joining era (an old receipt is probably missing): no change
+    # of type until it is entered
+    check = payment_check_rows(db, [member_id]).get(member_id)
+    if check and check["mismatch"]:
+        return None
     total = credit_ledger(db, member_id)["total"]
     tiers = ladder(db)
     if not tiers:
@@ -383,62 +388,99 @@ def apply_auto_upgrade(db: Session, member_id: int, acted_by: Optional[int]) -> 
 
     if qualified is not None:
         target, target_price = qualified
-        if current.membership_type_id == target.id:
-            return None
+        if current.membership_type_id == target.id or target_price <= old_price:
+            return None   # the type never moves down here: that happens when money is removed (after_money_removed)
         price_row = active_price(db, target.id)
         old_type_id = current.membership_type_id
         current.membership_type_id = target.id
         current.price_id = price_row.id if price_row else current.price_id
         current.updated_by = acted_by
-
-        if target_price > old_price:
-            action = "UPGRADED"
-            reason = f"Auto-upgrade: payments total {total} reached {target.name_en} ({target_price})"
-        else:
-            action = "DOWNGRADED"
-            reason = f"Auto-downgrade: payments total {total} adjusted to {target.name_en} ({target_price})"
-
+        reason = f"Auto-upgrade: payments total {total} reached {target.name_en} ({target_price})"
         db.add(MembershipTypeHistory(
             member_id=member_id, membership_id=current.id, old_type_id=old_type_id,
             new_type_id=target.id, old_price=float(old_price),
             new_price=float(target_price), changed_by=acted_by, changed_at=now,
             reason=reason, created_by=acted_by,
         ))
-        return {"action": action, "type": target.code, "price": float(target_price), "credit_total": float(total)}
+        return {"action": "UPGRADED", "type": target.code, "price": float(target_price), "credit_total": float(total)}
 
-    # qualified is None: total is 0 or less than the cheapest tier.
-    # Revert to the member's initial tier if one existed, else the base tier on the ladder.
-    first_hist = (
+    return None
+
+
+def frozen_members(db: Session, member_ids) -> set:
+    """Members whose payment does not add up to the price of their joining era (an old receipt is probably missing).
+    Called BEFORE money is removed: such a member is left alone, because their shortfall is not caused by the removal."""
+    ids = [m for m in set(member_ids or []) if m]
+    if not ids:
+        return set()
+    return {m for m, info in payment_check_rows(db, ids).items() if info["mismatch"]}
+
+
+def lower_if_unpaid(db: Session, member_id: int, acted_by: Optional[int]) -> Optional[dict]:
+    """After money was removed (a receipt deleted, cancelled, refunded or un-assigned): if the member's payments no
+    longer pay for the type they hold, move them down to the highest type their payments do pay for. Both are judged at
+    the prices of the day they began holding the type (their joining day, or the day of the last change of type), so
+    an old member who paid the price of their time is not judged by today's price. Returns the change, or None."""
+    from models.masters import MembershipType, MembershipTypePrice
+    from models.members import MembershipTypeHistory
+
+    current = _current_membership(db, member_id)
+    if current is None:
+        return None
+    hist = (
         db.query(MembershipTypeHistory)
         .filter(MembershipTypeHistory.member_id == member_id, MembershipTypeHistory.is_deleted == False)  # noqa: E712
-        .order_by(MembershipTypeHistory.id.asc())
-        .first()
+        .order_by(MembershipTypeHistory.id.desc()).all()
     )
-    initial_type_id = first_hist.old_type_id if (first_hist and first_hist.old_type_id) else (first_hist.new_type_id if first_hist else None)
-    initial_type = db.get(MembershipType, initial_type_id) if initial_type_id else None
-    fallback_type = (initial_type if (initial_type and not initial_type.is_deleted and initial_type.status) else None) or tiers[0][0]
-
-    target = fallback_type
-    price_row = active_price(db, target.id)
-    target_price = _d(price_row.amount) if price_row else Decimal(0)
-
-    if current.membership_type_id == target.id:
+    since = next((h.changed_at.date() for h in hist if h.new_type_id == current.membership_type_id and h.changed_at), None)
+    since = since or (current.applied_at.date() if current.applied_at else None)
+    if since is None:
+        return None
+    prices = db.query(MembershipTypePrice).filter(MembershipTypePrice.is_deleted == False).all()  # noqa: E712
+    held = _price_on(prices, current.membership_type_id, since)
+    if held is None or _d(held.amount) <= 0:
+        return None
+    required = _d(held.amount)
+    total = credit_ledger(db, member_id)["total"]
+    if total + Decimal("0.005") >= required:
         return None
 
+    best = None
+    for mt in db.query(MembershipType).filter(MembershipType.is_deleted == False, MembershipType.status == True).all():  # noqa: E712
+        row = _price_on(prices, mt.id, since)
+        if row is None:
+            continue
+        amount = _d(row.amount)
+        if 0 < amount <= total and amount < required and (best is None or amount > best[2]):
+            best = (mt, row, amount)
+    if best is None:
+        return None   # nothing cheaper is paid for either: left to the approvers (they get the review notice)
+
+    target, row, amount = best
+    old_type = db.get(MembershipType, current.membership_type_id)
     old_type_id = current.membership_type_id
     current.membership_type_id = target.id
-    current.price_id = price_row.id if price_row else current.price_id
+    current.price_id = row.id
     current.updated_by = acted_by
-    action = "DOWNGRADED"
-    reason = f"Auto-downgrade: payments removed (credit {total}), reverted to {target.name_en}"
-
     db.add(MembershipTypeHistory(
-        member_id=member_id, membership_id=current.id, old_type_id=old_type_id,
-        new_type_id=target.id, old_price=float(old_price),
-        new_price=float(target_price), changed_by=acted_by, changed_at=now,
-        reason=reason, created_by=acted_by,
+        member_id=member_id, membership_id=current.id, old_type_id=old_type_id, new_type_id=target.id,
+        old_price=float(required), new_price=float(amount), changed_by=acted_by, changed_at=datetime.now(timezone.utc),
+        reason=f"Auto-downgrade: payments total {total} no longer pay for {old_type.name_en if old_type else 'the type'} ({required}); now {target.name_en} ({amount})",
+        created_by=acted_by,
     ))
-    return {"action": action, "type": target.code, "price": float(target_price), "credit_total": float(total)}
+    return {"action": "DOWNGRADED", "type": target.code, "price": float(amount), "credit_total": float(total)}
+
+
+def after_money_removed(db: Session, member_ids, acted_by: Optional[int], frozen=()) -> list:
+    """Run lower_if_unpaid for each member (except those frozen before the removal). Does not commit."""
+    changes = []
+    for mid in {m for m in (member_ids or []) if m}:
+        if mid in frozen:
+            continue
+        change = lower_if_unpaid(db, mid, acted_by)
+        if change:
+            changes.append({"member_id": mid, **change})
+    return changes
 
 
 def recompute_members(db: Session, member_ids, acted_by: Optional[int]) -> list:
@@ -449,3 +491,83 @@ def recompute_members(db: Session, member_ids, acted_by: Optional[int]) -> list:
         if change:
             changes.append({"member_id": mid, **change})
     return changes
+
+
+# ── payment check against the price of the member's joining era ──────────────
+
+def _price_on(prices: list, type_id, on):
+    """The price row of a type that was in force on a date, or None when no row covers it."""
+    for row in prices:
+        if row.membership_type_id != type_id:
+            continue
+        if row.effective_from <= on and (row.effective_to is None or row.effective_to >= on):
+            return row
+    return None
+
+
+def payment_check_rows(db: Session, member_ids=None, *, limit: int = 0) -> dict:
+    """{member_id: info} for approved members: did they pay the price of the type they joined with, as it was
+    priced in their joining era (Membership Types > price history)?
+
+    A member joined on the day their first membership began, with the type they first held. Money counts when it is
+    a counted receipt type (see credit_receipt_types) dated inside that price's period. A member whose joining
+    date is covered by no price row cannot be judged and is left out. `mismatch` is true when they paid less than that
+    price: an old receipt is probably missing, so no type change is made for them until it is entered."""
+    from models.masters import MembershipTypePrice
+    from models.members import Member, MemberMembership, MembershipTypeHistory
+
+    q = (
+        db.query(MemberMembership)
+        .join(Member, Member.id == MemberMembership.member_id)
+        .filter(
+            MemberMembership.is_deleted == False,  # noqa: E712
+            MemberMembership.status == "ACTIVE",
+            Member.is_deleted == False,  # noqa: E712
+            Member.approval_status == "APPROVED",
+        )
+        .order_by(MemberMembership.member_id, MemberMembership.id)
+    )
+    if member_ids is not None:
+        q = q.filter(MemberMembership.member_id.in_(list(member_ids)))
+    first = {}
+    for ms in q.all():
+        first.setdefault(ms.member_id, ms)   # the earliest active membership is the joining one
+    if not first:
+        return {}
+
+    prices = db.query(MembershipTypePrice).filter(MembershipTypePrice.is_deleted == False).all()  # noqa: E712
+    if not prices:
+        return {}
+    hist = {}
+    for h in db.query(MembershipTypeHistory).filter(
+        MembershipTypeHistory.member_id.in_(list(first)), MembershipTypeHistory.is_deleted == False  # noqa: E712
+    ).order_by(MembershipTypeHistory.id).all():
+        hist.setdefault(h.member_id, h)       # the first change shows the type they started with
+    types = credit_receipt_types(db)
+    paid = {}
+    ids = list(first)
+    for i in range(0, len(ids), 500):
+        for alloc, receipt, _gross, counted in _counted_rows(db, ids[i:i + 500], types):
+            paid.setdefault(alloc.member_id, []).append((receipt.receipt_date, counted))
+
+    today = datetime.now(timezone.utc).date()
+    out = {}
+    for mid, ms in first.items():
+        joined = (ms.applied_at.date() if ms.applied_at else None)
+        if joined is None:
+            continue
+        h = hist.get(mid)
+        start_type = (h.old_type_id or h.new_type_id) if h else ms.membership_type_id
+        row = _price_on(prices, start_type, joined)
+        if row is None or _d(row.amount) <= 0:
+            continue
+        end = row.effective_to or today
+        in_era = sum((c for d, c in paid.get(mid, []) if row.effective_from <= d <= end), Decimal(0))
+        expected = _d(row.amount)
+        out[mid] = {
+            "member_id": mid, "joined_on": joined, "start_type_id": start_type,
+            "era_price": float(expected), "era_from": row.effective_from, "era_to": row.effective_to,
+            "paid_in_era": float(in_era), "shortfall": float(max(Decimal(0), expected - in_era)),
+            "mismatch": in_era + Decimal("0.005") < expected,
+        }
+    return out

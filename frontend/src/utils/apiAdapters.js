@@ -238,6 +238,7 @@ export const receiptToApiPayload = (formData, selectedMember = null) => {
     net_amount: amount,
     source: 'OFFLINE',
     is_renewal: Boolean(formData.isRenewal),
+    is_old_receipt: Boolean(formData.isOldReceipt),
     is_cancelled: Boolean(formData.isCancelled),
     payer_pan: (formData.panNo || '').trim() || null,
     payer_mobile: (formData.mobile || '').trim() || null,

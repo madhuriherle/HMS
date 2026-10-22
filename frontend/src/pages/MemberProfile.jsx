@@ -555,6 +555,13 @@ function MembershipTab({ id }) {
       {(d) => (
         <div className="space-y-5">
           <CreditBanner credit={d.membership_credit} />
+          {d.payment_check?.mismatch && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800">
+              <b>Payment mismatch.</b> Joined as {d.payment_check.joined_type} on {formatDate(d.payment_check.joined_on)}: the price then was{' '}
+              {inr(d.payment_check.era_price)} and {inr(d.payment_check.paid_in_era)} is recorded, short by {inr(d.payment_check.shortfall)}. An old
+              receipt is probably missing. Add it on Receipt Entry as an Old receipt (dummy). The type is not changed until then.
+            </div>
+          )}
           {d.approval && (
             <Card icon={User} title="Registration & approval">
               <dl className="divide-y divide-[#EFE6DE]/50 text-xs">
