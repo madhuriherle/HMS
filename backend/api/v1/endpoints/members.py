@@ -407,10 +407,36 @@ def create_member(
     _member_master_checks(db, member_in.model_dump(exclude_unset=False))
 
     fields = member_in.model_dump()
+    existing = bool(fields.pop("existing_member", False))
+    typed_number = (fields.pop("existing_membership_number", None) or "").strip()
+    if existing:
+        if not typed_number:
+            raise HTTPException(status_code=400, detail="Enter the membership number of the existing member")
+        in_use = db.query(MemberModel.id).filter(
+            MemberModel.membership_number == typed_number, MemberModel.is_deleted == False,  # noqa: E712
+        ).first() or db.query(MemberMembership.id).filter(
+            MemberMembership.membership_number == typed_number, MemberMembership.is_deleted == False,  # noqa: E712
+        ).first()
+        if in_use:
+            raise HTTPException(status_code=409, detail=f"Membership number {typed_number} is already used by another member")
     _magazine_choice(fields, needed=fields.get("magazine_needed"), own_email=fields.get("email"))
     db_obj = MemberModel(**fields, created_by=current_user.id)
     db.add(db_obj)
     db.flush()
+
+    if existing:
+        # already a member: approved straight away with the typed number (no receipt or meeting needed)
+        now = datetime.now(timezone.utc)
+        db_obj.membership_number = typed_number
+        db_obj.approval_status = "APPROVED"
+        db_obj.approved_by = current_user.id
+        db_obj.approved_at = now
+        db.add(MemberApprovalHistory(
+            member_id=db_obj.id, action="APPROVE", old_status="UNAPPROVED", new_status="APPROVED",
+            reason="Existing approved member entered with membership number " + typed_number,
+            acted_by=current_user.id, acted_at=now, created_by=current_user.id,
+        ))
+        db.flush()
 
     if db_obj.magazine_needed:
         # a member who says Yes is on the magazine subscription straight away (no separate accept step)

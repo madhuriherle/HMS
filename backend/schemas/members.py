@@ -169,7 +169,9 @@ class MemberBase(BaseModel):
         return self
 
 class MemberCreate(MemberBase):
-    pass
+    # an existing member being entered by hand: saved already Approved with the membership number typed in
+    existing_member: bool = False
+    existing_membership_number: Optional[str] = None
 
 
 class MemberUpdate(BaseModel):

@@ -71,7 +71,12 @@ def activate_member(db: Session, member: Member, *, activated_by: int, reason: O
 
     # Auto-generate member_code
     if not member.member_code:
-        member.member_code = generate_next_number(db, "MEMBER_CODE", "HMS")
+        # skip a number already typed in by hand for an existing member
+        for _ in range(100):
+            code = generate_next_number(db, "MEMBER_CODE", "HMS")
+            if not db.query(Member.id).filter(Member.membership_number == code, Member.is_deleted == False).first():  # noqa: E712
+                break
+        member.member_code = code
     member.approval_status = "APPROVED"
     member.approved_by = activated_by
     member.approved_at = now

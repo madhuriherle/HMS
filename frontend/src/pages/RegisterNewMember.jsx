@@ -158,6 +158,8 @@ export default function RegisterNewMember() {
     name: '',
     nameKn: '',
     email: '',
+    existingMember: false,
+    existingNumber: '',
     fatherHusbandName: '',
     fatherName: '',
     fatherMembershipNo: '',
@@ -716,6 +718,10 @@ export default function RegisterNewMember() {
     if (!formData.nameKn.trim()) {
       errors.nameKn = 'Name in Kannada is required';
     }
+    if (!isEditMode && formData.existingMember) {
+      if (!formData.existingNumber.trim()) errors.existingNumber = 'Enter the membership number';
+      if (!formData.membershipTypeId) errors.existingType = 'Choose the membership type';
+    }
     const cleanEmail = (formData.email || '').trim();
     if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
       errors.email = 'Enter a valid email address';
@@ -909,6 +915,10 @@ export default function RegisterNewMember() {
       magazine_needed: formData.magazineNeeded === 'YES',
       magazine_kind: formData.magazineNeeded === 'YES' ? formData.magazineKind || 'PHYSICAL' : null,
       magazine_delivery_address: formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' && formData.magazineDeliveryChoice === 'DIFFERENT' ? composeMagazineAddress(formData) || null : null,
+      // an existing member entered by hand: saved Approved with this membership number
+      ...(!isEditMode && formData.existingMember
+        ? { existing_member: true, existing_membership_number: formData.existingNumber.trim() }
+        : {}),
       // where the record came from is set once, when it is created; editing never changes it
       ...(isEditMode ? {} : { registration_source: 'OFFLINE' })
     };
@@ -957,6 +967,13 @@ export default function RegisterNewMember() {
         const form = new FormData();
         form.append('file', photoFile);
         await api.post(`/members/${data.id}/photo`, form);
+      }
+      if (formData.existingMember) {
+        // the membership starts now, with the type chosen on the form and the number typed in
+        await api.post(`/members/${data.id}/memberships`, { membership_type_id: Number(formData.membershipTypeId) });
+        showToast(`Member "${formData.name.trim()}" added as an approved member (${formData.existingNumber.trim()}).`);
+        navigate('/dashboard/membership/list');
+        return;
       }
       showToast(`Member "${formData.name.trim()}" registered and added to Unapproved Members.`);
       navigate('/dashboard/membership/unapproved');
@@ -1095,7 +1112,7 @@ export default function RegisterNewMember() {
                     {/* Row 1: Name (Title + Full Name), DOB, and Age in a SINGLE LINE */}
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-x-4 gap-y-5 items-start">
                       {/* Member Name */}
-                      <div className="sm:col-span-5">
+                      <div className="sm:col-span-4">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           Member Name: <span className="text-red-600">*</span>
                         </label>
@@ -1131,6 +1148,28 @@ export default function RegisterNewMember() {
                         {formErrors.name && (
                           <p className="text-[11px] text-red-600 mt-1">{formErrors.name}</p>
                         )}
+                      </div>
+
+                      {/* Name in Kannada, beside the name */}
+                      <div className="sm:col-span-3">
+                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                          Name (Kannada): <span className="text-red-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          lang="kn"
+                          placeholder="ಹೆಸರು (ಕನ್ನಡ)"
+                          disabled={isViewMode}
+                          value={formData.nameKn}
+                          onChange={(e) => {
+                            setFormData({ ...formData, nameKn: e.target.value });
+                            if (formErrors.nameKn) setFormErrors((prev) => ({ ...prev, nameKn: '' }));
+                          }}
+                          className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
+                            formErrors.nameKn ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
+                          }`}
+                        />
+                        {formErrors.nameKn && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.nameKn}</p>}
                       </div>
 
                       {/* Date of Birth */}
@@ -1309,28 +1348,67 @@ export default function RegisterNewMember() {
                       </div>
                     </div>
 
-                    {/* Kannada name and email */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5 items-start">
-                      <div>
-                        <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
-                          Name (Kannada): <span className="text-red-600">*</span>
+                    {/* Existing member: saved Approved with the membership number typed in */}
+                    {!isEditMode && !isViewMode && (
+                      <div className="rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={formData.existingMember}
+                            onChange={(e) => setFormData({ ...formData, existingMember: e.target.checked })}
+                            className="w-4 h-4 rounded text-[#510601] focus:ring-[#510601] border-[#E8DFD8] accent-[#510601] cursor-pointer"
+                          />
+                          <span className="text-xs sm:text-sm font-semibold text-[#3D140C]">Approved Member</span>
+                          <span className="text-[11px] text-stone-500">Already a member: no receipt or meeting needed</span>
                         </label>
-                        <input
-                          type="text"
-                          lang="kn"
-                          placeholder="ಹೆಸರು (ಕನ್ನಡ)"
-                          disabled={isViewMode}
-                          value={formData.nameKn}
-                          onChange={(e) => {
-                            setFormData({ ...formData, nameKn: e.target.value });
-                            if (formErrors.nameKn) setFormErrors((prev) => ({ ...prev, nameKn: '' }));
-                          }}
-                          className={`w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
-                            formErrors.nameKn ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
-                          }`}
-                        />
-                        {formErrors.nameKn && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.nameKn}</p>}
+                        {formData.existingMember && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 mt-3">
+                            <div>
+                              <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                                Membership Number: <span className="text-red-600">*</span>
+                              </label>
+                              <input
+                                type="text"
+                                value={formData.existingNumber}
+                                onChange={(e) => {
+                                  setFormData({ ...formData, existingNumber: e.target.value });
+                                  if (formErrors.existingNumber) setFormErrors((prev) => ({ ...prev, existingNumber: '' }));
+                                }}
+                                className={`w-full px-3 py-2 bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs ${
+                                  formErrors.existingNumber ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8]'
+                                }`}
+                              />
+                              {formErrors.existingNumber && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.existingNumber}</p>}
+                            </div>
+                            <div>
+                              <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                                Membership Type: <span className="text-red-600">*</span>
+                              </label>
+                              <select
+                                value={formData.membershipTypeId}
+                                onChange={(e) => {
+                                  const t = activeMembershipTypes.find((mt) => String(mt.id) === e.target.value);
+                                  setFormData({ ...formData, membershipTypeId: e.target.value, membershipType: t ? t.name : '' });
+                                  if (formErrors.existingType) setFormErrors((prev) => ({ ...prev, existingType: '' }));
+                                }}
+                                className={`w-full px-3 py-2 bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs cursor-pointer ${
+                                  formErrors.existingType ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8]'
+                                }`}
+                              >
+                                <option value="">Choose...</option>
+                                {activeMembershipTypes.map((mt) => (
+                                  <option key={mt.id} value={mt.id}>{mt.name}</option>
+                                ))}
+                              </select>
+                              {formErrors.existingType && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.existingType}</p>}
+                            </div>
+                          </div>
+                        )}
                       </div>
+                    )}
+
+                    {/* Email */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5 items-start">
                       <div>
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">Email Address:</label>
                         <input
