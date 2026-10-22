@@ -1073,6 +1073,65 @@ export default function RegisterNewMember() {
                 <fieldset disabled={isViewMode} className="space-y-4 disabled:opacity-95">
                   <div className="pb-2 border-b border-[#E8DFD8]"><h3 className="text-sm font-bold text-[#8C1801] uppercase tracking-wider">Personal Details</h3></div>
 
+                  {/* Existing member: saved Approved with the membership number typed in */}
+                  {!isEditMode && !isViewMode && (
+                    <div className="rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={formData.existingMember}
+                          onChange={(e) => setFormData({ ...formData, existingMember: e.target.checked })}
+                          className="w-4 h-4 rounded text-[#510601] focus:ring-[#510601] border-[#E8DFD8] accent-[#510601] cursor-pointer"
+                        />
+                        <span className="text-xs sm:text-sm font-semibold text-[#3D140C]">Approved Member</span>
+                        <span className="text-[11px] text-stone-500">Already a member: no receipt or meeting needed</span>
+                      </label>
+                      {formData.existingMember && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 mt-3">
+                          <div>
+                            <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                              Membership Number: <span className="text-red-600">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={formData.existingNumber}
+                              onChange={(e) => {
+                                setFormData({ ...formData, existingNumber: e.target.value });
+                                if (formErrors.existingNumber) setFormErrors((prev) => ({ ...prev, existingNumber: '' }));
+                              }}
+                              className={`w-full px-3 py-2 bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs ${
+                                formErrors.existingNumber ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8]'
+                              }`}
+                            />
+                            {formErrors.existingNumber && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.existingNumber}</p>}
+                          </div>
+                          <div>
+                            <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                              Membership Type: <span className="text-red-600">*</span>
+                            </label>
+                            <select
+                              value={formData.membershipTypeId}
+                              onChange={(e) => {
+                                const t = activeMembershipTypes.find((mt) => String(mt.id) === e.target.value);
+                                setFormData({ ...formData, membershipTypeId: e.target.value, membershipType: t ? t.name : '' });
+                                if (formErrors.existingType) setFormErrors((prev) => ({ ...prev, existingType: '' }));
+                              }}
+                              className={`w-full px-3 py-2 bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs cursor-pointer ${
+                                formErrors.existingType ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8]'
+                              }`}
+                            >
+                              <option value="">Choose...</option>
+                              {activeMembershipTypes.map((mt) => (
+                                <option key={mt.id} value={mt.id}>{mt.name}</option>
+                              ))}
+                            </select>
+                            {formErrors.existingType && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.existingType}</p>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Photo upload + Basic Details */}
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
                   {/* Left: Passport Size Photo Upload */}
@@ -1347,65 +1406,6 @@ export default function RegisterNewMember() {
                         </label>
                       </div>
                     </div>
-
-                    {/* Existing member: saved Approved with the membership number typed in */}
-                    {!isEditMode && !isViewMode && (
-                      <div className="rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3">
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={formData.existingMember}
-                            onChange={(e) => setFormData({ ...formData, existingMember: e.target.checked })}
-                            className="w-4 h-4 rounded text-[#510601] focus:ring-[#510601] border-[#E8DFD8] accent-[#510601] cursor-pointer"
-                          />
-                          <span className="text-xs sm:text-sm font-semibold text-[#3D140C]">Approved Member</span>
-                          <span className="text-[11px] text-stone-500">Already a member: no receipt or meeting needed</span>
-                        </label>
-                        {formData.existingMember && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 mt-3">
-                            <div>
-                              <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
-                                Membership Number: <span className="text-red-600">*</span>
-                              </label>
-                              <input
-                                type="text"
-                                value={formData.existingNumber}
-                                onChange={(e) => {
-                                  setFormData({ ...formData, existingNumber: e.target.value });
-                                  if (formErrors.existingNumber) setFormErrors((prev) => ({ ...prev, existingNumber: '' }));
-                                }}
-                                className={`w-full px-3 py-2 bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs ${
-                                  formErrors.existingNumber ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8]'
-                                }`}
-                              />
-                              {formErrors.existingNumber && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.existingNumber}</p>}
-                            </div>
-                            <div>
-                              <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
-                                Membership Type: <span className="text-red-600">*</span>
-                              </label>
-                              <select
-                                value={formData.membershipTypeId}
-                                onChange={(e) => {
-                                  const t = activeMembershipTypes.find((mt) => String(mt.id) === e.target.value);
-                                  setFormData({ ...formData, membershipTypeId: e.target.value, membershipType: t ? t.name : '' });
-                                  if (formErrors.existingType) setFormErrors((prev) => ({ ...prev, existingType: '' }));
-                                }}
-                                className={`w-full px-3 py-2 bg-white border rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs cursor-pointer ${
-                                  formErrors.existingType ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8]'
-                                }`}
-                              >
-                                <option value="">Choose...</option>
-                                {activeMembershipTypes.map((mt) => (
-                                  <option key={mt.id} value={mt.id}>{mt.name}</option>
-                                ))}
-                              </select>
-                              {formErrors.existingType && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.existingType}</p>}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
 
                     {/* Email */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5 items-start">
@@ -1747,7 +1747,7 @@ export default function RegisterNewMember() {
 
               {/* The sticker as it prints: membership number, name in bold, address (the sticker sheet's own format) */}
               <div
-                className="mt-4 rounded-md border border-stone-300 bg-white px-5 py-4 min-h-[170px] text-black"
+                className="mt-4 rounded-md border border-stone-300 bg-white px-5 py-4 h-[170px] overflow-hidden text-black"
                 style={{ fontFamily: '"Times New Roman", Times, serif' }}
               >
                 <div className="text-[13px] leading-tight">
