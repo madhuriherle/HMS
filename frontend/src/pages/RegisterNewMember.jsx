@@ -1456,32 +1456,41 @@ export default function RegisterNewMember() {
                             Same as mobile
                           </span>
                         </label>
-                        {/* a different WhatsApp number: whose it is */}
-                        {otherWhatsApp && (
-                          <div className="flex gap-1.5 mt-1.5">
+                          </div>
+
+                      {/* a different WhatsApp number: whose it is, in the same row as the number */}
+                      {otherWhatsApp && (
+                        <>
+                          <div className="sm:col-span-4">
+                            <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold truncate" title="Whose WhatsApp number this is">
+                              Belongs To / Relation:
+                            </label>
                             <select
                               value={formData.whatsappOwnerRelation}
                               onChange={(e) => setFormData({ ...formData, whatsappOwnerRelation: e.target.value })}
-                              title="Whose WhatsApp number this is"
-                              className="w-28 shrink-0 px-2 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer"
+                              className="w-full px-2.5 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer"
                             >
                               {BEHALF_OPTIONS.map((opt) => (
                                 <option key={opt} value={opt}>{opt}</option>
                               ))}
                             </select>
-                            {formData.whatsappOwnerRelation !== 'Self' && (
+                          </div>
+                          {formData.whatsappOwnerRelation !== 'Self' && (
+                            <div className="sm:col-span-4">
+                              <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold truncate" title="Name of the person this WhatsApp number belongs to">
+                                Name:
+                              </label>
                               <input
                                 type="text"
                                 maxLength={150}
-                                placeholder="Name"
                                 value={formData.whatsappOwnerName}
                                 onChange={(e) => setFormData({ ...formData, whatsappOwnerName: e.target.value })}
-                                className="flex-1 min-w-0 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                                className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                               />
-                            )}
-                          </div>
-                        )}
-                      </div>
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
