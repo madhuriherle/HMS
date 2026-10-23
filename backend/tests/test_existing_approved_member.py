@@ -44,3 +44,14 @@ def test_ordinary_registration_is_still_unapproved(client, admin_headers):
     r = client.post(f"{API}/members/", headers=admin_headers, json=_body(s))
     assert r.status_code in (200, 201), r.text
     assert client.get(f"{API}/members/{r.json()['id']}", headers=admin_headers).json()["approval_status"] == "UNAPPROVED"
+
+
+def test_mobile_and_whatsapp_owner_are_saved(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    r = client.post(f"{API}/members/", headers=h, json=_body(
+        s, applied_on_behalf_of="Father", mobile_owner_name="Ramesh Rao",
+        whatsapp_number="97" + s.zfill(8), whatsapp_owner_relation="Wife", whatsapp_owner_name="Latha Rao"))
+    assert r.status_code in (200, 201), r.text
+    got = client.get(f"{API}/members/{r.json()['id']}", headers=h).json()
+    assert got["mobile_owner_name"] == "Ramesh Rao"
+    assert got["whatsapp_owner_relation"] == "Wife" and got["whatsapp_owner_name"] == "Latha Rao"

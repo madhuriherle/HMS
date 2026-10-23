@@ -193,6 +193,9 @@ export default function RegisterNewMember() {
     nativePlace: '',
     appliedOnBehalfOf: 'Self',
     behalfOtherText: '',
+    mobileOwnerName: '',
+    whatsappOwnerRelation: 'Self',
+    whatsappOwnerName: '',
     qualification: '',
     employment: '',
     magazineNeeded: 'YES',
@@ -217,7 +220,7 @@ export default function RegisterNewMember() {
 
   const [formData, setFormData] = useState(initialFormState);
   const [formErrors, setFormErrors] = useState({});
-  const [isWhatsAppSameAsMobile, setIsWhatsAppSameAsMobile] = useState(false);
+  const [isWhatsAppSameAsMobile, setIsWhatsAppSameAsMobile] = useState(true); // a new member: WhatsApp follows the mobile until changed
 
   // PIN code autocomplete suggestions
   const [pinSuggestions, setPinSuggestions] = useState([]);
@@ -347,6 +350,9 @@ export default function RegisterNewMember() {
           nativePlace: m.native_place_text || '',
           appliedOnBehalfOf: !m.applied_on_behalf_of ? 'Self' : BEHALF_OPTIONS.includes(m.applied_on_behalf_of) ? m.applied_on_behalf_of : 'Others',
           behalfOtherText: m.applied_on_behalf_of && !BEHALF_OPTIONS.includes(m.applied_on_behalf_of) ? m.applied_on_behalf_of : '',
+          mobileOwnerName: m.mobile_owner_name || '',
+          whatsappOwnerRelation: m.whatsapp_owner_relation || 'Self',
+          whatsappOwnerName: m.whatsapp_owner_name || '',
           qualification: m.qualification_text || '',
           employment: m.occupation || '',
           magazineNeeded: m.magazine_needed === false ? 'NO' : 'YES',
@@ -855,6 +861,9 @@ export default function RegisterNewMember() {
     });
   };
 
+  // a WhatsApp number that is not the mobile: whose it is is asked and saved
+  const otherWhatsApp = !isWhatsAppSameAsMobile && Boolean((formData.whatsappNumber || '').trim());
+
   // ----------------------------------------------------
   // SAVE (server calls)
   // ----------------------------------------------------
@@ -914,6 +923,9 @@ export default function RegisterNewMember() {
       taluk_id: pinRow?.talukId || null,
       pincode_id: pinRow?.id || null,
       applied_on_behalf_of: formData.appliedOnBehalfOf === 'Others' ? (formData.behalfOtherText || '').trim() || 'Others' : formData.appliedOnBehalfOf || null,
+      mobile_owner_name: formData.appliedOnBehalfOf !== 'Self' ? (formData.mobileOwnerName || '').trim() || null : null,
+      whatsapp_owner_relation: otherWhatsApp ? formData.whatsappOwnerRelation || null : null,
+      whatsapp_owner_name: otherWhatsApp ? (formData.whatsappOwnerName || '').trim() || null : null,
       magazine_needed: formData.magazineNeeded === 'YES',
       magazine_kind: formData.magazineNeeded === 'YES' ? formData.magazineKind || 'PHYSICAL' : null,
       magazine_delivery_address: formData.magazineNeeded === 'YES' && formData.magazineKind !== 'EMAIL' && formData.magazineDeliveryChoice === 'DIFFERENT' ? composeMagazineAddress(formData) || null : null,
@@ -1214,7 +1226,7 @@ export default function RegisterNewMember() {
                       {/* Name in Kannada, beside the name */}
                       <div className="sm:col-span-6">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
-                          Name (Kannada): <span className="text-red-600">*</span>
+                          Member Name (Kannada): <span className="text-red-600">*</span>
                         </label>
                         <input
                           type="text"
@@ -1355,7 +1367,7 @@ export default function RegisterNewMember() {
                       </div>
 
                       {/* Membership Belongs To / Relationship */}
-                      <div className="sm:col-span-4">
+                      <div className={formData.appliedOnBehalfOf === 'Self' ? 'sm:col-span-4' : 'sm:col-span-3'}>
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold truncate" title="Membership Belongs To / Relationship">
                           Belongs To / Relation:
                         </label>
@@ -1387,8 +1399,24 @@ export default function RegisterNewMember() {
                         </div>
                       </div>
 
+                      {/* Name of the person the mobile belongs to (not shown for Self) */}
+                      {formData.appliedOnBehalfOf !== 'Self' && (
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold truncate" title="Name of the person this mobile belongs to">
+                            Name:
+                          </label>
+                          <input
+                            type="text"
+                            maxLength={150}
+                            value={formData.mobileOwnerName}
+                            onChange={(e) => setFormData({ ...formData, mobileOwnerName: e.target.value })}
+                            className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                          />
+                        </div>
+                      )}
+
                       {/* WhatsApp Number */}
-                      <div className="sm:col-span-4">
+                      <div className={formData.appliedOnBehalfOf === 'Self' ? 'sm:col-span-4' : 'sm:col-span-3'}>
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           WhatsApp Number:
                         </label>
@@ -1428,6 +1456,31 @@ export default function RegisterNewMember() {
                             Same as mobile
                           </span>
                         </label>
+                        {/* a different WhatsApp number: whose it is */}
+                        {otherWhatsApp && (
+                          <div className="flex gap-1.5 mt-1.5">
+                            <select
+                              value={formData.whatsappOwnerRelation}
+                              onChange={(e) => setFormData({ ...formData, whatsappOwnerRelation: e.target.value })}
+                              title="Whose WhatsApp number this is"
+                              className="w-28 shrink-0 px-2 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer"
+                            >
+                              {BEHALF_OPTIONS.map((opt) => (
+                                <option key={opt} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                            {formData.whatsappOwnerRelation !== 'Self' && (
+                              <input
+                                type="text"
+                                maxLength={150}
+                                placeholder="Name"
+                                value={formData.whatsappOwnerName}
+                                onChange={(e) => setFormData({ ...formData, whatsappOwnerName: e.target.value })}
+                                className="flex-1 min-w-0 px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                              />
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1863,31 +1916,6 @@ export default function RegisterNewMember() {
                     )}
                   </div>
 
-                {/* Section: Membership Referred By */}
-                <div className="pt-4 border-t border-[#E8DFD8]">
-                  <h3 className="text-sm font-bold text-[#8C1801] mb-2">Membership Referred By:</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">Membership Number:</label>
-                      <input
-                        type="text"
-                        value={formData.referredMembershipNo}
-                        onChange={(e) => setFormData({ ...formData, referredMembershipNo: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">Membership Name:</label>
-                      <input
-                        type="text"
-                        value={formData.referredMembershipName}
-                        onChange={(e) => setFormData({ ...formData, referredMembershipName: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
-                      />
-                    </div>
-                  </div>
-                </div>
-
                 {/* ═══════════════════════════════════════════════════════ */}
                 {/* Section: Family & Relationship Details */}
                 {/* ═══════════════════════════════════════════════════════ */}
@@ -2230,6 +2258,31 @@ export default function RegisterNewMember() {
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* Section: Membership Referred By */}
+                <div className="pt-4 border-t border-[#E8DFD8]">
+                  <h3 className="text-sm font-bold text-[#8C1801] mb-2">Membership Referred By:</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">Membership Number:</label>
+                      <input
+                        type="text"
+                        value={formData.referredMembershipNo}
+                        onChange={(e) => setFormData({ ...formData, referredMembershipNo: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">Membership Name:</label>
+                      <input
+                        type="text"
+                        value={formData.referredMembershipName}
+                        onChange={(e) => setFormData({ ...formData, referredMembershipName: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                   </fieldset>

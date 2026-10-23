@@ -42,6 +42,7 @@ def read_members(
     membership_type_id: Optional[int] = None,
     registration_source: Optional[str] = None,
     mobile_status: Optional[str] = None,  # MISSING (no mobile at all) | INVALID (the register's number was unusable)
+    payment_status: Optional[str] = None,  # NO_RECEIPT | MISMATCH (receipts pay less than the price) | NOT_MAPPED (their number is on an unassigned receipt)
     include_deleted: bool = False,
     search: Optional[str] = None,
     membership_no: Optional[str] = None,   # EXACT membership number only (never part of a number, a name or a mobile)
@@ -85,6 +86,26 @@ def read_members(
             query = query.filter(no_mobile)
         elif mobile_status.upper() == "INVALID":
             query = query.filter(no_mobile, Member.mobile_raw.isnot(None), Member.mobile_raw != "")
+    if payment_status:
+        wanted = payment_status.upper()
+        if wanted in ("NO_RECEIPT", "MISMATCH"):
+            from services import membership_credit
+            ids = [mid for mid, c in membership_credit.payment_check_rows(db).items()
+                   if c["mismatch"] and (c["no_receipt"] if wanted == "NO_RECEIPT" else not c["no_receipt"])]
+            query = query.filter(Member.id.in_(ids or [0]))
+        elif wanted == "NOT_MAPPED":
+            from models.receipts import Receipt
+            typed = func.upper(func.trim(Receipt.payer_membership_no))
+            waiting = db.query(typed).filter(
+                Receipt.is_deleted == False, Receipt.receipt_status == "UNASSIGNED",  # noqa: E712
+                Receipt.payment_status != "CANCELLED", Receipt.payer_membership_no.isnot(None),
+            )
+            query = query.filter(or_(
+                func.upper(func.trim(Member.membership_number)).in_(waiting),
+                Member.id.in_(db.query(MemberMembership.member_id).filter(
+                    MemberMembership.is_deleted == False,  # noqa: E712
+                    func.upper(func.trim(MemberMembership.membership_number)).in_(waiting))),
+            ))
     if membership_type_id:
         query = query.join(
             MemberMembership, MemberMembership.member_id == Member.id
@@ -313,6 +334,7 @@ def _attach_membership_types(db: Session, rows: list) -> None:
             check = checks.get(r.get("id"))
             r["payment_mismatch"] = bool(check and check["mismatch"])
             r["payment_shortfall"] = check["shortfall"] if check and check["mismatch"] else None
+            r["payment_no_receipt"] = bool(check and check["mismatch"] and check["no_receipt"])
             tid, name, ms_number = latest.get(r.get("id"), (None, None, None))
             r["membership_type_id"] = tid
             r["membership_type"] = name
@@ -2414,6 +2436,9 @@ def _profile_personal(db: Session, member: Member) -> dict:
         "member_status": member.member_status,
         "approval_status": member.approval_status,
         "applied_on_behalf_of": member.applied_on_behalf_of,
+        "mobile_owner_name": member.mobile_owner_name,
+        "whatsapp_owner_relation": member.whatsapp_owner_relation,
+        "whatsapp_owner_name": member.whatsapp_owner_name,
         "created_at": member.created_at,
     }
 
@@ -3107,15 +3132,14 @@ def _gotra_key(raw: Optional[str]) -> str:
 
 # Misspellings seen in the legacy register that the spelling key alone cannot reach -> the gotra they mean.
 _GOTRA_ALIASES = {
-    "Vasista": ["VSISHTA", "VASISAHTA", "VASHITA", "VASJHISTHA", "VASHIATHA", "VSISTATA"],
-    "Vishwamitra": ["VISHVAMITRA", "VISHWMITRA", "VISHWAMITHA", "VISHWMATRA", "VISEAMITRA", "VISHAWAMITRA", "VISHEMITRA",
+    "Vashishta": ["VSISHTA", "VASISAHTA", "VASHITA", "VASJHISTHA", "VASHIATHA", "VSISTATA"],
+    "VISHWAMITRA": ["VISHVAMITRA", "VISHWMITRA", "VISHWAMITHA", "VISHWMATRA", "VISEAMITRA", "VISHAWAMITRA", "VISHEMITRA",
                     "VISHWAMAITHRA", "VISMAMITRA", "VISHWAMTHRA", "VISHVAMITHRA"],
     "Kashyapa": ["KASHYPA", "KAISHIPA", "KASHIPA", "KAHYAPA", "KASAHYAPA", "KASHAPA"],
     "Jamadagni": ["JAMADGNI", "JAMDAGNI", "JAMADGI", "JAMADGHNI", "GAMADAGNI"],
-    "Goutama": ["GUTHAMA", "GOUTHMA"],
+    "Gowtama": ["GUTHAMA", "GOUTHMA"],
     "Bharadwaja": ["BAHRADWA", "JBHARADWAJ"],
-    "Mouna Bharghava": ["MOUNBHARGHAVA"],
-    "Haritasa": ["HARITHSA"],
+    "Mouna Bhargava": ["MOUNBHARGHAVA"],
 }
 _GOTRA_ALIAS_KEYS = {_gotra_key(alias): _gotra_key(real) for real, aliases in _GOTRA_ALIASES.items() for alias in aliases}
 

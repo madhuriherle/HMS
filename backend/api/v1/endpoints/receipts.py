@@ -266,9 +266,9 @@ def create_receipt(
         fmt = numbering.get_format(db, "OLD_RECEIPT")
         lead = f"{fmt.prefix}{fmt.separator}" if fmt.prefix else ""
         if not typed:
-            raise HTTPException(400, "Type the number of the old receipt")
+            raise HTTPException(400, "Type the number of the unknown receipt")
         if lead and not typed.upper().startswith(lead.upper()):
-            raise HTTPException(400, f'An old receipt number must start with "{lead}" (for example {numbering.render(fmt, receipt_in.receipt_date, fmt.start_value)})')
+            raise HTTPException(400, f'An unknown receipt number must start with "{lead}" (for example {numbering.render(fmt, receipt_in.receipt_date, fmt.start_value)})')
         receipt_numbers.assert_number_free(db, fy, typed)
         receipt_no = typed
     elif typed and numbering.get_format(db, "RECEIPT").allow_manual:

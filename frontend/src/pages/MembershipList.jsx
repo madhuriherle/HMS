@@ -68,7 +68,7 @@ export default function MembershipList() {
         if (type) params.membership_type_id = type.id;
       }
       if (statusFilter !== 'ALL') params.is_active = statusFilter === 'Active';
-      if (mobileFilter !== 'ALL') params.mobile_status = mobileFilter;
+      if (paymentFilter !== 'ALL') params.payment_status = paymentFilter;
       if (stateFilter !== 'ALL') {
         const st = states.find((x) => x.name.toLowerCase() === stateFilter.toLowerCase());
         if (st) params.state_id = st.id;
@@ -131,14 +131,14 @@ export default function MembershipList() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [stateFilter, setStateFilter] = useState('ALL');
   const [districtFilter, setDistrictFilter] = useState('ALL');
-  const [mobileFilter, setMobileFilter] = useState('ALL'); // ALL | MISSING | INVALID
+  const [paymentFilter, setPaymentFilter] = useState('ALL'); // ALL | NO_RECEIPT | MISMATCH | NOT_MAPPED
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
   // the page is read again whenever the page, the search, a filter or the sort changes (default: newest first)
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const filterKey = [debouncedSearch, typeFilter, statusFilter, stateFilter, districtFilter, mobileFilter, sort.by, sort.dir].join('|');
+  const filterKey = [debouncedSearch, typeFilter, statusFilter, stateFilter, districtFilter, paymentFilter, sort.by, sort.dir].join('|');
   const mastersReady = membershipTypes.length > 0 || states.length > 0;
   useEffect(() => {
     loadMembers();
@@ -200,7 +200,7 @@ export default function MembershipList() {
     (statusFilter !== 'ALL' ? 1 : 0) +
     (stateFilter !== 'ALL' ? 1 : 0) +
     (districtFilter !== 'ALL' ? 1 : 0) +
-    (mobileFilter !== 'ALL' ? 1 : 0);
+    (paymentFilter !== 'ALL' ? 1 : 0);
   const singleMatchMember =
     !loadingPage && total === 1 && paginatedMembers.length === 1 && (debouncedSearch.trim() || activeFilterCount > 0)
       ? paginatedMembers[0]
@@ -247,7 +247,7 @@ export default function MembershipList() {
     setStatusFilter('ALL');
     setStateFilter('ALL');
     setDistrictFilter('ALL');
-    setMobileFilter('ALL');
+    setPaymentFilter('ALL');
     setCurrentPage(1);
   };
 
@@ -348,7 +348,7 @@ export default function MembershipList() {
           (statusFilter !== 'ALL' ? 1 : 0) +
           (stateFilter !== 'ALL' ? 1 : 0) +
           (districtFilter !== 'ALL' ? 1 : 0) +
-          (mobileFilter !== 'ALL' ? 1 : 0)
+          (paymentFilter !== 'ALL' ? 1 : 0)
         }
         onResetFilters={handleClearFilters}
         rightSlot={
@@ -475,21 +475,21 @@ export default function MembershipList() {
           widthClass="w-full sm:w-48"
         />
 
-        {/* 5. Mobile filter: two tick boxes, shown directly (no dropdown) - no number, or a number from the old register that was unusable */}
-        {[['MISSING', 'No mobile number'], ['INVALID', 'Invalid number (to correct)']].map(([val, label]) => (
-          <label key={val} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#180200] cursor-pointer select-none whitespace-nowrap">
-            <input
-              type="checkbox"
-              checked={mobileFilter === val}
-              onChange={(e) => {
-                setMobileFilter(e.target.checked ? val : 'ALL');
-                setCurrentPage(1);
-              }}
-              className="w-4 h-4 accent-[#510601] cursor-pointer"
-            />
-            {label}
-          </label>
-        ))}
+        {/* 5. Payment status: members with no receipt, whose receipts pay less than the price, or whose receipt is still unmapped */}
+        <FilterSelect
+          value={paymentFilter}
+          onChange={(val) => {
+            setPaymentFilter(val);
+            setCurrentPage(1);
+          }}
+          options={[
+            { value: 'ALL', label: 'All Payment Status' },
+            { value: 'NO_RECEIPT', label: 'No receipt on record' },
+            { value: 'MISMATCH', label: 'Payment mismatch' },
+            { value: 'NOT_MAPPED', label: 'Receipt not mapped' }
+          ]}
+          widthClass="w-full sm:w-52"
+        />
 
         {/* Single reset / clear icon for search + filters */}
         <button
@@ -591,7 +591,7 @@ export default function MembershipList() {
                   return (
                     <tr
                       key={m.id}
-                      className={`transition-colors ${isSelected ? 'bg-[#FAF7F2]' : m.payment_mismatch ? 'bg-[#C08071]/20 hover:bg-[#C08071]/30' : 'bg-white hover:bg-[#FAF7F2]'
+                      className={`transition-colors ${isSelected ? 'bg-[#FAF7F2]' : m.payment_mismatch ? (m.payment_no_receipt ? 'bg-amber-100/70 hover:bg-amber-100' : 'bg-[#C08071]/20 hover:bg-[#C08071]/30') : 'bg-white hover:bg-[#FAF7F2]'
                         }`}
                     >
                       {/* Checkbox */}
@@ -616,9 +616,9 @@ export default function MembershipList() {
                           <Link
                             to={`/dashboard/membership/profile/${m.id}`}
                             className="block mt-0.5 text-[11px] font-bold text-[#510601] underline hover:text-[#180200]"
-                            title="Paid less than the price of the year they joined, so an old receipt is probably missing. Add it on Receipt Entry as an Old receipt (dummy)."
+                            title="Paid less than the price of the year they joined, so an old receipt is probably missing. Add it on Receipt Entry as an Unknown receipt."
                           >
-                            Payment mismatch · short by {m.payment_shortfall}
+                            {m.payment_no_receipt ? 'No receipt on record' : `Payment mismatch · short by ${m.payment_shortfall}`}
                           </Link>
                         )}
                       </td>

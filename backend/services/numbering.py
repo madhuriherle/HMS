@@ -20,7 +20,7 @@ from models.system import NumberFormat, NumberSequence
 DOC_LABELS = {
     "MEMBER_CODE": "Membership number",  # the one permanent number a member gets at approval
     "RECEIPT": "Receipt number",
-    "OLD_RECEIPT": "Old (dummy) receipt number",  # typed in for an old receipt that was never entered
+    "OLD_RECEIPT": "Unknown receipt number",  # typed in for an old receipt that was never entered
 }
 
 DATE_PARTS = {  # value -> label

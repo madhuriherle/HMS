@@ -60,6 +60,10 @@ def test_missing_old_receipt_is_flagged_and_cleared_by_a_dummy_receipt(client, a
     assert _check(client, h, mid)["mismatch"] is True
     listed = client.get(f"{API}/members/", headers=h, params={"search": "98" + s.zfill(8), "limit": 5}).json()["data"]
     assert listed and listed[0]["payment_mismatch"] is True
+    assert listed[0]["payment_no_receipt"] is True
+    for status, expect in (("NO_RECEIPT", True), ("MISMATCH", False), ("NOT_MAPPED", False)):
+        got = client.get(f"{API}/members/", headers=h, params={"payment_status": status, "search": "98" + s.zfill(8), "limit": 5}).json()["data"]
+        assert bool(got) is expect
 
     # the number of an old (dummy) receipt is typed, in the old-receipt format
     body = _old_body(mid, 200, "1990-06-01", is_old_receipt=True)
@@ -88,6 +92,7 @@ def test_missing_old_receipt_is_flagged_and_cleared_by_a_dummy_receipt(client, a
     assert check["mismatch"] is False and check["reference_date"] == "1990-07-01" and check["paid"] == 200
     listed = client.get(f"{API}/members/", headers=h, params={"search": "98" + s.zfill(8), "limit": 5}).json()["data"]
     assert listed[0]["payment_mismatch"] is False
+    assert listed[0]["payment_no_receipt"] is False
 
 
 def test_a_flagged_member_keeps_their_type_when_money_arrives(client, admin_headers):

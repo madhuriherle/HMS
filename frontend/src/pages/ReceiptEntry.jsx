@@ -866,8 +866,6 @@ export default function ReceiptEntry() {
       errors.receiptDate = 'Receipt Date is mandatory. Enter it as DD-MM-YYYY.';
     } else if (formData.receiptDate > getTodayISODate()) {
       errors.receiptDate = 'Receipt Date cannot be in the future.';
-    } else if (formData.receiptDate < '2000-01-01') {
-      errors.receiptDate = 'Receipt Date looks wrong. Please check the year.';
     }
 
     // A cancelled (spoiled) paper receipt only needs its number and date.
@@ -1146,7 +1144,7 @@ export default function ReceiptEntry() {
       if (formData.isOldReceipt && matchPreview?.extra > 0) {
         const ok = await confirmYesNo({
           title: 'More than is missing',
-          text: `This old receipt is ${matchPreview.extra} more than the member is short in FY ${matchPreview.financial_year}. The extra stays as remaining credit and counts toward the next type. Save it anyway?`,
+          text: `This unknown receipt is ${matchPreview.extra} more than the member is short in FY ${matchPreview.financial_year}. The extra stays as remaining credit and counts toward the next type. Save it anyway?`,
           confirmText: 'Yes, save',
           danger: true
         });
@@ -1186,7 +1184,7 @@ export default function ReceiptEntry() {
       console.error('Failed to save receipt.', error);
       if (
         (error.response?.status === 409 && /Receipt number/i.test(error.response?.data?.detail || '')) ||
-        (error.response?.status === 400 && /old receipt/i.test(error.response?.data?.detail || ''))
+        (error.response?.status === 400 && /unknown receipt/i.test(error.response?.data?.detail || ''))
       ) {
         setFormErrors((prev) => ({ ...prev, receiptNumber: error.response.data.detail }));
       }
@@ -1674,11 +1672,11 @@ export default function ReceiptEntry() {
                         onChange={(e) => toggleOldReceipt(e.target.checked)}
                         className="w-3.5 h-3.5 rounded accent-[#510601] cursor-pointer"
                       />
-                      <span className="text-[11px] font-semibold text-[#3D140C]">Old receipt (dummy)</span>
+                      <span className="text-[11px] font-semibold text-[#3D140C]">Unknown receipt</span>
                     </label>
                     {formData.isOldReceipt && oldInfo && (
                       <p className="text-[11px] text-[#863221] mt-1">
-                        Last old receipt: <b className="font-mono text-[#180200]">{oldInfo.last_number || 'none yet'}</b>
+                        Last unknown receipt: <b className="font-mono text-[#180200]">{oldInfo.last_number || 'none yet'}</b>
                         {oldInfo.last_date ? ` (${formatDate(oldInfo.last_date)})` : ''} · Next: <span className="font-mono">{oldInfo.next_number || oldInfo.example}</span>
                       </p>
                     )}

@@ -1079,12 +1079,12 @@ export default function MembershipTypeManagement() {
               </div>
 
               {hasPermission('masters.membership_types.write') && (
-                <div className="rounded-xl border border-[#E8DFD8] px-4 py-3">
+                <div className={oldPrice.open ? 'rounded-xl border border-[#E8DFD8] px-4 py-3' : ''}>
                   {!oldPrice.open ? (
                     <button
                       type="button"
                       onClick={() => setOldPrice((o) => ({ ...o, open: true }))}
-                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#510601] cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>Add old price (earlier financial years)</span>

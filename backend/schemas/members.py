@@ -22,6 +22,7 @@ EDITABLE_MEMBER_FIELDS: Set[str] = {
 
     "aadhaar_number", "referred_by_member_id",
     "name_title", "whatsapp_country_code", "applied_on_behalf_of", "magazine_needed",
+    "mobile_owner_name", "whatsapp_owner_relation", "whatsapp_owner_name",
     "magazine_delivery_address", "magazine_kind", "magazine_email",
     "membership_type_category", "referred_by_number", "referred_by_name",
     "family_membership_number", "family_membership_name", "registration_payment",
@@ -62,6 +63,9 @@ class MemberBase(BaseModel):
     name_title: Optional[str] = None
     whatsapp_country_code: Optional[str] = None
     applied_on_behalf_of: Optional[str] = None
+    mobile_owner_name: Optional[str] = None
+    whatsapp_owner_relation: Optional[str] = None
+    whatsapp_owner_name: Optional[str] = None
     magazine_needed: Optional[bool] = None
     magazine_delivery_address: Optional[str] = None
     magazine_kind: Optional[str] = None
@@ -207,6 +211,9 @@ class MemberUpdate(BaseModel):
     name_title: Optional[str] = None
     whatsapp_country_code: Optional[str] = None
     applied_on_behalf_of: Optional[str] = None
+    mobile_owner_name: Optional[str] = None
+    whatsapp_owner_relation: Optional[str] = None
+    whatsapp_owner_name: Optional[str] = None
     magazine_needed: Optional[bool] = None
     magazine_delivery_address: Optional[str] = None
     magazine_kind: Optional[str] = None

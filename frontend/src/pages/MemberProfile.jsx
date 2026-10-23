@@ -561,7 +561,7 @@ function MembershipTab({ id }) {
               {d.payment_check.no_receipt
                 ? `No membership receipt is on record for this ${d.payment_check.type_name} member.`
                 : `${d.payment_check.type_name}: the price on ${formatDate(d.payment_check.reference_date)} (the latest receipt) was ${inr(d.payment_check.price_then)} and ${inr(d.payment_check.paid)} is recorded, short by ${inr(d.payment_check.shortfall)}.`}{' '}
-              An old receipt is probably missing. Add it on Receipt Entry with its real date (an Old receipt (dummy) only if there is no real one). The type is not changed until then.
+              An old receipt is probably missing. Add it on Receipt Entry with its real date (an Unknown receipt only if there is no real one). The type is not changed until then.
             </div>
           )}
           {d.approval && (
@@ -617,7 +617,7 @@ function MembershipTab({ id }) {
                         <td className="py-2 pr-3 whitespace-nowrap">{formatDate(r.receipt_date)} <span className="text-[#863221]">(FY {r.financial_year})</span></td>
                         <td className="py-2 pr-3 font-mono font-bold">
                           {r.receipt_number}
-                          {r.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200" title="Old receipt added afterwards (dummy)">OLD</span>}
+                          {r.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200" title="Old receipt added afterwards (dummy)">UNKNOWN</span>}
                         </td>
                         <td className="py-2 pr-3 text-right font-mono">{inr(r.paid)}</td>
                         <td className="py-2 pr-3 text-right font-mono">{r.price_then != null ? inr(r.price_then) : <span className="text-[#863221]" title="No price is set for this type in that year (Membership Types > Price History)">no price set</span>}</td>
