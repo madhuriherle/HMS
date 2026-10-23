@@ -610,7 +610,7 @@ export default function MembershipList() {
                       </td>
 
                       {/* Name */}
-                      <td className="py-3 px-4 font-bold text-[#180200] text-sm">
+                      <td className="py-3 px-4 font-bold text-[#180200] text-sm break-words [overflow-wrap:anywhere]">
                         {m.fullName || m.name}
                         {m.payment_mismatch && (
                           <Link
@@ -642,7 +642,7 @@ export default function MembershipList() {
                           const whole = [street, place, pin].filter(Boolean).join(', ');
                           return whole ? (
                             <div className="max-w-[220px] text-xs text-[#180200] leading-snug" title={whole}>
-                              {street && <div className="line-clamp-2">{street}</div>}
+                              {street && <div className="break-words [overflow-wrap:anywhere]">{street}</div>}
                               {(place || pin) && <div className="text-[11px] text-[#863221]">{[place, pin].filter(Boolean).join(' · ')}</div>}
                             </div>
                           ) : <span className="text-xs text-[#863221]/60">—</span>;
