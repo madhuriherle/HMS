@@ -1311,7 +1311,7 @@ export default function RegisterNewMember() {
                         </label>
                         <div className="flex gap-1.5">
                           <div className="w-24 shrink-0">
-                            <CountryCodeSelect
+                            <CountryCodeSelect compact
                               value={formData.mobileCountryCode}
                               countryIso={formData.mobileCountryIso}
                               onChange={handleMobileCountryChange}
@@ -1422,7 +1422,7 @@ export default function RegisterNewMember() {
                         </label>
                         <div className="flex gap-1.5">
                           <div className="w-24 shrink-0">
-                            <CountryCodeSelect
+                            <CountryCodeSelect compact
                               value={formData.whatsappCountryCode}
                               countryIso={formData.whatsappCountryIso}
                               onChange={handleWhatsAppCountryChange}

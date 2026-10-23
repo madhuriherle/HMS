@@ -7,6 +7,7 @@ export default function CountryCodeSelect({
   countryIso = 'IN',
   onChange,
   disabled = false,
+  compact = false,   // same height as a py-2 text input (the Register form)
   className = ''
 }) {
   const COUNTRY_CODES = useCountryCodes(); // from the server (GET /meta/lists)
@@ -81,7 +82,7 @@ export default function CountryCodeSelect({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between gap-1.5 px-3 py-2.5 border rounded-lg text-xs sm:text-sm text-[#180200] transition-all ${
+        className={`w-full flex items-center justify-between gap-1.5 px-3 ${compact ? 'py-2' : 'py-2.5'} border rounded-lg text-xs sm:text-sm text-[#180200] transition-all ${
           disabled
             ? 'bg-stone-100 text-stone-400 border-[#E8DFD8] cursor-not-allowed'
             : 'bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border-[#E8DFD8] hover:border-[#8C1801]/60 cursor-pointer focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs'
