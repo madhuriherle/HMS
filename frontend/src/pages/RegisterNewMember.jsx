@@ -1367,7 +1367,7 @@ export default function RegisterNewMember() {
                       </div>
 
                       {/* Membership Belongs To / Relationship */}
-                      <div className={formData.appliedOnBehalfOf === 'Self' ? 'sm:col-span-4' : 'sm:col-span-3'}>
+                      <div className="sm:col-span-4">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold truncate" title="Membership Belongs To / Relationship">
                           Belongs To / Relation:
                         </label>
@@ -1401,7 +1401,7 @@ export default function RegisterNewMember() {
 
                       {/* Name of the person the mobile belongs to (not shown for Self) */}
                       {formData.appliedOnBehalfOf !== 'Self' && (
-                        <div className="sm:col-span-2">
+                        <div className="sm:col-span-4">
                           <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold truncate" title="Name of the person this mobile belongs to">
                             Name:
                           </label>
@@ -1416,7 +1416,7 @@ export default function RegisterNewMember() {
                       )}
 
                       {/* WhatsApp Number */}
-                      <div className={formData.appliedOnBehalfOf === 'Self' ? 'sm:col-span-4' : 'sm:col-span-3'}>
+                      <div className="sm:col-span-4 sm:col-start-1">
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           WhatsApp Number:
                         </label>
