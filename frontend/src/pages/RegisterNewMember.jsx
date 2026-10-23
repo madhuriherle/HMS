@@ -898,6 +898,8 @@ export default function RegisterNewMember() {
       gender: String(formData.gender || '').toUpperCase() || null,
       blood_group: formData.bloodGroup || null,
       aadhaar_number: formData.aadharNumber.replace(/\s/g, ''),
+      referred_by_number: (formData.referredMembershipNo || '').trim() || null,
+      referred_by_name: (formData.referredMembershipName || '').trim() || null,
       gotra_text: formData.gothra || null,
       qualification_text: formData.qualification || null,
       occupation: formData.employment.trim() || null,
@@ -1860,6 +1862,31 @@ export default function RegisterNewMember() {
                       </div>
                     )}
                   </div>
+
+                {/* Section: Membership Referred By */}
+                <div className="pt-4 border-t border-[#E8DFD8]">
+                  <h3 className="text-sm font-bold text-[#8C1801] mb-2">Membership Referred By:</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">Membership Number:</label>
+                      <input
+                        type="text"
+                        value={formData.referredMembershipNo}
+                        onChange={(e) => setFormData({ ...formData, referredMembershipNo: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">Membership Name:</label>
+                      <input
+                        type="text"
+                        value={formData.referredMembershipName}
+                        onChange={(e) => setFormData({ ...formData, referredMembershipName: e.target.value })}
+                        className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#DFD5CC] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
 
                 {/* ═══════════════════════════════════════════════════════ */}
                 {/* Section: Family & Relationship Details */}

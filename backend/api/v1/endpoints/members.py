@@ -2534,6 +2534,7 @@ def _profile_membership(db: Session, member: Member, actor=None) -> dict:
     return {
         "memberships": memberships,
         "payment_check": _payment_check_view(db, mid),
+        "payments": membership_credit.payment_table(db, mid),
         "approval": {
             "status": member.approval_status,
             "registered_at": member.created_at, "registered_by": actor(member.created_by),

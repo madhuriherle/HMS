@@ -276,6 +276,37 @@ export default function MembershipTypeManagement() {
 
   const isPendingApproval = (data) => Boolean(data && (data.approval_request_id || data.status === 'PENDING'));
 
+  // ---- old price: a price for whole financial years that were never entered (From FY, To FY, Amount) ----
+  const [oldPrice, setOldPrice] = useState({ open: false, from: '', to: '', amount: '', saving: false });
+  const handleAddOldPrice = async () => {
+    const from = Number(oldPrice.from);
+    const to = Number(oldPrice.to || oldPrice.from);
+    const amount = Number(oldPrice.amount);
+    if (!from || !to || to < from) {
+      showToast('Give the first financial year and the last one (the first not after the last).', 'error');
+      return;
+    }
+    if (!(amount > 0)) {
+      showToast('Enter the amount.', 'error');
+      return;
+    }
+    setOldPrice((o) => ({ ...o, saving: true }));
+    try {
+      const { data } = await api.post(`/masters/membership-types/${historyTargetItem.id}/prices/old`, { from_year: from, to_year: to, amount });
+      if (isPendingApproval(data)) {
+        showToast(data.message || 'Sent for approval.');
+      } else {
+        showToast(`Old price saved: ${formatMoney(amount)} for FY ${from}-${String(from + 1).slice(-2)} to ${to}-${String(to + 1).slice(-2)}.`);
+      }
+      setOldPrice({ open: false, from: '', to: '', amount: '', saving: false });
+      await handleOpenHistory(historyTargetItem);
+      fetchMembershipTypes();
+    } catch (err) {
+      setOldPrice((o) => ({ ...o, saving: false }));
+      showToast(err.response?.data?.detail || 'Failed to save the old price.', 'error');
+    }
+  };
+
   // ---- price history (read from the server) ----
   const handleOpenHistory = async (item) => {
     try {
@@ -1046,6 +1077,46 @@ export default function MembershipTypeManagement() {
                   </button>
                 )}
               </div>
+
+              {hasPermission('masters.membership_types.write') && (
+                <div className="rounded-xl border border-[#E8DFD8] px-4 py-3">
+                  {!oldPrice.open ? (
+                    <button
+                      type="button"
+                      onClick={() => setOldPrice((o) => ({ ...o, open: true }))}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#510601] cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add old price (earlier financial years)</span>
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-bold text-[#863221] uppercase tracking-wider mb-1" title="1959 means the financial year 1959-60 (1 April 1959 to 31 March 1960)">From FY (year)</label>
+                          <input type="number" value={oldPrice.from} onChange={(e) => setOldPrice((o) => ({ ...o, from: e.target.value }))} className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]" />
+                          {Number(oldPrice.from) > 0 && <p className="text-[11px] text-[#863221] mt-1">FY {oldPrice.from}-{String(Number(oldPrice.from) + 1).slice(-2)}</p>}
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-[#863221] uppercase tracking-wider mb-1">To FY (year)</label>
+                          <input type="number" value={oldPrice.to} onChange={(e) => setOldPrice((o) => ({ ...o, to: e.target.value }))} className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]" />
+                          {Number(oldPrice.to) > 0 && <p className="text-[11px] text-[#863221] mt-1">FY {oldPrice.to}-{String(Number(oldPrice.to) + 1).slice(-2)}</p>}
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-bold text-[#863221] uppercase tracking-wider mb-1">Amount</label>
+                          <input type="number" value={oldPrice.amount} onChange={(e) => setOldPrice((o) => ({ ...o, amount: e.target.value }))} className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]" />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button type="button" disabled={oldPrice.saving} onClick={handleAddOldPrice} className="px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50">
+                          {oldPrice.saving ? 'Saving...' : 'Save old price'}
+                        </button>
+                        <button type="button" onClick={() => setOldPrice({ open: false, from: '', to: '', amount: '', saving: false })} className="px-3 py-2 text-xs font-semibold text-[#863221] cursor-pointer">Cancel</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Price History Table */}
               <div className="border border-[#E8DFD8] rounded-xl overflow-hidden">

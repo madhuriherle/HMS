@@ -786,6 +786,19 @@ def next_receipt_number(
     }
 
 
+@router.get("/payment-preview")
+def payment_preview(
+    member_id: int,
+    date: date,
+    amount: float,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("receipts.read")),
+) -> Any:
+    """Receipt Entry asks this once a member is picked: the price of their type in the receipt's year, what they have paid
+    and what is still short, before and after this receipt. `extra` is the part of `amount` beyond what is missing."""
+    return membership_credit.payment_preview(db, member_id, date, amount)
+
+
 @router.get("/old-number")
 def last_old_receipt_number(
     db: Session = Depends(deps.get_db),

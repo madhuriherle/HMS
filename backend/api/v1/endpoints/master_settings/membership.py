@@ -256,6 +256,49 @@ def create_membership_type_price(
     return new_price
 
 
+@router.post("/membership-types/{id}/prices/old", response_model=Union[schemas_masters.MembershipTypePrice, PendingApproval])
+@approval_gate.gated("masters", "CREATE", "MembershipTypePrice", "masters.write")
+def create_old_membership_type_price(
+    *,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("masters.write")),
+    id: int,
+    price_in: schemas_masters.MembershipTypeOldPriceCreate,
+) -> Any:
+    """Add the price a type had in earlier financial years (From FY to FY, an amount): the history that old members'
+    receipts are checked against. The row runs from 1 April of the first year to 31 March after the last one and
+    must not overlap a price the type already has."""
+    obj = crud_masters.membership_type.get(db, id)
+    if not obj:
+        raise HTTPException(404, "Membership type not found")
+    this_year = date.today().year
+    if not (1900 <= price_in.from_year <= price_in.to_year <= this_year):
+        raise HTTPException(422, f"Give the financial years as start years from 1900 to {this_year}, the first not after the last")
+    if price_in.amount <= 0:
+        raise HTTPException(422, "Amount must be more than zero")
+    start = date(price_in.from_year, 4, 1)
+    end = date(price_in.to_year + 1, 3, 31)
+
+    for row in db.query(MembershipTypePrice).filter(
+        MembershipTypePrice.membership_type_id == id, MembershipTypePrice.is_deleted == False,  # noqa: E712
+    ).all():
+        if row.effective_from <= end and (row.effective_to is None or row.effective_to >= start):
+            span = f"{row.effective_from} to {row.effective_to}" if row.effective_to else f"from {row.effective_from}"
+            raise HTTPException(409, f"These years overlap an existing price of {float(row.amount):g} ({span}). Edit that price instead, or choose other years.")
+
+    fy = lambda y: f"{y}-{str(y + 1)[-2:]}"  # noqa: E731
+    new_price = MembershipTypePrice(
+        membership_type_id=id, amount=price_in.amount, currency=price_in.currency,
+        effective_from=start, effective_to=end,
+        change_reason=(price_in.change_reason or f"Old price, FY {fy(price_in.from_year)} to {fy(price_in.to_year)}").strip(),
+        created_by=current_user.id,
+    )
+    db.add(new_price)
+    db.commit()
+    db.refresh(new_price)
+    return new_price
+
+
 @router.get("/membership-types/{id}/prices/current", response_model=schemas_masters.MembershipTypePrice)
 def read_membership_type_current_price(
     *,

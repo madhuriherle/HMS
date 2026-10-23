@@ -598,6 +598,38 @@ function MembershipTab({ id }) {
               ))
             )}
           </Card>
+          {d.payments?.rows?.length > 0 && (
+            <Card icon={FileText} title={`Payments and prices${d.payments.type_name ? ` · ${d.payments.type_name}` : ''}`}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-wider text-[#863221] border-b border-[#E8DFD8]">
+                      <th className="py-2 pr-3">Date</th>
+                      <th className="py-2 pr-3">Receipt</th>
+                      <th className="py-2 pr-3 text-right">Paid</th>
+                      <th className="py-2 pr-3 text-right">{d.payments.type_name || 'Type'} price that year</th>
+                      <th className="py-2 text-right">Running total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.payments.rows.map((r) => (
+                      <tr key={r.receipt_id} className="border-b last:border-b-0 border-[#E8DFD8]/60">
+                        <td className="py-2 pr-3 whitespace-nowrap">{formatDate(r.receipt_date)} <span className="text-[#863221]">(FY {r.financial_year})</span></td>
+                        <td className="py-2 pr-3 font-mono font-bold">
+                          {r.receipt_number}
+                          {r.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200" title="Old receipt added afterwards (dummy)">OLD</span>}
+                        </td>
+                        <td className="py-2 pr-3 text-right font-mono">{inr(r.paid)}</td>
+                        <td className="py-2 pr-3 text-right font-mono">{r.price_then != null ? inr(r.price_then) : <span className="text-[#863221]" title="No price is set for this type in that year (Membership Types > Price History)">no price set</span>}</td>
+                        <td className="py-2 text-right font-mono font-bold">{inr(r.running_total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-[11px] text-[#863221]">The price is the one the type held now had in the year of each receipt. What counts is the total against the price on the date of the latest receipt.</p>
+            </Card>
+          )}
           <Card icon={History} title="Type changes">
             {d.type_changes.length === 0 ? (
               <Empty>No type changes recorded.</Empty>

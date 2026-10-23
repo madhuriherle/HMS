@@ -328,6 +328,35 @@ export default function ReceiptEntry() {
     [formData.amount, extraLines]
   );
 
+  // The membership money on this receipt (the lines of a particular that pays for membership) and what saving it does to
+  // the picked member's match: the price of their type in the receipt's year, what they have paid and what is still short.
+  const membershipAmount = useMemo(
+    () =>
+      [{ particular: formData.particulars, amount: formData.amount }, ...extraLines.map((l) => ({ particular: l.particular, amount: l.amount }))]
+        .filter((l) => particularObj(l.particular)?.paysForMembership)
+        .reduce((sum, l) => sum + (Number(l.amount) || 0), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [formData.particulars, formData.amount, extraLines, particularsMaster]
+  );
+  const [matchPreview, setMatchPreview] = useState(null);
+  useEffect(() => {
+    if (isEdit || !selectedMember?.id || membershipAmount <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(String(formData.receiptDate || ''))) {
+      setMatchPreview(null);
+      return undefined;
+    }
+    let alive = true;
+    const timer = setTimeout(() => {
+      api
+        .get('/receipts/payment-preview', { params: { member_id: selectedMember.id, date: formData.receiptDate, amount: membershipAmount } })
+        .then(({ data }) => alive && setMatchPreview(data?.applies ? data : null))
+        .catch(() => alive && setMatchPreview(null));
+    }, 450);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [isEdit, selectedMember?.id, formData.receiptDate, membershipAmount]);
+
   // ----------------------------------------------------
   // LOAD EVERYTHING FROM THE SERVER
   // ----------------------------------------------------
@@ -1114,6 +1143,18 @@ export default function ReceiptEntry() {
       } catch (_) {
         /* the check is only a helper; the server still validates on save */
       }
+      if (formData.isOldReceipt && matchPreview?.extra > 0) {
+        const ok = await confirmYesNo({
+          title: 'More than is missing',
+          text: `This old receipt is ${matchPreview.extra} more than the member is short in FY ${matchPreview.financial_year}. The extra stays as remaining credit and counts toward the next type. Save it anyway?`,
+          confirmText: 'Yes, save',
+          danger: true
+        });
+        if (!ok) {
+          setSaving(false);
+          return;
+        }
+      }
       const { data } = await api.post('/receipts/', receiptToApiPayload(payload, linked));
       const receiptNo = data?.receipt_number || payload.receiptNumber;
       const memberDisplayName = linked ? linked.fullName || linked.name : formData.name;
@@ -1717,6 +1758,20 @@ export default function ReceiptEntry() {
                     )}
                   </div>
                 </div>
+
+                {matchPreview && (
+                  !matchPreview.price_known ? (
+                    <p className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      No {matchPreview.type_name} price is set for FY {matchPreview.financial_year}, so the match cannot be checked. Add it in Membership Types &gt; Price History.
+                    </p>
+                  ) : (
+                    <div className={`text-[11px] rounded-lg px-3 py-2 border ${matchPreview.shortfall_after > 0 ? 'text-red-800 bg-red-50 border-red-200' : 'text-emerald-800 bg-emerald-50 border-emerald-200'}`}>
+                      <b>{matchPreview.type_name}</b> price in FY {matchPreview.financial_year}: <b>{matchPreview.price_then}</b> · paid so far: <b>{matchPreview.paid_so_far}</b> · with this receipt: <b>{matchPreview.paid_after}</b>
+                      {matchPreview.shortfall_after > 0 ? <> · still short by <b>{matchPreview.shortfall_after}</b></> : <> · covers the price</>}
+                      {matchPreview.extra > 0 && <> · <b>{matchPreview.extra}</b> more than is missing, kept as remaining credit</>}
+                    </div>
+                  )
+                )}
 
                 {/* Row 2: Payee Name & Mobile */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

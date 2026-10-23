@@ -168,6 +168,15 @@ class MembershipTypePriceCreate(BaseModel):
     change_reason: Optional[str] = None
 
 
+class MembershipTypeOldPriceCreate(BaseModel):
+    """An old price for whole financial years: from_year 1959 means FY 1959-60 (1 April 1959)."""
+    from_year: int
+    to_year: int
+    amount: float
+    currency: str = "INR"
+    change_reason: Optional[str] = None
+
+
 class MembershipTypePriceUpdate(BaseModel):
     amount: Optional[float] = None
     currency: Optional[str] = None

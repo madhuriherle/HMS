@@ -591,7 +591,7 @@ export default function MembershipList() {
                   return (
                     <tr
                       key={m.id}
-                      className={`transition-colors ${isSelected ? 'bg-[#FAF7F2]' : m.payment_mismatch ? 'bg-red-50 hover:bg-red-100/70' : 'bg-white hover:bg-[#FAF7F2]'
+                      className={`transition-colors ${isSelected ? 'bg-[#FAF7F2]' : m.payment_mismatch ? 'bg-[#C08071]/20 hover:bg-[#C08071]/30' : 'bg-white hover:bg-[#FAF7F2]'
                         }`}
                     >
                       {/* Checkbox */}
@@ -615,7 +615,7 @@ export default function MembershipList() {
                         {m.payment_mismatch && (
                           <Link
                             to={`/dashboard/membership/profile/${m.id}`}
-                            className="block mt-0.5 text-[11px] font-semibold text-red-700 hover:underline"
+                            className="block mt-0.5 text-[11px] font-bold text-[#510601] underline hover:text-[#180200]"
                             title="Paid less than the price of the year they joined, so an old receipt is probably missing. Add it on Receipt Entry as an Old receipt (dummy)."
                           >
                             Payment mismatch · short by {m.payment_shortfall}
@@ -641,7 +641,7 @@ export default function MembershipList() {
                           const pin = [m.stateName, m.postalCode].filter(Boolean).join(' - ');
                           const whole = [street, place, pin].filter(Boolean).join(', ');
                           return whole ? (
-                            <div className="max-w-[280px] text-xs text-[#180200] leading-snug" title={whole}>
+                            <div className="max-w-[220px] text-xs text-[#180200] leading-snug" title={whole}>
                               {street && <div className="line-clamp-2">{street}</div>}
                               {(place || pin) && <div className="text-[11px] text-[#863221]">{[place, pin].filter(Boolean).join(' · ')}</div>}
                             </div>
@@ -655,8 +655,8 @@ export default function MembershipList() {
                       </td>
 
                       {/* Action Buttons: View, Edit, Delete */}
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-1.5">
+                      <td className="py-3 px-4 text-right whitespace-nowrap w-px">
+                        <div className="flex flex-nowrap items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}

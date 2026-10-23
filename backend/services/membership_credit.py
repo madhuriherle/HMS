@@ -127,19 +127,46 @@ def set_credit_receipt_types(db: Session, types: list, user_id: Optional[int]) -
     return cleaned
 
 
-def ladder(db: Session) -> list:
-    """[(MembershipType, price Decimal)] for active types with a price > 0,
-    cheapest first."""
-    from models.masters import MembershipType
+def _price_rows(db: Session) -> list:
+    from models.masters import MembershipTypePrice
+    return db.query(MembershipTypePrice).filter(MembershipTypePrice.is_deleted == False).all()  # noqa: E712
+
+
+def price_row_on(db: Session, type_id, on=None, prices=None):
+    """The price row of a type on a date. Without a date, or for today (give or take a day), the current price; for an
+    earlier date only a row that covers it, so a receipt of 1975 is never judged by today's price."""
+    from datetime import timedelta
     from services.pricing import active_price
 
+    if on is None or on >= datetime.now(timezone.utc).date() - timedelta(days=1):
+        return active_price(db, type_id)
+    return _price_on(prices if prices is not None else _price_rows(db), type_id, on)
+
+
+def price_amount(db: Session, type_id, on=None, prices=None) -> Optional[Decimal]:
+    row = price_row_on(db, type_id, on, prices)
+    return _d(row.amount) if row is not None else None
+
+
+def latest_receipt_date(ledger: dict):
+    """The date of the member's latest counted receipt, which decides the prices a member is judged by."""
+    dates = [e["receipt_date"] for e in ledger["entries"] if e["receipt_date"]]
+    return max(dates) if dates else None
+
+
+def ladder(db: Session, on=None) -> list:
+    """[(MembershipType, price Decimal)] for active types with a price > 0, cheapest first. `on` prices them as of a
+    date (the day of a member's latest receipt); without it, at today's prices."""
+    from models.masters import MembershipType
+
+    prices = _price_rows(db) if on else None
     tiers = []
     for mt in db.query(MembershipType).filter(
         MembershipType.is_deleted == False, MembershipType.status == True  # noqa: E712
     ).all():
-        price = active_price(db, mt.id)
-        if price and _d(price.amount) > 0:
-            tiers.append((mt, _d(price.amount)))
+        amount = price_amount(db, mt.id, on, prices)
+        if amount and amount > 0:
+            tiers.append((mt, amount))
     tiers.sort(key=lambda t: (t[1], t[0].id))
     return tiers
 
@@ -216,7 +243,7 @@ def credit_ledger(db: Session, member_id: int, types: Optional[list] = None) -> 
             "allocation_id": alloc.id, "receipt_id": receipt.id,
             "receipt_number": receipt.receipt_number, "receipt_date": receipt.receipt_date,
             "receipt_type": receipt.receipt_type, "allocated_amount": float(gross),
-            "counted_amount": float(counted),
+            "counted_amount": float(counted), "is_old_receipt": bool(receipt.is_old_receipt),
         })
     return {"total": total, "entries": entries, "receipt_types": types}
 
@@ -280,7 +307,8 @@ def summary(db: Session, member_id: int, receipt_types: Optional[list] = None) -
 
     led = credit_ledger(db, member_id, receipt_types)
     total = led["total"]
-    tiers = ladder(db)
+    on = latest_receipt_date(led)
+    tiers = ladder(db, on)
     qualified = None
     for mt, price in tiers:
         if price <= total:
@@ -290,7 +318,7 @@ def summary(db: Session, member_id: int, receipt_types: Optional[list] = None) -
 
     current = _current_membership(db, member_id)
     current_type = db.get(MembershipType, current.membership_type_id) if current else None
-    current_price = active_price(db, current.membership_type_id) if current else None
+    current_price = price_row_on(db, current.membership_type_id, on) if current else None
 
     # What the member is working toward: the type they hold when they have not yet paid its price,
     # otherwise the next type up the ladder.
@@ -344,8 +372,10 @@ def apply_auto_upgrade(db: Session, member_id: int, acted_by: Optional[int]) -> 
     check = payment_check_rows(db, [member_id]).get(member_id)
     if check and check["mismatch"]:
         return None
-    total = credit_ledger(db, member_id)["total"]
-    tiers = ladder(db)
+    ledger = credit_ledger(db, member_id)
+    total = ledger["total"]
+    on = latest_receipt_date(ledger)   # the prices of the day of the latest receipt decide the type
+    tiers = ladder(db, on)
     if not tiers:
         return None
 
@@ -361,7 +391,7 @@ def apply_auto_upgrade(db: Session, member_id: int, acted_by: Optional[int]) -> 
         if not qualified:
             return None
         target, target_price = qualified
-        price_row = active_price(db, target.id)
+        price_row = price_row_on(db, target.id, on)
         reason = f"Auto-upgrade: payments total {total} reached {target.name_en} ({target_price})"
         membership = MemberMembership(
             member_id=member_id, membership_type_id=target.id,
@@ -381,7 +411,7 @@ def apply_auto_upgrade(db: Session, member_id: int, acted_by: Optional[int]) -> 
         ))
         return {"action": "CREATED", "type": target.code, "price": float(target_price), "credit_total": float(total)}
 
-    old_price_row = active_price(db, current.membership_type_id)
+    old_price_row = price_row_on(db, current.membership_type_id, on)
     if old_price_row is None:
         return None  # an unpriced (honorary / special) type is never replaced automatically
     old_price = _d(old_price_row.amount)
@@ -390,7 +420,7 @@ def apply_auto_upgrade(db: Session, member_id: int, acted_by: Optional[int]) -> 
         target, target_price = qualified
         if current.membership_type_id == target.id or target_price <= old_price:
             return None   # the type never moves down here: that happens when money is removed (after_money_removed)
-        price_row = active_price(db, target.id)
+        price_row = price_row_on(db, target.id, on)
         old_type_id = current.membership_type_id
         current.membership_type_id = target.id
         current.price_id = price_row.id if price_row else current.price_id
@@ -559,4 +589,57 @@ def payment_check_rows(db: Session, member_ids=None) -> dict:
             "shortfall": float(max(Decimal(0), expected - credit)),
             "mismatch": credit + Decimal("0.005") < expected,
         }
+    return out
+
+
+def payment_table(db: Session, member_id: int) -> dict:
+    """The member's counted receipts, oldest first, each with the price of the type they hold in that receipt's
+    year and the running total. For the profile, so staff can see exactly where a gap is."""
+    from models.masters import MembershipType
+    from services.receipt_numbers import financial_year_for
+
+    current = _current_membership(db, member_id)
+    ledger = credit_ledger(db, member_id)
+    prices = _price_rows(db)
+    held = db.get(MembershipType, current.membership_type_id) if current else None
+    rows, running = [], Decimal(0)
+    for e in sorted(ledger["entries"], key=lambda x: (x["receipt_date"], x["receipt_id"])):
+        running += Decimal(str(e["counted_amount"]))
+        price = price_amount(db, current.membership_type_id, e["receipt_date"], prices) if current else None
+        rows.append({
+            "receipt_id": e["receipt_id"], "receipt_number": e["receipt_number"], "receipt_date": e["receipt_date"],
+            "financial_year": financial_year_for(e["receipt_date"]), "paid": e["counted_amount"],
+            "is_old_receipt": e["is_old_receipt"], "price_then": float(price) if price is not None else None,
+            "running_total": float(running),
+        })
+    return {"type_name": held.name_en if held else None, "rows": rows}
+
+
+def payment_preview(db: Session, member_id: int, on, amount) -> dict:
+    """What saving a membership receipt of `amount` dated `on` would do to the member's match, for Receipt Entry:
+    the price of their type in that year, what they have paid, and the shortfall before and after."""
+    from models.masters import MembershipType
+    from services.receipt_numbers import financial_year_for
+
+    current = _current_membership(db, member_id)
+    if current is None:
+        return {"applies": False}
+    amount = _d(amount)
+    ledger = credit_ledger(db, member_id)
+    total = ledger["total"]
+    latest = latest_receipt_date(ledger)
+    after_date = max(latest, on) if latest else on
+    held = db.get(MembershipType, current.membership_type_id)
+    price = price_amount(db, current.membership_type_id, after_date)
+    out = {
+        "applies": True, "type_name": held.name_en if held else None, "date": on,
+        "financial_year": financial_year_for(on), "price_known": price is not None,
+        "price_then": float(price) if price is not None else None, "paid_so_far": float(total),
+        "paid_after": float(total + amount),
+    }
+    if price is not None:
+        gap = max(Decimal(0), price - total)   # what is missing at that date before this receipt
+        out["shortfall_before"] = float(gap)
+        out["shortfall_after"] = float(max(Decimal(0), price - total - amount))
+        out["extra"] = float(amount - gap) if gap > 0 and amount > gap else 0.0
     return out
