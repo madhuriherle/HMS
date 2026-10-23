@@ -1091,7 +1091,7 @@ export default function RegisterNewMember() {
                         <span className="text-[11px] text-stone-500">Already a member: no receipt or meeting needed</span>
                       </label>
                       {formData.existingMember && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 mt-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-4 mt-3">
                           <div>
                             <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                               Membership Number: <span className="text-red-600">*</span>
@@ -1132,7 +1132,7 @@ export default function RegisterNewMember() {
                             {formErrors.existingType && <p className="text-[11px] text-red-600 mt-1 font-medium">{formErrors.existingType}</p>}
                           </div>
                           <div>
-                            <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">Member Since:</label>
+                            <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold" title="The day they joined. Left empty, it is today. Their payments are checked against the price of that time.">Member Since:</label>
                             <DateInput
                               max={new Date().toISOString().slice(0, 10)}
                               value={formData.existingSince}
@@ -1140,7 +1140,6 @@ export default function RegisterNewMember() {
                               name="existingSince"
                               className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs"
                             />
-                            <p className="text-[11px] text-stone-500 mt-1">The day they joined. Left empty, it is today. Their payments are checked against the price of that time.</p>
                           </div>
                         </div>
                       )}

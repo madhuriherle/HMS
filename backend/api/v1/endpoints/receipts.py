@@ -1,4 +1,5 @@
 from typing import Any, Optional, Union
+import re
 from core.exceptions import InUseError
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.exc import IntegrityError
@@ -800,11 +801,16 @@ def last_old_receipt_number(
         .order_by(Receipt.id.desc())
         .first()
     )
+    # the next number follows the highest one used so far (deleted ones still hold their number)
+    used = [r[0] for r in db.query(Receipt.receipt_number).filter(Receipt.is_old_receipt == True).all()]  # noqa: E712
+    highest = max((int(m[-1]) for m in (re.findall(r"\d+", n) for n in used) if m), default=None)
+    next_n = fmt.start_value if highest is None else max(highest + 1, fmt.start_value)
     return {
         "last_number": last.receipt_number if last else None,
         "last_date": last.receipt_date if last else None,
         "prefix": f"{fmt.prefix}{fmt.separator}" if fmt.prefix else "",
         "example": numbering.render(fmt, date.today(), fmt.start_value),
+        "next_number": numbering.render(fmt, date.today(), next_n),
     }
 
 

@@ -68,6 +68,7 @@ def test_missing_old_receipt_is_flagged_and_cleared_by_a_dummy_receipt(client, a
     # the last one is shown to follow the sequence
     last = client.get(f"{API}/receipts/old-number", headers=h).json()
     assert last["last_number"] == number and last["prefix"] == "OLD-"
+    assert last["next_number"].startswith("OLD-") and last["next_number"] != number
 
     # paid in full for its era: no longer flagged
     assert mid not in _ids(client, h)

@@ -513,7 +513,7 @@ export default function ReceiptEntry() {
       .get('/receipts/old-number')
       .then(({ data }) => {
         setOldInfo(data);
-        setFormData((prev) => ({ ...prev, receiptNumber: prev.receiptNumber || data.prefix || '' }));
+        setFormData((prev) => ({ ...prev, receiptNumber: prev.receiptNumber || data.next_number || data.prefix || '' }));
       })
       .catch(() => setOldInfo(null));
   const toggleOldReceipt = (checked) => {
@@ -1638,7 +1638,7 @@ export default function ReceiptEntry() {
                     {formData.isOldReceipt && oldInfo && (
                       <p className="text-[11px] text-[#863221] mt-1">
                         Last old receipt: <b className="font-mono text-[#180200]">{oldInfo.last_number || 'none yet'}</b>
-                        {oldInfo.last_date ? ` (${formatDate(oldInfo.last_date)})` : ''} · Format: <span className="font-mono">{oldInfo.example}</span>
+                        {oldInfo.last_date ? ` (${formatDate(oldInfo.last_date)})` : ''} · Next: <span className="font-mono">{oldInfo.next_number || oldInfo.example}</span>
                       </p>
                     )}
                   </div>
