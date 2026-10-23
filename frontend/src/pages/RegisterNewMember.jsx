@@ -1416,7 +1416,7 @@ export default function RegisterNewMember() {
                       )}
 
                       {/* WhatsApp Number */}
-                      <div className="sm:col-span-4 sm:col-start-1">
+                      <div className={formData.appliedOnBehalfOf === 'Self' ? 'sm:col-span-4' : 'sm:col-span-4 sm:col-start-1'}>
                         <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
                           WhatsApp Number:
                         </label>
