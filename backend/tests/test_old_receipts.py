@@ -24,8 +24,7 @@ def _old_member(client, h, s, type_id):
         "existing_member": True, "existing_membership_number": "OM-" + s})
     assert r.status_code in (200, 201), r.text
     mid = r.json()["id"]
-    ms = client.post(f"{API}/members/{mid}/memberships", headers=h,
-                     json={"membership_type_id": type_id, "member_since": "1990-05-01"})
+    ms = client.post(f"{API}/members/{mid}/memberships", headers=h, json={"membership_type_id": type_id})
     assert ms.status_code in (200, 201), ms.text
     return mid
 
@@ -36,59 +35,72 @@ def _ids(client, h):
     return {row["member_id"]: row for row in got.json()["data"]}
 
 
+def _old_body(mid, amount, when, **over):
+    body = {"receipt_date": when, "receipt_type": "MEMBERSHIP", "payment_mode": "CASH", "payer_name": "Old",
+            "gross_amount": amount, "discount_amount": 0, "net_amount": amount,
+            "items": [{"item_type": "MEMBERSHIP", "amount": amount}],
+            "allocations": [{"member_id": mid, "allocated_amount": amount}]}
+    body.update(over)
+    return body
+
+
+def _check(client, h, mid):
+    return client.get(f"{API}/members/{mid}/profile/membership", headers=h).json()["payment_check"]
+
+
 def test_missing_old_receipt_is_flagged_and_cleared_by_a_dummy_receipt(client, admin_headers):
     h, s = admin_headers, _sfx()
     mt = _create_membership_type(client, h, "OR" + s[-5:], "Old Poshaka " + s)
     _era_prices(mt["id"])
     mid = _old_member(client, h, s, mt["id"])
 
-    # paid nothing in the 1990 era: flagged, with the era price
+    # no membership receipt on record at all: flagged
     row = _ids(client, h)[mid]
-    assert row["era_price"] == 200 and row["shortfall"] == 200 and row["joined_on"] == "1990-05-01"
-    shown = client.get(f"{API}/members/{mid}/profile/membership", headers=h).json()["payment_check"]
-    assert shown["mismatch"] is True
+    assert row["no_receipt"] is True and row["shortfall"] > 0
+    assert _check(client, h, mid)["mismatch"] is True
+    listed = client.get(f"{API}/members/", headers=h, params={"search": "98" + s.zfill(8), "limit": 5}).json()["data"]
+    assert listed and listed[0]["payment_mismatch"] is True
 
-    body = {"receipt_date": "1990-06-01", "receipt_type": "MEMBERSHIP", "payment_mode": "CASH", "payer_name": "Old",
-            "gross_amount": 200, "discount_amount": 0, "net_amount": 200,
-            "items": [{"item_type": "MEMBERSHIP", "amount": 200}],
-            "allocations": [{"member_id": mid, "allocated_amount": 200}], "is_old_receipt": True}
-
-    # the number is typed, in the old-receipt format
+    # the number of an old (dummy) receipt is typed, in the old-receipt format
+    body = _old_body(mid, 200, "1990-06-01", is_old_receipt=True)
     assert client.post(f"{API}/receipts/", headers=h, json=body).status_code == 400
     assert client.post(f"{API}/receipts/", headers=h, json={**body, "receipt_number": "R-" + s}).status_code == 400
 
+    # a short receipt (150 against the 1990 price of 200) leaves the member flagged, short by 50
     number = "OLD-" + s
-    made = client.post(f"{API}/receipts/", headers=h, json={**body, "receipt_number": number})
+    made = client.post(f"{API}/receipts/", headers=h, json={**_old_body(mid, 150, "1990-06-01", is_old_receipt=True), "receipt_number": number})
     assert made.status_code == 201, made.text
     assert made.json()["is_old_receipt"] is True and made.json()["receipt_number"] == number
+    short = _ids(client, h)[mid]
+    assert short["no_receipt"] is False and short["price_then"] == 200 and short["shortfall"] == 50
 
-    # a number cannot be used twice
+    # a number cannot be used twice, and the last one is shown so the next follows it
     assert client.post(f"{API}/receipts/", headers=h, json={**body, "receipt_number": number}).status_code == 409
-
-    # the last one is shown to follow the sequence
     last = client.get(f"{API}/receipts/old-number", headers=h).json()
     assert last["last_number"] == number and last["prefix"] == "OLD-"
     assert last["next_number"].startswith("OLD-") and last["next_number"] != number
 
-    # paid in full for its era: no longer flagged
+    # the missing 50 as a NORMAL receipt with its real date clears it: real and dummy receipts count the same
+    real = client.post(f"{API}/receipts/", headers=h, json=_old_body(mid, 50, "1990-07-01"))
+    assert real.status_code == 201, real.text
     assert mid not in _ids(client, h)
-    assert client.get(f"{API}/members/{mid}/profile/membership", headers=h).json()["payment_check"]["mismatch"] is False
+    check = _check(client, h, mid)
+    assert check["mismatch"] is False and check["reference_date"] == "1990-07-01" and check["paid"] == 200
+    listed = client.get(f"{API}/members/", headers=h, params={"search": "98" + s.zfill(8), "limit": 5}).json()["data"]
+    assert listed[0]["payment_mismatch"] is False
 
 
 def test_a_flagged_member_keeps_their_type_when_money_arrives(client, admin_headers):
-    """Joined as Poshaka in 1990 (200), old receipt missing: paying 1000 today must not move the type."""
+    """Poshaka entered by hand with nothing on record: a payment today must not move the type."""
     h, s = admin_headers, _sfx()
     mt = _create_membership_type(client, h, "OK" + s[-5:], "Keep Type " + s)
     _era_prices(mt["id"])
     mid = _old_member(client, h, s, mt["id"])
-    r = client.post(f"{API}/receipts/", headers=h, json={
-        "receipt_date": date.today().isoformat(), "receipt_type": "MEMBERSHIP", "payment_mode": "CASH", "payer_name": "x",
-        "gross_amount": 1000, "discount_amount": 0, "net_amount": 1000, "items": [{"item_type": "MEMBERSHIP", "amount": 1000}],
-        "allocations": [{"member_id": mid, "allocated_amount": 1000}]})
+    assert mid in _ids(client, h)
+    r = client.post(f"{API}/receipts/", headers=h, json=_old_body(mid, 1000, date.today().isoformat()))
     assert r.status_code == 201, r.text
     prof = client.get(f"{API}/members/{mid}/profile/membership", headers=h).json()
     assert [m["membership_type_id"] for m in prof["memberships"]] == [mt["id"]]
-    assert mid in _ids(client, h)   # still flagged until the 1990 receipt is entered
 
 
 def test_ordinary_receipts_are_not_old(client, admin_headers):
@@ -163,8 +175,8 @@ def test_removing_a_receipt_does_not_lower_a_member_with_a_missing_old_receipt(c
         "first_name_en": "Legacy", "mobile": "96" + s.zfill(8), "existing_member": True, "existing_membership_number": "LG-" + s})
     mid = r.json()["id"]
     assert client.post(f"{API}/members/{mid}/memberships", headers=h,
-                       json={"membership_type_id": ma["id"], "member_since": "1990-06-01"}).status_code in (200, 201)
-    assert mid in _ids(client, h)                       # flagged: its 1990 receipt is missing
-    other = _pay(client, h, mid, 1400, "1995-01-01")    # some other membership money
+                       json={"membership_type_id": ma["id"]}).status_code in (200, 201)
+    other = _pay(client, h, mid, 1400, "1995-01-01")    # some membership money, short of the 1995 Mahaposhaka price
+    assert mid in _ids(client, h)                       # flagged: payments fall short of the price on the receipt date
     assert client.delete(f"{API}/receipts/{other['id']}", headers=h, params={"force": True, "reason": "x"}).status_code in (200, 204)
     assert _type_of(client, h, mid) == ma["id"]         # not lowered

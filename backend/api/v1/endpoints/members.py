@@ -306,8 +306,13 @@ def _attach_membership_types(db: Session, rows: list) -> None:
     ):
         latest[ms.member_id] = (t.id, t.name_en, ms.membership_number)
     _attach_places(db, rows)
+    from services import membership_credit
+    checks = membership_credit.payment_check_rows(db, ids)   # who paid less than the price of their joining era
     for r in rows:
         if isinstance(r, dict):
+            check = checks.get(r.get("id"))
+            r["payment_mismatch"] = bool(check and check["mismatch"])
+            r["payment_shortfall"] = check["shortfall"] if check and check["mismatch"] else None
             tid, name, ms_number = latest.get(r.get("id"), (None, None, None))
             r["membership_type_id"] = tid
             r["membership_type"] = name
@@ -840,8 +845,8 @@ def payment_mismatches(
     page: int = 1,
     limit: int = 50,
 ) -> Any:
-    """Approved members whose payments fall short of the price of the type they joined with, as priced in their
-    joining era. An old receipt is probably missing: add it as an old (dummy) receipt on Receipt Entry."""
+    """Approved members whose payments fall short of the price of their type on the date of their latest receipt.
+    An old receipt is probably missing: add it on Receipt Entry (a real one with its own date, or an old dummy one)."""
     from models.masters import MembershipType
     from services import membership_credit
 
@@ -861,9 +866,8 @@ def payment_mismatches(
         rows.append({
             "member_id": mid, "name": " ".join(p for p in (m.name_title, m.display_name) if p),
             "membership_number": m.membership_number, "mobile": m.mobile,
-            "joined_type": names.get(c["start_type_id"]), "joined_on": c["joined_on"],
-            "era_price": c["era_price"], "era_from": c["era_from"], "era_to": c["era_to"],
-            "paid_in_era": c["paid_in_era"], "shortfall": c["shortfall"],
+            "type_name": names.get(c["type_id"]), "reference_date": c["reference_date"], "no_receipt": c["no_receipt"],
+            "price_then": c["price_then"], "paid": c["paid"], "shortfall": c["shortfall"],
         })
     return {"total": total, "page": page, "limit": limit, "data": rows}
 
@@ -1467,17 +1471,12 @@ def create_membership(
         raise HTTPException(status_code=400, detail="Unknown membership_type_id")
 
     now = datetime.now(timezone.utc)
-    began = now
-    if membership_in.member_since:
-        if membership_in.member_since > now.date():
-            raise HTTPException(status_code=400, detail="Member since cannot be in the future")
-        began = datetime.combine(membership_in.member_since, datetime.min.time(), tzinfo=timezone.utc)
     price = active_price(db, membership_in.membership_type_id)
     obj = MemberMembership(
         member_id=member.id,
         membership_type_id=membership_in.membership_type_id,
         price_id=price.id if price else None,
-        applied_at=began,
+        applied_at=now,
         status=membership_in.status,
         family_membership_number=membership_in.family_membership_number,
         created_by=current_user.id,
@@ -1485,7 +1484,7 @@ def create_membership(
     if member.approval_status == "APPROVED":
         from services.member_activation import membership_number_for
         obj.membership_number = membership_number_for(db, member)
-        obj.activated_at = began
+        obj.activated_at = now
     db.add(obj)
     db.commit()
     db.refresh(obj)
@@ -2491,8 +2490,8 @@ def _payment_check_view(db: Session, member_id: int):
     c = membership_credit.payment_check_rows(db, [member_id]).get(member_id)
     if not c:
         return None
-    t = db.get(MembershipType, c["start_type_id"])
-    return {**c, "joined_type": t.name_en if t else None}
+    t = db.get(MembershipType, c["type_id"])
+    return {**c, "type_name": t.name_en if t else None}
 
 
 def _profile_membership(db: Session, member: Member, actor=None) -> dict:

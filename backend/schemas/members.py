@@ -532,8 +532,6 @@ class MembershipCreate(BaseModel):
     membership_type_id: int
     status: str = "ACTIVE"
     family_membership_number: Optional[str] = None
-    # an existing member joined in the past: the date the membership began (today when left out)
-    member_since: Optional[date] = None
 
 
 class MemberProfileChangeRequestUpdate(BaseModel):

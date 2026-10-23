@@ -26,9 +26,8 @@ import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import api from '../api';
 import { notify } from '../utils/notify';
-import { formatDate } from '../utils/dateUtils';
 import Pager from '../components/Pager';
-import { fetchMemberPage, normalizeMember } from '../utils/apiAdapters';
+import { fetchMemberPage } from '../utils/apiAdapters';
 import useRules from '../hooks/useRules';
 
 import ModalFooter from '../components/ModalFooter';
@@ -169,7 +168,6 @@ export default function MembershipList() {
   const [] = useState({});
 
   // 3. Status Change Confirmation Modal
-  const [statusDialog, setStatusDialog] = useState(null); // { member, nextStatus }
 
   // 4. Delete Confirmation Modal
   const [deleteDialog, setDeleteDialog] = useState(null); // member
@@ -177,19 +175,6 @@ export default function MembershipList() {
 
   // 5. Label Preview Modal
   const [isLabelPreviewOpen, setIsLabelPreviewOpen] = useState(false);
-  // members whose payments fall short of the price of their joining era (an old receipt is probably missing)
-  const [mismatchOpen, setMismatchOpen] = useState(false);
-  const [mismatch, setMismatch] = useState({ total: 0, data: [], loading: false });
-  const loadMismatch = () => {
-    setMismatch((m) => ({ ...m, loading: true }));
-    api
-      .get('/members/payment-mismatches', { params: { limit: 200 } })
-      .then(({ data }) => setMismatch({ total: data.total || 0, data: data.data || [], loading: false }))
-      .catch(() => setMismatch({ total: 0, data: [], loading: false }));
-  };
-  useEffect(() => {
-    loadMismatch();
-  }, []);
   const printContainerRef = useRef(null);
 
   // Active membership types available for new registrations
@@ -292,23 +277,6 @@ export default function MembershipList() {
   // ----------------------------------------------------
 
 
-  const handleConfirmStatusToggle = async () => {
-    if (!statusDialog) return;
-    const { member, nextStatus } = statusDialog;
-    try {
-      const { data } = await api.put(`/members/${member.id}`, {
-        member_status: nextStatus === 'Active' ? 'ACTIVE' : 'INACTIVE',
-      }, { params: { reason: 'Status changed via UI' } });
-      const updatedMember = normalizeMember(data);
-      setMembers((prev) => prev.map((m) => (m.id === member.id ? updatedMember : m)));
-      showToast(`Member "${member.fullName || member.name}" set to ${nextStatus}.`);
-      setStatusDialog(null);
-    } catch (error) {
-      console.error('Failed to update member status.', error);
-      showToast(error.response?.data?.detail || 'Failed to update member status through API.', 'error');
-    }
-  };
-
   const handleConfirmDelete = async () => {
     if (!deleteDialog) return;
     const reason = 'Deleted via UI';
@@ -338,18 +306,6 @@ export default function MembershipList() {
     setDeleteDialog(null);
     setDeleteReason('');
   };
-
-  useSwalConfirm(
-    statusDialog,
-    () => setStatusDialog(null),
-    ({ member, nextStatus }) => ({
-      title: `${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} member?`,
-      text: `Are you sure you want to mark ${member.fullName || member.name} as ${nextStatus}?`,
-      confirmText: nextStatus === 'Inactive' ? 'Yes, deactivate' : 'Yes, activate',
-      danger: nextStatus === 'Inactive',
-    }),
-    handleConfirmStatusToggle
-  );
 
   useSwalConfirm(
     deleteDialog,
@@ -446,16 +402,6 @@ export default function MembershipList() {
               </Link>
             )}
             */}
-            {mismatch.total > 0 && (
-              <button
-                type="button"
-                onClick={() => setMismatchOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-red-50 border border-red-300 text-red-700 hover:bg-red-100 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs cursor-pointer shrink-0"
-                title="Members whose payments do not add up to the price of the year they joined. An old receipt is probably missing."
-              >
-                <span>Payment mismatches ({mismatch.total})</span>
-              </button>
-            )}
             {hasPermission('members.list.write') && (
               <button
                 type="button"
@@ -620,16 +566,15 @@ export default function MembershipList() {
                 <SortTh label="Contact" field="mobile" sort={sort} onSort={toggleSort} className="py-3 px-4" />
                 <th className="py-3 px-4">Address</th>
                 <th className="py-3 px-4">Type</th>
-                <SortTh label="Status" field="member_status" sort={sort} onSort={toggleSort} className="py-3 px-4 text-center" />
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DFD8]">
               {loadingPage && paginatedMembers.length === 0 ? (
-                <tr><td colSpan={9} className="py-12 text-center text-sm text-[#863221]">Loading members…</td></tr>
+                <tr><td colSpan={8} className="py-12 text-center text-sm text-[#863221]">Loading members…</td></tr>
               ) : paginatedMembers.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-[#863221]">
+                  <td colSpan="8" className="py-12 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center">
                       <AlertCircle className="w-8 h-8 text-[#863221]/40 mb-2" />
                       <p className="font-semibold text-sm text-[#180200]">No members found</p>
@@ -642,12 +587,11 @@ export default function MembershipList() {
               ) : (
                 paginatedMembers.map((m) => {
                   const isSelected = selectedMemberIds.has(m.id);
-                  const displayStatus = m.status === 'Approved' ? 'Active' : m.status || 'Active';
 
                   return (
                     <tr
                       key={m.id}
-                      className={`transition-colors ${isSelected ? 'bg-[#FAF7F2]' : 'bg-white hover:bg-[#FAF7F2]'
+                      className={`transition-colors ${isSelected ? 'bg-[#FAF7F2]' : m.payment_mismatch ? 'bg-red-50 hover:bg-red-100/70' : 'bg-white hover:bg-[#FAF7F2]'
                         }`}
                     >
                       {/* Checkbox */}
@@ -668,6 +612,15 @@ export default function MembershipList() {
                       {/* Name */}
                       <td className="py-3 px-4 font-bold text-[#180200] text-sm">
                         {m.fullName || m.name}
+                        {m.payment_mismatch && (
+                          <Link
+                            to={`/dashboard/membership/profile/${m.id}`}
+                            className="block mt-0.5 text-[11px] font-semibold text-red-700 hover:underline"
+                            title="Paid less than the price of the year they joined, so an old receipt is probably missing. Add it on Receipt Entry as an Old receipt (dummy)."
+                          >
+                            Payment mismatch · short by {m.payment_shortfall}
+                          </Link>
+                        )}
                       </td>
 
                       {/* Contact Info (Mobile & Email) */}
@@ -699,23 +652,6 @@ export default function MembershipList() {
                       {/* Membership Type, from the server */}
                       <td className="py-3 px-4">
                         <span className="text-xs font-semibold text-[#510601]">{m.membershipType || '—'}</span>
-                      </td>
-
-                      {/* Status Toggle Button */}
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setStatusDialog({
-                              member: m,
-                              nextStatus: displayStatus === 'Active' ? 'Inactive' : 'Active'
-                            })
-                          }
-                          className={`chip ${displayStatus === 'Active' ? 'chip-on' : 'chip-off'}`}
-                          title={`Click to ${displayStatus === 'Active' ? 'deactivate' : 'activate'}`}
-                        >
-                          <span>{displayStatus}</span>
-                        </button>
                       </td>
 
                       {/* Action Buttons: View, Edit, Delete */}
@@ -772,53 +708,6 @@ export default function MembershipList() {
       </div>
 
       {/* View Member Profile is handled on dedicated full-screen page /dashboard/membership/profile/:id */}
-
-      <Modal isOpen={mismatchOpen} onClose={() => setMismatchOpen(false)} title={`Payment mismatches (${mismatch.total})`} maxWidthClass="max-w-5xl">
-        <div className="p-5 space-y-3">
-          <p className="text-xs text-[#863221]">
-            These members paid less than the price of the year they joined (Membership Types &gt; price history). An old receipt is probably
-            missing, so their type is not changed until it is entered. Add it on Receipt Entry as an <b>Old receipt (dummy)</b> and map it to the member.
-          </p>
-          <div className="overflow-x-auto border border-[#E8DFD8] rounded-xl">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="bg-[#FAF7F2] text-[10px] uppercase tracking-wider text-[#863221]">
-                  <th className="py-2 px-3">Member</th>
-                  <th className="py-2 px-3">Joined</th>
-                  <th className="py-2 px-3 text-right">Price then</th>
-                  <th className="py-2 px-3 text-right">Paid then</th>
-                  <th className="py-2 px-3 text-right">Short by</th>
-                  <th className="py-2 px-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {mismatch.data.map((r) => (
-                  <tr key={r.member_id} className="border-t border-[#E8DFD8]/70">
-                    <td className="py-2 px-3">
-                      <div className="font-semibold text-[#180200]">{r.name || `ID ${r.member_id}`}</div>
-                      <div className="font-mono text-[11px] text-[#863221]">{r.membership_number || '-'} · {r.mobile || '-'}</div>
-                    </td>
-                    <td className="py-2 px-3">
-                      {r.joined_type}
-                      <div className="text-[11px] text-[#863221]">{r.joined_on ? formatDate(r.joined_on) : ''}</div>
-                    </td>
-                    <td className="py-2 px-3 text-right font-mono">{r.era_price}</td>
-                    <td className="py-2 px-3 text-right font-mono">{r.paid_in_era}</td>
-                    <td className="py-2 px-3 text-right font-mono font-bold text-red-700">{r.shortfall}</td>
-                    <td className="py-2 px-3 text-right whitespace-nowrap">
-                      <Link to={`/dashboard/membership/profile/${r.member_id}`} className="text-[#510601] font-semibold mr-3">Open</Link>
-                      <Link to="/dashboard/receipts/entry" className="text-[#510601] font-semibold">Add old receipt</Link>
-                    </td>
-                  </tr>
-                ))}
-                {mismatch.data.length === 0 && (
-                  <tr><td colSpan={6} className="py-6 text-center text-[#863221]">{mismatch.loading ? 'Loading...' : 'No mismatches.'}</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </Modal>
 
       {/* ==================================================== */}
       {/* MODAL 3: LABEL PREVIEW & PRINT INTERFACE             */}

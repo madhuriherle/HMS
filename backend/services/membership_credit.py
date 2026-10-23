@@ -419,29 +419,26 @@ def frozen_members(db: Session, member_ids) -> set:
 def lower_if_unpaid(db: Session, member_id: int, acted_by: Optional[int]) -> Optional[dict]:
     """After money was removed (a receipt deleted, cancelled, refunded or un-assigned): if the member's payments no
     longer pay for the type they hold, move them down to the highest type their payments do pay for. Both are judged at
-    the prices of the day they began holding the type (their joining day, or the day of the last change of type), so
-    an old member who paid the price of their time is not judged by today's price. Returns the change, or None."""
+    the prices of the day of their latest receipt (a receipt dated 1980 is judged by the 1980 prices), so an old member
+    who paid the price of their time is not judged by today's price. With no receipt left there is nothing to judge by.
+    Returns the change, or None."""
     from models.masters import MembershipType, MembershipTypePrice
     from models.members import MembershipTypeHistory
 
     current = _current_membership(db, member_id)
     if current is None:
         return None
-    hist = (
-        db.query(MembershipTypeHistory)
-        .filter(MembershipTypeHistory.member_id == member_id, MembershipTypeHistory.is_deleted == False)  # noqa: E712
-        .order_by(MembershipTypeHistory.id.desc()).all()
-    )
-    since = next((h.changed_at.date() for h in hist if h.new_type_id == current.membership_type_id and h.changed_at), None)
-    since = since or (current.applied_at.date() if current.applied_at else None)
-    if since is None:
+    ledger = credit_ledger(db, member_id)
+    dates = [e["receipt_date"] for e in ledger["entries"] if e["receipt_date"]]
+    if not dates:
         return None
+    since = max(dates)
     prices = db.query(MembershipTypePrice).filter(MembershipTypePrice.is_deleted == False).all()  # noqa: E712
     held = _price_on(prices, current.membership_type_id, since)
     if held is None or _d(held.amount) <= 0:
         return None
     required = _d(held.amount)
-    total = credit_ledger(db, member_id)["total"]
+    total = ledger["total"]
     if total + Decimal("0.005") >= required:
         return None
 
@@ -493,7 +490,7 @@ def recompute_members(db: Session, member_ids, acted_by: Optional[int]) -> list:
     return changes
 
 
-# ── payment check against the price of the member's joining era ──────────────
+# ── payment check against the price of the day of the member's latest receipt ──────────────
 
 def _price_on(prices: list, type_id, on):
     """The price row of a type that was in force on a date, or None when no row covers it."""
@@ -505,16 +502,17 @@ def _price_on(prices: list, type_id, on):
     return None
 
 
-def payment_check_rows(db: Session, member_ids=None, *, limit: int = 0) -> dict:
-    """{member_id: info} for approved members: did they pay the price of the type they joined with, as it was
-    priced in their joining era (Membership Types > price history)?
+def payment_check_rows(db: Session, member_ids=None) -> dict:
+    """{member_id: info} for approved members: do their payments cover the price of the type they hold?
 
-    A member joined on the day their first membership began, with the type they first held. Money counts when it is
-    a counted receipt type (see credit_receipt_types) dated inside that price's period. A member whose joining
-    date is covered by no price row cannot be judged and is left out. `mismatch` is true when they paid less than that
-    price: an old receipt is probably missing, so no type change is made for them until it is entered."""
+    The price is the one in force on the date of the member's latest membership receipt (Membership Types > price
+    history), so a member whose last receipt is dated 1980 is judged by the 1980 price, not today's. Every receipt
+    counts the same, real or dummy, as long as it is mapped to the member and is of a type that counts toward
+    membership. A member with no such receipt at all has `no_receipt` set and is flagged. A member whose receipt date
+    falls under no price row of their type cannot be judged and is left out. `mismatch` is true when the payments
+    fall short: an old receipt is probably missing, so no type change is made for them until it is entered."""
     from models.masters import MembershipTypePrice
-    from models.members import Member, MemberMembership, MembershipTypeHistory
+    from models.members import Member, MemberMembership
 
     q = (
         db.query(MemberMembership)
@@ -529,45 +527,36 @@ def payment_check_rows(db: Session, member_ids=None, *, limit: int = 0) -> dict:
     )
     if member_ids is not None:
         q = q.filter(MemberMembership.member_id.in_(list(member_ids)))
-    first = {}
+    held = {}
     for ms in q.all():
-        first.setdefault(ms.member_id, ms)   # the earliest active membership is the joining one
-    if not first:
+        held[ms.member_id] = ms   # the latest active membership is the one they hold
+    if not held:
         return {}
 
     prices = db.query(MembershipTypePrice).filter(MembershipTypePrice.is_deleted == False).all()  # noqa: E712
     if not prices:
         return {}
-    hist = {}
-    for h in db.query(MembershipTypeHistory).filter(
-        MembershipTypeHistory.member_id.in_(list(first)), MembershipTypeHistory.is_deleted == False  # noqa: E712
-    ).order_by(MembershipTypeHistory.id).all():
-        hist.setdefault(h.member_id, h)       # the first change shows the type they started with
     types = credit_receipt_types(db)
     paid = {}
-    ids = list(first)
+    ids = list(held)
     for i in range(0, len(ids), 500):
         for alloc, receipt, _gross, counted in _counted_rows(db, ids[i:i + 500], types):
             paid.setdefault(alloc.member_id, []).append((receipt.receipt_date, counted))
 
     today = datetime.now(timezone.utc).date()
     out = {}
-    for mid, ms in first.items():
-        joined = (ms.applied_at.date() if ms.applied_at else None)
-        if joined is None:
-            continue
-        h = hist.get(mid)
-        start_type = (h.old_type_id or h.new_type_id) if h else ms.membership_type_id
-        row = _price_on(prices, start_type, joined)
+    for mid, ms in held.items():
+        rows = paid.get(mid, [])
+        reference = max((d for d, _c in rows), default=None)
+        row = _price_on(prices, ms.membership_type_id, reference or today)
         if row is None or _d(row.amount) <= 0:
             continue
-        end = row.effective_to or today
-        in_era = sum((c for d, c in paid.get(mid, []) if row.effective_from <= d <= end), Decimal(0))
         expected = _d(row.amount)
+        credit = sum((c for _d_, c in rows), Decimal(0))
         out[mid] = {
-            "member_id": mid, "joined_on": joined, "start_type_id": start_type,
-            "era_price": float(expected), "era_from": row.effective_from, "era_to": row.effective_to,
-            "paid_in_era": float(in_era), "shortfall": float(max(Decimal(0), expected - in_era)),
-            "mismatch": in_era + Decimal("0.005") < expected,
+            "member_id": mid, "type_id": ms.membership_type_id, "reference_date": reference,
+            "no_receipt": not rows, "price_then": float(expected), "paid": float(credit),
+            "shortfall": float(max(Decimal(0), expected - credit)),
+            "mismatch": credit + Decimal("0.005") < expected,
         }
     return out

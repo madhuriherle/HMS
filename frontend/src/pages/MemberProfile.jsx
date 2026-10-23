@@ -557,9 +557,11 @@ function MembershipTab({ id }) {
           <CreditBanner credit={d.membership_credit} />
           {d.payment_check?.mismatch && (
             <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800">
-              <b>Payment mismatch.</b> Joined as {d.payment_check.joined_type} on {formatDate(d.payment_check.joined_on)}: the price then was{' '}
-              {inr(d.payment_check.era_price)} and {inr(d.payment_check.paid_in_era)} is recorded, short by {inr(d.payment_check.shortfall)}. An old
-              receipt is probably missing. Add it on Receipt Entry as an Old receipt (dummy). The type is not changed until then.
+              <b>Payment mismatch.</b>{' '}
+              {d.payment_check.no_receipt
+                ? `No membership receipt is on record for this ${d.payment_check.type_name} member.`
+                : `${d.payment_check.type_name}: the price on ${formatDate(d.payment_check.reference_date)} (the latest receipt) was ${inr(d.payment_check.price_then)} and ${inr(d.payment_check.paid)} is recorded, short by ${inr(d.payment_check.shortfall)}.`}{' '}
+              An old receipt is probably missing. Add it on Receipt Entry with its real date (an Old receipt (dummy) only if there is no real one). The type is not changed until then.
             </div>
           )}
           {d.approval && (
