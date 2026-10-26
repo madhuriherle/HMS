@@ -13,7 +13,7 @@ EDITABLE_MEMBER_FIELDS: Set[str] = {
     "address_line1_kn", "address_line2_kn", "locality_kn",
     "full_name_kn", "gender", "date_of_birth",
     "father_husband_name", "blood_group", "native_place_id",
-    "native_place_text", "qualification_id", "qualification_text", "occupation",
+    "native_place_text", "qualification_id", "qualification_text", "occupation", "designation", "native_address", "native_same_as_current",
     "gotra_id", "gotra_text",
     "father_name", "father_membership_number", "mother_name", "mother_membership_number",
     "is_married", "spouse_name", "spouse_membership_number", "has_children", "children_details",
@@ -53,6 +53,9 @@ class MemberBase(BaseModel):
     gotra_id: Optional[int] = None
     gotra_text: Optional[str] = None
     occupation: Optional[str] = None
+    designation: Optional[str] = None
+    native_address: Optional[str] = None
+    native_same_as_current: Optional[bool] = None
     category: Optional[str] = None
     company: Optional[str] = None
     website: Optional[str] = None
@@ -201,6 +204,9 @@ class MemberUpdate(BaseModel):
     gotra_id: Optional[int] = None
     gotra_text: Optional[str] = None
     occupation: Optional[str] = None
+    designation: Optional[str] = None
+    native_address: Optional[str] = None
+    native_same_as_current: Optional[bool] = None
     category: Optional[str] = None
     company: Optional[str] = None
     website: Optional[str] = None

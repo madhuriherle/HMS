@@ -485,7 +485,7 @@ _PUBLIC_REGISTER_ALLOWED = {
     "first_name_en", "middle_name_en", "last_name_en", "full_name_kn",
     "gender", "date_of_birth", "father_husband_name", "blood_group",
     "native_place_id", "native_place_text", "qualification_id",
-    "qualification_text", "gotra_id", "gotra_text", "occupation",
+    "qualification_text", "gotra_id", "gotra_text", "occupation", "designation", "native_address", "native_same_as_current",
     "mobile", "mobile_country_code", "alternate_mobile", "whatsapp_number",
     "email", "address_line1", "address_line2", "locality", "area", "place",
     "grama", "village", "label_point", "address_remarks",
@@ -2521,6 +2521,7 @@ def _profile_personal(db: Session, member: Member) -> dict:
         "qualification": pick("qualification"),
         "native_place": pick("native_place"),
         "occupation": member.occupation,
+        "designation": member.designation,
         "category": member.category,
         "company": member.company,
         "website": member.website,
@@ -2547,6 +2548,8 @@ def _profile_contact(db: Session, member: Member) -> dict:
         "email": member.email,
         "address_line1": member.address_line1,
         "address_line2": member.address_line2,
+        "native_address": member.native_address,
+        "native_same_as_current": bool(member.native_same_as_current),
         "address_line1_kn": member.address_line1_kn,
         "address_line2_kn": member.address_line2_kn,
         "locality": member.locality,
@@ -2998,7 +3001,7 @@ def _profile_overview(db: Session, member: Member, current_user: User) -> dict:
     )
     return {
         "basic": {k: personal[k] for k in (
-            "gender", "date_of_birth", "blood_group", "gotra", "qualification", "occupation", "native_place")},
+            "gender", "date_of_birth", "blood_group", "gotra", "qualification", "occupation", "designation", "native_place")},
         "contact": {
             "mobile": contact["mobile"], "mobile_country_code": contact["mobile_country_code"],
             "whatsapp_number": contact["whatsapp_number"], "whatsapp_country_code": contact["whatsapp_country_code"],

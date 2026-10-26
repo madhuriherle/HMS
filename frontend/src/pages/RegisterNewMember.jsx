@@ -184,6 +184,9 @@ export default function RegisterNewMember() {
     aadharNumber: '',
     address: '',
     addressKn: '',
+    nativeAddress: '',
+    nativeSame: false,
+    designation: '',
     postalCode: '',
     locality: '',
     localityKn: '',
@@ -341,6 +344,9 @@ export default function RegisterNewMember() {
           aadharNumber: m.aadhaar_number || '',
           address: m.address_line1 || '',
           addressKn: m.address_line1_kn || '',
+          nativeAddress: m.native_address || '',
+          nativeSame: !!m.native_same_as_current,
+          designation: m.designation || '',
           postalCode: pin?.postalCode || '',
           locality: m.locality || m.post || pin?.area || '',
           localityKn: m.locality_kn || '',
@@ -912,6 +918,9 @@ export default function RegisterNewMember() {
       gotra_text: formData.gothra || null,
       qualification_text: formData.qualification || null,
       occupation: formData.employment.trim() || null,
+      designation: (formData.designation || '').trim() || null,
+      native_same_as_current: !!formData.nativeSame,
+      native_address: (formData.nativeSame ? formData.address : formData.nativeAddress || '').trim() || null,
       native_place_text: formData.nativePlace.trim() || null,
       address_line1: formData.address.trim(),
       address_line1_kn: (formData.addressKn || '').trim() || null,
@@ -1645,6 +1654,29 @@ export default function RegisterNewMember() {
                   </div>
                   )}
 
+                  {/* Native Address: one box, or the same as the communication address */}
+                  <div className="col-span-full">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-sm text-[#3D140C] font-semibold">Native Address:</label>
+                      <label className="flex items-center gap-2 text-xs text-[#3D140C] cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={!!formData.nativeSame}
+                          onChange={(e) => setFormData({ ...formData, nativeSame: e.target.checked })}
+                          className="accent-[#8C1801]"
+                        />
+                        Same as communication address
+                      </label>
+                    </div>
+                    <textarea
+                      rows={2}
+                      disabled={!!formData.nativeSame}
+                      value={formData.nativeSame ? formData.address : formData.nativeAddress}
+                      onChange={(e) => setFormData({ ...formData, nativeAddress: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all" 
+                    />
+                  </div>
+
                   {/* Pin Code with Autocomplete */}
                   <div className="relative" ref={pinWrapperRef}>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
@@ -1772,6 +1804,20 @@ export default function RegisterNewMember() {
                     {formErrors.qualification && (
                       <p className="text-[11px] text-red-600 mt-1">{formErrors.qualification}</p>
                     )}
+                  </div>
+
+                  {/* Designation */}
+                  <div>
+                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
+                      Designation:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Advocate, Teacher"
+                      value={formData.designation}
+                      onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                    />
                   </div>
 
                   {/* Employment */}

@@ -56,6 +56,22 @@ def read_register(content: bytes) -> list:
     return [dict(zip(header, row)) for row in it if any(c not in (None, "") for c in row)]
 
 
+_SAME_WORDS = re.compile(r"\b(above|same|ditto|abv)\b", re.I)
+
+
+def native_fields(r: dict, address: str) -> dict:
+    """designation, native_address and native_same_as_current from the register. A short native address such as "AS ABOVE" or
+    "same" means it is the communication address: the flag is set and the box holds a copy of that address."""
+    native = " ".join(_lines(r.get("CusAddressNative")))
+    out = {"designation": _s(r.get("CusDesignation"))[:150] or None, "native_address": None, "native_same_as_current": False}
+    if native and len(native) <= 20 and _SAME_WORDS.search(native):
+        out["native_same_as_current"] = True
+        out["native_address"] = address or None
+    elif native:
+        out["native_address"] = native
+    return out
+
+
 def _norm_name(name: str) -> str:
     return re.sub(r"[^A-Z ]", "", name.upper().replace(".", " ")).replace("  ", " ").strip()
 
@@ -456,6 +472,7 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
             magazine_needed=wants, magazine_kind="EMAIL" if (wants and online) else ("PHYSICAL" if wants else None),
             magazine_email=(email if (wants and online) else None),
             remarks=" | ".join(notes) or None,
+            **native_fields(r, ", ".join(addr)),
             approval_status="APPROVED", registration_status="APPROVED", registration_source="MIGRATION",
             member_status="INACTIVE" if (status_text == "expired" or is_deleted) else "ACTIVE", approved_at=now, created_by=user_id,
         )
@@ -674,3 +691,31 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
     return {"created": created, "shared": shared, "dummy": dummy, "zero_amount": zero, "skipped": len(skipped), "skipped_list": skipped[:200],
             "ignored_undated": len(ignored), "not_imported_other": len(not_imported), "plan": plan,
             "ignored_list": ignored, "not_imported_list": not_imported}
+
+
+def backfill_native(db, rows: list, *, batch: int = 1000) -> dict:
+    """Fill designation and the native address on the members already imported (matched by the old number). Only empty
+    fields are written, so anything the office typed since is kept. Safe to repeat."""
+    from models.members import Member
+
+    done = untouched = missing = 0
+    by_old = {o: i for o, i in db.query(Member.old_membership_number, Member.id).filter(Member.old_membership_number != None).all()}  # noqa: E711
+    for n, r in enumerate(rows, 1):
+        mid = by_old.get(_s(r.get("CusNo")))
+        if mid is None:
+            missing += 1
+            continue
+        m = db.get(Member, mid)
+        addr = ", ".join(x for x in (m.address_line1, m.address_line2) if x)
+        want = native_fields(r, addr)
+        changed = False
+        if want["designation"] and not m.designation:
+            m.designation, changed = want["designation"], True
+        if want["native_address"] and not m.native_address:
+            m.native_address, m.native_same_as_current, changed = want["native_address"], want["native_same_as_current"], True
+        done += changed
+        untouched += not changed
+        if n % batch == 0:
+            db.commit()
+    db.commit()
+    return {"updated": done, "unchanged": untouched, "not_found": missing}

@@ -47,6 +47,10 @@ class Member(AuditMixin, Base):
     gotra_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("gotras.id"), nullable=True)
     gotra_text: Mapped[str] = mapped_column(String(100), nullable=True)
     occupation: Mapped[str] = mapped_column(String(150), nullable=True)
+    designation: Mapped[str] = mapped_column(String(150), nullable=True)
+    # The native (home town) address is one free-text box; the flag means it is the same as the communication address.
+    native_address: Mapped[str] = mapped_column(Text, nullable=True)
+    native_same_as_current: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     category: Mapped[str] = mapped_column(String(50), nullable=True)
     company: Mapped[str] = mapped_column(String(150), nullable=True)
     website: Mapped[str] = mapped_column(String(255), nullable=True)

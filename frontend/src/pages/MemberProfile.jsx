@@ -464,6 +464,7 @@ function PersonalTab({ id }) {
               <Row label="Native place">{p.native_place}</Row>
               <Row label="Qualification">{p.qualification}</Row>
               <Row label="Occupation">{p.occupation}</Row>
+              <Row label="Designation">{p.designation}</Row>
               <Row label="Company">{p.company}</Row>
               <Row label="Website">{p.website}</Row>
               <Row label="Category">{p.category}</Row>
@@ -503,6 +504,7 @@ function PersonalTab({ id }) {
               <Row label="Country">{c.country}</Row>
               <Row label="Landmark">{c.label_point}</Row>
               <Row label="Address remarks">{c.address_remarks}</Row>
+              <Row label="Native address">{c.native_same_as_current ? `Same as communication address${c.native_address ? ` (${c.native_address})` : ''}` : c.native_address}</Row>
             </>
           )}
         </Panel>
