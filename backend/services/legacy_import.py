@@ -696,9 +696,15 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
 def backfill_native(db, rows: list, *, batch: int = 1000) -> dict:
     """Fill designation and the native address on the members already imported (matched by the old number). Only empty
     fields are written, so anything the office typed since is kept. Safe to repeat."""
+    from api.v1.endpoints.members import _GOTRA_ALIAS_KEYS, _NO_GOTRA, _clean_import_name, _gotra_key
+    from models.masters import Gotra
     from models.members import Member
 
     done = untouched = missing = 0
+    gotras = {}
+    for g in db.query(Gotra).filter(Gotra.is_deleted == False, Gotra.status == True).all():  # noqa: E712
+        gotras.setdefault(_gotra_key(g.name_en), g)
+    unmatched = Counter()
     by_old = {o: i for o, i in db.query(Member.old_membership_number, Member.id).filter(Member.old_membership_number != None).all()}  # noqa: E711
     for n, r in enumerate(rows, 1):
         mid = by_old.get(_s(r.get("CusNo")))
@@ -713,9 +719,17 @@ def backfill_native(db, rows: list, *, batch: int = 1000) -> dict:
             m.designation, changed = want["designation"], True
         if want["native_address"] and not m.native_address:
             m.native_address, m.native_same_as_current, changed = want["native_address"], want["native_same_as_current"], True
+        raw = _clean_import_name(r.get("CusGotra"))
+        if raw and raw.upper() not in _NO_GOTRA and not m.gotra_id:
+            k = _gotra_key(raw)
+            master = gotras.get(_GOTRA_ALIAS_KEYS.get(k, k))
+            if master:
+                m.gotra_id, m.gotra_text, changed = master.id, master.name_en, True
+            else:
+                unmatched[raw] += 1
         done += changed
         untouched += not changed
         if n % batch == 0:
             db.commit()
     db.commit()
-    return {"updated": done, "unchanged": untouched, "not_found": missing}
+    return {"updated": done, "unchanged": untouched, "not_found": missing, "gotra_not_in_master": dict(unmatched)}

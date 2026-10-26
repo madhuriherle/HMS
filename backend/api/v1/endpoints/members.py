@@ -3216,7 +3216,7 @@ def _clean_import_mobile(raw: Optional[str]) -> tuple:
     return None, f"'{text}' is not a valid mobile number, so it was left blank"
 
 
-_NO_GOTRA = {"", "GENERAL", "NA", "N/A", "NONE", "NIL", "UNKNOWN", "-", "--"}
+_NO_GOTRA = {"", "NA", "N/A", "NONE", "NIL", "UNKNOWN", "-", "--"}
 
 
 def _gotra_key(raw: Optional[str]) -> str:
