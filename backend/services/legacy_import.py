@@ -431,6 +431,10 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
             master = gotras.get(_GOTRA_ALIAS_KEYS.get(k, k))
             if master:
                 gotra_id, gotra_text = master.id, master.name_en
+            elif gotras.get(_gotra_key("GENERAL")):
+                master = gotras[_gotra_key("GENERAL")]
+                gotra_id, gotra_text = master.id, master.name_en
+                warn.append(f"Gotra '{g}' is not in the Gotra master: set to GENERAL")
             else:
                 warn.append(f"Gotra '{g}' is not in the Gotra master: left blank")
         pc = pins.get(_s(r.get("CusPinCode")))
@@ -723,6 +727,7 @@ def backfill_native(db, rows: list, *, batch: int = 1000) -> dict:
         if raw and raw.upper() not in _NO_GOTRA and not m.gotra_id:
             k = _gotra_key(raw)
             master = gotras.get(_GOTRA_ALIAS_KEYS.get(k, k))
+            master = master or gotras.get(_gotra_key("GENERAL"))   # a gotra the master does not have is GENERAL
             if master:
                 m.gotra_id, m.gotra_text, changed = master.id, master.name_en, True
             else:
