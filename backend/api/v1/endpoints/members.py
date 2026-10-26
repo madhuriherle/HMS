@@ -708,6 +708,36 @@ def export_labels(
         headers={"Content-Disposition": "attachment; filename=labels.pdf"}
     )
 
+@router.get("/duplicates")
+def read_duplicates(
+    kind: str = "mobile",          # mobile | name | similar
+    search: Optional[str] = None,  # a name, mobile or membership number inside the group
+    page: int = 1, limit: int = 20,
+    export: Optional[str] = None,  # "excel": every group as one sheet
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.list.read")),
+) -> Any:
+    """Members who may be the same person: one mobile used by several members, the same name, or names spelled a little differently.
+    The page is a slice of the GROUPS (at most 200); nothing is merged or changed."""
+    from core.pagination import LIST_PAGE_MAX
+    from services import duplicate_members
+
+    try:
+        groups = duplicate_members.find_groups(db, kind.lower(), search)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if export:
+        return Response(
+            content=duplicate_members.groups_xlsx(groups),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename=duplicate_members_{kind.lower()}.xlsx"},
+        )
+    page, limit = max(1, page), max(1, min(limit, LIST_PAGE_MAX))
+    total = len(groups)
+    return {"groups": groups[(page - 1) * limit: page * limit], "total": total, "page": page, "limit": limit,
+            "pages": max(1, -(-total // limit)), "members_in_groups": sum(len(g["members"]) for g in groups)}
+
+
 @router.get("/duplicate-check")
 def duplicate_check(
     mobile: Optional[str] = None,

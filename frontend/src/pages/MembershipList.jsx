@@ -402,6 +402,15 @@ export default function MembershipList() {
               </Link>
             )}
             */}
+            {hasPermission('members.list.read') && (
+              <Link
+                to="/dashboard/membership/duplicates"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#510601] text-[#510601] hover:bg-[#510601]/5 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs cursor-pointer shrink-0"
+                title="Members who share a mobile or a name, or have names spelled a little differently"
+              >
+                <span>Duplicates</span>
+              </Link>
+            )}
             {hasPermission('members.list.write') && (
               <button
                 type="button"
