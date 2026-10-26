@@ -316,6 +316,8 @@ class MemberInDBBase(MemberBase):
     id: int
     membership_number: Optional[str] = None
     member_code: Optional[str] = None  # the same number, under its old name
+    old_membership_number: Optional[str] = None
+    legacy_ref_number: Optional[str] = None
     registration_status: str
     approval_status: str
     member_status: str

@@ -607,6 +607,7 @@ export default function MembershipList() {
                       {/* Membership No. */}
                       <td className="py-3 px-4 font-mono font-bold text-xs text-[#510601] whitespace-nowrap">
                         {m.membershipNumber ? `${m.membershipNumber}` : '—'}
+                        {m.old_membership_number && <div className="text-[10px] font-medium text-[#863221]">Old: {m.old_membership_number}</div>}
                       </td>
 
                       {/* Name */}

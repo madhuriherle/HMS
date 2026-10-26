@@ -142,6 +142,7 @@ export default function ReceiptTracking() {
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, Assigned, Unassigned
   const [fyFilter, setFyFilter] = useState(() => getCurrentFY());
   const [modeFilter, setModeFilter] = useState('ALL');
+  const [numberFilter, setNumberFilter] = useState('ALL'); // ALL, KNOWN, UNKNOWN (dummy number), ZERO (no amount)
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [periodMode, setPeriodMode] = useState('FY'); // ALL, TODAY, MONTH, FY, CUSTOM
@@ -174,12 +175,13 @@ export default function ReceiptTracking() {
       ...(statusFilter !== 'ALL' ? { receipt_status: statusCode[statusFilter] } : {}),
       ...(fyFilter !== 'ALL' ? { fy: fyFilter } : {}),
       ...(modeFilter !== 'ALL' ? { mode: modeFilter } : {}),
+      ...(numberFilter !== 'ALL' ? { number_kind: numberFilter } : {}),
       ...(fromDate ? { from_date: fromDate } : {}),
       ...(toDate ? { to_date: toDate } : {}),
       ...sortParams,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, particularsFilter, subTypeFilter, statusFilter, fyFilter, modeFilter, fromDate, toDate, sort.by, sort.dir]);
+  }, [debouncedSearch, particularsFilter, subTypeFilter, statusFilter, fyFilter, modeFilter, numberFilter, fromDate, toDate, sort.by, sort.dir]);
 
   const requestSeq = useRef(0);
   const loadPage = async () => {
@@ -443,7 +445,8 @@ export default function ReceiptTracking() {
           (subTypeFilter !== 'ALL' ? 1 : 0) +
           (statusFilter !== 'ALL' ? 1 : 0) +
           (periodMode !== 'FY' || fyFilter !== getCurrentFY() ? 1 : 0) +
-          (modeFilter !== 'ALL' ? 1 : 0)
+          (modeFilter !== 'ALL' ? 1 : 0) +
+          (numberFilter !== 'ALL' ? 1 : 0)
         }
         onResetFilters={() => {
           const currentFY = getCurrentFY();
@@ -453,6 +456,7 @@ export default function ReceiptTracking() {
           setStatusFilter('ALL');
           setFyFilter(currentFY);
           setModeFilter('ALL');
+          setNumberFilter('ALL');
           setFromDate('');
           setToDate('');
           setPeriodMode('FY');
@@ -530,6 +534,19 @@ export default function ReceiptTracking() {
             { value: 'Cancelled', label: 'Cancelled' }
           ]}
           widthClass="w-full sm:w-48"
+        />
+
+        {/* Old-register receipts with no real number (FY43-001 style) or no amount */}
+        <FilterSelect
+          value={numberFilter}
+          onChange={(val) => setNumberFilter(val)}
+          options={[
+            { value: 'ALL', label: 'All Receipt Numbers' },
+            { value: 'KNOWN', label: 'Real number' },
+            { value: 'UNKNOWN', label: 'Unknown number (dummy)' },
+            { value: 'ZERO', label: 'No amount' }
+          ]}
+          widthClass="w-full sm:w-52"
         />
 
         {/* Payment Mode */}

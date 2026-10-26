@@ -20,6 +20,7 @@ import useAuth from '../hooks/useAuth';
 import { formatDateTime } from '../utils/dateUtils';
 import { confirmAction } from '../utils/actionConfirm';
 import { memberName } from '../utils/memberName';
+import LegacyDryRun from '../components/LegacyDryRun';
 
 export default function MemberImport() {
   const navigate = useNavigate();
@@ -339,6 +340,8 @@ export default function MemberImport() {
               Download Template CSV
             </button>
           </div>
+
+        {hasPermission('members.import.write') && <LegacyDryRun />}
 
         {/* Upload & Progress Card */}
         <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-sm p-6 space-y-6">

@@ -137,6 +137,7 @@ def read_members(
             Member.mobile.ilike(f"%{search}%"),
             Member.alternate_mobile.ilike(f"%{search}%"),
             Member.member_code.ilike(f"%{search}%"),
+            Member.old_membership_number == search.strip(),
             Member.email.ilike(f"%{search}%"),
             Member.locality.ilike(f"%{search}%"),
             Member.city.ilike(f"%{search}%"),
@@ -221,7 +222,7 @@ def read_label_list(
         like = f"%{search}%"
         q = q.filter(or_(
             Member.first_name_en.ilike(like), Member.middle_name_en.ilike(like), Member.last_name_en.ilike(like),
-            Member.mobile.ilike(like), Member.member_code.ilike(like), Member.email.ilike(like),
+            Member.mobile.ilike(like), Member.member_code.ilike(like), Member.old_membership_number == like.strip("%"), Member.email.ilike(like),
             Member.locality.ilike(like), Member.city.ilike(like),
             Member.district_id.in_(db.query(District.id).filter(District.name_en.ilike(like))),
             Member.pincode_id.in_(db.query(PostalCode.id).filter(PostalCode.pincode.ilike(like))),
@@ -829,6 +830,98 @@ def _import_run_row(run: MemberImportRun, names: dict, detail: bool = False) -> 
         out["skipped"] = run.skipped or []
         out["warnings"] = run.warnings or []
     return out
+
+
+# ─── DRY RUN OF THE OLD REGISTER (MstMember.xlsx) ───────────────────
+# The register has ~32,000 members and ~39,000 receipt lines, so the check runs in the background: the screen starts
+# it, asks how far it is, then downloads the reports. Nothing is saved to the member or receipt tables.
+def _legacy_dir() -> str:
+    path = os.path.join(settings.UPLOAD_DIR, "legacy_reports")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _legacy_status(job_id: str, user: User) -> dict:
+    import json
+    if not re.fullmatch(r"[0-9a-f]{32}", job_id or ""):
+        raise HTTPException(404, "Dry run not found")
+    path = os.path.join(_legacy_dir(), f"{job_id}.json")
+    if not os.path.exists(path):
+        raise HTTPException(404, "Dry run not found")
+    with open(path, encoding="utf-8") as fh:
+        info = json.load(fh)
+    if info.get("user_id") != user.id:
+        raise HTTPException(404, "Dry run not found")
+    return info
+
+
+def _run_legacy_dry_run(job_id: str, user_id: int, file_name: str, content: bytes) -> None:
+    import json
+    from db.session import SessionLocal
+    from services import legacy_import
+
+    base = os.path.join(_legacy_dir(), job_id)
+
+    def write(info: dict) -> None:
+        with open(base + ".json", "w", encoding="utf-8") as fh:
+            json.dump({"user_id": user_id, "file_name": file_name, **info}, fh, default=str)
+
+    db = SessionLocal()
+    try:
+        write({"status": "RUNNING"})
+        plan = legacy_import.build_plan(db, legacy_import.read_register(content))
+        with open(base + ".xlsx", "wb") as fh:
+            fh.write(legacy_import.reports_xlsx(plan))
+        write({"status": "DONE", **legacy_import.summary_json(plan)})
+    except Exception as exc:  # the screen shows the reason
+        write({"status": "FAILED", "error": str(exc)[:500]})
+    finally:
+        db.rollback()
+        db.close()
+
+
+@router.post("/legacy-import/dry-run")
+async def start_legacy_dry_run(
+    file: UploadFile = File(...),
+    current_user: User = Depends(deps.require_any_permission("members.import.write", "members.register.write", "members.write")),
+) -> Any:
+    """Check the old register file exactly as its import would judge it and write the reports. Saves no members or
+    receipts. Returns a job id: ask GET /legacy-import/dry-run/{job_id} until it is DONE."""
+    import threading
+    import uuid
+    import json
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "The file is empty")
+    job_id = uuid.uuid4().hex
+    with open(os.path.join(_legacy_dir(), f"{job_id}.json"), "w", encoding="utf-8") as fh:
+        json.dump({"user_id": current_user.id, "file_name": (file.filename or "")[:255], "status": "RUNNING"}, fh)
+    threading.Thread(target=_run_legacy_dry_run, args=(job_id, current_user.id, (file.filename or "")[:255], content), daemon=True).start()
+    return {"job_id": job_id, "status": "RUNNING"}
+
+
+@router.get("/legacy-import/dry-run/{job_id}")
+def read_legacy_dry_run(
+    job_id: str,
+    current_user: User = Depends(deps.require_any_permission("members.import.write", "members.register.write", "members.write")),
+) -> Any:
+    return _legacy_status(job_id, current_user)
+
+
+@router.get("/legacy-import/dry-run/{job_id}/report")
+def download_legacy_dry_run(
+    job_id: str,
+    current_user: User = Depends(deps.require_any_permission("members.import.write", "members.register.write", "members.write")),
+) -> Any:
+    from fastapi.responses import FileResponse
+
+    info = _legacy_status(job_id, current_user)
+    path = os.path.join(_legacy_dir(), f"{job_id}.xlsx")
+    if info.get("status") != "DONE" or not os.path.exists(path):
+        raise HTTPException(409, "The reports are not ready yet")
+    return FileResponse(path, filename="old_register_dry_run.xlsx",
+                        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 @router.get("/import-history")
@@ -2078,6 +2171,7 @@ def read_member_profile(
             "type_name_en": t.name_en,
             "type_name_kn": t.name_kn,
             "membership_number": m.membership_number,
+            "old_membership_number": member.old_membership_number,   # the number the old register gave
             "status": m.status,
             "applied_at": m.applied_at,
             "activated_at": m.activated_at,
@@ -2538,7 +2632,7 @@ def _profile_membership(db: Session, member: Member, actor=None) -> dict:
         price = active_price(db, t.id)
         memberships.append({
             "id": m.id, "membership_type_id": t.id, "type_code": t.code, "type_name_en": t.name_en,
-            "type_name_kn": t.name_kn, "membership_number": m.membership_number, "status": m.status,
+            "type_name_kn": t.name_kn, "membership_number": m.membership_number, "old_membership_number": member.old_membership_number, "status": m.status,
             "applied_at": m.applied_at, "activated_at": m.activated_at, "expires_at": m.expires_at,
             "family_membership_number": m.family_membership_number,
             "current_price": float(price.amount) if price else None,

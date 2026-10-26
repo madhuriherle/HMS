@@ -319,6 +319,7 @@ def read_receipt_tracking(
     fy: Optional[str] = None,           # financial year "2025-26" (1 Apr - 31 Mar)
     mode: Optional[str] = None,         # payment mode as shown: "Cash", or the bank/account name
     member_ids: Optional[str] = None,   # comma separated member ids (their receipts), at most 200
+    number_kind: Optional[str] = None,  # UNKNOWN (dummy number, FY43-001 style) | KNOWN (real number) | ZERO (no amount)
 ) -> Any:
     """Receipt register for the Receipt Tracking screen.
 
@@ -343,6 +344,11 @@ def read_receipt_tracking(
         filters.append(Receipt.id == receipt_id)
     if receipt_status:
         filters.append(Receipt.receipt_status == receipt_status.upper())
+    if number_kind:
+        kind = number_kind.upper()
+        if kind not in ("UNKNOWN", "KNOWN", "ZERO"):
+            raise HTTPException(400, "number_kind must be UNKNOWN, KNOWN or ZERO")
+        filters.append(Receipt.net_amount == 0 if kind == "ZERO" else Receipt.is_old_receipt == (kind == "UNKNOWN"))  # noqa: E712
     if member_ids:
         wanted = [int(x) for x in member_ids.split(",") if x.strip().isdigit()][:LIST_PAGE_MAX]
         filters.append(Receipt.id.in_(

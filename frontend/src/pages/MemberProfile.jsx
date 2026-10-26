@@ -274,7 +274,8 @@ function OverviewTab({ id }) {
               ) : (
                 <>
                   <Row label="Type">{m.current.type_name_en}</Row>
-                  <Row label="Membership number">{m.current.membership_number || 'Given on approval'}</Row>
+                  <Row label="Membership number">{m.current.membership_number || (m.current.old_membership_number ? 'None yet' : 'Given on approval')}</Row>
+                  {m.current.old_membership_number && <Row label="Old membership number">{m.current.old_membership_number}</Row>}
                   <Row label="Member since">{since ? formatDate(since) : ''}</Row>
                   <Row label="Valid till">{m.current.expires_at ? formatDate(m.current.expires_at) : ''}</Row>
                   <Row label="Receipts">{d.receipts.total ? `${d.receipts.total} · last ${formatDate(d.receipts.latest[0]?.receipt_date)}` : 'None yet'}</Row>

@@ -18,6 +18,10 @@ class Member(AuditMixin, Base):
     # the old name still works in code as an alias.
     membership_number: Mapped[str] = mapped_column(String(30), nullable=True)
     member_code = synonym("membership_number")
+    # The numbers the old register gave: CusNo is the OLD membership number (kept for members who have no new one yet),
+    # CusNoOld a further reference. Both are only kept and searched, never used as a membership number.
+    old_membership_number: Mapped[str] = mapped_column(String(30), nullable=True, index=True)
+    legacy_ref_number: Mapped[str] = mapped_column(String(30), nullable=True)
 
     @property
     def display_name(self) -> str:

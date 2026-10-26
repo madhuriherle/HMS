@@ -78,6 +78,7 @@ export default function MembershipTypeManagement() {
   const [editingItem, setEditingItem] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
+    code: '',
     amount: '',
     chartColor: '',
     status: 'Active'
@@ -159,6 +160,7 @@ export default function MembershipTypeManagement() {
     setEditingItem(null);
     setFormData({
       name: '',
+      code: '',
       amount: '',
       chartColor: '',
       status: 'Active'
@@ -172,6 +174,7 @@ export default function MembershipTypeManagement() {
     setEditingItem(item);
     setFormData({
       name: item.name || '',
+      code: item.code || '',
       amount: String(item.currentPrice || ''),
       chartColor: item.chartColor || '',
       status: item.status || 'Active'
@@ -232,6 +235,7 @@ export default function MembershipTypeManagement() {
       if (modalMode === 'add') {
         const res = await api.post('/masters/membership-types', {
           name_en: formData.name,
+          code: formData.code.trim() || undefined,
           chart_color: formData.chartColor || null,
           status: isActive
         });
@@ -255,6 +259,7 @@ export default function MembershipTypeManagement() {
         }
         await api.put(`/masters/membership-types/${editingItem.id}`, {
           name_en: formData.name,
+          code: formData.code.trim() || undefined,
           chart_color: formData.chartColor || null,
           status: isActive
         });
@@ -565,6 +570,7 @@ export default function MembershipTypeManagement() {
               <tr className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-xs font-semibold text-[#863221] uppercase tracking-wider">
                 <th className="px-5 py-3.5 w-12"></th>
                 <th className="px-5 py-3.5">Membership Type</th>
+                <th className="px-5 py-3.5">Code</th>
                 <th className="px-5 py-3.5 text-right">Amount</th>
                 <th className="px-5 py-3.5 text-center">Status</th>
                 <th className="px-5 py-3.5 text-center">Price History</th>
@@ -588,6 +594,9 @@ export default function MembershipTypeManagement() {
                       <td className="px-5 py-4 font-bold text-[#180200]">
                         <span className="text-sm">{item.name}</span>
                       </td>
+
+                      {/* Code */}
+                      <td className="px-5 py-4 font-mono font-bold text-xs text-[#510601]">{item.code || '—'}</td>
 
                       {/* Amount */}
                       <td className="px-5 py-4 font-mono font-bold text-[#510601] text-base text-right">
@@ -657,7 +666,7 @@ export default function MembershipTypeManagement() {
                 })
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-[#863221]">
+                  <td colSpan="7" className="px-6 py-12 text-center text-[#863221]">
                     <div className="w-12 h-12 rounded-full bg-[#FAF7F2] text-[#863221]/60 flex items-center justify-center mx-auto mb-3">
                       <Tag className="w-6 h-6" />
                     </div>
@@ -817,6 +826,20 @@ export default function MembershipTypeManagement() {
                   {formErrors.name}
                 </p>
               )}
+            </div>
+
+            {/* Code (short letters used for the type, for example PO) */}
+            <div>
+              <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider mb-1.5">Code</label>
+              <input
+                type="text"
+                name="code"
+                maxLength={10}
+                placeholder="for example PO"
+                value={formData.code}
+                onChange={(e) => setFormData((prev) => ({ ...prev, code: e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '') }))}
+                className="w-full px-3.5 py-2.5 bg-white border border-[#E8DFD8] rounded-xl text-sm font-mono font-bold text-[#180200] placeholder-[#863221]/40 focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] transition-colors"
+              />
             </div>
 
             {/* 2. Amount (Text Box) */}
