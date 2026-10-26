@@ -389,8 +389,11 @@ MENU_PAGE_CATALOG = [
     ("system.number_formats", "Number Formats", "system.hub", "/dashboard/system/number-formats", "list-checks", 2, "system.number_formats.read", None),
     ("masters.organisation", "Organisation Settings", "system.hub", "/dashboard/master/organisation-settings", "building", 1, "masters.organisation.read", None),
     ("masters.payment_modes", "Payment Mode Setup", "masters", "/dashboard/master/payment-modes", "credit-card", 5, "masters.payment_modes.read", None),
-    # Personal Masters screen is switched off for now (also switched off in migration 0025):
-    # ("masters.personal", "Personal Masters", "masters", "/dashboard/master/personal-masters", "list-checks", 7, "masters.read", None),
+    # Personal Masters: a page with Gotra, Name Title and Qualification as the pages below it
+    ("masters.personal", "Personal Masters", "masters", "/dashboard/master/personal-masters", "list-checks", 7, "masters.read", None),
+    ("masters.gotra", "Gotra", "masters.personal", "/dashboard/master/gotra", "list-checks", 1, "masters.read", None),
+    ("masters.name_title", "Name Title", "masters.personal", "/dashboard/master/name-title", "list-checks", 2, "masters.read", None),
+    ("masters.qualification", "Qualification", "masters.personal", "/dashboard/master/qualification", "list-checks", 3, "masters.read", None),
     # parent may list alternatives ("a|b"): the first module code that exists is used
     ("approvals.requests", "Approval Requests", "approvals", "/dashboard/approvals", "check-circle", 1, "approvals.read", None),
     # Magazine, Reports and Notifications: one sidebar page per section (no tab rows). Each page opens with the

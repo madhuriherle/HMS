@@ -148,6 +148,14 @@ class Gotra(AuditMixin, Base):
     name_kn: Mapped[str] = mapped_column(String(150), nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
 
+class NameTitle(AuditMixin, Base):
+    """A title before a member's name (SRI., SMT., DR. ...). Members keep the title as text."""
+    __tablename__ = "name_titles"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    name_en: Mapped[str] = mapped_column(String(30), nullable=False)
+    name_kn: Mapped[str] = mapped_column(String(150), nullable=True)   # not used; the shared master code expects it
+    status: Mapped[bool] = mapped_column(Boolean, default=True)
+
 class Qualification(AuditMixin, Base):
     __tablename__ = "qualifications"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)

@@ -37,8 +37,8 @@ import EventsManagement from './pages/EventsManagement';
 import EngagementsManagement from './pages/EngagementsManagement';
 import ReportsManagement from './pages/ReportsManagement';
 import NotificationsManagement from './pages/NotificationsManagement';
-// Personal Masters (gotra / qualification / native place) screen is switched off for now:
-// import PersonalMasters from './pages/MasterLists';
+// Gotra, Qualification and Name title masters (one screen each)
+import { GotraMaster, QualificationMaster, NameTitleMaster, PersonalMastersHub } from './pages/MasterLists';
 
 // Anyone without a login is sent to the sign-in page before any panel screen renders
 const RequireLogin = ({ children }) => {
@@ -112,7 +112,10 @@ function App() {
           <Route path="settings/recycle-bin" element={<RecycleBin />} />
           <Route path="settings/cleanup" element={<DataCleanup />} />
           <Route path="master/payment-modes" element={<BankDetailsManagement />} />
-          {/* <Route path="master/personal-masters" element={<PersonalMasters />} /> */}
+          <Route path="master/personal-masters" element={<PersonalMastersHub />} />
+          <Route path="master/gotra" element={<GotraMaster />} />
+          <Route path="master/name-title" element={<NameTitleMaster />} />
+          <Route path="master/qualification" element={<QualificationMaster />} />
           <Route path="approvals" element={<Approvals />} />
           <Route path="masters/payment-modes" element={<BankDetailsManagement />} />
           <Route path="master/payment-mode" element={<BankDetailsManagement />} />

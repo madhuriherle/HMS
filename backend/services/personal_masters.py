@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from typing import Optional, Type
 
 from models.masters import (
-    Qualification, NativePlace, Gotra,
+    Qualification, NativePlace, Gotra, NameTitle,
 )
 
 
@@ -29,6 +29,7 @@ class PersonalMasterSpec:
     label: str                     # human label for error messages, e.g. "Gotra"
     uses_district: bool = False    # only NativePlace filters/validates by district
     text_field: Optional[str] = None  # free-text fallback column, e.g. "native_place_text"
+    member_text_field: Optional[str] = None  # a master the member keeps as plain text (name_title): blocks delete while used
 
 
 PERSONAL_MASTERS = [
@@ -38,6 +39,11 @@ PERSONAL_MASTERS = [
         "native_place", "native-places", NativePlace, "native_place_id", "native_place",
         "Native place", uses_district=True, text_field="native_place_text",
     ),
+]
+
+# Masters the member keeps as text, not as an id: they get the same routes but are not part of the profile's personal masters.
+TEXT_MASTERS = [
+    PersonalMasterSpec("name_title", "name-titles", NameTitle, None, "name_title", "Name title", member_text_field="name_title"),
 ]
 
 BY_PREFIX = {spec.route_prefix: spec for spec in PERSONAL_MASTERS}

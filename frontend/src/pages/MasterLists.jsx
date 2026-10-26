@@ -1,25 +1,27 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Pencil, Trash2, Search } from 'lucide-react';
 import api from '../api';
+import PageTitle from '../components/PageTitle';
 import PermissionGate from '../components/PermissionGate';
-import SearchFilterBar from '../components/SearchFilterBar';
-import FilterSelect from '../components/FilterSelect';
 import useAuth from '../hooks/useAuth';
-import { askForm, confirmYesNo, showError, showSuccess } from '../utils/dialogs';
+import { confirmYesNo, showError, showSuccess } from '../utils/dialogs';
 
 const isPending = (d) => Boolean(d && (d.approval_request_id || d.status === 'PENDING'));
 
-// One list screen for a simple master: search, add, edit, active/inactive, delete.
-// Everything is read from and written to the server.
-//   fields:  [{ name, label, type, required, options }]   -> keys sent to the API as-is
-//   columns: [{ label, render(row) }]
-function MasterTable({ title, subtitle, endpoint, fields, columns, withCode, pageTitle, permBase = 'masters' }) {
+// A master with one field: the form on the left (Add, or Edit after Edit is pressed), the list on the right.
+// Every row is Active; there is no status to set. Everything is read from and written to the server.
+// The Kannada name is switched off for now (the column and the server still support it).
+function SimpleMaster({ title, endpoint, label = 'Name', placeholder = '' }) {
   const { hasPermission } = useAuth();
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [name, setName] = useState('');
+  const [editing, setEditing] = useState(null);   // the row being edited, null when adding
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const canWrite = hasPermission('masters.write');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,266 +42,183 @@ function MasterTable({ title, subtitle, endpoint, fields, columns, withCode, pag
   }, [load]);
 
   const visible = useMemo(() => {
-    let list = rows;
-    if (statusFilter !== 'ALL') {
-      const want = statusFilter === 'Active';
-      list = list.filter((r) => Boolean(r.status) === want);
-    }
     const q = search.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((r) => JSON.stringify(r).toLowerCase().includes(q));
-  }, [rows, search, statusFilter]);
+    return q ? rows.filter((r) => String(r.name_en || '').toLowerCase().includes(q)) : rows;
+  }, [rows, search]);
 
-  const formFields = (row) => [
-    ...fields.map((f) => ({ ...f, value: row ? row[f.name] ?? '' : '' })),
-    { name: 'status', label: 'Status', type: 'status', required: true, value: row ? (row.status ? 'Active' : 'Inactive') : 'Active' }
-  ];
-
-  const toBody = (values) => {
-    const body = { status: values.status !== 'Inactive' };
-    fields.forEach((f) => {
-      const v = values[f.name];
-      body[f.name] = v === '' || v === undefined ? null : f.type === 'select' && /^\d+$/.test(String(v)) ? Number(v) : v;
-    });
-    return body;
+  const reset = () => {
+    setEditing(null);
+    setName('');
   };
 
-  const done = async (data, ok, pending) => {
-    await showSuccess(isPending(data) ? pending : ok);
-    await load();
-  };
-
-  const add = async () => {
-    const values = await askForm({ title: `Add ${title}`, fields: formFields(null), confirmText: 'Add' });
-    if (!values) return;
+  const save = async (e) => {
+    e.preventDefault();
+    const value = name.trim();
+    if (!value) {
+      setError(`${label} is required.`);
+      return;
+    }
+    setSaving(true);
+    setError('');
     try {
-      const body = toBody(values);
-      const { data } = await api.post(endpoint, body);
-      await done(data, 'Added.', 'Submitted for approval.');
+      const { data } = editing
+        ? await api.put(`${endpoint}/${editing.id}`, { name_en: value })
+        : await api.post(endpoint, { name_en: value, status: true });
+      await showSuccess(isPending(data) ? 'Submitted for approval.' : editing ? 'Saved.' : 'Added.');
+      reset();
+      await load();
     } catch (err) {
-      await showError(err, 'Could not add.');
+      await showError(err, editing ? 'Could not save.' : 'Could not add.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const edit = async (row) => {
-    const values = await askForm({ title: `Edit ${title}`, fields: formFields(row), confirmText: 'Save' });
-    if (!values) return;
-    try {
-      const { data } = await api.put(`${endpoint}/${row.id}`, toBody(values));
-      await done(data, 'Saved.', 'Change submitted for approval.');
-    } catch (err) {
-      await showError(err, 'Could not save.');
-    }
-  };
-
-  const toggle = async (row) => {
-    const next = !row.status;
-    const ok = await confirmYesNo({
-      title: `Set ${next ? 'Active' : 'Inactive'}?`,
-      text: row.name_en,
-      confirmText: next ? 'Activate' : 'Deactivate'
-    });
-    if (!ok) return;
-    try {
-      const { data } = await api.put(`${endpoint}/${row.id}`, { status: next });
-      await done(data, `Now ${next ? 'Active' : 'Inactive'}.`, 'Change submitted for approval.');
-    } catch (err) {
-      await showError(err, 'Could not change the status.');
-    }
+  const startEdit = (row) => {
+    setEditing(row);
+    setName(row.name_en || '');
+    setError('');
   };
 
   const remove = async (row) => {
-    const ok = await confirmYesNo({
-      title: `Delete "${row.name_en}"?`,
-      text: 'This cannot be undone.',
-      confirmText: 'Yes, delete',
-      danger: true
-    });
+    const ok = await confirmYesNo({ title: `Delete "${row.name_en}"?`, text: 'This cannot be undone.', confirmText: 'Yes, delete', danger: true });
     if (!ok) return;
     try {
       const { data } = await api.delete(`${endpoint}/${row.id}`);
-      await done(data, 'Deleted.', 'Delete request submitted for approval.');
+      await showSuccess(isPending(data) ? 'Delete request submitted for approval.' : 'Deleted.');
+      if (editing?.id === row.id) reset();
+      await load();
     } catch (err) {
       await showError(err, 'Could not delete.');
     }
   };
 
   return (
-    <div className="space-y-4">
-      <SearchFilterBar
-        title={pageTitle ? pageTitle : <h2 className="text-lg font-bold text-[#180200]">{title}</h2>}
-        searchQuery={search}
-        onSearchChange={(val) => setSearch(val)}
-        activeFiltersCount={statusFilter !== 'ALL' ? 1 : 0}
-        onResetFilters={() => {
-          setSearch('');
-          setStatusFilter('ALL');
-        }}
-        rightSlot={
-          <>
-            
-            {hasPermission(`${permBase}.write`) && (
-              <button
-                type="button"
-                onClick={add}
-                title={`Add ${title}`}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#510601] hover:bg-[#8C1801] text-white text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-40 shrink-0"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add</span>
-              </button>
-            )}
-          </>
-        }
-      >
-        <FilterSelect
-          value={statusFilter}
-          onChange={setStatusFilter}
-          options={[
-            { value: 'ALL', label: 'All Status' },
-            { value: 'Active', label: 'Active' },
-            { value: 'Inactive', label: 'Inactive' }
-          ]}
-          widthClass="w-full sm:w-40"
-        />
-      </SearchFilterBar>
-
-      {error && <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>}
-
-      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs">
-          <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-            <tr>
-              {columns.map((c) => (
-                <th key={c.label} className="py-3 px-4">{c.label}</th>
-              ))}
-              <th className="py-3 px-4 text-center">Status</th>
-              <th className="py-3 px-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#E8DFD8]">
-            {visible.length === 0 ? (
-              <tr>
-                <td colSpan={columns.length + 2} className="py-10 text-center text-[#863221]/70">
-                  {loading ? 'Loading…' : 'Nothing here yet.'}
-                </td>
-              </tr>
-            ) : (
-              visible.map((row) => (
-                <tr key={row.id} className="hover:bg-[#FAF7F2]/40">
-                  {columns.map((c) => (
-                    <td key={c.label} className="py-3 px-4 text-[#180200]">{c.render(row) || '—'}</td>
-                  ))}
-                  <td className="py-3 px-4 text-center">
-                    <button
-                      type="button"
-                      onClick={() => toggle(row)}
-                      disabled={!hasPermission(`${permBase}.write`)}
-                      className={`px-2.5 py-1 rounded-full text-[10px] font-bold border cursor-pointer disabled:opacity-40 ${
-                        row.status
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-gray-100 text-gray-600 border-gray-200'
-                      }`}
-                      title={!hasPermission(`${permBase}.write`) ? `Requires ${permBase}.write permission` : 'Click to change status'}
-                    >
-                      {row.status ? 'Active' : 'Inactive'}
-                    </button>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {hasPermission(`${permBase}.write`) && (
-                        <button
-                          type="button"
-                          onClick={() => edit(row)}
-                          className="btn-act"
-                          title={'Edit'}
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                          <span>Edit</span>
-                        </button>
-                      )}
-                      {hasPermission(`${permBase}.delete`) && (
-                        <button
-                          type="button"
-                          onClick={() => remove(row)}
-                          className="btn-act btn-act-danger"
-                          title={'Delete'}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>Delete</span>
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ───────────── Personal masters: gotra, qualification, native place ─────────────
-export default function PersonalMasters() {
-  const [tab, setTab] = useState('gotras');
-  const [districts, setDistricts] = useState([]);
-
-  useEffect(() => {
-    api
-      .get('/masters/districts', { params: { limit: 2000 } })
-      .then((res) => setDistricts(res.data?.data || []))
-      .catch(() => setDistricts([]));
-  }, []);
-
-  const districtName = useMemo(() => Object.fromEntries(districts.map((d) => [d.id, d.name_en])), [districts]);
-
-  const base = [
-    { name: 'name_en', label: 'Name', required: true },
-    { name: 'name_kn', label: 'Name (Kannada)' }
-  ];
-  const baseColumns = [
-    { label: 'Name', render: (r) => r.name_en },
-    { label: 'Kannada', render: (r) => r.name_kn }
-  ];
-
-  const tabs = {
-    gotras: { label: 'Gotra', title: 'Gotra', endpoint: '/masters/gotras', fields: base, columns: baseColumns },
-    qualifications: { label: 'Qualification', title: 'Qualification', endpoint: '/masters/qualifications', fields: base, columns: baseColumns },
-    'native-places': {
-      label: 'Native place',
-      title: 'Native place',
-      endpoint: '/masters/native-places',
-      fields: [
-        ...base,
-        { name: 'district_id', label: 'District', type: 'select', options: districts.map((d) => ({ value: d.id, label: d.name_en })) }
-      ],
-      columns: [...baseColumns, { label: 'District', render: (r) => districtName[r.district_id] }]
-    }
-  };
-  const current = tabs[tab];
-
-  return (
     <PermissionGate required="masters.read">
-      <div className="space-y-6">
+      <PageTitle>{title}</PageTitle>
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] gap-6 items-start">
+        {canWrite && (
+          <form onSubmit={save} className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 bg-[#FAF7F2] border-b border-[#E8DFD8]">
+              <h2 className="text-sm font-bold text-[#180200]">{editing ? `Edit ${title}` : `Add ${title}`}</h2>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs sm:text-sm text-[#3D140C] mb-1 font-semibold">
+                  {label}: <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  maxLength={100}
+                  placeholder={placeholder}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setError('');
+                  }}
+                  className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                />
+              </div>
+              {error && <p className="text-[11px] text-red-600 font-medium">{error}</p>}
+              <div className="flex items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 px-4 py-2.5 bg-[#510601] hover:bg-[#8C1801] disabled:opacity-60 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm transition-colors cursor-pointer"
+                >
+                  {saving ? 'Saving…' : editing ? 'Update' : 'Save'}
+                </button>
+                {editing && (
+                  <button
+                    type="button"
+                    onClick={reset}
+                    className="flex-1 px-4 py-2.5 bg-white border border-[#E8DFD8] text-[#510601] hover:bg-[#FAF7F2] text-xs sm:text-sm font-semibold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </div>
+          </form>
+        )}
 
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(tabs).map(([key, t]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold border cursor-pointer transition-colors ${
-                tab === key ? 'bg-[#510601] text-white border-[#510601]' : 'bg-white text-[#510601] border-[#E8DFD8] hover:bg-[#FAF7F2]'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="space-y-3">
+          {!canWrite && error && <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>}
+          <div className="relative">
+            <Search className="w-4 h-4 text-[#9E8B7F] absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${title.toLowerCase()}`}
+              className="w-full pl-9 pr-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs sm:text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20"
+            />
+          </div>
+          <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="py-3 px-4">{title}</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E8DFD8]">
+                {visible.length === 0 ? (
+                  <tr>
+                    <td colSpan={2} className="py-10 text-center text-[#863221]/70">
+                      {loading ? 'Loading…' : 'Nothing here yet.'}
+                    </td>
+                  </tr>
+                ) : (
+                  visible.map((row) => (
+                    <tr key={row.id} className={`hover:bg-[#FAF7F2]/40 ${editing?.id === row.id ? 'bg-[#FAF7F2]' : ''}`}>
+                      <td className="py-3 px-4 text-[#180200] break-words [overflow-wrap:anywhere]">{row.name_en || '—'}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {canWrite && (
+                            <button type="button" onClick={() => startEdit(row)} className="btn-act" title="Edit">
+                              <Pencil className="w-3.5 h-3.5" />
+                              <span>Edit</span>
+                            </button>
+                          )}
+                          {hasPermission('masters.delete') && (
+                            <button type="button" onClick={() => remove(row)} className="btn-act btn-act-danger" title="Delete">
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <MasterTable key={tab} {...current} />
       </div>
     </PermissionGate>
   );
 }
+
+export const GotraMaster = () => <SimpleMaster title="Gotra" endpoint="/masters/gotras" />;
+export const QualificationMaster = () => <SimpleMaster title="Qualification" endpoint="/masters/qualifications" />;
+export const NameTitleMaster = () => <SimpleMaster title="Name Title" endpoint="/masters/name-titles" label="Title" placeholder="for example SRI." />;
+
+// The Personal Masters page: the parent of the three screens above in the sidebar, with a link to each.
+export const PersonalMastersHub = () => (
+  <PermissionGate required="masters.read">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {[
+        ['Gotra', '/dashboard/master/gotra', 'The gotras a member can belong to'],
+        ['Name Title', '/dashboard/master/name-title', 'SRI., SMT., DR. and the other titles before a name'],
+        ['Qualification', '/dashboard/master/qualification', 'The qualifications a member can have']
+      ].map(([name, to, note]) => (
+        <Link key={to} to={to} className="block bg-white border border-[#E8DFD8] rounded-2xl shadow-sm p-5 hover:border-[#510601] transition-colors">
+          <h3 className="text-sm font-bold text-[#180200]">{name}</h3>
+          <p className="text-xs text-[#863221] mt-1">{note}</p>
+        </Link>
+      ))}
+    </div>
+  </PermissionGate>
+);

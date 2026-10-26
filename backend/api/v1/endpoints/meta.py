@@ -15,9 +15,15 @@ router = APIRouter()
 
 
 @router.get("/rules")
-def read_rules(current_user: User = Depends(deps.get_current_user)) -> Any:
+def read_rules(db: Session = Depends(deps.get_db), current_user: User = Depends(deps.get_current_user)) -> Any:
     """The data rules the server enforces (formats, limits, fixed lists), for the screens to use."""
-    return rules.as_dict()
+    from models.masters import NameTitle
+
+    out = rules.as_dict()
+    titles = [t for (t,) in db.query(NameTitle.name_en).filter(NameTitle.is_deleted == False, NameTitle.status == True).order_by(NameTitle.id).all()]  # noqa: E712
+    if titles:   # the Name Titles master; the built-in list only until it has rows
+        out["name_titles"] = titles
+    return out
 
 
 @router.get("/lists")

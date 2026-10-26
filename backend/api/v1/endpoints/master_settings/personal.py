@@ -2,6 +2,7 @@
 from typing import Any, Optional, Union
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api import deps
@@ -12,7 +13,7 @@ from models.users import User
 from schemas import masters as schemas_masters
 from schemas.common import PendingApproval
 from services import approval_gate
-from services.personal_masters import PERSONAL_MASTERS as _PERSONAL_MASTERS, PersonalMasterSpec as _PersonalMasterSpec
+from services.personal_masters import PERSONAL_MASTERS as _PERSONAL_MASTERS, TEXT_MASTERS as _TEXT_MASTERS, PersonalMasterSpec as _PersonalMasterSpec
 from .common import ensure_district
 
 router = APIRouter()
@@ -50,7 +51,7 @@ def read_personal_masters_overview(
     return overview
 
 
-for _spec in _PERSONAL_MASTERS:
+for _spec in [*_PERSONAL_MASTERS, *_TEXT_MASTERS]:
     _crud = _personal_master_crud(_spec)
     _resp = schemas_masters.NativePlace if _spec.uses_district else schemas_masters.PersonalMaster
 
@@ -154,6 +155,11 @@ for _spec in _PERSONAL_MASTERS:
                     col == id, Member.is_deleted == False  # noqa: E712
                 ).first():
                     raise HTTPException(409, f"{_spec.label} is assigned to members and cannot be deleted")
+            if _spec.member_text_field:
+                from models.members import Member
+                col = getattr(Member, _spec.member_text_field)
+                if db.query(Member.id).filter(func.upper(col) == obj.name_en.upper(), Member.is_deleted == False).first():  # noqa: E712
+                    raise HTTPException(409, f"{_spec.label} is used by members and cannot be deleted. Make it inactive instead.")
             return _crud.remove(db, id=id, deleted_by=current_user.id)
 
         delete_personal_master.__name__ = f"delete_{_spec.route_prefix.replace('-', '_')}"

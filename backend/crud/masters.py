@@ -2,7 +2,7 @@ from crud.base import CRUDBase
 from models.masters import (
     State, District, Taluk, PostalCode, MembershipType, MembershipTypePrice,
     DocumentType, ServiceType, Particular, HmsSetting, Bank,
-    Qualification, NativePlace, Gotra,
+    Qualification, NativePlace, Gotra, NameTitle,
     DeletionReason,
 )
 from schemas.masters import (
@@ -68,6 +68,7 @@ class CRUDNativePlace(CRUDBase[NativePlace, NativePlaceCreate, NativePlaceUpdate
 
 qualification = CRUDPersonalMaster(Qualification)
 gotra = CRUDPersonalMaster(Gotra)
+name_title = CRUDPersonalMaster(NameTitle)
 native_place = CRUDNativePlace(NativePlace)
 
 class CRUDDeletionReason(CRUDBase[DeletionReason, DeletionReasonCreate, DeletionReasonUpdate]):
