@@ -48,6 +48,7 @@ SUB_MODULE_AREAS = {
             ("GET", r"^/members/\d+(/(family|services|donations|profile(/[a-z]+)?|membership-credit|documents|service-optins))?/?$"),
             ("PUT|DELETE", r"^/members/\d+/?$"),
             ("GET|PUT", r"^/members/\d+/verification/?$"),   # the phone check (Duplicate Members, profile)
+            ("GET|PUT", r"^/members/\d+/(possible-duplicates|duplicate-review)/?$"),   # same / different person, asked in the phone check
         ]),
         # the printable label list has its own privilege (it used to ride on Membership List's)
         ("members.label_list", "Label List", [

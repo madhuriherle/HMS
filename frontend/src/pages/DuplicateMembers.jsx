@@ -138,7 +138,7 @@ export default function DuplicateMembers() {
                       <th className="px-3 py-2">Mobile</th>
                       <th className="px-3 py-2">Date of birth</th>
                       <th className="px-3 py-2">Father / husband</th>
-                      <th className="px-3 py-2">Place</th>
+                      <th className="px-3 py-2">Post office · Taluk</th>
                       <th className="px-3 py-2">Pincode</th>
                       <th className="px-3 py-2">District</th>
                       <th className="px-3 py-2">Status</th>
@@ -157,7 +157,7 @@ export default function DuplicateMembers() {
                         <td className="px-3 py-2">{m.mobile || '—'}</td>
                         <td className="px-3 py-2">{formatDate(m.dob)}</td>
                         <td className="px-3 py-2">{m.father || '—'}</td>
-                        <td className="px-3 py-2">{m.place || '—'}</td>
+                        <td className="px-3 py-2">{[m.post_office, m.taluk].filter(Boolean).join(' · ') || m.place || '—'}</td>
                         <td className="px-3 py-2">{m.pincode || '—'}</td>
                         <td className="px-3 py-2">{m.district || '—'}</td>
                         <td className="px-3 py-2 whitespace-nowrap">

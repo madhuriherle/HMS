@@ -48,23 +48,88 @@ def _alike(w1: tuple, w2: tuple) -> bool:
 
 
 def _load(db) -> list:
-    from models.masters import District, PostalCode
+    from models.masters import District, PostalCode, Taluk
     from models.members import Member
 
     q = (db.query(Member.id, Member.full_name_en, Member.first_name_en, Member.middle_name_en, Member.last_name_en, Member.mobile,
                   Member.membership_number, Member.old_membership_number, Member.date_of_birth, Member.father_husband_name,
                   Member.locality, Member.village, Member.city, Member.approval_status, Member.member_status, Member.gender,
                   Member.verification_status, Member.verified_at, Member.verification_remark,
-                  PostalCode.pincode, District.name_en)
+                  PostalCode.pincode, District.name_en, PostalCode.post_office_name, Taluk.name_en)
          .outerjoin(PostalCode, PostalCode.id == Member.pincode_id).outerjoin(District, District.id == Member.district_id)
+         .outerjoin(Taluk, Taluk.id == Member.taluk_id)
          .filter(Member.is_deleted == False))  # noqa: E712
     out = []
-    for (mid, full, f, mi, la, mobile, mno, old, dob, father, loc, vil, city, appr, status, gender, vstatus, vat, vremark, pin, district) in q.all():
+    for (mid, full, f, mi, la, mobile, mno, old, dob, father, loc, vil, city, appr, status, gender, vstatus, vat, vremark, pin, district, post_office, taluk) in q.all():
         name = " ".join((full or " ".join(p for p in (f, mi, la) if p)).split())
         out.append({"id": mid, "name": name, "mobile": mobile or "", "membership_no": mno or "", "old_no": old or "",
-                    "dob": dob.isoformat() if dob else "", "father": father or "", "place": loc or vil or city or "",
+                    "dob": dob.isoformat() if dob else "", "father": father or "", "place": loc or vil or city or "", "post_office": post_office or "", "taluk": taluk or "",
                     "pincode": pin or "", "district": district or "", "approval": appr or "", "status": status or "", "gender": gender or "",
                     "verification": vstatus or "NOT_VERIFIED", "verified_at": vat.date().isoformat() if vat else "", "verification_remark": vremark or ""})
+    return out
+
+
+def review_pairs(db) -> dict:
+    """{(lower id, higher id): "SAME" | "DIFFERENT"} answered by callers."""
+    from models.members import MemberDuplicateReview
+
+    return {(a, b): d for a, b, d in db.query(MemberDuplicateReview.member_id, MemberDuplicateReview.other_member_id, MemberDuplicateReview.decision)
+            .filter(MemberDuplicateReview.is_deleted == False).all()}  # noqa: E712
+
+
+def candidates_for(db, member_id: int, limit: int = 12) -> list:
+    """Other members who may be this person: same mobile, same name, or a name spelled a little differently."""
+    from models.members import Member, MemberMembership
+    from models.masters import MembershipType
+    from models.magazines import MagazineSubscription
+    from models.receipts import Receipt, ReceiptAllocation
+    from sqlalchemy import func
+
+    people = _load(db)
+    me = next((p for p in people if p["id"] == member_id), None)
+    if me is None:
+        return []
+    my_letters = _letters(me["name"])
+    my_ini, my_words = _parts(me["name"])
+    reviews = review_pairs(db)
+    found = []
+    for p in people:
+        if p["id"] == member_id:
+            continue
+        tags = []
+        if me["mobile"] and p["mobile"] == me["mobile"]:
+            tags.append("Same mobile")
+        theirs = _letters(p["name"])
+        if my_letters and theirs == my_letters:
+            tags.append("Same name")
+        elif my_words:
+            ini, words = _parts(p["name"])
+            if ini == my_ini and len(words) == len(my_words) and (
+                    tuple(_sound(w) for w in words) == tuple(_sound(w) for w in my_words) or _alike(my_words, words)):
+                tags.append("Similar name")
+        if tags:
+            found.append((p, tags))
+    order = {"Same mobile": 0, "Same name": 1, "Similar name": 2}
+    found.sort(key=lambda t: (order[t[1][0]], t[0]["name"].upper()))
+    found = found[:limit]
+    ids = [p["id"] for p, _t in found]
+    if not ids:
+        return []
+    types = dict(db.query(MemberMembership.member_id, MembershipType.name_en).join(MembershipType, MembershipType.id == MemberMembership.membership_type_id)
+                 .filter(MemberMembership.member_id.in_(ids), MemberMembership.is_deleted == False, MemberMembership.status == "ACTIVE").all())  # noqa: E712
+    money = {m: (c, float(t or 0)) for m, c, t in db.query(ReceiptAllocation.member_id, func.count(func.distinct(ReceiptAllocation.receipt_id)), func.sum(ReceiptAllocation.allocated_amount))
+             .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id).filter(ReceiptAllocation.member_id.in_(ids), ReceiptAllocation.is_deleted == False, Receipt.is_deleted == False)  # noqa: E712
+             .group_by(ReceiptAllocation.member_id).all()}
+    mags = {m: (need, sub or "") for m, need, sub in db.query(Member.id, Member.magazine_needed, MagazineSubscription.delivery_status)
+            .outerjoin(MagazineSubscription, (MagazineSubscription.member_id == Member.id) & (MagazineSubscription.is_deleted == False))  # noqa: E712
+            .filter(Member.id.in_(ids)).all()}
+    out = []
+    for p, tags in found:
+        pair = (min(member_id, p["id"]), max(member_id, p["id"]))
+        count, total = money.get(p["id"], (0, 0.0))
+        need, sub = mags.get(p["id"], (False, ""))
+        out.append({**p, "tags": tags, "type": types.get(p["id"], ""), "receipts_count": count, "receipts_total": total,
+                    "magazine": ("Yes" + (f" - {sub.lower()}" if sub else "")) if need else "No", "review": reviews.get(pair)})
     return out
 
 
@@ -147,6 +212,19 @@ def find_groups(db, kind: str, search: Optional[str] = None, verification: Optio
             spellings = sorted({m["name"] for m in ms}, key=str.upper)
             out.append({"key": " / ".join(spellings[:3]) + (" ..." if len(spellings) > 3 else ""),
                         "reason": f"{len(ks)} spellings", "members": sorted(ms, key=lambda m: m["name"].upper())})
+    # answers from callers: a group whose pairs were all found to be different people goes; a pair found to be the same waits for an admin
+    reviews = review_pairs(db)
+    if reviews:
+        kept = []
+        for g in out:
+            ids = sorted(m["id"] for m in g["members"])
+            pairs = [(a, b) for i, a in enumerate(ids) for b in ids[i + 1:]]
+            if pairs and all(reviews.get(pr) == "DIFFERENT" for pr in pairs):
+                continue
+            if any(reviews.get(pr) == "SAME" for pr in pairs):
+                g = {**g, "reason": g["reason"] + " - merge pending"}
+            kept.append(g)
+        out = kept
     if search and search.strip():
         s = search.strip().lower()
         out = [g for g in out if any(s in (m["name"] + " " + m["mobile"] + " " + m["membership_no"] + " " + m["old_no"]).lower() for m in g["members"])]
@@ -162,10 +240,10 @@ def groups_xlsx(groups: list) -> bytes:
 
     wb = Workbook(write_only=True)
     ws = wb.create_sheet("Duplicates")
-    ws.append(["Group", "Why", "Name", "Membership no", "Old no", "Mobile", "Date of birth", "Father / husband", "Place", "Pincode", "District", "Gender", "Approval", "Status", "KYC", "KYC on", "KYC remark", "Members with this exact name"])
+    ws.append(["Group", "Why", "Name", "Membership no", "Old no", "Mobile", "Date of birth", "Father / husband", "Village / area", "Post office", "Taluk", "Pincode", "District", "Gender", "Approval", "Status", "KYC", "KYC on", "KYC remark", "Members with this exact name"])
     for n, g in enumerate(groups, 1):
         for m in g["members"]:
-            ws.append([n, g["reason"], m["name"], m["membership_no"], m["old_no"], m["mobile"], m["dob"], m["father"], m["place"], m["pincode"], m["district"],
+            ws.append([n, g["reason"], m["name"], m["membership_no"], m["old_no"], m["mobile"], m["dob"], m["father"], m["place"], m["post_office"], m["taluk"], m["pincode"], m["district"],
                        m["gender"], m["approval"], m["status"], m["verification"].replace("_", " ").title(), m["verified_at"], m["verification_remark"],
                        m.get("same_name_count", "")])
     out = io.BytesIO()
