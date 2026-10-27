@@ -1342,7 +1342,9 @@ export default function ReceiptEntry() {
   // The Membership No., the Payee Name (from 2 letters) and the Mobile (from 3 digits) narrow the list; the box typed in last decides,
   // so a name that finds nobody does not stop a membership number typed after it from showing its member
   const usable = { membershipNo: numberText.length >= 1, name: nameText.length >= 2, mobile: mobileText.length >= 3 };
-  const activeBox = typingFree ? [...typingOrder].reverse().find((k) => usable[k]) : undefined;
+  // a number or name that is sitting in a box always narrows the list, even when it was not typed just now (the list refresh icon, the
+  // browser's autofill or a pasted value forget what was typed last): then Membership No., Mobile, Payee Name are tried in that order
+  const activeBox = typingFree ? ([...typingOrder].reverse().find((k) => usable[k]) || ['membershipNo', 'mobile', 'name'].find((k) => usable[k])) : undefined;
   const typedNumber = activeBox === 'membershipNo' ? numberText : '';
   const typedName = activeBox === 'name' ? nameText : '';
   const typedMobile = activeBox === 'mobile' ? mobileText : '';
