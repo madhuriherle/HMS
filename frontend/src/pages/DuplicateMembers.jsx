@@ -4,6 +4,7 @@ import { Download, Loader2, Search } from 'lucide-react';
 import api from '../api';
 import Pager from '../components/Pager';
 import { notify } from '../utils/notify';
+import { formatDate } from '../utils/dateUtils';
 
 // Members who may be the same person. Only a pointer for the office: nothing is merged or changed here.
 const KINDS = [
@@ -136,7 +137,7 @@ export default function DuplicateMembers() {
                         <td className="px-3 py-2">{m.membership_no || (m.approval === 'APPROVED' ? '—' : `ID: ${m.id}`)}</td>
                         <td className="px-3 py-2">{m.old_no || '—'}</td>
                         <td className="px-3 py-2">{m.mobile || '—'}</td>
-                        <td className="px-3 py-2">{m.dob || '—'}</td>
+                        <td className="px-3 py-2">{formatDate(m.dob)}</td>
                         <td className="px-3 py-2">{m.father || '—'}</td>
                         <td className="px-3 py-2">{m.place || '—'}</td>
                         <td className="px-3 py-2">{m.pincode || '—'}</td>
