@@ -49,7 +49,7 @@ def test_register_rules(client):
     c = plan["counts"]
     assert c["members"] == 6 and c["deleted"] == 1
     assert sorted(d["dummy"] for d in plan["dummies"]) == ["FY80-001", "FY80-002"]
-    assert {d["old_no"] for d in plan["dummies"]} == {2, 4}
+    assert {d["cus_no"] for d in plan["dummies"]} == {2, 4}
     assert c["receipts_shared_by_members"] == 1 and plan["shared"][0]["members"] == [1, 3]
     assert c["receipts_wrong_date"] == 2 and c["receipts_no_date"] == 1
     assert c["receipts_zero_amount"] == 1

@@ -2,7 +2,7 @@
 
 Nothing is saved here. `build_plan` reads the rows, applies the import rules and returns the findings; `reports_xlsx`
 puts them in one Excel file. The rules (agreed with the office):
-  * CusNo is the OLD number, CusNoNew the new membership number (0 = none yet), CusNoOld a further reference;
+  * CusNo is the membership number, CusNoOld the old number (0 = none), CusNoNew is not used;
   * up to 6 receipt lines per member; a line with a date but no number gets a dummy number FY43-001 (the last two
     digits of the financial year, then a running number) and keeps its amount (0 when there is none);
   * receipts before 1943 or after today are wrong dates and are not imported (the member is);
@@ -89,8 +89,10 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
     gotras = {_gotra_key(g.name_en) for g in db.query(Gotra).filter(Gotra.is_deleted == False, Gotra.status == True).all()}  # noqa: E712
     title_keys = {re.sub(r"[^A-Z]", "", t.upper()) for (t,) in db.query(NameTitle.name_en).filter(NameTitle.is_deleted == False, NameTitle.status == True).all()}  # noqa: E712
     pins = {p for (p,) in db.query(PostalCode.pincode).filter(PostalCode.is_deleted == False).all() if p}  # noqa: E712
-    taken = {n.strip().upper() for (n,) in db.query(Member.membership_number).filter(Member.membership_number != None).all()}  # noqa: E711
-    taken |= {n.strip().upper() for (n,) in db.query(MemberMembership.membership_number).filter(MemberMembership.membership_number != None).all()}  # noqa: E711
+    # numbers of members that this import did not make (its own members are the register's members, not clashes)
+    taken = {n.strip().upper() for (n,) in db.query(Member.membership_number).filter(Member.membership_number != None, Member.registration_source != "MIGRATION").all()}  # noqa: E711
+    taken |= {n.strip().upper() for (n,) in db.query(MemberMembership.membership_number).join(Member, Member.id == MemberMembership.member_id)
+              .filter(MemberMembership.membership_number != None, Member.registration_source != "MIGRATION").all()}  # noqa: E711
     dummy_used = defaultdict(int)       # FY code -> highest FYyy-nnn already in the database
     for (n,) in db.query(Receipt.receipt_number).filter(Receipt.receipt_number.like("FY%-%")).all():
         m = re.fullmatch(r"FY(\d\d)-(\d+)", n or "")
@@ -98,18 +100,14 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
             dummy_used[m.group(1)] = max(dummy_used[m.group(1)], int(m.group(2)))
 
     members, problems = [], []
-    new_numbers = Counter()
-    for r in rows:
-        new_no = int(_num(r.get("CusNoNew")))
-        if new_no > 0:
-            new_numbers[new_no] += 1
+    numbers = Counter(int(_num(r.get("CusNo"))) for r in rows)
 
     def problem(m, what):
-        problems.append({"old_no": m["old_no"], "new_no": m["new_no"] or "", "name": m["name"], "problem": what})
+        problems.append({"cus_no": m["cus_no"], "old_no": m["old_no"] or "", "name": m["name"], "problem": what})
 
     for r in rows:
-        old_no = int(_num(r.get("CusNo")))
-        new_no = int(_num(r.get("CusNoNew"))) or None
+        cus_no = int(_num(r.get("CusNo")))
+        old_no = int(_num(r.get("CusNoOld"))) or None
         raw_type = _s(r.get("CusMemberType")).upper()
         type_key = TYPE_FIXES.get(raw_type, raw_type)
         mobile = None
@@ -118,7 +116,7 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
             if mobile:
                 break
         m = {
-            "old_no": old_no, "new_no": new_no, "ref_no": int(_num(r.get("CusNoOld"))) or None,
+            "cus_no": cus_no, "old_no": old_no,
             "name": _clean_import_name(r.get("CusName")), "title": _s(r.get("CusTitle")),
             "type": types.get(type_key), "type_text": raw_type, "mobile": mobile,
             "mobile_text": _s(r.get("CusMobile")), "pin": _s(r.get("CusPinCode")),
@@ -147,11 +145,10 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
                 problem(m, f"Gotra '{g}' is not in the Gotra master")
         if m["pin"] and m["pin"] not in pins:
             problem(m, f"PIN code '{m['pin']}' is not in the postal codes master")
-        if new_no:
-            if new_numbers[new_no] > 1:
-                problem(m, f"New number {new_no} is used by {new_numbers[new_no]} members in the file")
-            if str(new_no).upper() in taken:
-                problem(m, f"New number {new_no} already exists in the system")
+        if numbers[cus_no] > 1:
+            problem(m, f"Membership number {cus_no} is used by {numbers[cus_no]} members in the file")
+        if str(cus_no) in taken:
+            problem(m, f"Membership number {cus_no} already exists in the system")
 
         # receipt lines
         for j in SLOTS:
@@ -163,7 +160,7 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
             if not (number or dt or has_money):
                 continue
             d = _as_date(dt)
-            line = {"old_no": old_no, "name": m["name"], "slot": j, "number": number, "date": d, "raw_date": _s(dt),
+            line = {"cus_no": cus_no, "name": m["name"], "slot": j, "number": number, "date": d, "raw_date": _s(dt),
                     "membership": mem, "upgrade": up, "other": extra, "note": _s(r.get(f"CusReceiptNote{j}")), "kind": "OK",
                     "scholarship": _num(r.get(f"CusScholarAmt{j}")),
                     "donation": sum(_num(r.get(f"CusDon{k}Amt{j}")) for k in (1, 2, 3))}
@@ -193,7 +190,7 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
         first_date = Counter(g["date"] for g in group).most_common(1)[0][0]
         on_first = [g for g in group if g["date"] == first_date]
         if len(on_first) > 1:   # one receipt shared by several members
-            shared.append({"fy": key[0], "number": key[1], "date": first_date, "members": [g["old_no"] for g in on_first]})
+            shared.append({"fy": key[0], "number": key[1], "date": first_date, "members": [g["cus_no"] for g in on_first]})
         for ln in group:
             if ln["date"] != first_date:
                 ln["kind"] = "NUMBER_TAKEN"
@@ -201,7 +198,7 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
 
     dummies = []
     seq = defaultdict(int, dummy_used)
-    for m, ln in sorted(importable, key=lambda p: (p[1]["date"], p[1]["old_no"], p[1]["slot"])):
+    for m, ln in sorted(importable, key=lambda p: (p[1]["date"], p[1]["cus_no"], p[1]["slot"])):
         if ln["kind"] in ("NUMBER_TAKEN",) or not ln["number"]:
             if ln["kind"] != "NUMBER_TAKEN":
                 ln["kind"] = "NO_NUMBER"
@@ -222,12 +219,12 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
             continue
         good = [ln for ln in m["lines"] if ln["kind"] not in ("WRONG_DATE", "NO_DATE")]
         if not good:
-            no_receipt.append({"old_no": m["old_no"], "new_no": m["new_no"] or "", "name": m["name"], "type": m["type"].name_en})
+            no_receipt.append({"cus_no": m["cus_no"], "old_no": m["old_no"] or "", "name": m["name"], "type": m["type"].name_en})
             continue
         ref = max(ln["date"] for ln in good)
         row = membership_credit._price_on(prices, m["type"].id, ref)
         paid = sum(ln["membership"] + ln["upgrade"] for ln in good)
-        info = {"old_no": m["old_no"], "new_no": m["new_no"] or "", "name": m["name"], "type": m["type"].name_en,
+        info = {"cus_no": m["cus_no"], "old_no": m["old_no"] or "", "name": m["name"], "type": m["type"].name_en,
                 "last_receipt": ref, "paid": paid}
         if row is None:
             no_price.append(info)
@@ -248,13 +245,13 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
         if len(g) > 1:
             same = len({_norm_name(x["name"]) for x in g}) < len(g)
             for x in g:
-                dup_mobile.append({"mobile": mob, "old_no": x["old_no"], "new_no": x["new_no"] or "", "name": x["name"], "pin": x["pin"],
+                dup_mobile.append({"mobile": mob, "cus_no": x["cus_no"], "old_no": x["old_no"] or "", "name": x["name"], "pin": x["pin"],
                                    "same_name_in_group": "YES" if same else ""})
     for nm, g in by_name.items():
         if len(g) > 1 and nm:
             mobiles = Counter(x["mobile"] for x in g if x["mobile"])
             for x in g:
-                dup_name.append({"name": x["name"], "old_no": x["old_no"], "new_no": x["new_no"] or "", "mobile": x["mobile"] or "", "pin": x["pin"],
+                dup_name.append({"name": x["name"], "cus_no": x["cus_no"], "old_no": x["old_no"] or "", "mobile": x["mobile"] or "", "pin": x["pin"],
                                  "same_mobile": "YES" if x["mobile"] and mobiles[x["mobile"]] > 1 else ""})
 
     counts = Counter()
@@ -262,8 +259,8 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
         counts["members"] += 1
         counts["deleted"] += m["deleted"]
         counts["expired"] += m["expired"]
-        counts["with_new_number"] += bool(m["new_no"])
-        counts["without_new_number"] += not m["new_no"]
+        counts["with_old_number"] += bool(m["old_no"])
+        counts["without_old_number"] += not m["old_no"]
         counts["magazine_yes"] += m["magazine"].lower() == "yes"
         counts["magazine_online"] += m["online"].lower() == "online"
         counts["magazine_returned_marks"] += m["returned"]
@@ -280,7 +277,7 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
     counts["members_no_price_for_date"] = len(no_price)
     counts["duplicate_mobile_members"] = len(dup_mobile)
     counts["duplicate_name_members"] = len(dup_name)
-    counts["members_with_problems"] = len({p["old_no"] for p in problems})
+    counts["members_with_problems"] = len({p["cus_no"] for p in problems})
 
     return {
         "counts": dict(counts), "problems": problems, "dummies": dummies, "zero_amount": zero_amount, "shared": shared,
@@ -291,7 +288,7 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
 
 
 def _line_row(ln: dict) -> list:
-    return [ln["old_no"], ln["name"], ln["slot"], ln.get("number") or "", ln.get("dummy") or "", ln["date"] or ln.get("raw_date") or "",
+    return [ln["cus_no"], ln["name"], ln["slot"], ln.get("number") or "", ln.get("dummy") or "", ln["date"] or ln.get("raw_date") or "",
             ln["membership"], ln["upgrade"], ln["other"]]
 
 
@@ -308,7 +305,7 @@ def reports_xlsx(plan: dict) -> bytes:
             ws.append(r)
 
     sheet("Summary", ["What", "Count"], [[k, v] for k, v in plan["counts"].items()])
-    line_head = ["Old no", "Name", "Slot", "Receipt no (sheet)", "Dummy no", "Date", "Membership amt", "Upgrade amt", "Other amt"]
+    line_head = ["Membership no", "Name", "Slot", "Receipt no (sheet)", "Dummy no", "Date", "Membership amt", "Upgrade amt", "Other amt"]
     sheet("Dummy receipts", line_head + ["Reason"], [_line_row(d) + [d["reason"]] for d in plan["dummies"]])
     sheet("Zero amount", line_head, [_line_row(d) for d in plan["zero_amount"]])
     sheet("Shared receipts", ["Financial year", "Receipt no", "Date", "Members (old no)"],
@@ -316,16 +313,16 @@ def reports_xlsx(plan: dict) -> bytes:
     sheet("Number used twice", line_head + ["Why"], [_line_row(d) + [d["why"]] for d in plan["conflicts"]])
     sheet("Wrong dates", line_head + ["Why"], [_line_row(d) + [d["why"]] for d in plan["wrong_dates"]])
     sheet("No date", line_head, [_line_row(d) for d in plan["no_dates"]])
-    sheet("Payment mismatch", ["Old no", "New no", "Name", "Type", "Last receipt", "Price then", "Paid", "Short by"],
-          [[x["old_no"], x["new_no"], x["name"], x["type"], x["last_receipt"], x["price_then"], x["paid"], x["short_by"]] for x in plan["mismatches"]])
-    sheet("No receipt", ["Old no", "New no", "Name", "Type"], [[x["old_no"], x["new_no"], x["name"], x["type"]] for x in plan["no_receipt"]])
-    sheet("No price for date", ["Old no", "New no", "Name", "Type", "Last receipt", "Paid"],
-          [[x["old_no"], x["new_no"], x["name"], x["type"], x["last_receipt"], x["paid"]] for x in plan["no_price"]])
-    sheet("Duplicate mobile", ["Mobile", "Old no", "New no", "Name", "PIN", "Same name in group"],
-          [[x["mobile"], x["old_no"], x["new_no"], x["name"], x["pin"], x["same_name_in_group"]] for x in sorted(plan["dup_mobile"], key=lambda x: x["mobile"])])
-    sheet("Duplicate name", ["Name", "Old no", "New no", "Mobile", "PIN", "Same mobile"],
-          [[x["name"], x["old_no"], x["new_no"], x["mobile"], x["pin"], x["same_mobile"]] for x in sorted(plan["dup_name"], key=lambda x: x["name"].upper())])
-    sheet("Member problems", ["Old no", "New no", "Name", "Problem"], [[p["old_no"], p["new_no"], p["name"], p["problem"]] for p in plan["problems"]])
+    sheet("Payment mismatch", ["Membership no", "Old no", "Name", "Type", "Last receipt", "Price then", "Paid", "Short by"],
+          [[x["cus_no"], x["old_no"], x["name"], x["type"], x["last_receipt"], x["price_then"], x["paid"], x["short_by"]] for x in plan["mismatches"]])
+    sheet("No receipt", ["Membership no", "Old no", "Name", "Type"], [[x["cus_no"], x["old_no"], x["name"], x["type"]] for x in plan["no_receipt"]])
+    sheet("No price for date", ["Membership no", "Old no", "Name", "Type", "Last receipt", "Paid"],
+          [[x["cus_no"], x["old_no"], x["name"], x["type"], x["last_receipt"], x["paid"]] for x in plan["no_price"]])
+    sheet("Duplicate mobile", ["Mobile", "Membership no", "Old no", "Name", "PIN", "Same name in group"],
+          [[x["mobile"], x["cus_no"], x["old_no"], x["name"], x["pin"], x["same_name_in_group"]] for x in sorted(plan["dup_mobile"], key=lambda x: x["mobile"])])
+    sheet("Duplicate name", ["Name", "Membership no", "Old no", "Mobile", "PIN", "Same mobile"],
+          [[x["name"], x["cus_no"], x["old_no"], x["mobile"], x["pin"], x["same_mobile"]] for x in sorted(plan["dup_name"], key=lambda x: x["name"].upper())])
+    sheet("Member problems", ["Membership no", "Old no", "Name", "Problem"], [[p["cus_no"], p["old_no"], p["name"], p["problem"]] for p in plan["problems"]])
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()
@@ -378,32 +375,32 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
     pins = {}
     for pc in db.query(PostalCode).filter(PostalCode.pincode.in_(wanted_pins), PostalCode.is_deleted == False).all():  # noqa: E712
         pins.setdefault(pc.pincode.strip(), pc)
-    have_old = {n for (n,) in db.query(Member.old_membership_number).filter(Member.old_membership_number != None).all()}  # noqa: E711
+    have_no = {n for (n,) in db.query(Member.membership_number).filter(Member.registration_source == "MIGRATION", Member.membership_number != None).all()}  # noqa: E711
     taken = {n.strip().upper() for (n,) in db.query(Member.membership_number).filter(Member.membership_number != None).all()}  # noqa: E711
     taken |= {n.strip().upper() for (n,) in db.query(MemberMembership.membership_number).filter(MemberMembership.membership_number != None).all()}  # noqa: E711
 
     created, skipped, warnings = 0, [], []
     deleted = expired = 0
     for n, r in enumerate(rows, 1):
-        old_no = str(int(_num(r.get("CusNo"))))
-        new_no = int(_num(r.get("CusNoNew"))) or None
-        if old_no in have_old:
-            skipped.append({"membership_number": old_no, "reason": "Already imported (old number exists)"})
+        cus_no = str(int(_num(r.get("CusNo"))))
+        old_no = str(int(_num(r.get("CusNoOld")))) if _num(r.get("CusNoOld")) else None
+        if cus_no in have_no:
+            skipped.append({"membership_number": cus_no, "reason": "Already imported (membership number exists)"})
             continue
         name = _clean_import_name(r.get("CusName"))
         if not name:
-            skipped.append({"membership_number": old_no, "reason": "No name"})
+            skipped.append({"membership_number": cus_no, "reason": "No name"})
             continue
         raw_type = _s(r.get("CusMemberType")).upper()
         mtype = types.get(TYPE_FIXES.get(raw_type, raw_type))
         if mtype is None:
-            skipped.append({"membership_number": old_no, "reason": f"Membership type '{raw_type}' is not in the system"})
+            skipped.append({"membership_number": cus_no, "reason": f"Membership type '{raw_type}' is not in the system"})
             continue
         notes, warn = [], []
-        number = str(new_no) if new_no else None
-        if number and number.upper() in taken:
-            warn.append(f"New number {number} is already used by another member: left blank")
-            notes.append(f"Old register new number {number} could not be used (already taken)")
+        number = cus_no
+        if number.upper() in taken:
+            warn.append(f"Membership number {number} is already used by another member: left blank")
+            notes.append(f"Old register membership number {number} could not be used (already taken)")
             number = None
         mobile, mobile_warning = _clean_import_mobile(_s(r.get("CusMobile")))
         mobile_raw = None
@@ -456,9 +453,8 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
         wants = _s(r.get("CusMagazine")).lower() == "yes"
         ref_no = int(_num(r.get("CusNoRef"))) or None
         email = _s(r.get("CusEmail")) or None
-        legacy_ref = str(int(_num(r.get("CusNoOld")))) if _num(r.get("CusNoOld")) else None
         member = Member(
-            membership_number=number, old_membership_number=old_no, legacy_ref_number=legacy_ref,
+            membership_number=number, old_membership_number=old_no,
             name_title=title, full_name_en=name, first_name_en=first[:100], middle_name_en=(middle or None), last_name_en=(last or None),
             full_name_kn=_s(r.get("CusNameKannada")) or None, date_of_birth=_as_date(r.get("CusDoB")),
             blood_group=_s(r.get("CusBloodGroup"))[:10] or None, father_husband_name=father[:150] if father else None,
@@ -501,16 +497,16 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
                     if sub is not None and note:
                         sub.notes = note[:2000]
         except Exception as exc:  # this member only
-            skipped.append({"membership_number": old_no, "reason": f"Could not be saved: {str(exc)[:160]}"})
+            skipped.append({"membership_number": cus_no, "reason": f"Could not be saved: {str(exc)[:160]}"})
             continue
-        have_old.add(old_no)
+        have_no.add(cus_no)
         if number:
             taken.add(number.upper())
         created += 1
         deleted += is_deleted
         expired += status_text == "expired"
         for w in warn:
-            warnings.append({"membership_number": old_no, "warning": w})
+            warnings.append({"membership_number": cus_no, "warning": w})
         if n % batch == 0:
             db.commit()
             if progress:
@@ -565,8 +561,8 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
     from services import receipt_numbers
 
     plan = build_plan(db, rows)
-    ids = {o: (i, mno, nm) for o, i, mno, nm in
-           db.query(Member.old_membership_number, Member.id, Member.membership_number, Member.full_name_en).filter(Member.old_membership_number != None).all()}  # noqa: E711
+    ids = {mno: (i, mno, nm) for i, mno, nm in
+           db.query(Member.id, Member.membership_number, Member.full_name_en).filter(Member.registration_source == "MIGRATION", Member.membership_number != None).all()}  # noqa: E711
     # lines of this import that are already in: (member, date, number); a dummy-numbered one is (member, date, "")
     have = {(m, d, "" if old else n) for m, d, n, old in db.query(ReceiptAllocation.member_id, Receipt.receipt_date, Receipt.receipt_number, Receipt.is_old_receipt)
             .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id).filter(Receipt.source == SOURCE, Receipt.is_deleted == False).all()}  # noqa: E712
@@ -581,7 +577,7 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
     groups, order = {}, []
     ignored, not_imported = [], []
     for m in plan["members"]:
-        mid = ids.get(str(m["old_no"]))
+        mid = ids.get(str(m["cus_no"]))
         for ln in m["lines"]:
             if ln["kind"] in ("NO_DATE", "WRONG_DATE"):
                 (ignored if ln["kind"] == "NO_DATE" else not_imported).append({k: v for k, v in ln.items()})
@@ -592,7 +588,7 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
             real = bool(ln["number"]) and ln["kind"] != "NUMBER_TAKEN"
             if (mid[0], ln["date"], ln["number"] if real else "") in have:
                 continue
-            key = (financial_year_start(ln["date"]), ln["number"], ln["date"]) if real else ("dummy", ln["old_no"], ln["slot"])
+            key = (financial_year_start(ln["date"]), ln["number"], ln["date"]) if real else ("dummy", ln["cus_no"], ln["slot"])
             if key not in groups:
                 groups[key] = []
                 order.append(key)
@@ -709,9 +705,9 @@ def backfill_native(db, rows: list, *, batch: int = 1000) -> dict:
     for g in db.query(Gotra).filter(Gotra.is_deleted == False, Gotra.status == True).all():  # noqa: E712
         gotras.setdefault(_gotra_key(g.name_en), g)
     unmatched = Counter()
-    by_old = {o: i for o, i in db.query(Member.old_membership_number, Member.id).filter(Member.old_membership_number != None).all()}  # noqa: E711
+    by_no = {o: i for o, i in db.query(Member.membership_number, Member.id).filter(Member.registration_source == "MIGRATION", Member.membership_number != None).all()}  # noqa: E711
     for n, r in enumerate(rows, 1):
-        mid = by_old.get(_s(r.get("CusNo")))
+        mid = by_no.get(_s(r.get("CusNo")))
         if mid is None:
             missing += 1
             continue
@@ -738,3 +734,57 @@ def backfill_native(db, rows: list, *, batch: int = 1000) -> dict:
             db.commit()
     db.commit()
     return {"updated": done, "unchanged": untouched, "not_found": missing, "gotra_not_in_master": dict(unmatched)}
+
+
+def renumber_imported(db, rows: list) -> dict:
+    """One-time correction of members imported when CusNo was wrongly taken as the OLD number: the membership number is CusNo,
+    the old number is CusNoOld, CusNoNew is not used. Members are found by the old number they were given then (CusNo).
+    Receipts of the import carry the payer's membership number, so those are fixed too, and the membership number counter
+    is moved past the highest number. All or nothing; refuses to run again once every imported member has a number."""
+    from datetime import date as _date
+    from sqlalchemy import func
+    from models.members import Member, MemberMembership
+    from models.receipts import Receipt, ReceiptAllocation
+    from services import numbering
+
+    base = db.query(Member).filter(Member.registration_source == "MIGRATION", Member.is_deleted == False)  # noqa: E712
+    if base.filter(Member.membership_number == None).count() == 0:  # noqa: E711
+        raise RuntimeError("Every imported member already has a membership number: the correction was already made")
+    by_cus = {m.old_membership_number: m for m in base.filter(Member.old_membership_number != None).all()}  # noqa: E711
+    wanted = {}
+    for r in rows:
+        cus = _s(r.get("CusNo"))
+        if cus and cus in by_cus:
+            wanted[by_cus[cus].id] = (str(int(_num(r.get("CusNo")))), str(int(_num(r.get("CusNoOld")))) if _num(r.get("CusNoOld")) else None)
+    ids = list(wanted)
+    others = {n.strip().upper() for (n,) in db.query(Member.membership_number).filter(Member.membership_number != None, Member.id.notin_(ids)).all()}  # noqa: E711
+    clash = sorted(n for n, _o in wanted.values() if n.upper() in others)
+    if clash:
+        raise RuntimeError(f"These membership numbers are already used by other members: {clash[:20]}")
+    # step 1 clears the numbers (a number moving from one member to another would meet the unique index half way)
+    for i in range(0, len(ids), 1000):
+        part = ids[i:i + 1000]
+        db.query(MemberMembership).filter(MemberMembership.member_id.in_(part), MemberMembership.is_deleted == False).update({"membership_number": None}, synchronize_session=False)  # noqa: E712
+        db.query(Member).filter(Member.id.in_(part)).update({"membership_number": None}, synchronize_session=False)
+    db.flush()
+    db.expire_all()      # the rows were changed behind the session's back
+    for i in range(0, len(ids), 1000):
+        for m in db.query(Member).filter(Member.id.in_(ids[i:i + 1000])).all():
+            no, old = wanted[m.id]
+            m.membership_number, m.old_membership_number, m.legacy_ref_number = no, old, None
+        for ms in db.query(MemberMembership).filter(MemberMembership.member_id.in_(ids[i:i + 1000]), MemberMembership.is_deleted == False).all():  # noqa: E712
+            ms.membership_number = wanted[ms.member_id][0]
+        db.flush()
+    # the payer on a receipt of the import is its first member
+    first = (db.query(ReceiptAllocation.receipt_id, func.min(ReceiptAllocation.id).label("a")).join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
+             .filter(Receipt.source == SOURCE).group_by(ReceiptAllocation.receipt_id).subquery())
+    fixed = 0
+    for rid, mid in db.query(ReceiptAllocation.receipt_id, ReceiptAllocation.member_id).join(first, first.c.a == ReceiptAllocation.id).all():
+        if mid in wanted:
+            fixed += db.query(Receipt).filter(Receipt.id == rid).update({"payer_membership_no": wanted[mid][0]}, synchronize_session=False)
+    top = max(int(n) for n, _o in wanted.values())
+    numbering.note_used(db, "MEMBER_CODE", str(top), _date.today())
+    db.commit()
+    nxt = numbering.peek_number(db, "MEMBER_CODE")      # peeking ends the transaction, so only after the commit
+    return {"members": len(ids), "with_old_number": sum(1 for _n, o in wanted.values() if o), "receipts_payer_fixed": fixed, "highest_number": top,
+            "next_new_member_number": nxt}

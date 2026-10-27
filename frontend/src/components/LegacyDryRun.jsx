@@ -6,8 +6,8 @@ import { notify } from '../utils/notify';
 // What each count means, in the order the office reads them.
 const LABELS = [
   ['members', 'Members in the file'],
-  ['with_new_number', 'With a new membership number'],
-  ['without_new_number', 'Without a new number (old number only)'],
+  ['with_old_number', 'With an old number'],
+  ['without_old_number', 'Without an old number'],
   ['expired', 'Expired'],
   ['deleted', 'Marked deleted (*)'],
   ['receipt_lines', 'Receipt lines'],

@@ -66,7 +66,7 @@ try:
         db.flush()
         made += 1
         ids = {L._s(r.get("CusNo")) for r in members}
-        for m in db.query(Member).filter(Member.old_membership_number.in_(ids), Member.pincode_id == None).all():  # noqa: E711
+        for m in db.query(Member).filter(Member.membership_number.in_(ids), Member.pincode_id == None).all():  # noqa: E711
             m.pincode_id, m.state_id, m.district_id, m.taluk_id = pc.id, state.id, district.id, pc.taluk_id
             linked += 1
         print(f"{p}: {district.name_en} / {taluk.name_en if taluk else '(taluk not in the master)'} - {len(members)} members")
