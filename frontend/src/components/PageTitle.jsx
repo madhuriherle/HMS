@@ -101,6 +101,17 @@ export function PageTitleProvider({ children }) {
   );
 }
 
+const DEFAULT_TAB_TITLE = typeof document !== 'undefined' ? document.title : 'HMS';
+
+// the words of a title that may be a string or a small element (<h1>Receipt Entry</h1>)
+const plainText = (node) => {
+  if (node === null || node === undefined || typeof node === 'boolean') return '';
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(plainText).join('');
+  if (React.isValidElement(node)) return plainText(node.props?.children);
+  return '';
+};
+
 export function PageTitleSlot() {
   const location = useLocation();
   const customTitle = useSyncExternalStore(pageTitleStore.subscribe, pageTitleStore.getSnapshot);
@@ -112,6 +123,12 @@ export function PageTitleSlot() {
 
   const routeTitle = getRouteTitle(location.pathname);
   const display = customTitle || routeTitle;
+
+  // the browser tab names the page ("Receipt Tracking · HMS"), the page first so it still shows when the tab is narrow
+  useEffect(() => {
+    const name = plainText(display);
+    document.title = name ? `${name} · HMS` : DEFAULT_TAB_TITLE;
+  }, [display]);
 
   return (
     <div id={SLOT_ID} className="min-w-0 flex-1 truncate">
