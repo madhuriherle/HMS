@@ -10,14 +10,23 @@ import { notify } from '../utils/notify';
 // The caller rings the member, fixes whatever is wrong, and records how the call went. The details are saved with the
 // normal member update; the outcome with the verification call. One reason prompt covers both.
 const FIELDS = [
-  ['first_name_en', 'First name'],
-  ['middle_name_en', 'Middle name'],
-  ['last_name_en', 'Last name'],
+  ['name', 'Name'],
   ['mobile', 'Mobile'],
   ['date_of_birth', 'Date of birth', 'date'],
   ['father_husband_name', 'Father / husband'],
   ['locality', 'Place']
 ];
+// the name is one box, as on the Register screen: first / middle / last are filled from it the same way
+const nameOf = (m) => m.full_name_en || [m.first_name_en, m.middle_name_en, m.last_name_en].filter(Boolean).join(' ');
+const nameParts = (name) => {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return {
+    full_name_en: words.join(' '),
+    first_name_en: words[0] || null,
+    middle_name_en: words.length > 2 ? words.slice(1, -1).join(' ') : null,
+    last_name_en: words.length > 1 ? words[words.length - 1] : null
+  };
+};
 const OUTCOMES = ['VERIFIED', 'NOT_REACHABLE', 'WRONG_NUMBER', 'CALL_BACK'];
 const input = 'w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-sm text-[#180200] focus:outline-none focus:border-[#510601]';
 
@@ -35,7 +44,7 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
       .then(([m, v]) => {
         if (!current) return;
         setMember(m.data);
-        setForm(Object.fromEntries(FIELDS.map(([k]) => [k, m.data[k] || ''])));
+        setForm(Object.fromEntries(FIELDS.map(([k]) => [k, (k === 'name' ? nameOf(m.data) : m.data[k]) || ''])));
         setCalls(v.data.calls || []);
       })
       .catch((e) => { notify(e.response?.data?.detail || 'Could not load the member.', 'error'); onClose(); });
@@ -43,7 +52,9 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
   }, [memberId]);
 
   const save = async () => {
-    const changed = Object.fromEntries(FIELDS.map(([k]) => k).filter((k) => (form[k] || '') !== (member[k] || '')).map((k) => [k, form[k] || null]));
+    const was = (k) => (k === 'name' ? nameOf(member) : member[k]) || '';
+    const changed = Object.fromEntries(FIELDS.map(([k]) => k).filter((k) => k !== 'name' && (form[k] || '') !== was(k)).map((k) => [k, form[k] || null]));
+    if (form.name.trim().split(/\s+/).join(' ') !== was('name').trim().split(/\s+/).join(' ')) Object.assign(changed, nameParts(form.name));
     const reason = await confirmAction('put', `/members/${memberId}/verification`);
     if (!reason) return;
     const headers = { 'X-Action-Reason': reason };
