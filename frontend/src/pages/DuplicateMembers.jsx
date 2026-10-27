@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, Loader2, Search, Users } from 'lucide-react';
+import { Download, Loader2, Search } from 'lucide-react';
 import api from '../api';
 import Pager from '../components/Pager';
 import { notify } from '../utils/notify';
@@ -59,9 +59,19 @@ export default function DuplicateMembers() {
   return (
     <div className="space-y-4 pb-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Users className="w-5 h-5 text-[#510601]" />
-          <h1 className="text-lg font-bold text-[#180200]">Duplicate Members</h1>
+        <div className="flex flex-wrap gap-2">
+          {KINDS.map((k) => (
+            <button
+              key={k.id}
+              type="button"
+              onClick={() => { setKind(k.id); setPage(1); }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                kind === k.id ? 'bg-[#510601] text-white border-[#510601]' : 'bg-white text-[#510601] border-[#E8DFD8] hover:border-[#510601]'
+              }`}
+            >
+              {k.label}
+            </button>
+          ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
@@ -85,20 +95,6 @@ export default function DuplicateMembers() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {KINDS.map((k) => (
-          <button
-            key={k.id}
-            type="button"
-            onClick={() => { setKind(k.id); setPage(1); }}
-            className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-              kind === k.id ? 'bg-[#510601] text-white border-[#510601]' : 'bg-white text-[#510601] border-[#E8DFD8] hover:border-[#510601]'
-            }`}
-          >
-            {k.label}
-          </button>
-        ))}
-      </div>
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-[#7D7068] py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
       ) : !data.groups.length ? (
