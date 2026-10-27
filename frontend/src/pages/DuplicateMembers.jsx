@@ -7,9 +7,9 @@ import { notify } from '../utils/notify';
 
 // Members who may be the same person. Only a pointer for the office: nothing is merged or changed here.
 const KINDS = [
-  { id: 'mobile', label: 'Same mobile', hint: 'One mobile number used by more than one member (a family may share one).' },
-  { id: 'name', label: 'Same name', hint: 'The same name for more than one member, with their other details side by side.' },
-  { id: 'similar', label: 'Similar names', hint: 'Names spelled a little differently, like Madhuri and Maduri.' }
+  { id: 'mobile', label: 'Same mobile' },
+  { id: 'name', label: 'Same name' },
+  { id: 'similar', label: 'Similar names' }
 ];
 
 const REASON_TONE = {
@@ -56,8 +56,6 @@ export default function DuplicateMembers() {
     }
   };
 
-  const active = KINDS.find((k) => k.id === kind);
-
   return (
     <div className="space-y-4 pb-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -101,10 +99,6 @@ export default function DuplicateMembers() {
           </button>
         ))}
       </div>
-      <p className="text-xs text-[#7D7068]">
-        {active.hint} <span className="font-semibold text-[#180200]">{data.total} groups, {data.members_in_groups} members.</span>
-      </p>
-
       {loading ? (
         <div className="flex items-center gap-2 text-sm text-[#7D7068] py-10 justify-center"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
       ) : !data.groups.length ? (
@@ -141,6 +135,7 @@ export default function DuplicateMembers() {
                       <tr key={m.id} className="hover:bg-[#FAF7F2]">
                         <td className="px-4 py-2 font-semibold text-[#180200]">
                           <Link to={`/dashboard/membership/profile/${m.id}`} className="text-[#510601] hover:underline">{m.name || '—'}</Link>
+                          {m.same_name_count > 1 && <span className="ml-2 text-[10px] font-bold text-[#7D7068]">+{m.same_name_count - 1} with this exact name</span>}
                         </td>
                         <td className="px-3 py-2">{m.membership_no || (m.approval === 'APPROVED' ? '—' : `ID: ${m.id}`)}</td>
                         <td className="px-3 py-2">{m.old_no || '—'}</td>

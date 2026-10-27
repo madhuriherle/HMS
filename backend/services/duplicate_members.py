@@ -140,7 +140,8 @@ def find_groups(db, kind: str, search: Optional[str] = None) -> list:
         for ks in clusters.values():
             if len(ks) < 2:
                 continue            # one spelling only: that is the "same name" report
-            ms = [m for k in ks for m in by_letters[k]]
+            # one row per spelling: members with exactly the same name are in the "same name" report, here only the different spellings show
+            ms = [dict(sorted(by_letters[k], key=lambda m: m["id"])[0], same_name_count=len(by_letters[k])) for k in ks]
             spellings = sorted({m["name"] for m in ms}, key=str.upper)
             out.append({"key": " / ".join(spellings[:3]) + (" ..." if len(spellings) > 3 else ""),
                         "reason": f"{len(ks)} spellings", "members": sorted(ms, key=lambda m: m["name"].upper())})
@@ -156,11 +157,11 @@ def groups_xlsx(groups: list) -> bytes:
 
     wb = Workbook(write_only=True)
     ws = wb.create_sheet("Duplicates")
-    ws.append(["Group", "Why", "Name", "Membership no", "Old no", "Mobile", "Date of birth", "Father / husband", "Place", "Pincode", "District", "Gender", "Approval", "Status"])
+    ws.append(["Group", "Why", "Name", "Membership no", "Old no", "Mobile", "Date of birth", "Father / husband", "Place", "Pincode", "District", "Gender", "Approval", "Status", "Members with this exact name"])
     for n, g in enumerate(groups, 1):
         for m in g["members"]:
             ws.append([n, g["reason"], m["name"], m["membership_no"], m["old_no"], m["mobile"], m["dob"], m["father"], m["place"], m["pincode"], m["district"],
-                       m["gender"], m["approval"], m["status"]])
+                       m["gender"], m["approval"], m["status"], m.get("same_name_count", "")])
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()
