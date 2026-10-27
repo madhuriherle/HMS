@@ -1339,9 +1339,9 @@ export default function ReceiptEntry() {
   const numberText = String(formData.membershipNo || '').trim().toLowerCase();
   const nameText = String(formData.name || '').trim().toLowerCase();
   const mobileText = String(formData.mobile || '');
-  // Payee Name and Mobile searching is switched off for now (only the Membership No. narrows the list); to bring it back,
-  // use  name: nameText.length >= 2, mobile: mobileText.length >= 3
-  const usable = { membershipNo: numberText.length >= 1, name: false /* nameText.length >= 2 */, mobile: false /* mobileText.length >= 3 */ };
+  // The Membership No. and the Mobile narrow the list (the mobile from 3 digits). Payee Name searching is switched off for now; to bring it
+  // back, use  name: nameText.length >= 2
+  const usable = { membershipNo: numberText.length >= 1, name: false /* nameText.length >= 2 */, mobile: mobileText.length >= 3 };
   const activeBox = typingFree ? [...typingOrder].reverse().find((k) => usable[k]) : undefined;
   const typedNumber = activeBox === 'membershipNo' ? numberText : '';
   const typedName = activeBox === 'name' ? nameText : '';
@@ -1849,6 +1849,15 @@ export default function ReceiptEntry() {
                       </p>
                     )}
                   </div>
+                  {/* the member picked: the name next to the number, in the free half of this row */}
+                  {!(typedNumber || typedName || typedMobile) && selectedMember && (
+                    <div className="self-end rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs min-h-[38px] flex items-center min-w-0">
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-emerald-900">{selectedMember.fullName || selectedMember.name}</p>
+                        <p className="truncate text-[11px] text-emerald-800">{[selectedMember.membershipType, selectedMember.districtName || selectedMember.district].filter(Boolean).join(' · ')}</p>
+                      </div>
+                    </div>
+                  )}
                   {/* what the typing found: a short note in the free half of this row */}
                   {(typedNumber || typedName || typedMobile) && (
                     <div className={`self-end rounded-xl border px-3 py-2 text-xs min-h-[38px] flex items-center ${totalRightMembers === 1 ? 'border-emerald-300 bg-emerald-50' : 'border-[#E8DFD8] bg-[#FAF7F2]'}`}>

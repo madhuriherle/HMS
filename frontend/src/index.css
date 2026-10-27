@@ -273,6 +273,7 @@
 .hms-mini-swal .swal2-styled {
   font-size: 0.78rem !important;
   font-weight: 600 !important;
+  min-width: 6.5rem; /* Yes is as wide as Cancel */
   padding: 0.55rem 1.1rem !important;
   border-radius: 0.7rem !important;
   margin: 0 !important;

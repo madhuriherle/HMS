@@ -19,10 +19,12 @@ export default function SearchFilterBar({
   rightSlot,
   leftSlot,
   searchInHeader = false, // kept for the screens that pass it: the search box is always in the toolbar row now
+  filtersAlwaysShown = false, // the filters are open all the time, in a row under the toolbar (no filter icon)
   className = ''
 }) {
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersToggled, setFiltersOpen] = useState(false);
   const hasFilters = Boolean(children) || Boolean(onResetFilters);
+  const filtersOpen = !filtersAlwaysShown && filtersToggled;
 
   const searchBox = onSearchChange !== undefined && (
     <div className={filtersOpen ? 'hidden 2xl:block relative min-w-[200px] flex-1 max-w-sm' : 'relative min-w-[200px] flex-1 max-w-sm'}>
@@ -47,7 +49,7 @@ export default function SearchFilterBar({
     </div>
   );
 
-  const filterButton = hasFilters && (
+  const filterButton = hasFilters && !filtersAlwaysShown && (
     <button
       type="button"
       onClick={() => setFiltersOpen((open) => !open)}
@@ -104,6 +106,24 @@ export default function SearchFilterBar({
               {filterButton}
               {rightSlot}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Always-shown filters: their own row under the toolbar, one reset icon at the end */}
+      {hasFilters && filtersAlwaysShown && (
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {children}
+          {onResetFilters && (
+            <button
+              type="button"
+              onClick={onResetFilters}
+              className="flex items-center justify-center w-9 h-9 bg-white border border-[#E8DFD8] text-[#863221] rounded-xl hover:bg-red-50 hover:text-[#ED4636] hover:border-red-200 transition-colors cursor-pointer shrink-0 shadow-2xs"
+              title="Reset all filters"
+              aria-label="Reset all filters"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
           )}
         </div>
       )}

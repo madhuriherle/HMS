@@ -26,9 +26,7 @@ import { formatDate } from '../utils/dateUtils';
 import { apiErrorMessage } from '../utils/apiError';
 import { notify } from '../utils/notify';
 import { fetchReceiptPage } from '../utils/apiAdapters';
-import Pager from '../components/Pager';
 import { currentRules } from '../hooks/useRules';
-import { useList } from '../hooks/useLists';
 import { formatMoney } from '../utils/money';
 
 import ModalFooter from '../components/ModalFooter';
@@ -111,26 +109,15 @@ function TypeCell({ receipt }) {
   );
 }
 
-function StatusDot({ receipt }) {
-  const statuses = useList('receipt_statuses');
-  const key = receipt.receiptStatus || (isReceiptUnmapped(receipt) ? 'UNASSIGNED' : 'ASSIGNED');
-  const look = statuses.find((s) => s.code === key);
-  if (!look) return <span className="chip chip-off">{key}</span>;
-  return (
-    <span className={`chip ${look.extra || 'chip-off'}`}>{look.label}</span>
-  );
-}
-
 export default function ReceiptTracking() {
   const { hasPermission } = useAuth();
   const navigate = useNavigate();
   // Master Synchronized Stores
   const [receipts, setReceipts] = useState([]); // ONE page of the register (at most 200 rows), the rest stays on the server
   const [total, setTotal] = useState(0);
-  const [pages, setPages] = useState(1);
   const [summary, setSummary] = useState({});
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(200);
+  const pageSize = 200; // Load more adds 200 at a time (rule 10.6: never more than 200 in one request)
   const [loadingPage, setLoadingPage] = useState(true);
   const [filterOptions, setFilterOptions] = useState({ financial_years: [], sub_types: {}, payment_modes: [] });
   const [debouncedSearch, setDebouncedSearch] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
@@ -184,15 +171,21 @@ export default function ReceiptTracking() {
   }, [debouncedSearch, particularsFilter, subTypeFilter, statusFilter, fyFilter, modeFilter, numberFilter, fromDate, toDate, sort.by, sort.dir]);
 
   const requestSeq = useRef(0);
-  const loadPage = async () => {
+  // Load more: page 1 replaces the list, a later page is added under it; reloadAll (after an edit or a delete) asks pages 1..page again
+  const loadPage = async (reloadAll = false) => {
     const seq = (requestSeq.current += 1);
     setLoadingPage(true);
     try {
-      const result = await fetchReceiptPage({ ...listParams, page, limit: pageSize });
-      if (seq !== requestSeq.current) return; // a newer request is already on its way
-      setReceipts(result.rows);
+      const first = reloadAll || page === 1 ? 1 : page;
+      let rows = [];
+      let result = null;
+      for (let n = first; n <= page; n += 1) {
+        result = await fetchReceiptPage({ ...listParams, page: n, limit: pageSize });
+        if (seq !== requestSeq.current) return; // a newer request is already on its way
+        rows = rows.concat(result.rows);
+      }
+      setReceipts((prev) => (first === 1 ? rows : [...prev, ...rows.filter((r) => !prev.some((x) => x.id === r.id))]));
       setTotal(result.total);
-      setPages(Math.max(1, result.pages));
       setSummary(result.summary);
       if (page > Math.max(1, result.pages)) setPage(Math.max(1, result.pages));
     } catch (error) {
@@ -210,7 +203,7 @@ export default function ReceiptTracking() {
       showToast(error.response?.data?.detail || `Failed to load ${what} from the server.`, 'error');
     };
     await Promise.all([
-      loadPage(),
+      loadPage(true),
       // one call gives every filter: the years, sub types, payment modes in use, and the active particulars / payment modes
       api.get('/receipts/tracking-options')
         .then(({ data }) => {
@@ -230,7 +223,7 @@ export default function ReceiptTracking() {
   useEffect(() => {
     loadPage();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listParams, page, pageSize]);
+  }, [listParams, page]);
   // typing in the search box waits a moment, then asks the server
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 350);
@@ -239,7 +232,7 @@ export default function ReceiptTracking() {
   // a new search / filter / sort starts again from page 1
   useEffect(() => {
     setPage(1);
-  }, [listParams, pageSize]);
+  }, [listParams]);
 
   const filteredReceipts = receipts; // the server already filtered, sorted and paged them
 
@@ -437,6 +430,7 @@ export default function ReceiptTracking() {
       {/* Header, Filter & Search Toolbar */}
       <SearchFilterBar
         searchInHeader
+        filtersAlwaysShown
         title="Receipt Tracking"
         searchQuery={searchQuery}
         onSearchChange={(val) => setSearchQuery(val)}
@@ -628,14 +622,13 @@ export default function ReceiptTracking() {
                 <th className="py-3.5 px-4 whitespace-nowrap">Particulars</th>
                 <SortTh label="Amount" field="amount" sort={sort} onSort={toggleSort} className="py-3.5 px-4 text-right whitespace-nowrap" />
                 <th className="py-3.5 px-4 whitespace-nowrap">Mode</th>
-                <SortTh label="Status" field="payment_status" sort={sort} onSort={toggleSort} className="py-3.5 px-4 whitespace-nowrap" />
                 <th className="py-3.5 px-4 text-right whitespace-nowrap min-w-[170px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DFD8] text-xs sm:text-sm">
               {filteredReceipts.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="py-14 text-center text-[#863221]">
+                  <td colSpan="7" className="py-14 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <FileSpreadsheet className="w-10 h-10 text-[#863221]/40" />
                       <p className="text-base font-bold text-[#180200]">No receipts found</p>
@@ -657,6 +650,7 @@ export default function ReceiptTracking() {
                       {/* Column 1: Receipt Number */}
                       <td className="py-3.5 px-4 font-mono font-bold text-xs">
                         <span className="text-[#510601] tracking-wider">{receipt.receiptNumber}</span>
+                        {(receipt.receiptStatus === 'CANCELLED' || String(receipt.status || '').toUpperCase() === 'CANCELLED') && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide bg-red-50 text-red-700 border border-red-200 align-middle">CANCELLED</span>}
                         {receipt.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide bg-amber-100 text-amber-800 border border-amber-200 align-middle" title="Old receipt added afterwards (dummy)">UNKNOWN</span>}
                       </td>
 
@@ -687,7 +681,6 @@ export default function ReceiptTracking() {
                         {formatMoney(receipt.amount)}
                       </td>
                       <td className="py-3.5 px-4 text-xs">{receipt.paymentMode || '—'}</td>
-                      <td className="py-3.5 px-4"><StatusDot receipt={receipt} /></td>
 
                       {/* Column 6: Action */}
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
@@ -752,7 +745,19 @@ export default function ReceiptTracking() {
 
         {/* Footer: page controls, then the counts of the whole filtered set */}
         <div className="px-5 py-3.5 bg-[#FAF7F2] border-t border-[#E8DFD8] space-y-2.5">
-          <Pager page={page} pages={pages} total={total} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#863221]">
+            <span>Showing <strong className="text-[#180200]">{receipts.length}</strong> of <strong className="text-[#180200]">{total}</strong></span>
+            {receipts.length < total && (
+              <button
+                type="button"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={loadingPage}
+                className="px-4 py-2 text-xs font-bold text-[#510601] bg-white border border-[#510601] rounded-xl hover:bg-[#510601]/5 disabled:opacity-50 cursor-pointer"
+              >
+                {loadingPage ? 'Loading…' : `Load more (${Math.min(pageSize, total - receipts.length)})`}
+              </button>
+            )}
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[#863221]">
             <span>
               {loadingPage ? 'Loading…' : <><strong className="text-[#180200]">{total}</strong> receipt(s) match</>}
