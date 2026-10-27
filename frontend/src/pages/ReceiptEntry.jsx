@@ -1339,9 +1339,9 @@ export default function ReceiptEntry() {
   const numberText = String(formData.membershipNo || '').trim().toLowerCase();
   const nameText = String(formData.name || '').trim().toLowerCase();
   const mobileText = String(formData.mobile || '');
-  // The Membership No. and the Mobile narrow the list (the mobile from 3 digits). Payee Name searching is switched off for now; to bring it
-  // back, use  name: nameText.length >= 2
-  const usable = { membershipNo: numberText.length >= 1, name: false /* nameText.length >= 2 */, mobile: mobileText.length >= 3 };
+  // The Membership No., the Payee Name (from 2 letters) and the Mobile (from 3 digits) narrow the list; the box typed in last decides,
+  // so a name that finds nobody does not stop a membership number typed after it from showing its member
+  const usable = { membershipNo: numberText.length >= 1, name: nameText.length >= 2, mobile: mobileText.length >= 3 };
   const activeBox = typingFree ? [...typingOrder].reverse().find((k) => usable[k]) : undefined;
   const typedNumber = activeBox === 'membershipNo' ? numberText : '';
   const typedName = activeBox === 'name' ? nameText : '';
