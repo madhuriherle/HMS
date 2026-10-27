@@ -714,6 +714,7 @@ def read_duplicates(
     search: Optional[str] = None,  # a name, mobile or membership number inside the group
     page: int = 1, limit: int = 20,
     export: Optional[str] = None,  # "excel": every group as one sheet
+    verification: Optional[str] = None,  # verified | not_verified: groups that have such a member
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("members.list.read")),
 ) -> Any:
@@ -723,7 +724,7 @@ def read_duplicates(
     from services import duplicate_members
 
     try:
-        groups = duplicate_members.find_groups(db, kind.lower(), search)
+        groups = duplicate_members.find_groups(db, kind.lower(), search, verification)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     if export:
@@ -736,6 +737,57 @@ def read_duplicates(
     total = len(groups)
     return {"groups": groups[(page - 1) * limit: page * limit], "total": total, "page": page, "limit": limit,
             "pages": max(1, -(-total // limit)), "members_in_groups": sum(len(g["members"]) for g in groups)}
+
+
+VERIFICATION_STATUSES = ("NOT_VERIFIED", "VERIFIED", "NOT_REACHABLE", "WRONG_NUMBER", "CALL_BACK")
+
+
+class VerificationIn(pydantic.BaseModel):
+    status: str
+    remark: Optional[str] = pydantic.Field(default=None, max_length=1000)
+
+    @model_validator(mode="after")
+    def _status(self):
+        self.status = (self.status or "").upper()
+        if self.status not in VERIFIED_CHOICES:
+            raise ValueError("status must be one of " + ", ".join(VERIFIED_CHOICES))
+        return self
+
+
+VERIFIED_CHOICES = VERIFICATION_STATUSES[1:]   # a call always ends in an outcome; "not verified" is only the starting state
+
+
+@router.get("/{id}/verification")
+def read_verification(id: int, db: Session = Depends(deps.get_db),
+                      current_user: User = Depends(deps.require_permission("members.list.read"))) -> Any:
+    """The latest phone check of a member and every call made to them."""
+    from models.members import MemberVerificationLog
+    member = crud_members.member.get(db=db, id=id)
+    if not member:
+        raise HTTPException(404, "Member not found")
+    rows = (db.query(MemberVerificationLog, User.name).outerjoin(User, User.id == MemberVerificationLog.called_by)
+            .filter(MemberVerificationLog.member_id == id, MemberVerificationLog.is_deleted == False)  # noqa: E712
+            .order_by(MemberVerificationLog.id.desc()).all())
+    return {"status": member.verification_status or "NOT_VERIFIED", "verified_at": member.verified_at, "remark": member.verification_remark,
+            "calls": [{"id": r.id, "status": r.status, "remark": r.remark, "called_at": r.called_at, "called_by": name or "-"} for r, name in rows]}
+
+
+@router.put("/{id}/verification")
+def save_verification(id: int, payload: VerificationIn, db: Session = Depends(deps.get_db),
+                      current_user: User = Depends(deps.require_permission("members.list.write"))) -> Any:
+    """Record the outcome of a call to the member (the details themselves are edited with PUT /members/{id})."""
+    from models.members import MemberVerificationLog
+    member = crud_members.member.get(db=db, id=id)
+    if not member or member.is_deleted:
+        raise HTTPException(404, "Member not found")
+    now = datetime.now(timezone.utc)
+    member.verification_status = payload.status
+    member.verification_remark = (payload.remark or "").strip() or None
+    member.verified_at, member.verified_by = now, current_user.id
+    db.add(MemberVerificationLog(member_id=id, status=payload.status, remark=member.verification_remark, called_by=current_user.id,
+                                 called_at=now, created_by=current_user.id))
+    db.commit()
+    return {"status": member.verification_status, "verified_at": member.verified_at, "remark": member.verification_remark}
 
 
 @router.get("/duplicate-check")
@@ -3036,6 +3088,7 @@ def _profile_overview(db: Session, member: Member, current_user: User) -> dict:
             "mobile": contact["mobile"], "mobile_country_code": contact["mobile_country_code"],
             "whatsapp_number": contact["whatsapp_number"], "whatsapp_country_code": contact["whatsapp_country_code"],
             "email": contact["email"], "address": address,
+            "verification_status": member.verification_status or "NOT_VERIFIED", "verified_at": member.verified_at,
         },
         "membership": {"current": current, "credit": membership["membership_credit"]},
         "family": {

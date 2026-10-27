@@ -54,19 +54,21 @@ def _load(db) -> list:
     q = (db.query(Member.id, Member.full_name_en, Member.first_name_en, Member.middle_name_en, Member.last_name_en, Member.mobile,
                   Member.membership_number, Member.old_membership_number, Member.date_of_birth, Member.father_husband_name,
                   Member.locality, Member.village, Member.city, Member.approval_status, Member.member_status, Member.gender,
+                  Member.verification_status, Member.verified_at, Member.verification_remark,
                   PostalCode.pincode, District.name_en)
          .outerjoin(PostalCode, PostalCode.id == Member.pincode_id).outerjoin(District, District.id == Member.district_id)
          .filter(Member.is_deleted == False))  # noqa: E712
     out = []
-    for (mid, full, f, mi, la, mobile, mno, old, dob, father, loc, vil, city, appr, status, gender, pin, district) in q.all():
+    for (mid, full, f, mi, la, mobile, mno, old, dob, father, loc, vil, city, appr, status, gender, vstatus, vat, vremark, pin, district) in q.all():
         name = " ".join((full or " ".join(p for p in (f, mi, la) if p)).split())
         out.append({"id": mid, "name": name, "mobile": mobile or "", "membership_no": mno or "", "old_no": old or "",
                     "dob": dob.isoformat() if dob else "", "father": father or "", "place": loc or vil or city or "",
-                    "pincode": pin or "", "district": district or "", "approval": appr or "", "status": status or "", "gender": gender or ""})
+                    "pincode": pin or "", "district": district or "", "approval": appr or "", "status": status or "", "gender": gender or "",
+                    "verification": vstatus or "NOT_VERIFIED", "verified_at": vat.date().isoformat() if vat else "", "verification_remark": vremark or ""})
     return out
 
 
-def find_groups(db, kind: str, search: Optional[str] = None) -> list:
+def find_groups(db, kind: str, search: Optional[str] = None, verification: Optional[str] = None) -> list:
     """Groups of members, largest first. Each group: {"key", "reason", "members": [...]}."""
     if kind not in KINDS:
         raise ValueError("kind must be mobile, name or similar")
@@ -148,6 +150,9 @@ def find_groups(db, kind: str, search: Optional[str] = None) -> list:
     if search and search.strip():
         s = search.strip().lower()
         out = [g for g in out if any(s in (m["name"] + " " + m["mobile"] + " " + m["membership_no"] + " " + m["old_no"]).lower() for m in g["members"])]
+    if verification in ("verified", "not_verified"):    # groups with at least one member still to call (or already called)
+        want = verification == "verified"
+        out = [g for g in out if any((m["verification"] == "VERIFIED") == want for m in g["members"])]
     out.sort(key=lambda g: (-len(g["members"]), g["key"].upper()))
     return out
 
@@ -157,11 +162,12 @@ def groups_xlsx(groups: list) -> bytes:
 
     wb = Workbook(write_only=True)
     ws = wb.create_sheet("Duplicates")
-    ws.append(["Group", "Why", "Name", "Membership no", "Old no", "Mobile", "Date of birth", "Father / husband", "Place", "Pincode", "District", "Gender", "Approval", "Status", "Members with this exact name"])
+    ws.append(["Group", "Why", "Name", "Membership no", "Old no", "Mobile", "Date of birth", "Father / husband", "Place", "Pincode", "District", "Gender", "Approval", "Status", "KYC", "KYC on", "KYC remark", "Members with this exact name"])
     for n, g in enumerate(groups, 1):
         for m in g["members"]:
             ws.append([n, g["reason"], m["name"], m["membership_no"], m["old_no"], m["mobile"], m["dob"], m["father"], m["place"], m["pincode"], m["district"],
-                       m["gender"], m["approval"], m["status"], m.get("same_name_count", "")])
+                       m["gender"], m["approval"], m["status"], m["verification"].replace("_", " ").title(), m["verified_at"], m["verification_remark"],
+                       m.get("same_name_count", "")])
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()

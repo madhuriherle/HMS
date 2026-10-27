@@ -5,6 +5,9 @@ import api from '../api';
 import Pager from '../components/Pager';
 import { notify } from '../utils/notify';
 import { formatDate } from '../utils/dateUtils';
+import useAuth from '../hooks/useAuth';
+import VerificationBadge from '../components/VerificationBadge';
+import VerifyMemberModal from '../components/VerifyMemberModal';
 
 // Members who may be the same person. Only a pointer for the office: nothing is merged or changed here.
 const KINDS = [
@@ -26,6 +29,11 @@ export default function DuplicateMembers() {
   const [pageSize, setPageSize] = useState(25);
   const [data, setData] = useState({ groups: [], total: 0, pages: 1, members_in_groups: 0 });
   const [loading, setLoading] = useState(true);
+  const [kyc, setKyc] = useState('');        // '' = all, verified, not_verified
+  const [verifying, setVerifying] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const { hasPermission } = useAuth();
+  const canVerify = hasPermission('members.list.write');
 
   useEffect(() => {
     const t = setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 400);
@@ -35,17 +43,17 @@ export default function DuplicateMembers() {
   useEffect(() => {
     let current = true;
     setLoading(true);
-    api.get('/members/duplicates', { params: { kind, page, limit: pageSize, ...(debounced ? { search: debounced } : {}) } })
+    api.get('/members/duplicates', { params: { kind, page, limit: pageSize, ...(kyc ? { verification: kyc } : {}), ...(debounced ? { search: debounced } : {}) } })
       .then(({ data: d }) => { if (current) setData(d); })
       .catch((e) => { if (current) notify(e.response?.data?.detail || 'Could not load the duplicate report from the server.', 'error'); })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [kind, page, pageSize, debounced]);
+  }, [kind, page, pageSize, debounced, kyc, reloadKey]);
 
   const download = async () => {
     try {
       const { data: blob } = await api.get('/members/duplicates', {
-        params: { kind, export: 'excel', ...(debounced ? { search: debounced } : {}) }, responseType: 'blob'
+        params: { kind, export: 'excel', ...(kyc ? { verification: kyc } : {}), ...(debounced ? { search: debounced } : {}) }, responseType: 'blob'
       });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -75,6 +83,15 @@ export default function DuplicateMembers() {
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={kyc}
+            onChange={(e) => { setKyc(e.target.value); setPage(1); }}
+            className="px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601]"
+          >
+            <option value="">All KYC</option>
+            <option value="not_verified">Not verified</option>
+            <option value="verified">Verified</option>
+          </select>
           <div className="relative">
             <Search className="w-4 h-4 text-[#9E8B7F] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -125,6 +142,7 @@ export default function DuplicateMembers() {
                       <th className="px-3 py-2">Pincode</th>
                       <th className="px-3 py-2">District</th>
                       <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">KYC</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#EFE6DE]/70">
@@ -151,6 +169,12 @@ export default function DuplicateMembers() {
                           )) }
                           {!m.approval && !m.status && '—'}
                         </td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <VerificationBadge status={m.verification} title={[m.verified_at && formatDate(m.verified_at), m.verification_remark].filter(Boolean).join(' · ')} />
+                          {canVerify && (
+                            <button type="button" onClick={() => setVerifying(m.id)} className="ml-2 text-[11px] font-bold text-[#510601] underline cursor-pointer">Verify</button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -160,6 +184,8 @@ export default function DuplicateMembers() {
           ))}
         </div>
       )}
+
+      {verifying && <VerifyMemberModal memberId={verifying} onClose={() => setVerifying(null)} onSaved={() => setReloadKey((k) => k + 1)} />}
 
       <Pager page={page} pages={data.pages} total={data.total} pageSize={pageSize} onPage={setPage} onPageSize={(n) => { setPageSize(n); setPage(1); }} />
     </div>

@@ -123,6 +123,21 @@ class Member(AuditMixin, Base):
     member_status: Mapped[str] = mapped_column(String(20), default="ACTIVE")
     approved_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
     approved_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Office phone check: the member's details confirmed on a call (latest outcome here, every call in member_verification_logs).
+    verification_status: Mapped[str] = mapped_column(String(20), default="NOT_VERIFIED", server_default="NOT_VERIFIED")
+    verified_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
+    verified_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
+    verification_remark: Mapped[str] = mapped_column(Text, nullable=True)
+
+class MemberVerificationLog(AuditMixin, Base):
+    """One call to a member: its outcome and what was said."""
+    __tablename__ = "member_verification_logs"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    remark: Mapped[str] = mapped_column(Text, nullable=True)
+    called_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
+    called_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 class MemberMembership(AuditMixin, Base):
     __tablename__ = "member_memberships"

@@ -327,6 +327,9 @@ class MemberInDBBase(MemberBase):
     registration_status: str
     approval_status: str
     member_status: str
+    verification_status: Optional[str] = "NOT_VERIFIED"
+    verified_at: Optional[datetime] = None
+    verification_remark: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
