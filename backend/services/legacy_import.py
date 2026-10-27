@@ -16,6 +16,7 @@ from collections import Counter, defaultdict
 from datetime import date, datetime
 from typing import Any, Optional
 
+_KANNADA = re.compile("[\u0C80-\u0CFF]")
 FIRST_YEAR = 1943          # the Sabha began in 1943: no receipt can be older
 SLOTS = range(1, 7)
 TYPE_FIXES = {"POSHAK": "POSHAKA", "AJEEV": "AJEEVA", "A": "AJEEVA"}   # typos in the old register ("A" is a guess)
@@ -51,6 +52,10 @@ def read_register(content: bytes) -> list:
     ws = wb.worksheets[0]
     it = ws.iter_rows(values_only=True)
     header = [_s(h) for h in next(it)]
+    if "CusNameKannada" not in header:
+        # the Unicode copy of the register has this heading converted with the names (letters turned into Kannada): it is the
+        # only heading with Kannada letters in it
+        header = ["CusNameKannada" if _KANNADA.search(h) else h for h in header]
     if "CusNo" not in header or "CusName" not in header:
         raise ValueError("This is not the member register: the columns CusNo and CusName are missing")
     return [dict(zip(header, row)) for row in it if any(c not in (None, "") for c in row)]
@@ -788,3 +793,35 @@ def renumber_imported(db, rows: list) -> dict:
     nxt = numbering.peek_number(db, "MEMBER_CODE")      # peeking ends the transaction, so only after the commit
     return {"members": len(ids), "with_old_number": sum(1 for _n, o in wanted.values() if o), "receipts_payer_fixed": fixed, "highest_number": top,
             "next_new_member_number": nxt}
+
+
+def backfill_kannada(db, rows: list, *, batch: int = 2000) -> dict:
+    """Put the Kannada name of the Unicode register on the members already imported (matched by the membership number).
+    A name that is not Kannada script (the old font's encoding shows as junk symbols) is replaced; a member the Unicode
+    file has no Kannada name for gets the junk cleared. Safe to repeat."""
+    from models.members import Member
+
+    by_no = {o: i for o, i in db.query(Member.membership_number, Member.id).filter(Member.registration_source == "MIGRATION", Member.membership_number != None).all()}  # noqa: E711
+    set_, same, cleared, missing, no_name = 0, 0, 0, 0, 0
+    for n, r in enumerate(rows, 1):
+        mid = by_no.get(_s(r.get("CusNo")))
+        if mid is None:
+            missing += 1
+            continue
+        m = db.get(Member, mid)
+        name = _s(r.get("CusNameKannada"))
+        if name and _KANNADA.search(name):
+            if m.full_name_kn == name:
+                same += 1
+            else:
+                m.full_name_kn = name[:250]
+                set_ += 1
+        else:
+            no_name += 1
+            if m.full_name_kn and not _KANNADA.search(m.full_name_kn):
+                m.full_name_kn = None
+                cleared += 1
+        if n % batch == 0:
+            db.commit()
+    db.commit()
+    return {"updated": set_, "already_right": same, "no_kannada_in_file": no_name, "junk_cleared": cleared, "not_found": missing}

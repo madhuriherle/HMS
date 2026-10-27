@@ -148,3 +148,27 @@ def test_renumber_imported(client, admin_headers):
         assert raised          # a second run is refused
     finally:
         db.close()
+
+
+def test_backfill_kannada(client, admin_headers):
+    """The Unicode register's Kannada name replaces the old font's junk; a member with none loses the junk."""
+    from db.session import SessionLocal
+    from models.members import Member
+    from services import legacy_import
+
+    s = _sfx()
+    _create_membership_type(client, admin_headers, "KN" + s[-5:], "Ajeeva")
+    rows = legacy_import.read_register(_register([_row(950001, "ARUN K", CusNameKannada="ಅರುಣ್"), _row(950002, "BHAVYA M")]))
+    db = SessionLocal()
+    try:
+        legacy_import.import_members(db, rows, 1, run_id="w" + s[-8:])
+        for no, junk in (("950001", "²æÃ"), ("950002", "¦ðv")):
+            db.query(Member).filter(Member.membership_number == no).update({"full_name_kn": junk})
+        db.commit()
+        out = legacy_import.backfill_kannada(db, rows)
+        assert out["updated"] >= 1 and out["junk_cleared"] >= 1, out
+        assert db.query(Member).filter(Member.membership_number == "950001").one().full_name_kn == "ಅರುಣ್"
+        assert db.query(Member).filter(Member.membership_number == "950002").one().full_name_kn is None
+        assert legacy_import.backfill_kannada(db, rows)["updated"] == 0      # a second run changes nothing
+    finally:
+        db.close()
