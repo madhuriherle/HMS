@@ -141,7 +141,15 @@ export default function DuplicateMembers() {
                         <td className="px-3 py-2">{m.place || '—'}</td>
                         <td className="px-3 py-2">{m.pincode || '—'}</td>
                         <td className="px-3 py-2">{m.district || '—'}</td>
-                        <td className="px-3 py-2">{[m.approval, m.status].filter(Boolean).join(' · ') || '—'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {/* Approved is the usual case, so it is left out; only a member who is not approved shows the approval too */}
+                          {[m.approval !== 'APPROVED' ? m.approval : '', m.status].filter(Boolean).map((s) => (
+                            <span key={s} className={`mr-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
+                              s === 'ACTIVE' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+                            }`}>{s.charAt(0) + s.slice(1).toLowerCase()}</span>
+                          )) }
+                          {!m.approval && !m.status && '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
