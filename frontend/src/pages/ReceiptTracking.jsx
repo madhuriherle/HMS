@@ -514,29 +514,21 @@ export default function ReceiptTracking() {
           value={subTypeFilter !== 'ALL' ? `S|${subTypeFilter}` : particularsFilter !== 'ALL' ? `T|${particularsFilter}` : 'ALL'}
           onChange={chooseType}
           options={typeOptions}
-          widthClass="w-full sm:w-56"
+          widthClass="w-full sm:w-52"
         />
 
-        {/* Status Filter */}
+        {/* Status: whether the receipt is linked to a member, plus the old-register receipts with no real number (FY43-001 style) or no amount */}
         <FilterSelect
-          value={statusFilter}
-          onChange={(val) => setStatusFilter(val)}
+          value={numberFilter !== 'ALL' ? numberFilter : statusFilter}
+          onChange={(val) => {
+            if (val === 'UNKNOWN' || val === 'ZERO') { setNumberFilter(val); setStatusFilter('ALL'); }
+            else { setNumberFilter('ALL'); setStatusFilter(val); }
+          }}
           options={[
             { value: 'ALL', label: 'All Statuses' },
             { value: 'Assigned', label: 'Assigned' },
             { value: 'Unassigned', label: 'Unassigned' },
-            { value: 'Cancelled', label: 'Cancelled' }
-          ]}
-          widthClass="w-full sm:w-48"
-        />
-
-        {/* Old-register receipts with no real number (FY43-001 style) or no amount */}
-        <FilterSelect
-          value={numberFilter}
-          onChange={(val) => setNumberFilter(val)}
-          options={[
-            { value: 'ALL', label: 'All Receipt Numbers' },
-            { value: 'KNOWN', label: 'Real number' },
+            { value: 'Cancelled', label: 'Cancelled' },
             { value: 'UNKNOWN', label: 'Unknown number (dummy)' },
             { value: 'ZERO', label: 'No amount' }
           ]}
@@ -548,7 +540,7 @@ export default function ReceiptTracking() {
           value={modeFilter}
           onChange={(val) => setModeFilter(val)}
           options={[{ value: 'ALL', label: 'All Payment Modes' }, ...modeOptions.map((m) => ({ value: m, label: m }))]}
-          widthClass="w-full sm:w-48"
+          widthClass="w-full sm:w-44"
         />
       </SearchFilterBar>
 

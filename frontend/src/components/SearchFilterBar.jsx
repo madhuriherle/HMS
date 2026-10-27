@@ -19,7 +19,7 @@ export default function SearchFilterBar({
   rightSlot,
   leftSlot,
   searchInHeader = false, // kept for the screens that pass it: the search box is always in the toolbar row now
-  filtersAlwaysShown = false, // the filters are open all the time, in a row under the toolbar (no filter icon)
+  filtersAlwaysShown = false, // one card in one row: search, the filters, a reset icon and the action buttons (no filter icon)
   className = ''
 }) {
   const [filtersToggled, setFiltersOpen] = useState(false);
@@ -72,6 +72,35 @@ export default function SearchFilterBar({
 
   const showToolbar = Boolean(leftSlot || rightSlot || searchBox || filterButton);
 
+  const resetIcon = onResetFilters && (
+    <button
+      type="button"
+      onClick={onResetFilters}
+      className="flex items-center justify-center w-9 h-9 bg-white border border-[#E8DFD8] text-[#863221] rounded-xl hover:bg-red-50 hover:text-[#ED4636] hover:border-red-200 transition-colors cursor-pointer shrink-0 shadow-2xs"
+      title="Reset all filters"
+      aria-label="Reset all filters"
+    >
+      <RotateCcw className="w-4 h-4" />
+    </button>
+  );
+
+  // filters that are always shown: one white card, one row (it wraps on a narrow screen)
+  if (filtersAlwaysShown) {
+    return (
+      <div className={`space-y-4 w-full ${className}`}>
+        {title && <PageTitle>{title}</PageTitle>}
+        {breadcrumb && <div>{breadcrumb}</div>}
+        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-3 flex items-center gap-2.5 flex-wrap">
+          {leftSlot}
+          {searchBox}
+          {children}
+          {resetIcon}
+          {rightSlot && <div className="ml-auto flex items-center gap-2.5 flex-wrap">{rightSlot}</div>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`space-y-4 w-full ${className}`}>
       {/* Send page title to the sticky top bar header */}
@@ -89,41 +118,13 @@ export default function SearchFilterBar({
               {hasFilters && filtersOpen && (
                 <>
                   {children}
-                  {onResetFilters && (
-                    <button
-                      type="button"
-                      onClick={onResetFilters}
-                      className="flex items-center justify-center w-9 h-9 bg-white border border-[#E8DFD8] text-[#863221] rounded-xl hover:bg-red-50 hover:text-[#ED4636] hover:border-red-200 transition-colors cursor-pointer shrink-0 shadow-2xs"
-                      title="Reset all filters"
-                      aria-label="Reset all filters"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </button>
-                  )}
+                  {resetIcon}
                 </>
               )}
               {searchBox}
               {filterButton}
               {rightSlot}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Always-shown filters: their own row under the toolbar, one reset icon at the end */}
-      {hasFilters && filtersAlwaysShown && (
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {children}
-          {onResetFilters && (
-            <button
-              type="button"
-              onClick={onResetFilters}
-              className="flex items-center justify-center w-9 h-9 bg-white border border-[#E8DFD8] text-[#863221] rounded-xl hover:bg-red-50 hover:text-[#ED4636] hover:border-red-200 transition-colors cursor-pointer shrink-0 shadow-2xs"
-              title="Reset all filters"
-              aria-label="Reset all filters"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
           )}
         </div>
       )}
