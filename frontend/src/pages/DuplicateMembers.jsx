@@ -4,6 +4,7 @@ import { Download, Loader2, Search } from 'lucide-react';
 import api from '../api';
 import Pager from '../components/Pager';
 import { notify } from '../utils/notify';
+import { confirmAction } from '../utils/actionConfirm';
 import { formatDate } from '../utils/dateUtils';
 import useAuth from '../hooks/useAuth';
 import VerificationBadge from '../components/VerificationBadge';
@@ -34,6 +35,20 @@ export default function DuplicateMembers() {
   const [reloadKey, setReloadKey] = useState(0);
   const { hasPermission } = useAuth();
   const canVerify = hasPermission('members.list.write');
+  const canDelete = hasPermission('members.list.delete');
+
+  // the office keeps one record and deletes the other: the usual member delete (asks for a reason; may go for approval)
+  const remove = async (m) => {
+    const reason = await confirmAction('delete', `/members/${m.id}`);
+    if (!reason) return;
+    try {
+      const { data: res } = await api.delete(`/members/${m.id}`, { params: { reason }, headers: { 'X-Action-Reason': reason } });
+      notify(res?.message || 'Member deleted.', 'success');
+      setReloadKey((k) => k + 1);
+    } catch (e) {
+      notify(e.response?.data?.detail || 'Could not delete the member.', 'error');
+    }
+  };
 
   useEffect(() => {
     const t = setTimeout(() => { setDebounced(search.trim()); setPage(1); }, 400);
@@ -143,6 +158,7 @@ export default function DuplicateMembers() {
                       <th className="px-3 py-2">District</th>
                       <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2">KYC</th>
+                      {canDelete && <th className="px-3 py-2" />}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#EFE6DE]/70">
@@ -170,11 +186,14 @@ export default function DuplicateMembers() {
                           {!m.approval && !m.status && '—'}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
-                          <VerificationBadge status={m.verification} title={[m.verified_at && formatDate(m.verified_at), m.verification_remark].filter(Boolean).join(' · ')} />
-                          {canVerify && (
-                            <button type="button" onClick={() => setVerifying(m.id)} className="ml-2 text-[11px] font-bold text-[#510601] underline cursor-pointer">Verify</button>
-                          )}
+                          <VerificationBadge status={m.verification} onClick={canVerify ? () => setVerifying(m.id) : undefined}
+                            title={[m.verified_at && formatDate(m.verified_at), m.verification_remark].filter(Boolean).join(' · ') || (canVerify ? 'Record a KYC call' : '')} />
                         </td>
+                        {canDelete && (
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <button type="button" onClick={() => remove(m)} className="text-[11px] font-bold text-[#8C1801] hover:underline cursor-pointer">Delete</button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

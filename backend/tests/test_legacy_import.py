@@ -8,7 +8,7 @@ from test_frontend_contract import API
 
 def _register(rows):
     from openpyxl import Workbook
-    cols = ["CusNo", "CusNoNew", "CusNoOld", "CusName", "CusMobile", "CusMemberType", "CusGotra", "CusStatus", "DeleteMark", "CusPinCode", "CusNameKannada"]
+    cols = ["CusNo", "CusNoNew", "CusNoOld", "CusName", "CusMobile", "CusMemberType", "CusGotra", "CusStatus", "DeleteMark", "CusPinCode", "CusNameKannada", "CusMemUpAmt1"]
     for j in range(1, 7):
         cols += [f"CusReceiptNo{j}", f"CusReceiptDate{j}", f"CusMemAmt{j}", f"CusMemUpAmt{j}", f"CusScholarAmt{j}", f"CusDon1Amt{j}", f"CusReceiptNote{j}"]
     wb = Workbook()

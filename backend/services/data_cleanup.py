@@ -44,7 +44,7 @@ GROUPS = {
         Group("members", "Members",
               "Every member with their memberships, documents, history, KYC requests, magazine subscriptions and event / committee links. Also clears Receipts & Payments. Membership numbers start again.",
               ("membership_type_history", "membership_type_change_requests", "member_memberships", "member_documents",
-               "member_service_optins", "member_profile_history", "member_profile_change_requests", "member_kyc_requests", "member_verification_logs", "member_duplicate_reviews",
+               "member_service_optins", "member_profile_history", "member_profile_change_requests", "member_kyc_requests", "member_verification_logs",
                "member_deletion_requests", "member_approval_history", "member_meeting_exports", "member_activity_logs", "magazine_returns",
                "magazine_delivery_pauses", "magazine_subscriptions", "event_member_links", "event_participants",
                "file_attachments", "committee_member_links", "members"),

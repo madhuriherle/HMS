@@ -790,52 +790,6 @@ def save_verification(id: int, payload: VerificationIn, db: Session = Depends(de
     return {"status": member.verification_status, "verified_at": member.verified_at, "remark": member.verification_remark}
 
 
-class DuplicateReviewIn(pydantic.BaseModel):
-    other_id: int
-    decision: str      # SAME | DIFFERENT | CLEAR (take the answer back)
-
-
-@router.get("/{id}/possible-duplicates")
-def read_possible_duplicates(id: int, db: Session = Depends(deps.get_db),
-                             current_user: User = Depends(deps.require_permission("members.list.read"))) -> Any:
-    """Other members who may be this person (same mobile, same name, a name spelled a little differently), with what a caller needs to tell."""
-    from services import duplicate_members
-    member = crud_members.member.get(db=db, id=id)
-    if not member or member.is_deleted:
-        raise HTTPException(404, "Member not found")
-    return {"items": duplicate_members.candidates_for(db, id)}
-
-
-@router.put("/{id}/duplicate-review")
-def save_duplicate_review(id: int, payload: DuplicateReviewIn, db: Session = Depends(deps.get_db),
-                          current_user: User = Depends(deps.require_permission("members.list.write"))) -> Any:
-    """The caller's answer for a pair: SAME (an admin merges later; nothing is merged here) or DIFFERENT (the pair leaves the Duplicate Members report)."""
-    from models.members import MemberDuplicateReview
-    decision = (payload.decision or "").upper()
-    if decision not in ("SAME", "DIFFERENT", "CLEAR"):
-        raise HTTPException(400, "decision must be SAME, DIFFERENT or CLEAR")
-    if payload.other_id == id:
-        raise HTTPException(400, "A member cannot be compared with themselves")
-    for mid in (id, payload.other_id):
-        m = crud_members.member.get(db=db, id=mid)
-        if not m or m.is_deleted:
-            raise HTTPException(404, "Member not found")
-    low, high = min(id, payload.other_id), max(id, payload.other_id)
-    row = (db.query(MemberDuplicateReview)
-           .filter(MemberDuplicateReview.member_id == low, MemberDuplicateReview.other_member_id == high, MemberDuplicateReview.is_deleted == False)  # noqa: E712
-           .first())
-    now = datetime.now(timezone.utc)
-    if decision == "CLEAR":
-        if row:
-            row.is_deleted, row.deleted_at, row.deleted_by = True, now, current_user.id
-    elif row:
-        row.decision, row.reviewed_by, row.reviewed_at, row.updated_by = decision, current_user.id, now, current_user.id
-    else:
-        db.add(MemberDuplicateReview(member_id=low, other_member_id=high, decision=decision, reviewed_by=current_user.id, reviewed_at=now, created_by=current_user.id))
-    db.commit()
-    return {"member_id": id, "other_id": payload.other_id, "decision": None if decision == "CLEAR" else decision}
-
-
 @router.get("/duplicate-check")
 def duplicate_check(
     mobile: Optional[str] = None,

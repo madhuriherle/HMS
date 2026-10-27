@@ -129,17 +129,6 @@ class Member(AuditMixin, Base):
     verified_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
     verification_remark: Mapped[str] = mapped_column(Text, nullable=True)
 
-class MemberDuplicateReview(AuditMixin, Base):
-    """A caller's answer on a pair of members that look alike: the same person (an admin merges them later) or different people.
-    member_id is always the lower id of the pair."""
-    __tablename__ = "member_duplicate_reviews"
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
-    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=False, index=True)
-    other_member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("members.id"), nullable=False, index=True)
-    decision: Mapped[str] = mapped_column(String(12), nullable=False)   # SAME | DIFFERENT
-    reviewed_by: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=True)
-    reviewed_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
-
 class MemberVerificationLog(AuditMixin, Base):
     """One call to a member: its outcome and what was said."""
     __tablename__ = "member_verification_logs"

@@ -9,9 +9,12 @@ export const VERIFICATION = {
   CALL_BACK: { label: 'Call back', tone: 'bg-blue-50 text-blue-700 border-blue-200' }
 };
 
-export default function VerificationBadge({ status, title }) {
+// With onClick the badge is the button that opens the KYC call popup.
+export default function VerificationBadge({ status, title, onClick }) {
   const v = VERIFICATION[String(status || 'NOT_VERIFIED').toUpperCase()] || VERIFICATION.NOT_VERIFIED;
+  const look = `inline-block whitespace-nowrap text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${v.tone}`;
+  if (!onClick) return <span title={title} className={look}>{v.label}</span>;
   return (
-    <span title={title} className={`inline-block whitespace-nowrap text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${v.tone}`}>{v.label}</span>
+    <button type="button" onClick={onClick} title={title || 'Record a KYC call'} className={`${look} cursor-pointer hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-[#510601]/30`}>{v.label}</button>
   );
 }

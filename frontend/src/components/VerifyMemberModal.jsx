@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import api from '../api';
 import Modal from './Modal';
 import ModalFooter from './ModalFooter';
@@ -32,7 +31,6 @@ const nameParts = (name) => {
 const OUTCOMES = ['VERIFIED', 'NOT_REACHABLE', 'WRONG_NUMBER', 'CALL_BACK'];
 const input = 'w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-sm text-[#180200] focus:outline-none focus:border-[#510601]';
 const heading = 'text-[11px] font-bold uppercase tracking-wider text-[#7D7068]';
-const tagTone = { 'Same mobile': 'bg-[#8C1801]/10 text-[#8C1801] border-[#8C1801]/20', 'Same name': 'bg-[#8C1801]/10 text-[#8C1801] border-[#8C1801]/20', 'Similar name': 'bg-[#EE6A00]/10 text-[#B34E00] border-[#EE6A00]/30' };
 
 export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
   const [member, setMember] = useState(null);
@@ -41,7 +39,6 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
   const [pinInfo, setPinInfo] = useState(null);   // what the pincode master says about the pincode typed
   const [pinChoice, setPinChoice] = useState(null); // the post office row chosen when the pincode has several
   const [calls, setCalls] = useState([]);
-  const [others, setOthers] = useState([]);
   const [status, setStatus] = useState('VERIFIED');
   const [remark, setRemark] = useState('');
   const [busy, setBusy] = useState(false);
@@ -55,13 +52,12 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
 
   useEffect(() => {
     let current = true;
-    Promise.all([api.get(`/members/${memberId}`), api.get(`/members/${memberId}/verification`), api.get(`/members/${memberId}/possible-duplicates`)])
-      .then(([m, v, d]) => {
+    Promise.all([api.get(`/members/${memberId}`), api.get(`/members/${memberId}/verification`)])
+      .then(([m, v]) => {
         if (!current) return;
         setMember(m.data);
         setForm(Object.fromEntries(FIELDS.map(([k]) => [k, (k === 'name' ? nameOf(m.data) : m.data[k]) || ''])));
         setCalls(v.data.calls || []);
-        setOthers(d.data.items || []);
         setPin(m.data.pincode || '');
         if (m.data.pincode) showPin(m.data.pincode, m.data.pincode_id);
       })
@@ -77,17 +73,6 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
   };
 
   const chosen = pinInfo?.found ? pinInfo.matches.find((x) => x.id === pinChoice) : null;
-
-  const answer = async (other, decision) => {
-    const reason = await confirmAction('put', `/members/${memberId}/duplicate-review`);
-    if (!reason) return;
-    try {
-      const { data } = await api.put(`/members/${memberId}/duplicate-review`, { other_id: other.id, decision }, { headers: { 'X-Action-Reason': reason } });
-      setOthers((list) => list.map((x) => (x.id === other.id ? { ...x, review: data.decision } : x)));
-    } catch (e) {
-      notify(e.response?.data?.detail || 'Could not save the answer.', 'error');
-    }
-  };
 
   const save = async () => {
     const was = (k) => (k === 'name' ? nameOf(member) : member[k]) || '';
@@ -125,7 +110,7 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
   );
 
   return (
-    <Modal title={`KYC call${member?.membership_number ? ` · ${member.membership_number}` : ''}`} onClose={onClose} maxWidthClass="max-w-3xl"
+    <Modal title={`KYC call${member?.membership_number ? ` · ${member.membership_number}` : ''}`} onClose={onClose} maxWidthClass="max-w-2xl"
       footer={<ModalFooter kind="add" submitLabel="Save KYC" onCancel={onClose} onSubmit={save} busy={busy} disabled={!member} />}>
       {!member ? <div className="p-8 text-sm text-center text-[#7D7068]">Loading…</div> : (
         <div className="p-5 space-y-5">
@@ -171,53 +156,6 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
           </section>
 
           <section className="space-y-3">
-            <div className="flex items-baseline justify-between">
-              <h3 className={heading}>Other records that may be this person</h3>
-              <span className="text-xs text-[#7D7068]">{others.length ? `${others.length} found` : 'none found'}</span>
-            </div>
-            {others.length > 0 && (
-              <div className="border border-[#E8DFD8] rounded-xl divide-y divide-[#E8DFD8] overflow-hidden">
-                {others.map((o) => (
-                  <div key={o.id} className="px-4 py-3 space-y-2 bg-white">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <b className="text-sm">{o.name}</b>
-                      <span className="text-xs text-[#7D4A3F]">{o.membership_no ? `Membership no ${o.membership_no}` : `ID: ${o.id}`}</span>
-                      {o.tags.map((t) => <span key={t} className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${tagTone[t] || ''}`}>{t}</span>)}
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-xs">
-                      <div><span className="text-[#7D7068]">Type</span><br /><b>{o.type || '—'}</b></div>
-                      <div><span className="text-[#7D7068]">Date of birth</span><br /><b>{o.dob || '—'}</b></div>
-                      <div><span className="text-[#7D7068]">Father / husband</span><br /><b>{o.father || '—'}</b></div>
-                      <div><span className="text-[#7D7068]">Pincode</span><br /><b>{o.pincode || '—'}</b></div>
-                      <div><span className="text-[#7D7068]">Receipts</span><br /><b>{o.receipts_count ? `${o.receipts_count} · total ${o.receipts_total.toLocaleString('en-IN')}` : 'none'}</b></div>
-                      <div><span className="text-[#7D7068]">Magazine</span><br /><b>{o.magazine}</b></div>
-                      <div><span className="text-[#7D7068]">KYC</span><br /><b>{VERIFICATION[o.verification]?.label || '—'}{o.verified_at ? ` ${o.verified_at}` : ''}</b></div>
-                      <div><span className="text-[#7D7068]">Status</span><br /><b>{o.status || '—'}</b></div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {o.review ? (
-                        <>
-                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${o.review === 'SAME' ? 'bg-[#8C1801]/10 text-[#8C1801] border-[#8C1801]/20' : 'bg-[#3D705C]/10 text-[#3D705C] border-[#3D705C]/30'}`}>
-                            {o.review === 'SAME' ? 'Marked as the same person · waiting for an admin' : 'Marked as a different person'}
-                          </span>
-                          <button type="button" onClick={() => answer(o, 'CLEAR')} className="text-xs font-bold text-[#510601] underline cursor-pointer">Undo</button>
-                        </>
-                      ) : (
-                        <>
-                          <button type="button" onClick={() => answer(o, 'SAME')} className="px-3.5 py-2 text-xs font-bold text-white bg-[#510601] border border-[#510601] rounded-xl cursor-pointer">Same person</button>
-                          <button type="button" onClick={() => answer(o, 'DIFFERENT')} className="px-3.5 py-2 text-xs font-bold text-[#510601] bg-white border border-[#510601] rounded-xl cursor-pointer">Different person</button>
-                        </>
-                      )}
-                      <Link to={`/dashboard/membership/profile/${o.id}`} target="_blank" className="text-xs font-bold text-[#510601] hover:underline ml-1">Open profile</Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <p className="text-xs text-[#7D7068]">Same person only marks the pair for an admin: nothing is merged or deleted here. Different person takes the pair off the Duplicate Members list.</p>
-          </section>
-
-          <section className="space-y-3">
             <h3 className={heading}>Call result</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className={`block ${heading}`}>
@@ -245,9 +183,6 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
             )}
           </section>
 
-          <div className="pt-1">
-            <Link to={`/dashboard/membership/edit/${memberId}`} className="text-sm font-bold text-[#510601] hover:underline">Open full edit (address, Kannada name, type)</Link>
-          </div>
         </div>
       )}
     </Modal>

@@ -668,10 +668,15 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
                         description=description, amount=amount, line_no=line_no,
                         pays_for_membership=bool(particular.pays_for_membership), created_by=user_id))
 
-                if mem > 0 or total == 0:
-                    item("MEMBERSHIP", p["membership"], None, mem, "Shared by %d members" % len(members) if len(members) > 1 else None)
-                if up > 0:
-                    item("TYPE_CHANGE", p["membership"], None, up, "Upgrade amount (old register)")
+                # the membership amount and the upgrade amount are ONE Membership line: the Receipt Entry screen allows a
+                # particular once per receipt, so two lines could not be edited or saved again
+                if mem + up > 0 or total == 0:
+                    note = []
+                    if len(members) > 1:
+                        note.append("Shared by %d members" % len(members))
+                    if up > 0:
+                        note.append("includes upgrade amount %s" % f"{up:g}")
+                    item("MEMBERSHIP", p["membership"], None, mem + up, "; ".join(note) or None)
                 if sch > 0:
                     item("SCHOLARSHIP", p["scholarship"], p["general_scholarship"], sch, notes or None)
                 if don > 0:
@@ -825,3 +830,44 @@ def backfill_kannada(db, rows: list, *, batch: int = 2000) -> dict:
             db.commit()
     db.commit()
     return {"updated": set_, "already_right": same, "no_kannada_in_file": no_name, "junk_cleared": cleared, "not_found": missing}
+
+
+def merge_same_particular_lines(db) -> dict:
+    """Receipts of the old register made before the importer joined them have two lines of one particular (Membership +
+    the upgrade amount, or one line per member of a shared receipt). The Receipt Entry screen allows a particular once
+    per receipt, so such a receipt could not be edited. The lines become one: the first keeps the sum, the others are marked
+    deleted. The receipt totals do not change. Safe to repeat."""
+    from collections import defaultdict as _dd
+    from datetime import timezone
+    from models.receipts import Receipt, ReceiptItem
+
+    groups = _dd(list)
+    q = (db.query(ReceiptItem).join(Receipt, Receipt.id == ReceiptItem.receipt_id)
+         .filter(Receipt.source == SOURCE, Receipt.is_deleted == False, ReceiptItem.is_deleted == False)  # noqa: E712
+         .order_by(ReceiptItem.receipt_id, ReceiptItem.line_no, ReceiptItem.id))
+    for it in q.all():
+        groups[(it.receipt_id, it.particular_name, it.sub_particular_name or "")].append(it)
+    now = datetime.now(timezone.utc)
+    receipts = lines_removed = 0
+    seen_receipts = set()
+    for items in groups.values():
+        if len(items) < 2:
+            continue
+        keep, rest = items[0], items[1:]
+        upgrade = sum(float(i.amount) for i in items if (i.item_type or "").upper() == "TYPE_CHANGE")
+        shared = any("Shared by" in (i.description or "") or "same receipt" in (i.description or "") for i in items)
+        note = []
+        if shared:
+            note.append("Shared by several members")
+        if upgrade > 0:
+            note.append("includes upgrade amount %s" % f"{upgrade:g}")
+        keep.amount = sum(float(i.amount) for i in items)
+        keep.item_type = "MEMBERSHIP" if (keep.item_type or "").upper() in ("MEMBERSHIP", "TYPE_CHANGE") else keep.item_type
+        keep.description = "; ".join(note) or keep.description
+        for i in rest:
+            i.is_deleted, i.deleted_at = True, now
+        lines_removed += len(rest)
+        seen_receipts.add(keep.receipt_id)
+    receipts = len(seen_receipts)
+    db.commit()
+    return {"receipts_changed": receipts, "lines_removed": lines_removed}

@@ -308,9 +308,10 @@ function OverviewTab({ id }) {
             <Panel icon={Phone} title="Contact" tag="Reach">
               {contact.filter(([label]) => label !== 'Address').map(([label, value]) => <Row key={label} label={label}>{value}</Row>)}
               <Row label="KYC (phone)">
-                <VerificationBadge status={c.verification_status} title={c.verified_at ? formatDate(c.verified_at) : ''} />
+                <VerificationBadge status={c.verification_status} onClick={hasPermission('members.list.write') ? () => setVerifying(true) : undefined}
+                  title={c.verified_at ? formatDate(c.verified_at) : (hasPermission('members.list.write') ? 'Record a KYC call' : '')} />
                 {hasPermission('members.list.write') && (
-                  <button type="button" onClick={() => setVerifying(true)} className="ml-2 text-[11px] font-bold text-[#510601] underline cursor-pointer">Verify</button>
+                  <button type="button" onClick={() => setVerifying(true)} className="ml-2 px-2.5 py-1 text-[11px] font-bold text-[#510601] bg-white border border-[#510601] rounded-lg hover:bg-[#510601]/5 cursor-pointer">KYC call</button>
                 )}
               </Row>
             </Panel>

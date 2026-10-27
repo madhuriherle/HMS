@@ -172,3 +172,35 @@ def test_backfill_kannada(client, admin_headers):
         assert legacy_import.backfill_kannada(db, rows)["updated"] == 0      # a second run changes nothing
     finally:
         db.close()
+
+
+def test_receipt_lines_are_one_per_particular(client, admin_headers):
+    """Membership + upgrade amount is ONE Membership line, and older receipts with two lines are joined."""
+    from datetime import date
+    from db.session import SessionLocal
+    from models.members import Member
+    from models.receipts import Receipt, ReceiptItem
+    from services import legacy_import
+
+    s = _sfx()
+    _create_membership_type(client, admin_headers, "ML" + s[-5:], "Ajeeva")
+    rows = legacy_import.read_register(_register([_row(960001, "UMA U", [(7001, datetime(1999, 5, 1), 400)], CusMemUpAmt1=100)]))
+    db = SessionLocal()
+    try:
+        legacy_import.import_members(db, rows, 1, run_id="x" + s[-8:])
+        legacy_import.import_receipts(db, rows, 1)
+        rid = db.query(Receipt.id).filter(Receipt.receipt_number == "7001", Receipt.receipt_date == date(1999, 5, 1)).scalar()
+        lines = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == rid, ReceiptItem.is_deleted == False).all()  # noqa: E712
+        assert len(lines) == 1 and float(lines[0].amount) == 500 and "upgrade amount 100" in lines[0].description
+        # a receipt made the old way (two Membership lines) is joined
+        first = lines[0]
+        db.add(ReceiptItem(receipt_id=rid, item_type="TYPE_CHANGE", particular_id=first.particular_id, particular_name=first.particular_name,
+                           description="Upgrade amount (old register)", amount=50, line_no=2, pays_for_membership=True, created_by=1))
+        db.commit()
+        out = legacy_import.merge_same_particular_lines(db)
+        assert out["lines_removed"] >= 1
+        lines = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == rid, ReceiptItem.is_deleted == False).all()  # noqa: E712
+        assert len(lines) == 1 and float(lines[0].amount) == 550
+        assert legacy_import.merge_same_particular_lines(db)["lines_removed"] == 0      # a second run changes nothing
+    finally:
+        db.close()

@@ -23,6 +23,7 @@ import {
 import { loadLocations, loadMembershipTypes, loadGothras } from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
 import VerificationBadge from '../components/VerificationBadge';
+import VerifyMemberModal from '../components/VerifyMemberModal';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import api from '../api';
@@ -172,6 +173,7 @@ export default function MembershipList() {
 
   // 4. Delete Confirmation Modal
   const [deleteDialog, setDeleteDialog] = useState(null); // member
+  const [verifyingId, setVerifyingId] = useState(null); // the KYC call popup
   const [, setDeleteReason] = useState('');
 
   // 5. Label Preview Modal
@@ -646,7 +648,7 @@ export default function MembershipList() {
                       </td>
 
                       {/* KYC: the office's phone check */}
-                      <td className="py-3 px-4"><VerificationBadge status={m.verification_status} /></td>
+                      <td className="py-3 px-4"><VerificationBadge status={m.verification_status} onClick={hasPermission('members.list.write') ? () => setVerifyingId(m.id) : undefined} /></td>
 
                       {/* Address: the street lines, then taluk / district, then state - PIN (all from the list call) */}
                       <td className="py-3 px-4 align-top">
@@ -723,6 +725,8 @@ export default function MembershipList() {
       </div>
 
       {/* View Member Profile is handled on dedicated full-screen page /dashboard/membership/profile/:id */}
+
+      {verifyingId && <VerifyMemberModal memberId={verifyingId} onClose={() => setVerifyingId(null)} onSaved={loadMembers} />}
 
       {/* ==================================================== */}
       {/* MODAL 3: LABEL PREVIEW & PRINT INTERFACE             */}
