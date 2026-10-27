@@ -17,7 +17,6 @@ import {
   AlertCircle,
   MapPin,
   Filter,
-  RotateCcw,
   CheckSquare,
 } from 'lucide-react';
 import { loadLocations, loadMembershipTypes, loadGothras } from '../utils/serverData';
@@ -136,7 +135,7 @@ export default function MembershipList() {
   const [paymentFilter, setPaymentFilter] = useState('ALL'); // ALL | NO_RECEIPT | MISMATCH | NOT_MAPPED
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
 
   // the page is read again whenever the page, the search, a filter or the sort changes (default: newest first)
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -503,15 +502,6 @@ export default function MembershipList() {
           widthClass="w-full sm:w-52"
         />
 
-        {/* Single reset / clear icon for search + filters */}
-        <button
-          type="button"
-          onClick={handleClearFilters}
-          className="flex items-center justify-center w-9 h-9 bg-white border border-[#E8DFD8] text-[#863221] rounded-xl hover:bg-red-50 hover:text-[#ED4636] hover:border-red-200 transition-colors cursor-pointer shrink-0 shadow-2xs"
-          title="Clear search & filters"
-        >
-          <RotateCcw className="w-4 h-4" />
-        </button>
       </SearchFilterBar>
 
       {/* ---------------------------------------------------- */}

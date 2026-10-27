@@ -4,8 +4,8 @@ import PageTitle from './PageTitle';
 
 /**
  * The toolbar of a list screen. The title goes to the top bar; the search box, the filter icon and the action buttons sit
- * in one row. The filters themselves (the dropdowns and Reset Filters) are hidden: the filter icon opens that card and
- * closes it again, so the list starts right under the toolbar.
+ * in one row. The filters (the dropdowns and one reset icon) are hidden until the filter icon is clicked, and then they
+ * open in the SAME row; the search box steps aside while they are open unless the screen is wide enough for both.
  */
 export default function SearchFilterBar({
   title,
@@ -25,7 +25,7 @@ export default function SearchFilterBar({
   const hasFilters = Boolean(children) || Boolean(onResetFilters);
 
   const searchBox = onSearchChange !== undefined && (
-    <div className="relative min-w-[200px] flex-1 max-w-sm">
+    <div className={filtersOpen ? 'hidden 2xl:block relative min-w-[200px] flex-1 max-w-sm' : 'relative min-w-[200px] flex-1 max-w-sm'}>
       <Search className="w-4 h-4 text-[#863221]/50 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
       <input
         type="text"
@@ -84,32 +84,27 @@ export default function SearchFilterBar({
           <div className="flex items-center gap-3 min-w-0">{leftSlot}</div>
           {(searchBox || filterButton || rightSlot) && (
             <div className="flex items-center gap-2.5 flex-wrap justify-end ml-auto">
+              {hasFilters && filtersOpen && (
+                <>
+                  {children}
+                  {onResetFilters && (
+                    <button
+                      type="button"
+                      onClick={onResetFilters}
+                      className="flex items-center justify-center w-9 h-9 bg-white border border-[#E8DFD8] text-[#863221] rounded-xl hover:bg-red-50 hover:text-[#ED4636] hover:border-red-200 transition-colors cursor-pointer shrink-0 shadow-2xs"
+                      title="Reset all filters"
+                      aria-label="Reset all filters"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                  )}
+                </>
+              )}
               {searchBox}
               {filterButton}
               {rightSlot}
             </div>
           )}
-        </div>
-      )}
-
-      {/* The filters: only when the filter icon has been clicked */}
-      {hasFilters && filtersOpen && (
-        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            {children}
-
-            {onResetFilters && (
-              <button
-                type="button"
-                onClick={onResetFilters}
-                className="px-3 py-2 text-xs font-semibold text-[#863221] hover:text-[#ED4636] hover:bg-red-50 rounded-xl border border-[#E8DFD8] hover:border-red-200 transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-2xs shrink-0"
-                title="Reset all filters"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Reset Filters</span>
-              </button>
-            )}
-          </div>
         </div>
       )}
     </div>

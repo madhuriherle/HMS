@@ -130,7 +130,7 @@ export default function ReceiptTracking() {
   const [pages, setPages] = useState(1);
   const [summary, setSummary] = useState({});
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
   const [loadingPage, setLoadingPage] = useState(true);
   const [filterOptions, setFilterOptions] = useState({ financial_years: [], sub_types: {}, payment_modes: [] });
   const [debouncedSearch, setDebouncedSearch] = useState(() => new URLSearchParams(window.location.search).get('search') || '');
