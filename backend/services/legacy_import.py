@@ -373,10 +373,12 @@ class _UserRef:
         self.id = user_id
 
 
-def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str = "", batch: int = 500, progress=None) -> dict:
+def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str = "", batch: int = 500, progress=None, applicants: bool = False) -> dict:
     """Create the members of the old register (members only: their receipts are a later step). Safe to run again: a member
     whose old number is already in the system is skipped. Each member is saved on its own, so one bad row never stops
-    the rest; every problem is returned. The type is the register's, no automatic upgrade is run."""
+    the rest; every problem is returned. The type is the register's, no automatic upgrade is run.
+    applicants=True imports the applications register (MstApplication): UNAPPROVED members with no membership number, the register's
+    CusNo kept as their application number (members.legacy_ref_number), a pending membership of the chosen type, no magazine yet."""
     from datetime import timezone
     from api.v1.endpoints.members import (
         _GOTRA_ALIAS_KEYS, _NO_GOTRA, _clean_import_mobile, _clean_import_name, _gotra_key, _record_import_run,
@@ -412,6 +414,9 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
             return with_taluk[0]
         return with_taluk[0] if with_taluk else rows_[0]
     have_no = {n for (n,) in db.query(Member.membership_number).filter(Member.registration_source == "MIGRATION", Member.membership_number != None).all()}  # noqa: E711
+    if applicants:   # an application is found again by its application number
+        have_no = {n for (n,) in db.query(Member.legacy_ref_number).filter(Member.registration_source == "MIGRATION", Member.approval_status != "APPROVED",
+                                                                           Member.legacy_ref_number != None).all()}  # noqa: E711
     taken = {n.strip().upper() for (n,) in db.query(Member.membership_number).filter(Member.membership_number != None).all()}  # noqa: E711
     taken |= {n.strip().upper() for (n,) in db.query(MemberMembership.membership_number).filter(MemberMembership.membership_number != None).all()}  # noqa: E711
 
@@ -425,8 +430,10 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
         else:
             cus_no = str(int(cus_no_raw))
         old_no = str(int(old_no_raw)) if old_no_raw else None
+        if applicants:
+            old_no = None
         if cus_no in have_no:
-            skipped.append({"membership_number": cus_no, "reason": "Already imported (membership number exists)"})
+            skipped.append({"membership_number": cus_no, "reason": "Already imported (" + ("application number" if applicants else "membership number") + " exists)"})
             continue
         name = _clean_import_name(r.get("CusName"))
         if not name:
@@ -438,8 +445,8 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
             skipped.append({"membership_number": cus_no, "reason": f"Membership type '{raw_type}' is not in the system"})
             continue
         notes, warn = [], []
-        number = cus_no
-        if number.upper() in taken:
+        number = None if applicants else cus_no     # an applicant has no membership number until approval
+        if number is not None and number.upper() in taken:
             warn.append(f"Membership number {number} is already used by another member: left blank")
             notes.append(f"Old register membership number {number} could not be used (already taken)")
             number = None
@@ -495,7 +502,7 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
         ref_no = int(_num(r.get("CusNoRef"))) or None
         email = _s(r.get("CusEmail")) or None
         member = Member(
-            membership_number=number, old_membership_number=old_no,
+            membership_number=number, old_membership_number=old_no, legacy_ref_number=(cus_no if applicants else None),
             name_title=title, full_name_en=name, first_name_en=first[:100], middle_name_en=(middle or None), last_name_en=(last or None),
             full_name_kn=_s(r.get("CusNameKannada")) or None, date_of_birth=_as_date(r.get("CusDoB")),
             blood_group=_s(r.get("CusBloodGroup"))[:10] or None, father_husband_name=father[:150] if father else None,
@@ -514,8 +521,9 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
             magazine_email=(email if (wants and online) else None),
             remarks=" | ".join(notes) or None,
             **native_fields(r, ", ".join(addr)),
-            approval_status="APPROVED", registration_status="APPROVED", registration_source="MIGRATION",
-            member_status="INACTIVE" if (status_text == "expired" or is_deleted) else "ACTIVE", approved_at=now, created_by=user_id,
+            approval_status=("UNAPPROVED" if applicants else "APPROVED"), registration_status=("PENDING" if applicants else "APPROVED"),
+            registration_source="MIGRATION",
+            member_status="INACTIVE" if (status_text == "expired" or is_deleted) else "ACTIVE", approved_at=(None if applicants else now), created_by=user_id,
         )
         try:
             with db.begin_nested():
@@ -525,12 +533,12 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
                 stamp = datetime(enrolled.year, enrolled.month, enrolled.day, tzinfo=timezone.utc) if enrolled and FIRST_YEAR <= enrolled.year <= date.today().year else now
                 exp = _as_date(r.get("CusExpDt"))
                 db.add(MemberMembership(
-                    member_id=member.id, membership_type_id=mtype.id, membership_number=number, status="ACTIVE",
-                    applied_at=stamp, activated_at=stamp,
+                    member_id=member.id, membership_type_id=mtype.id, membership_number=number, status=("PENDING" if applicants else "ACTIVE"),
+                    applied_at=stamp, activated_at=(None if applicants else stamp),
                     expires_at=datetime(exp.year, exp.month, exp.day, tzinfo=timezone.utc) if exp and FIRST_YEAR <= exp.year <= 2200 else None,
                     created_by=user_id,
                 ))
-                if wants and member.member_status == "ACTIVE":
+                if wants and member.member_status == "ACTIVE" and not applicants:
                     sub = sync_member_magazine_subscription(db, member, user_id=user_id)
                     returned = [str(j) for j in range(1, 13) if _s(r.get(f"CusMagazineReturned{j}"))]
                     magazine_notes = " ".join(_lines(r.get("CusNoteMagazine")))
@@ -591,20 +599,27 @@ def _particulars(db, user_id: int) -> dict:
             "scholarship": scholarship, "general_scholarship": general_scholarship}
 
 
-def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int = 500) -> dict:
+def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int = 500, applicants: bool = False) -> dict:
     """Create the receipts of the old register for the members already imported. Lines with no date are not imported (the
     office chose to ignore them) and neither are dates before 1943 or in the future: they are returned in the lists.
     A receipt number is kept; with none (or one already used on another date that year) the receipt gets FY43-001 and is
     marked unknown. Every register record is a receipt of its own (a repeated number gets /2, /3). The members' types are
-    never changed. A member who already has receipts from this import is left out, so the run can be repeated."""
+    never changed. A member who already has receipts from this import is left out, so the run can be repeated.
+    applicants=True: the register is the applications register; its people are found by application number (legacy_ref_number) and the
+    receipts are linked to them as applicants (no membership number on the receipt)."""
     from sqlalchemy import func
     from models.members import Member
     from models.receipts import Receipt, ReceiptAllocation, ReceiptItem
     from services import receipt_numbers
 
     plan = build_plan(db, rows)
-    ids = {mno: (i, mno, nm) for i, mno, nm in
-           db.query(Member.id, Member.membership_number, Member.full_name_en).filter(Member.registration_source == "MIGRATION", Member.membership_number != None).all()}  # noqa: E711
+    if applicants:
+        ids = {ref: (i, None, nm) for i, ref, nm in
+               db.query(Member.id, Member.legacy_ref_number, Member.full_name_en).filter(Member.registration_source == "MIGRATION", Member.approval_status != "APPROVED",
+                                                                                        Member.legacy_ref_number != None).all()}  # noqa: E711
+    else:
+        ids = {mno: (i, mno, nm) for i, mno, nm in
+               db.query(Member.id, Member.membership_number, Member.full_name_en).filter(Member.registration_source == "MIGRATION", Member.membership_number != None).all()}  # noqa: E711
     # lines of this import that are already in: (member, date, number); a dummy-numbered one is (member, date, "")
     have = {(m, d, "" if old else n) for m, d, n, old in db.query(ReceiptAllocation.member_id, Receipt.receipt_date, Receipt.receipt_number, Receipt.is_old_receipt)
             .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id).filter(Receipt.source == SOURCE, Receipt.is_deleted == False).all()}  # noqa: E712
@@ -791,7 +806,7 @@ def renumber_imported(db, rows: list) -> dict:
     from models.receipts import Receipt, ReceiptAllocation
     from services import numbering
 
-    base = db.query(Member).filter(Member.registration_source == "MIGRATION", Member.is_deleted == False)  # noqa: E712
+    base = db.query(Member).filter(Member.registration_source == "MIGRATION", Member.approval_status == "APPROVED", Member.is_deleted == False)  # noqa: E712 (applicants have no membership number)
     if base.filter(Member.membership_number == None).count() == 0:  # noqa: E711
         raise RuntimeError("Every imported member already has a membership number: the correction was already made")
     by_cus = {m.old_membership_number: m for m in base.filter(Member.old_membership_number != None).all()}  # noqa: E711
@@ -1073,3 +1088,67 @@ def reimport_shared_members(db, rows: list, user_id: int) -> dict:
     db.commit()
     out = import_receipts(db, [r for r in rows if str(int(r["CusNo"])) in numbers], user_id)
     return {"set_aside": len(rids), "members": len(numbers), "created": out["created"], "shared": out["shared"], "dummy": out["dummy"], "skipped": out["skipped"]}
+
+
+def reconcile_applicants(db, rows: list) -> dict:
+    """Matched and missed for the applications register, applicant by applicant and receipt by receipt, against what is in the system:
+      * applicants: found by application number (legacy_ref_number) or MISSED;
+      * receipts: each register receipt line (a date and an amount) found on that applicant's receipts, with the number they carry in the
+        system, or MISSED / AMOUNT DIFFERS;
+      * the same receipt number and date already on a member's receipt (a payment that may be counted twice);
+      * applicants who are already members (same mobile or same name)."""
+    from models.members import Member
+    from models.receipts import Receipt, ReceiptAllocation
+
+    plan = build_plan(db, rows)
+    apps = {ref: (i, nm, mob) for i, ref, nm, mob in
+            db.query(Member.id, Member.legacy_ref_number, Member.full_name_en, Member.mobile)
+            .filter(Member.registration_source == "MIGRATION", Member.approval_status != "APPROVED", Member.legacy_ref_number != None).all()}  # noqa: E711
+    got = defaultdict(list)       # applicant id -> [(date, number, allocated amount, net)]
+    for mid, rd, num, alloc, net in (db.query(ReceiptAllocation.member_id, Receipt.receipt_date, Receipt.receipt_number, ReceiptAllocation.allocated_amount, Receipt.net_amount)
+                                     .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
+                                     .filter(Receipt.is_deleted == False, ReceiptAllocation.member_id.in_([v[0] for v in apps.values()] or [0])).all()):  # noqa: E712
+        got[mid].append((rd, num, float(alloc), float(net)))
+    member_receipts = {(num, rd) for num, rd in
+                       db.query(Receipt.receipt_number, Receipt.receipt_date).join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id)
+                       .join(Member, Member.id == ReceiptAllocation.member_id)
+                       .filter(Receipt.is_deleted == False, Member.approval_status == "APPROVED").distinct().all()}  # noqa: E712
+    members_by_mobile = defaultdict(list)
+    members_by_name = defaultdict(list)
+    for no, nm, mob in db.query(Member.membership_number, Member.full_name_en, Member.mobile).filter(Member.approval_status == "APPROVED", Member.is_deleted == False).all():  # noqa: E712
+        if mob:
+            members_by_mobile[mob].append(no)
+        members_by_name[_norm_name(nm or "")].append(no)
+
+    out = {"applicants": [], "receipts": [], "same_receipt_as_member": [], "already_member": [], "counts": Counter()}
+    for m in plan["members"]:
+        ref = str(m["cus_no"])
+        hit = apps.get(ref)
+        lines = [ln for ln in m["lines"] if ln["kind"] not in ("WRONG_DATE", "NO_DATE")]
+        mine = list(got.get(hit[0], [])) if hit else []
+        done = 0
+        for ln in lines:
+            want = round(ln["membership"] + ln["patrika"] + ln["scholarship"] + ln["donation"] + ln["upgrade"], 2)
+            pick = next((g for g in mine if g[0] == ln["date"] and abs(g[2] - want) < 0.01), None) or next((g for g in mine if g[0] == ln["date"]), None)
+            if pick is None:
+                status, shown = "MISSED", ""
+            else:
+                mine.remove(pick)
+                status, shown = ("MATCHED" if abs(pick[2] - want) < 0.01 else "AMOUNT DIFFERS"), pick[1]
+            done += status == "MATCHED"
+            out["receipts"].append({"application_no": ref, "name": m["name"], "register_number": ln["number"], "date": ln["date"], "amount": want,
+                                    "in_system_number": shown, "status": status})
+            out["counts"]["receipt " + status.lower()] += 1
+            if ln["number"] and (ln["number"], ln["date"]) in member_receipts:
+                out["same_receipt_as_member"].append({"application_no": ref, "name": m["name"], "number": ln["number"], "date": ln["date"], "amount": want})
+        out["applicants"].append({"application_no": ref, "name": m["name"], "mobile": m.get("mobile") or "", "status": "STORED" if hit else "MISSED",
+                                  "receipts_expected": len(lines), "receipts_matched": done})
+        out["counts"]["applicant " + ("stored" if hit else "missed")] += 1
+        mob = m.get("mobile") or ""
+        same = sorted(set(members_by_mobile.get(mob, []) if mob else []) | set(members_by_name.get(_norm_name(m["name"]), [])))
+        if same:
+            out["already_member"].append({"application_no": ref, "name": m["name"], "mobile": mob,
+                                          "same mobile": ", ".join(members_by_mobile.get(mob, [])) if mob else "",
+                                          "same name": ", ".join(members_by_name.get(_norm_name(m["name"]), []))})
+    out["counts"] = dict(out["counts"])
+    return out
