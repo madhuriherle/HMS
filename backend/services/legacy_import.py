@@ -394,9 +394,24 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
     titles = {re.sub(r"[^A-Z]", "", t.upper()): t for (t,) in db.query(NameTitle.name_en).filter(NameTitle.is_deleted == False).all()}  # noqa: E712
     states = {re.sub(r"[^A-Z]", "", s.name_en.upper()): s for s in db.query(State).filter(State.is_deleted == False).all()}  # noqa: E712
     wanted_pins = {_s(r.get("CusPinCode")) for r in rows}
-    pins = {}
-    for pc in db.query(PostalCode).filter(PostalCode.pincode.in_(wanted_pins), PostalCode.is_deleted == False).all():  # noqa: E712
-        pins.setdefault(pc.pincode.strip(), pc)
+    from services.pincode_map import post_office_key
+    pins = defaultdict(list)       # a pincode has many post offices: the member's own post office (CusPost) picks the row
+    for pc in db.query(PostalCode).filter(PostalCode.pincode.in_(wanted_pins), PostalCode.is_deleted == False).order_by(PostalCode.id).all():  # noqa: E712
+        pins[pc.pincode.strip()].append(pc)
+
+    def pick_pincode(pin: str, post: str):
+        rows_ = pins.get(pin)
+        if not rows_:
+            return None
+        key = post_office_key(post) if post else ""
+        if key:
+            hit = next((x for x in rows_ if post_office_key(x.post_office_name) == key), None)
+            if hit:
+                return hit
+        with_taluk = [x for x in rows_ if x.taluk_id]
+        if with_taluk and len({x.taluk_id for x in with_taluk}) == 1:      # every post office of the pincode is in one taluk
+            return with_taluk[0]
+        return with_taluk[0] if with_taluk else rows_[0]
     have_no = {n for (n,) in db.query(Member.membership_number).filter(Member.registration_source == "MIGRATION", Member.membership_number != None).all()}  # noqa: E711
     taken = {n.strip().upper() for (n,) in db.query(Member.membership_number).filter(Member.membership_number != None).all()}  # noqa: E711
     taken |= {n.strip().upper() for (n,) in db.query(MemberMembership.membership_number).filter(MemberMembership.membership_number != None).all()}  # noqa: E711
@@ -461,7 +476,7 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
                 warn.append(f"Gotra '{g}' is not in the Gotra master: set to GENERAL")
             else:
                 warn.append(f"Gotra '{g}' is not in the Gotra master: left blank")
-        pc = pins.get(_s(r.get("CusPinCode")))
+        pc = pick_pincode(_s(r.get("CusPinCode")), _s(r.get("CusPost")))
         state = states.get(re.sub(r"[^A-Z]", "", _s(r.get("CusState")).upper()))
         addr = _lines(r.get("CusAddress"))
         status_text = _s(r.get("CusStatus")).lower()
