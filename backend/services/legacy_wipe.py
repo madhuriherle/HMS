@@ -10,67 +10,55 @@ Nothing is deleted from tables that no removed row points into. dry=True counts 
 """
 from sqlalchemy import text
 
-from models.base import Base
-
 SEEDS = {"members": "registration_source = 'MIGRATION'", "receipts": "source = 'OLD_REGISTER'"}
 
 
 def wipe(db, dry: bool = False) -> dict:
-    doomed = {}                       # table name -> temp table of ids
-    order = []                        # discovery order, parents first
-    counts = {}
-    detached = {}
-    tables = list(Base.metadata.sorted_tables)
+    from sqlalchemy import inspect
+
+    insp = inspect(db.get_bind())
+    names = [t for t in insp.get_table_names() if not t.startswith("alembic")]
+    fks = {t: [f for f in insp.get_foreign_keys(t) if f["referred_columns"] == ["id"] and len(f["constrained_columns"]) == 1] for t in names}
+    nullable = {t: {c["name"]: c["nullable"] for c in insp.get_columns(t)} for t in names}
+    has_id = {t: insp.get_pk_constraint(t).get("constrained_columns") == ["id"] for t in names}
+    doomed, order, direct, counts = {}, [], [], {}
 
     def mk(name, select_sql):
-        tmp = f"d_{name}"
-        db.execute(text(f"DROP TABLE IF EXISTS {tmp}"))
-        db.execute(text(f"CREATE TEMP TABLE {tmp} AS {select_sql}"))
-        doomed[name] = tmp
+        db.execute(text(f"DROP TABLE IF EXISTS d_{name}"))
+        db.execute(text(f"CREATE TEMP TABLE d_{name} AS {select_sql}"))
+        doomed[name] = f"d_{name}"
 
     for name, where in SEEDS.items():
         mk(name, f"SELECT id FROM {name} WHERE {where}")
         order.append(name)
-
-    direct = []                       # (table, where-sql) of tables without an id column to follow further
-    for t in tables:
-        if t.name in SEEDS or t.name.startswith("alembic"):
-            continue
-        fks = [fk for fk in t.foreign_keys if fk.column.table.name in doomed and fk.column.name == "id"]
-        if not fks:
-            continue
-        hard = [fk for fk in fks if not fk.parent.nullable]
-        if hard:
-            cond = " OR ".join(f"{fk.parent.name} IN (SELECT id FROM {doomed[fk.column.table.name]})" for fk in hard)
-            if "id" in t.c and t.c["id"].primary_key:
-                mk(t.name, f"SELECT id FROM {t.name} WHERE {cond}")
-                order.append(t.name)
+    # follow the links parents first: a row that must have its parent goes with it
+    grew = True
+    while grew:
+        grew = False
+        for t in names:
+            if t in doomed or t in {x for x, _ in direct}:
+                continue
+            hard = [f for f in fks[t] if f["referred_table"] in doomed and not nullable[t][f["constrained_columns"][0]]]
+            if not hard:
+                continue
+            cond = " OR ".join(f"{f['constrained_columns'][0]} IN (SELECT id FROM {doomed[f['referred_table']]})" for f in hard)
+            if has_id[t]:
+                mk(t, f"SELECT id FROM {t} WHERE {cond}")
+                order.append(t)
             else:
-                direct.append((t.name, cond))
-        for fk in fks:
-            if fk.parent.nullable:
-                detached.setdefault(t.name, []).append((fk.parent.name, doomed[fk.column.table.name]))
-
-    # links from rows that stay: set to NULL, rows that go are skipped
-    for tname, links in detached.items():
-        for col, tmp in links:
-            own = f" AND id NOT IN (SELECT id FROM d_{tname})" if tname in doomed else ""
-            res = db.execute(text(f"UPDATE {tname} SET {col} = NULL WHERE {col} IN (SELECT id FROM {tmp}){own}"))
-            if res.rowcount:
-                counts[f"{tname}.{col} detached"] = res.rowcount
-    # a seed table pointing at another seed or itself through a nullable column (members -> members): cut first, so the order of deletion is free
-    for name in SEEDS:
-        t = Base.metadata.tables[name]
-        for fk in t.foreign_keys:
-            tn = fk.column.table.name
-            if tn in doomed and fk.column.name == "id" and fk.parent.nullable:
-                res = db.execute(text(f"UPDATE {name} SET {fk.parent.name} = NULL WHERE {fk.parent.name} IN (SELECT id FROM {doomed[tn]})"))
+                direct.append((t, cond))
+            grew = True
+    # links that may be empty, from any table: cut them (rows that go anyway do not matter)
+    for t in names:
+        for f in fks[t]:
+            col = f["constrained_columns"][0]
+            if f["referred_table"] in doomed and nullable[t][col]:
+                res = db.execute(text(f"UPDATE {t} SET {col} = NULL WHERE {col} IN (SELECT id FROM {doomed[f['referred_table']]})"))
                 if res.rowcount:
-                    counts[f"{name}.{fk.parent.name} detached"] = res.rowcount
-
-    for tname, cond in direct:
-        res = db.execute(text(f"DELETE FROM {tname} WHERE {cond}"))
-        counts[tname] = res.rowcount or 0
+                    counts[f"{t}.{col} detached"] = res.rowcount
+    for t, cond in direct:
+        res = db.execute(text(f"DELETE FROM {t} WHERE {cond}"))
+        counts[t] = res.rowcount or 0
     for name in reversed(order):
         res = db.execute(text(f"DELETE FROM {name} WHERE id IN (SELECT id FROM {doomed[name]})"))
         counts[name] = res.rowcount or 0
