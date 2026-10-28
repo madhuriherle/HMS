@@ -25,6 +25,9 @@ def test_verification_flow(client, admin_headers):
 
     h = client.get(f"/api/v1/members/{a['id']}/verification", headers=admin_headers).json()
     assert h["status"] == "VERIFIED" and h["remark"] == "all correct"
+    r_reset = client.put(f"/api/v1/members/{a['id']}/verification", headers=admin_headers, json={"status": "NOT_VERIFIED", "remark": "reset back"})
+    assert r_reset.status_code == 200 and r_reset.json()["status"] == "NOT_VERIFIED"
+    client.put(f"/api/v1/members/{a['id']}/verification", headers=admin_headers, json={"status": "VERIFIED", "remark": "all correct"})
     assert [c["status"] for c in h["calls"]] == ["VERIFIED", "CALL_BACK"]
     assert client.get(f"/api/v1/members/{a['id']}", headers=admin_headers).json()["verification_status"] == "VERIFIED"
 

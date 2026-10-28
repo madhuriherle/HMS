@@ -754,7 +754,7 @@ class VerificationIn(pydantic.BaseModel):
         return self
 
 
-VERIFIED_CHOICES = VERIFICATION_STATUSES[1:]   # a call always ends in an outcome; "not verified" is only the starting state
+VERIFIED_CHOICES = VERIFICATION_STATUSES   # a call always ends in an outcome; "not verified" is only the starting state
 
 
 @router.get("/{id}/verification")
