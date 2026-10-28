@@ -31,7 +31,8 @@ def test_pincodes_follow_their_village(client, admin_headers):
         b = PostalCode(pincode="574002", post_office_name="Samename B.O", state_id=st.id, district_id=d.id, taluk_id=t_old.id, status=True)
         c = PostalCode(pincode="574003", post_office_name="Twice B.O", state_id=st.id, district_id=d.id, taluk_id=t_old.id, status=True)
         e = PostalCode(pincode="574004", post_office_name="Nothing like it S.O", state_id=st.id, district_id=d.id, taluk_id=t_old.id, status=True)
-        db.add_all([a, b, c, e])
+        f = PostalCode(pincode="574001", post_office_name="Town S.O", state_id=st.id, district_id=d.id, taluk_id=t_other.id, status=True)   # same pincode as a
+        db.add_all([a, b, c, e, f])
         db.flush()
         m = Member(first_name_en="PinMember", state_id=st.id, district_id=d.id, taluk_id=t_old.id, pincode_id=a.id)
         db.add(m)
@@ -46,6 +47,8 @@ def test_pincodes_follow_their_village(client, admin_headers):
         assert b.village_id is not None and b.taluk_id == t_old.id                                   # two villages, one in its taluk: keeps it
         assert c.village_id is None and c.taluk_id == t_old.id and ("574003", "Twice B.O", 2) in out["review"]   # ambiguous: left
         assert e.village_id is None and e.taluk_id == t_old.id                                       # no village of that name: left
+        db.refresh(f)
+        assert f.village_id is None and f.taluk_id == t_new.id                                       # unknown to the village list: follows its pincode
         again = pincode_map.map_pincodes(db, apply=True)
         assert again["pointed at a village (taluk changed)"] == 0
     finally:

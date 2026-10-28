@@ -44,8 +44,9 @@ def map_pincodes(db, apply: bool = True) -> dict:
         by_district[did][_letters(name)].append((vid, tid))
     pcs = db.query(PostalCode).filter(PostalCode.is_deleted == False).all()  # noqa: E712
     out = {"pincodes": len(pcs), "pointed at a village (same taluk)": 0, "pointed at a village (taluk changed)": 0, "several villages, left for the office": 0,
-           "no village of that name": 0, "members moved with their pincode": 0}
+           "no village of that name": 0, "followed the other post offices of their pincode": 0, "members moved with their pincode": 0}
     review, changes, unmatched = [], [], []
+    loose = []                                                  # post offices with no village of their own: [(pc, village hits or None)]
     changed_taluk = {}
     for pc in pcs:
         key = post_office_key(pc.post_office_name)
@@ -53,6 +54,7 @@ def map_pincodes(db, apply: bool = True) -> dict:
         if not key or not names:
             out["no village of that name"] += 1
             unmatched.append((pc.pincode, pc.post_office_name, pc.taluk_id))
+            loose.append((pc, None))
             continue
         hits = names.get(key)
         if not hits:
@@ -61,6 +63,7 @@ def map_pincodes(db, apply: bool = True) -> dict:
         if not hits:
             out["no village of that name"] += 1
             unmatched.append((pc.pincode, pc.post_office_name, pc.taluk_id))
+            loose.append((pc, None))
             continue
         if len(hits) > 1:
             same = [h for h in hits if h[1] == pc.taluk_id]
@@ -69,6 +72,7 @@ def map_pincodes(db, apply: bool = True) -> dict:
             else:
                 out["several villages, left for the office"] += 1
                 review.append((pc.pincode, pc.post_office_name, len(hits)))
+                loose.append((pc, hits))
                 continue
         vid, tid = hits[0]
         if pc.taluk_id == tid:
@@ -78,6 +82,33 @@ def map_pincodes(db, apply: bool = True) -> dict:
             changed_taluk[pc.id] = (pc.taluk_id, tid)
             changes.append((pc.pincode, pc.post_office_name, pc.taluk_id, tid))
         pc.village_id = vid
+        pc.taluk_id = tid
+    # a post office the village list does not know (Kota S.O, Manur B.O...) follows the other post offices of its pincode when those,
+    # matched to villages, all sit in one taluk of its district; where they disagree it stays and is listed
+    sibling = defaultdict(set)
+    for pc in pcs:
+        if pc.village_id:
+            sibling[pc.pincode].add((pc.taluk_id, pc.district_id))
+    for pc, hits in loose:
+        found = sibling.get(pc.pincode, set())
+        if len(found) != 1:
+            continue
+        tid, did = next(iter(found))
+        if did != pc.district_id or pc.taluk_id == tid:
+            continue
+        if hits is not None:
+            mine = [h for h in hits if h[1] == tid]
+            if len(mine) != 1:
+                continue
+            pc.village_id = mine[0][0]
+            review[:] = [r for r in review if not (r[0] == pc.pincode and r[1] == pc.post_office_name)]
+            out["several villages, left for the office"] -= 1
+        else:
+            unmatched[:] = [u for u in unmatched if not (u[0] == pc.pincode and u[1] == pc.post_office_name)]
+            out["no village of that name"] -= 1
+        out["followed the other post offices of their pincode"] += 1
+        changed_taluk[pc.id] = (pc.taluk_id, tid)
+        changes.append((pc.pincode, pc.post_office_name, pc.taluk_id, tid))
         pc.taluk_id = tid
     # members linked to a pincode whose taluk changed follow it (only when they still hold the old taluk)
     for pid, (old, new) in changed_taluk.items():
