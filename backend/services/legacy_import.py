@@ -1030,10 +1030,12 @@ def split_shared_receipts(db, rows: list, user_id: int) -> dict:
     shared_ids = [rid for (rid,) in db.query(ReceiptAllocation.receipt_id).join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
                   .filter(Receipt.source == SOURCE, Receipt.is_deleted == False)  # noqa: E712
                   .group_by(ReceiptAllocation.receipt_id).having(func.count(ReceiptAllocation.id) > 1).all()]
-    if not shared_ids:
-        return {"split": 0}
     numbers = {m for (m,) in db.query(Member.membership_number).join(ReceiptAllocation, ReceiptAllocation.member_id == Member.id)
-               .filter(ReceiptAllocation.receipt_id.in_(shared_ids)).all()}
+               .filter(ReceiptAllocation.receipt_id.in_(shared_ids)).all()} if shared_ids else set()
+    # members of the register's shared numbers: also picks up those a run that stopped half way left without their receipt
+    numbers |= {str(int(c)) for g in build_plan(db, rows)["shared"] for c in g["members"]}
+    if not numbers:
+        return {"split": 0}
     for rid in shared_ids:
         r = db.get(Receipt, rid)
         r.receipt_number = f"SPLIT-{rid}"
