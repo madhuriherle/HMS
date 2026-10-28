@@ -3,6 +3,8 @@
 Nothing is saved here. `build_plan` reads the rows, applies the import rules and returns the findings; `reports_xlsx`
 puts them in one Excel file. The rules (agreed with the office):
   * CusNo is the membership number, CusNoOld the old number (0 = none), CusNoNew is not used;
+  * the upgrade column (CusMemUpAmt) is Patrika Nidhi money, whatever the year or the amount (the office confirmed): it is a
+    Donation > Patrika Nidhi line and never counts as membership. Membership is the membership column (CusMemAmt) only;
   * up to 6 receipt lines per member; a line with a date but no number gets a dummy number FY43-001 (the last two
     digits of the financial year, then a running number) and keeps its amount (0 when there is none);
   * receipts before 1943 or after today are wrong dates and are not imported (the member is);
@@ -171,8 +173,9 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
                     "membership": mem, "upgrade": up, "other": extra, "note": _s(r.get(f"CusReceiptNote{j}")), "kind": "OK",
                     "scholarship": _num(r.get(f"CusScholarAmt{j}")),
                     "donation": sum(_num(r.get(f"CusDon{k}Amt{j}")) for k in (1, 2, 3)), "patrika": 0.0}
+            line["patrika"], line["upgrade"] = line["upgrade"], 0.0       # the upgrade column is Patrika Nidhi
             if _PATRIKA.search(line["note"]):
-                line["patrika"], line["upgrade"], line["donation"] = line["upgrade"] + line["donation"], 0.0, 0.0
+                line["patrika"], line["donation"] = line["patrika"] + line["donation"], 0.0
             m["lines"].append(line)
 
     # --- receipts: wrong dates, missing dates, shared and repeated numbers, dummy numbers
@@ -216,7 +219,7 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
             ln["dummy"] = f"FY{code}-{seq[code]:03d}"
             dummies.append({**ln, "reason": ("number already used on another date" if ln["kind"] == "NUMBER_TAKEN"
                                              else "no receipt number" + (", no amount" if not (ln["membership"] or ln["upgrade"] or ln["other"]) else ""))})
-        elif not (ln["membership"] or ln["upgrade"] or ln["other"]):
+        elif not (ln["membership"] or ln["upgrade"] or ln["other"] or ln["patrika"]):
             ln["kind"] = "NO_AMOUNT"
 
     zero_amount = [ln for _m, ln in importable if ln["kind"] == "NO_AMOUNT"]
@@ -616,7 +619,7 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
         don = sum(l["donation"] for _m, l in members)
         pat = sum(l["patrika"] for _m, l in members)
         total = mem + up + sch + don + pat
-        if mem + up > 0 or total == 0:
+        if mem > 0 or total == 0:
             rtype = "MEMBERSHIP"
         else:
             rtype = "SCHOLARSHIP" if sch > 0 and don == 0 and pat == 0 else "GENERAL_DONATION"
@@ -674,21 +677,15 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
                         description=description, amount=amount, line_no=line_no,
                         pays_for_membership=bool(particular.pays_for_membership), created_by=user_id))
 
-                # the membership amount and the upgrade amount are ONE Membership line: the Receipt Entry screen allows a
-                # particular once per receipt, so two lines could not be edited or saved again
-                if mem + up > 0 or total == 0:
-                    note = []
-                    if len(members) > 1:
-                        note.append("Shared by %d members" % len(members))
-                    if up > 0:
-                        note.append("includes upgrade amount %s" % f"{up:g}")
-                    item("MEMBERSHIP", p["membership"], None, mem + up, "; ".join(note) or None)
+                # the Membership line is the membership amount only; the upgrade column is the Patrika Nidhi line below
+                if mem > 0 or total == 0:
+                    item("MEMBERSHIP", p["membership"], None, mem, "Shared by %d members" % len(members) if len(members) > 1 else None)
                 if sch > 0:
                     item("SCHOLARSHIP", p["scholarship"], p["general_scholarship"], sch, notes or None)
                 if don > 0:
                     item("DONATION", p["donation"], p["general_donation"], don, notes or None)
                 if pat > 0:
-                    item("DONATION", p["donation"], p["patrika_nidhi"], pat, notes or None)
+                    item("DONATION", p["donation"], p["patrika_nidhi"], pat, notes or "Old register: upgrade column (Patrika Nidhi)")
                 for (mid, mno, _name), ln in members:
                     own = ln["membership"] + ln["upgrade"] + ln["scholarship"] + ln["donation"] + ln["patrika"]
                     # on a receipt shared by several members each one is given the membership money of their own line
@@ -942,3 +939,76 @@ def retag_patrika_receipts(db, rows: list, user_id: int) -> dict:
             moved += got
     db.commit()
     return {"receipts_changed": fixed, "amount_moved_to_patrika_nidhi": moved, "receipts_not_found": missing}
+
+
+def split_upgrade_into_patrika(db, rows: list, user_id: int) -> dict:
+    """Receipts already imported with the upgrade column inside the Membership line (or as an upgrade-only line): that money is
+    Patrika Nidhi. Each receipt's Membership money goes down by it and a Donation > Patrika Nidhi line takes it; a receipt left
+    with no membership money becomes a General Donation receipt. Receipt totals do not change. Slots are matched to receipts by
+    member and date (a shared receipt gets the upgrade money of all its members). Safe to repeat: a receipt that already holds
+    its Patrika Nidhi amount is left alone."""
+    from collections import defaultdict as _dd
+    from datetime import timezone
+    from models.members import Member
+    from models.receipts import Receipt, ReceiptAllocation, ReceiptItem
+
+    p = _particulars(db, user_id)
+    pat = p["patrika_nidhi"]
+    now = datetime.now(timezone.utc)
+    by_no = {n: i for n, i in db.query(Member.membership_number, Member.id).filter(Member.registration_source == "MIGRATION", Member.membership_number != None).all()}  # noqa: E711
+    wanted, missing = _dd(float), 0
+    for r in rows:
+        mid = by_no.get(_s(r.get("CusNo")))
+        for j in SLOTS:
+            up = _num(r.get(f"CusMemUpAmt{j}"))
+            note_money = _num(r.get(f"CusMemUpAmt{j}")) + sum(_num(r.get(f"CusDon{k}Amt{j}")) for k in (1, 2, 3)) if _PATRIKA.search(_s(r.get(f"CusReceiptNote{j}"))) else up
+            d = _as_date(r.get(f"CusReceiptDate{j}"))
+            if not note_money or d is None or mid is None:
+                continue
+            number = _s(r.get(f"CusReceiptNo{j}"))
+            q = (db.query(Receipt).join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id)
+                 .filter(ReceiptAllocation.member_id == mid, ReceiptAllocation.is_deleted == False, Receipt.receipt_date == d,  # noqa: E712
+                         Receipt.source == SOURCE, Receipt.is_deleted == False))  # noqa: E712
+            found = q.all()
+            rec = next((x for x in found if x.receipt_number == number), None) or (found[0] if found else None)
+            if rec is None:
+                missing += 1
+                continue
+            wanted[rec.id] += note_money
+    changed, moved = 0, 0.0
+    for rid, want in wanted.items():
+        items = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == rid, ReceiptItem.is_deleted == False).order_by(ReceiptItem.line_no).all()  # noqa: E712
+        have = sum(float(i.amount) for i in items if i.particular_name == "Donation" and i.sub_particular_id == pat.id)
+        delta = round(want - have, 2)
+        if delta <= 0.005:
+            continue
+        left = delta
+        for kind in ("TYPE_CHANGE", "MEMBERSHIP"):
+            for i in items:
+                if left <= 0:
+                    break
+                if i.is_deleted or i.particular_name != "Membership" or (i.item_type or "").upper() != kind:
+                    continue
+                cut = min(float(i.amount), left)
+                left -= cut
+                i.amount = float(i.amount) - cut
+                if i.amount <= 0.0001:
+                    i.is_deleted, i.deleted_at = True, now
+                elif "includes upgrade" in (i.description or ""):
+                    i.description = "Shared by several members" if "Shared by" in (i.description or "") else None
+        took = delta - left
+        if took <= 0:
+            continue
+        existing = next((i for i in items if not i.is_deleted and i.particular_name == "Donation" and i.sub_particular_id == pat.id), None)
+        if existing is not None:
+            existing.amount = float(existing.amount) + took
+        else:
+            db.add(ReceiptItem(receipt_id=rid, item_type="DONATION", particular_id=p["donation"].id, particular_name=p["donation"].name_en,
+                               sub_particular_id=pat.id, sub_particular_name=pat.name_en, description="Old register: upgrade column (Patrika Nidhi)",
+                               amount=took, line_no=max([i.line_no or 0 for i in items] + [0]) + 1, pays_for_membership=bool(p["donation"].pays_for_membership), created_by=user_id))
+        if not any(not i.is_deleted and i.particular_name == "Membership" for i in items):
+            db.query(Receipt).filter(Receipt.id == rid).update({"receipt_type": "GENERAL_DONATION"}, synchronize_session=False)
+        changed += 1
+        moved += took
+    db.commit()
+    return {"receipts_changed": changed, "amount_moved_to_patrika_nidhi": round(moved, 2), "slots_without_a_receipt": missing}

@@ -112,6 +112,7 @@ const toEntryMember = (m, loc) => {
     registrationType: m.registration_source || '',
     registrationDate: created,
     createdDate: created,
+    memberSince: m.member_since || m.approved_at || null,
     // what was typed on the application's payment tab
     paymentMode: reg.payment_mode || '',
     bankAccount: reg.bank_account || '',
@@ -536,7 +537,8 @@ export default function ReceiptEntry() {
             setSelectedMember((prev) => (prev && prev.id === member.id ? {
               ...prev,
               membershipNumber: prev.membershipNumber || realMemNo,
-              membershipType: ms?.type_name_en || prev.membershipType
+              membershipType: ms?.type_name_en || prev.membershipType,
+              memberSince: data?.member_since || ms?.member_since || prev.memberSince
             } : prev));
           } else if (ms) {
             setSelectedMember((prev) => (prev && prev.id === member.id ? { ...prev, membershipType: ms.type_name_en || '' } : prev));
@@ -2450,7 +2452,7 @@ export default function ReceiptEntry() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2.5 border-b border-[#E8DFD8]">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pb-2.5 border-b border-[#E8DFD8]">
                       <div>
                         <span className="text-[#863221] font-semibold block">Date of Birth & Age:</span>
                         <span className="text-[#180200]">{formatDate(selectedMember.birthDate)} {selectedMember.age ? `(Age: ${selectedMember.age})` : ''}</span>
@@ -2458,6 +2460,10 @@ export default function ReceiptEntry() {
                       <div>
                         <span className="text-[#863221] font-semibold block">Mobile / Contact Number:</span>
                         <strong className="font-mono text-[#180200]">{selectedMember.mobile || selectedMember.mobileNumber || selectedMember.contactNumber || '—'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-[#863221] font-semibold block">Member Since:</span>
+                        <strong className="text-[#180200]">{selectedMember.memberSince ? formatDate(selectedMember.memberSince) : '—'}</strong>
                       </div>
                     </div>
 

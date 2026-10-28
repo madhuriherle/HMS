@@ -174,34 +174,60 @@ def test_backfill_kannada(client, admin_headers):
         db.close()
 
 
-def test_receipt_lines_are_one_per_particular(client, admin_headers):
-    """Membership + upgrade amount is ONE Membership line, and older receipts with two lines are joined."""
+def test_upgrade_column_is_patrika_nidhi(client, admin_headers):
+    """The upgrade column is Patrika Nidhi: Membership + upgrade is a Membership line and a Patrika Nidhi line; receipts made the old way are split."""
     from datetime import date
     from db.session import SessionLocal
-    from models.members import Member
     from models.receipts import Receipt, ReceiptItem
     from services import legacy_import
 
     s = _sfx()
     _create_membership_type(client, admin_headers, "ML" + s[-5:], "Ajeeva")
-    rows = legacy_import.read_register(_register([_row(960001, "UMA U", [(7001, datetime(1999, 5, 1), 400)], CusMemUpAmt1=100)]))
+    rows = legacy_import.read_register(_register([
+        _row(960001, "UMA U", [(7001, datetime(1999, 5, 1), 400)], CusMemUpAmt1=100),
+        _row(960002, "VEENA V", [(7002, datetime(1999, 6, 1), 0)], CusMemUpAmt1=100),       # an upgrade amount alone
+    ]))
     db = SessionLocal()
+
+    def lines(number):
+        rid = db.query(Receipt.id).filter(Receipt.receipt_number == number).scalar()
+        return rid, sorted((i.particular_name, i.sub_particular_name or "", float(i.amount)) for i in
+                           db.query(ReceiptItem).filter(ReceiptItem.receipt_id == rid, ReceiptItem.is_deleted == False))  # noqa: E712
     try:
         legacy_import.import_members(db, rows, 1, run_id="x" + s[-8:])
         legacy_import.import_receipts(db, rows, 1)
-        rid = db.query(Receipt.id).filter(Receipt.receipt_number == "7001", Receipt.receipt_date == date(1999, 5, 1)).scalar()
-        lines = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == rid, ReceiptItem.is_deleted == False).all()  # noqa: E712
-        assert len(lines) == 1 and float(lines[0].amount) == 500 and "upgrade amount 100" in lines[0].description
-        # a receipt made the old way (two Membership lines) is joined
-        first = lines[0]
-        db.add(ReceiptItem(receipt_id=rid, item_type="TYPE_CHANGE", particular_id=first.particular_id, particular_name=first.particular_name,
-                           description="Upgrade amount (old register)", amount=50, line_no=2, pays_for_membership=True, created_by=1))
+        rid, got = lines("7001")
+        assert got == [("Donation", "Patrika Nidhi", 100.0), ("Membership", "", 400.0)], got
+        alone, got2 = lines("7002")
+        assert got2 == [("Donation", "Patrika Nidhi", 100.0)], got2
+        assert db.query(Receipt.receipt_type).filter(Receipt.id == alone).scalar() == "GENERAL_DONATION"
+        assert db.query(Receipt.receipt_type).filter(Receipt.id == rid).scalar() == "MEMBERSHIP"
+
+        # a receipt made the old way (the upgrade inside the Membership line, or as an upgrade-only line) is split
+        items = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == rid, ReceiptItem.is_deleted == False).all()  # noqa: E712
+        for i in items:
+            if i.particular_name == "Donation":
+                i.is_deleted = True
+            else:
+                i.amount, i.description = 500, "includes upgrade amount 100"
+        for i in db.query(ReceiptItem).filter(ReceiptItem.receipt_id == alone, ReceiptItem.is_deleted == False):  # noqa: E712
+            i.item_type, i.particular_name, i.sub_particular_name, i.sub_particular_id = "TYPE_CHANGE", "Membership", None, None
+        db.query(Receipt).filter(Receipt.id == alone).update({"receipt_type": "MEMBERSHIP"})
         db.commit()
-        out = legacy_import.merge_same_particular_lines(db)
-        assert out["lines_removed"] >= 1
-        lines = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == rid, ReceiptItem.is_deleted == False).all()  # noqa: E712
-        assert len(lines) == 1 and float(lines[0].amount) == 550
-        assert legacy_import.merge_same_particular_lines(db)["lines_removed"] == 0      # a second run changes nothing
+        out = legacy_import.split_upgrade_into_patrika(db, rows, 1)
+        assert out["receipts_changed"] == 2 and out["amount_moved_to_patrika_nidhi"] == 200, out
+        assert lines("7001")[1] == [("Donation", "Patrika Nidhi", 100.0), ("Membership", "", 400.0)]
+        assert lines("7002")[1] == [("Donation", "Patrika Nidhi", 100.0)]
+        assert db.query(Receipt.receipt_type).filter(Receipt.id == alone).scalar() == "GENERAL_DONATION"
+        assert legacy_import.split_upgrade_into_patrika(db, rows, 1)["receipts_changed"] == 0      # a second run changes nothing
+
+        # two lines of one particular on a receipt are still joined by merge_same_particular_lines
+        first = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == rid, ReceiptItem.particular_name == "Membership").first()
+        db.add(ReceiptItem(receipt_id=rid, item_type="MEMBERSHIP", particular_id=first.particular_id, particular_name="Membership", amount=50, line_no=9,
+                           pays_for_membership=True, created_by=1))
+        db.commit()
+        assert legacy_import.merge_same_particular_lines(db)["lines_removed"] >= 1
+        assert lines("7001")[1] == [("Donation", "Patrika Nidhi", 100.0), ("Membership", "", 450.0)]
     finally:
         db.close()
 
@@ -228,12 +254,12 @@ def test_patrika_nidhi_receipts(client, admin_headers):
         assert [(i.particular_name, i.sub_particular_name, float(i.amount), i.item_type) for i in lines] == [("Donation", "Patrika Nidhi", 100.0, "DONATION")]
         assert pat.receipt_type == "GENERAL_DONATION" and float(pat.net_amount) == 100
         normal = db.query(Receipt).filter(Receipt.receipt_number == "8802").one()
-        assert [(i.particular_name, float(i.amount)) for i in db.query(ReceiptItem).filter(ReceiptItem.receipt_id == normal.id, ReceiptItem.is_deleted == False)] == [("Membership", 500.0)]  # noqa: E712
+        assert sorted((i.particular_name, float(i.amount)) for i in db.query(ReceiptItem).filter(ReceiptItem.receipt_id == normal.id, ReceiptItem.is_deleted == False)) == [("Donation", 100.0), ("Membership", 400.0)]  # noqa: E712
 
         # a receipt imported the old way (the money as a membership upgrade line) is moved
         for i in lines:
             i.is_deleted = True
-        db.add(ReceiptItem(receipt_id=pat.id, item_type="TYPE_CHANGE", particular_id=db.query(ReceiptItem.particular_id).filter(ReceiptItem.receipt_id == normal.id).scalar(),
+        db.add(ReceiptItem(receipt_id=pat.id, item_type="TYPE_CHANGE", particular_id=db.query(ReceiptItem.particular_id).filter(ReceiptItem.receipt_id == normal.id, ReceiptItem.particular_name == "Membership").scalar(),
                            particular_name="Membership", description="Upgrade amount (old register)", amount=100, line_no=1, pays_for_membership=True, created_by=1))
         pat.receipt_type = "MEMBERSHIP"
         db.commit()

@@ -1081,6 +1081,7 @@ def read_member(
         raise HTTPException(status_code=404, detail="Member not found")
     data = schemas_members.Member.model_validate(member).model_dump(mode="json")
     _attach_places(db, [data])  # the popup gets state / district / taluk names with the member, in the same call
+    data["member_since"] = calculate_member_since(db, member)
     return data
 
 @router.get("/{id}/family", response_model=List[schemas_members.MemberFamilyLink])
@@ -2244,6 +2245,7 @@ def read_member_profile(
     )
     from services.pricing import active_price
 
+    since_dt = calculate_member_since(db, member, memberships[0][0] if memberships else None)
     membership_list = []
     for m, t in memberships:
         price = active_price(db, t.id)
@@ -2259,6 +2261,7 @@ def read_member_profile(
             "applied_at": m.applied_at,
             "activated_at": m.activated_at,
             "expires_at": m.expires_at,
+            "member_since": since_dt or m.activated_at or m.applied_at,
             "current_price": float(price.amount) if price else None,
         })
 
@@ -2346,6 +2349,7 @@ def read_member_profile(
             **_location_names(db, member),
         },
         "memberships": membership_list,
+        "member_since": since_dt,
         "membership_credit": __import__("services.membership_credit", fromlist=["summary"]).summary(db, id),
         "services": {
             # Generic opt-ins (Temple, Mangalya, Hall, …) — the catalogue is
@@ -2699,6 +2703,41 @@ def _payment_check_view(db: Session, member_id: int):
     return {**c, "type_name": t.name_en if t else None}
 
 
+def calculate_member_since(db: Session, member: Member, current_membership: Optional[Any] = None) -> Optional[Any]:
+    """Calculate the 'Member since' date:
+    - For imported members (registration_source in ('MIGRATION', 'IMPORT') or is_imported):
+      The receipt date of their earliest (first) receipt.
+    - For normal members:
+      The date selected while approving (member.approved_at or current_membership.activated_at).
+    """
+    from models.receipts import Receipt, ReceiptAllocation
+    is_imported = (member.registration_source in ("MIGRATION", "IMPORT") or getattr(member, "is_imported", False))
+    if is_imported:
+        first_receipt = (
+            db.query(Receipt.receipt_date)
+            .join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id)
+            .filter(
+                ReceiptAllocation.member_id == member.id,
+                ReceiptAllocation.is_deleted == False,
+                Receipt.is_deleted == False,
+                Receipt.receipt_status != "CANCELLED",
+            )
+            .order_by(Receipt.receipt_date.asc(), Receipt.id.asc())
+            .first()
+        )
+        if first_receipt and first_receipt[0]:
+            return first_receipt[0]
+
+    # For normal ones (or imported members without receipts), the approval date:
+    if member.approved_at:
+        return member.approved_at
+    if current_membership and getattr(current_membership, "activated_at", None):
+        return current_membership.activated_at
+    if current_membership and getattr(current_membership, "applied_at", None):
+        return current_membership.applied_at
+    return member.created_at
+
+
 def _profile_membership(db: Session, member: Member, actor=None) -> dict:
     actor = actor or (lambda _uid: None)
     from models.masters import MembershipType
@@ -2713,6 +2752,7 @@ def _profile_membership(db: Session, member: Member, actor=None) -> dict:
         .order_by(MemberMembership.applied_at.desc())
         .all()
     )
+    since_dt = calculate_member_since(db, member, rows[0][0] if rows else None)
     memberships = []
     for m, t in rows:
         price = active_price(db, t.id)
@@ -2720,6 +2760,7 @@ def _profile_membership(db: Session, member: Member, actor=None) -> dict:
             "id": m.id, "membership_type_id": t.id, "type_code": t.code, "type_name_en": t.name_en,
             "type_name_kn": t.name_kn, "membership_number": m.membership_number, "old_membership_number": member.old_membership_number, "status": m.status,
             "applied_at": m.applied_at, "activated_at": m.activated_at, "expires_at": m.expires_at,
+            "member_since": since_dt or m.activated_at or m.applied_at,
             "family_membership_number": m.family_membership_number,
             "current_price": float(price.amount) if price else None,
         })
@@ -2738,6 +2779,7 @@ def _profile_membership(db: Session, member: Member, actor=None) -> dict:
     } if any(h.receipt_id for h in changes) else {}
     return {
         "memberships": memberships,
+        "member_since": since_dt,
         "payment_check": _payment_check_view(db, mid),
         "payments": membership_credit.payment_table(db, mid),
         "approval": {
@@ -3091,7 +3133,11 @@ def _profile_overview(db: Session, member: Member, current_user: User) -> dict:
             "email": contact["email"], "address": address,
             "verification_status": member.verification_status or "NOT_VERIFIED", "verified_at": member.verified_at,
         },
-        "membership": {"current": current, "credit": membership["membership_credit"]},
+        "membership": {
+            "current": current,
+            "credit": membership["membership_credit"],
+            "member_since": membership.get("member_since"),
+        },
         "family": {
             "father_name": family["father_name"], "father_membership_number": family["father_membership_number"],
             "mother_name": family["mother_name"], "mother_membership_number": family["mother_membership_number"],

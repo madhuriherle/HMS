@@ -243,7 +243,7 @@ function OverviewTab({ id }) {
         const credit = m.credit;
         const target = credit?.target_type;
         const pct = target?.price ? Math.min(100, Math.round((credit.credit_total / target.price) * 100)) : 100;
-        const since = m.current?.activated_at || m.current?.applied_at;
+        const since = m.current?.member_since || d.membership?.member_since || m.current?.activated_at || m.current?.applied_at;
         const personal = [
           ['Gender', b.gender],
           ['Date of birth', b.date_of_birth ? formatDate(b.date_of_birth) : ''],
@@ -601,7 +601,7 @@ function MembershipTab({ id }) {
                     <div className="text-xs text-[#863221] font-mono">{m.membership_number || 'No number yet'}</div>
                     {m.family_membership_number && <div className="text-[11px] text-[#863221]">Family no. {m.family_membership_number}</div>}
                     <div className="text-[11px] text-[#863221]">
-                      {m.activated_at ? `Active from ${formatDate(m.activated_at)}` : m.applied_at ? `Applied ${formatDate(m.applied_at)}` : ''}
+                      {m.member_since ? `Member since ${formatDate(m.member_since)}` : m.activated_at ? `Active from ${formatDate(m.activated_at)}` : m.applied_at ? `Applied ${formatDate(m.applied_at)}` : ''}
                     </div>
                   </div>
                   <div className="text-right text-xs text-[#863221]">
