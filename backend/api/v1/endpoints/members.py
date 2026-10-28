@@ -1082,6 +1082,7 @@ def read_member(
     data = schemas_members.Member.model_validate(member).model_dump(mode="json")
     _attach_places(db, [data])  # the popup gets state / district / taluk names with the member, in the same call
     data["member_since"] = calculate_member_since(db, member)
+    data["photo_path"] = member.photo_path       # the Edit page shows the photo from this
     return data
 
 @router.get("/{id}/family", response_model=List[schemas_members.MemberFamilyLink])
