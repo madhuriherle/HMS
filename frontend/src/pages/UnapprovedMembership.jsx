@@ -685,7 +685,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           options={[
             { value: 'ALL', label: 'Payment Status' },
             { value: 'NO_RECEIPT', label: 'No receipt on record' },
-            { value: 'MISMATCH', label: 'Payment mismatch' }
+            { value: 'MISMATCH', label: 'Payment mismatch' },
+            { value: 'NOT_MAPPED', label: 'Receipt not mapped' }
           ]}
           widthClass="w-full sm:w-44"
         />

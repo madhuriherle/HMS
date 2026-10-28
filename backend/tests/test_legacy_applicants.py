@@ -89,3 +89,39 @@ def test_applicants_payment_status_filter_and_shortfall(client, admin_headers):
     none = client.get("/api/v1/members/", headers=admin_headers, params={"approval_status": "UNAPPROVED", "payment_status": "NO_RECEIPT", "limit": 200}).json()
     none = none["data"] if isinstance(none, dict) else none
     assert [m for m in none if str(m.get("legacy_ref_number")) == "970003"]
+
+
+def test_applicants_receipt_not_mapped(client, admin_headers):
+    """An unassigned receipt that carries an applicant's application number or mobile marks them as having a receipt not mapped."""
+    from db.session import SessionLocal
+    from models.masters import Particular
+    from models.receipts import Receipt
+    from services import legacy_import
+
+    import time
+
+    s = _sfx()
+    digits = str(int(time.time() * 1000))[-8:]
+    mobile = "9" + digits + "1"
+    _create_membership_type(client, admin_headers, "NM" + s[-5:], "Ajeeva")
+    rows = legacy_import.read_register(_register([
+        _row(980001, "WAITING BY MOBILE", CusMobile=mobile),
+        _row(980002, "WAITING BY NUMBER"),
+        _row(980003, "NOTHING WAITING", CusMobile="8" + digits + "2"),
+    ]))
+    db = SessionLocal()
+    try:
+        if not db.query(Particular).filter(Particular.name_en == "Membership", Particular.parent_id.is_(None), Particular.is_deleted == False).first():  # noqa: E712
+            db.add(Particular(code="RT-" + s[-6:], name_en="Membership", status=True, pays_for_membership=True))
+            db.commit()
+        assert legacy_import.import_members(db, rows, 1, run_id="n" + s[-8:], applicants=True)["created"] == 3
+        for no, payer_mobile, number in ((None, mobile, "NM1" + s[-5:]), ("980002", None, "NM2" + s[-5:])):
+            db.add(Receipt(receipt_number=number, receipt_date=date(2026, 4, 1), financial_year="2026-27", receipt_type="MEMBERSHIP", source="OFFLINE",
+                           gross_amount=1000, discount_amount=0, net_amount=1000, payment_status="SUCCESS", receipt_status="UNASSIGNED", payment_mode="CASH",
+                           payer_membership_no=no, payer_mobile=payer_mobile))
+        db.commit()
+    finally:
+        db.close()
+    got = client.get("/api/v1/members/", headers=admin_headers, params={"approval_status": "UNAPPROVED", "payment_status": "NOT_MAPPED", "limit": 200}).json()
+    refs = {str(m.get("legacy_ref_number")) for m in (got["data"] if isinstance(got, dict) else got)}
+    assert {"980001", "980002"} <= refs and "980003" not in refs
