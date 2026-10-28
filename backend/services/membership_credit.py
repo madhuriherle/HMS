@@ -532,8 +532,9 @@ def _price_on(prices: list, type_id, on):
     return None
 
 
-def payment_check_rows(db: Session, member_ids=None) -> dict:
+def payment_check_rows(db: Session, member_ids=None, applicants: bool = False) -> dict:
     """{member_id: info} for approved members: do their payments cover the price of the type they hold?
+    applicants=True asks the same of the applicants (unapproved, a pending membership of the type they chose).
 
     The price is the one in force on the date of the member's latest membership receipt (Membership Types > price
     history), so a member whose last receipt is dated 1980 is judged by the 1980 price, not today's. Every receipt
@@ -549,9 +550,9 @@ def payment_check_rows(db: Session, member_ids=None) -> dict:
         .join(Member, Member.id == MemberMembership.member_id)
         .filter(
             MemberMembership.is_deleted == False,  # noqa: E712
-            MemberMembership.status == "ACTIVE",
+            MemberMembership.status == ("PENDING" if applicants else "ACTIVE"),
             Member.is_deleted == False,  # noqa: E712
-            Member.approval_status == "APPROVED",
+            (Member.approval_status != "APPROVED") if applicants else (Member.approval_status == "APPROVED"),
         )
         .order_by(MemberMembership.member_id, MemberMembership.id)
     )
