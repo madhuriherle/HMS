@@ -18,6 +18,8 @@ import {
   Phone,
   Plus,
   Trash2,
+  Receipt,
+  Loader2,
 } from 'lucide-react';
 import Modal from '../components/Modal';
 import PermissionGate from '../components/PermissionGate';
@@ -30,7 +32,8 @@ import { notify } from '../utils/notify';
 import { apiErrorMessage } from '../utils/apiError';
 import { confirmYesNo } from '../utils/dialogs';
 import { formatDate, formatDateTime, getTodayISODate } from '../utils/dateUtils';
-import { receiptToApiPayload, fetchMemberPage } from '../utils/apiAdapters';
+import { receiptToApiPayload, fetchMemberPage, fetchReceiptRow } from '../utils/apiAdapters';
+import ReceiptViewModal from '../components/ReceiptViewModal';
 import { formatPaymentModeLabel } from '../utils/displayHelpers';
 import {
   loadParticulars,
@@ -170,6 +173,40 @@ export default function ReceiptEntry() {
   const [rightLoading, setRightLoading] = useState(false);
   const [bottomLoading, setBottomLoading] = useState(false);
   const [selectedMemberReceipts, setSelectedMemberReceipts] = useState([]); // receipts of the member picked
+  const [viewingReceipt, setViewingReceipt] = useState(null);
+  const [memberReceiptsLoading, setMemberReceiptsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!selectedMember?.id) {
+      setSelectedMemberReceipts([]);
+      return;
+    }
+    let alive = true;
+    setMemberReceiptsLoading(true);
+    api
+      .get('/receipts/tracking', { params: { member_ids: selectedMember.id, limit: 50 } })
+      .then(({ data }) => {
+        if (alive) {
+          setSelectedMemberReceipts(data?.data || []);
+        }
+      })
+      .catch(() => {
+        if (alive) setSelectedMemberReceipts([]);
+      })
+      .finally(() => {
+        if (alive) setMemberReceiptsLoading(false);
+      });
+    return () => { alive = false; };
+  }, [selectedMember?.id]);
+
+  const openReceipt = async (r) => {
+    try {
+      const full = await fetchReceiptRow({ id: r.id || r.receipt_id, number: r.receipt_number, memberId: selectedMember?.id });
+      setViewingReceipt(full || r);
+    } catch {
+      setViewingReceipt(r);
+    }
+  };
   const [, setMembershipTypes] = useState([]);
   const [paymentModeConfigs, setPaymentModeConfigs] = useState([]);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [], postalCodes: [] });
@@ -2445,6 +2482,82 @@ export default function ReceiptEntry() {
                   </div>
                 </div>
 
+                {/* Section 4: Receipt Details */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-[#1D4ED8] tracking-wide uppercase flex items-center gap-1.5">
+                      <Receipt className="w-3.5 h-3.5 text-[#1D4ED8]" />
+                      <span>Receipt Details:</span>
+                    </h4>
+                    {selectedMemberReceipts.length > 0 && (
+                      <span className="text-[11px] font-bold text-[#510601] bg-[#FAF7F2] px-2 py-0.5 rounded-md border border-[#E8DFD8]">
+                        {selectedMemberReceipts.length} {selectedMemberReceipts.length === 1 ? 'receipt' : 'receipts'} · Total: {formatMoney(selectedMemberReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0))}
+                      </span>
+                    )}
+                  </div>
+
+                  {memberReceiptsLoading ? (
+                    <div className="bg-[#FAF7F2] p-4 rounded-xl border border-[#E8DFD8] text-center text-xs text-[#7D7068] flex items-center justify-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-[#863221]" />
+                      <span>Loading receipt details…</span>
+                    </div>
+                  ) : selectedMemberReceipts.length === 0 ? (
+                    <div className="bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E8DFD8] text-xs text-[#7D7068] text-center">
+                      No prior receipts on record for this member.
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-xl border border-[#E8DFD8] overflow-hidden">
+                      <div className="max-h-56 overflow-y-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[10px] sticky top-0 z-10">
+                            <tr>
+                              <th className="py-2 px-3">Receipt No</th>
+                              <th className="py-2 px-3">Date</th>
+                              <th className="py-2 px-3">Particulars</th>
+                              <th className="py-2 px-3 text-right">Amount</th>
+                              <th className="py-2 px-3 text-center w-14">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#E8DFD8]/70">
+                            {selectedMemberReceipts.map((r) => {
+                              const particularText = (r.items && r.items.length > 0)
+                                ? r.items.map((it) => it.particular || it.item_type).filter(Boolean).join(', ')
+                                : (r.receipt_type ? String(r.receipt_type).replace(/_/g, ' ') : '—');
+                              return (
+                                <tr key={r.id || r.receipt_number} className="hover:bg-[#FAF7F2]/60 transition-colors">
+                                  <td className="py-2 px-3 font-mono font-bold text-[#180200] whitespace-nowrap">
+                                    {r.receipt_number || `ID: ${r.id}`}
+                                  </td>
+                                  <td className="py-2 px-3 text-[#180200] whitespace-nowrap">
+                                    {formatDate(r.receipt_date)}
+                                  </td>
+                                  <td className="py-2 px-3 text-[#180200] max-w-[180px] truncate" title={particularText}>
+                                    {particularText}
+                                  </td>
+                                  <td className="py-2 px-3 font-mono font-bold text-[#510601] text-right whitespace-nowrap">
+                                    {formatMoney(r.amount || 0)}
+                                  </td>
+                                  <td className="py-2 px-3 text-center whitespace-nowrap">
+                                    <button
+                                      type="button"
+                                      onClick={() => openReceipt(r)}
+                                      className="btn-act px-2 py-1 text-[11px]"
+                                      title="View Receipt Voucher"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span>View</span>
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
               </div>
             </div>
           ) : (
@@ -2942,6 +3055,7 @@ export default function ReceiptEntry() {
           )}
         </div>
       )}
+      <ReceiptViewModal receipt={viewingReceipt} onClose={() => setViewingReceipt(null)} />
     </div>
     </PermissionGate>
   );
