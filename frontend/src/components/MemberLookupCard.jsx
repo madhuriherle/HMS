@@ -66,7 +66,6 @@ export default function MemberLookupCard({ lookup, onUse }) {
 
             <div className="grid grid-cols-2 gap-x-3 gap-y-2">
               <Field label="Membership No." value={m.membership_number || m.member_code} />
-              <Field label="Record ID" value={m.registration_number} />
               <Field label="Mobile" value={m.mobile} />
               <Field label="Valid till" value={m.valid_till ? formatDate(m.valid_till) : ''} />
               <div className="col-span-2 min-w-0">

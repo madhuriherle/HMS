@@ -1551,10 +1551,6 @@ export default function ReceiptEntry() {
                       <span className="text-[#180200] font-semibold">{viewingMember.fullName || viewingMember.name || '—'}</span>
                     </div>
 
-                    <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-[#863221] shrink-0">Registration Number:</span>
-                      <span className="text-[#180200] font-mono">{viewingMember.registrationNumber || viewingMember.id || '—'}</span>
-                    </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
                       <span className="font-bold text-[#863221] shrink-0">Registration Date:</span>
@@ -2554,7 +2550,7 @@ export default function ReceiptEntry() {
                               return (
                                 <tr key={r.id || r.receipt_number} className="hover:bg-[#FAF7F2]/60 transition-colors">
                                   <td className="py-2 px-3 font-mono font-bold text-[#180200] whitespace-nowrap">
-                                    {r.receipt_number || `ID: ${r.id}`}
+                                    {r.receipt_number || '—'}
                                   </td>
                                   <td className="py-2 px-3 text-[#180200] whitespace-nowrap">
                                     {formatDate(r.receipt_date)}
@@ -2698,7 +2694,7 @@ export default function ReceiptEntry() {
 
                     const shortCode = member.membershipNumber
                       ? `${String(member.membershipNumber).split('-').pop()}`
-                      : `ID ${member.registrationNumber || member.id || '—'}`;
+                      : '—';
                     const mobile = member.contactNumber || member.mobile || member.phone || '';
                     const isAssigned = selectedMember && (
                       String(member.id) === String(selectedMember.id) ||
@@ -2719,7 +2715,7 @@ export default function ReceiptEntry() {
                         <div className="flex items-center gap-3 min-w-0">
                           <div
                             className="text-xs sm:text-sm font-mono font-bold text-[#510601] pr-3 border-r border-[#E8DFD8] shrink-0"
-                            title={member.membershipNumber ? `Membership ${member.membershipNumber}` : `App ID ${member.registrationNumber || member.id}`}
+                            title={member.membershipNumber ? `Membership ${member.membershipNumber}` : undefined}
                           >
                             {shortCode}
                           </div>
@@ -2963,9 +2959,6 @@ export default function ReceiptEntry() {
                         <td className="py-3.5 px-4">
                           <div className="font-bold text-[#180200] text-xs sm:text-sm">
                             {member.fullName || member.name}
-                          </div>
-                          <div className="font-mono text-[11px] text-[#510601] mt-0.5">
-                            ID: {member.registrationNumber || member.id || '—'}
                           </div>
                         </td>
 

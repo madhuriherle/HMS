@@ -1205,7 +1205,6 @@ export default function UserManagement() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-[#180200]">User Details</h3>
-                  <p className="text-xs text-[#863221]">Account ID: {viewingUser.id}</p>
                 </div>
               </div>
               <button

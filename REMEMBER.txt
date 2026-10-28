@@ -9,9 +9,10 @@ RULE 1: MEMBER RECORD ID (id) vs. PERMANENT MEMBERSHIP NUMBER (member_code)
 --------------------------------------------------------------------------------
 1.1  DATABASE RECORD ID (Member.id):
      - An internal auto-increment primary key (e.g., 1, 2, 7, 9).
-     - Used ONLY for foreign keys, internal database lookups, and identifying
-       unapproved applicants in the review queue (labeled strictly as "ID: 7" or
-       "App ID #7").
+     - Used ONLY for foreign keys and internal database lookups. IT IS NEVER SHOWN ANYWHERE ON A
+       SCREEN (28-Oct-2026, the user's order): no "ID: 7", no "App ID", no "Record ID", no
+       "Registration Number", no "Application ID", no "Tier ID" / "Account ID". A person is shown by
+       name and membership number; an unapproved applicant by name, mobile and source only.
      - NEVER display, label, or treat Member.id as "Membership No", "Member ID",
        "MID", or "Member Code".
      - NEVER fall back to Member.id if a member has no membership number.
@@ -131,7 +132,7 @@ RULE 4: BULK RECEIPT AUTO-MAPPING RULES
 RULE 5: UI & DISPLAY STANDARDS
 --------------------------------------------------------------------------------
 5.1  LABELS AND TEXT:
-     - Unapproved list: Label as "ID: 7" (Application sequence/record).
+     - Unapproved list: no id is shown (name, mobile and source only).
      - Approved list: Label as "#12345" (Permanent Membership Number).
      - Never use the term "MID" as it confuses users between "Member ID" and
        "Membership Number".
@@ -421,7 +422,7 @@ RULE 12: UI STANDARDS (PAGES, POPUPS, BUTTONS, BOTTOM BARS)
      label-over-value items. Empty fields are not drawn; one quiet line lists what was not
      provided. No "View all" links (the tabs are right above) and no boxes inside boxes.
 12.12 NO "#" BEFORE IDs OR NUMBERS. Membership numbers, receipt numbers, member / application ids
-     and request ids are shown plain (HMS-0001, 0010, ID 7), on screens, in toasts, in popups
+     and request ids are shown plain (HMS-0001, 0010), on screens, in toasts, in popups
      and in the text the server writes (notifications, activity log, fallback names). A "#" is
      only for a position in a list (Particulars #2), never for an identifier.
 12.13 REPEATED ROWS (extra particular lines, children, relatives): the field labels are written

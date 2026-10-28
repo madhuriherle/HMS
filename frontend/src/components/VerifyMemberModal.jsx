@@ -210,7 +210,7 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
 
   return (
     <Modal
-      title={`KYC call · ${member?.membership_number || member?.member_code || `ID: ${memberId}`}${member?.full_name_en ? ` (${member.full_name_en})` : ''}`}
+      title={`KYC call${member?.membership_number || member?.member_code ? ` · ${member.membership_number || member.member_code}` : ''}${member?.full_name_en ? ` (${member.full_name_en})` : ''}`}
       onClose={onClose}
       maxWidthClass="max-w-3xl"
       footer={

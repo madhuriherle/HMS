@@ -712,7 +712,7 @@ function SubscriptionForm({ editing, memberName, onClose, onSaved }) {
                     {memberHits.length > 0 && (
                       <ul className="mt-1 max-h-56 overflow-y-auto rounded-lg border border-[#E8DFD8] bg-white divide-y divide-[#E8DFD8]">
                         {memberHits.map((m) => {
-                          const label = `${m.name_title ? `${m.name_title} ` : ''}${m.full_name_en || [m.first_name_en, m.middle_name_en, m.last_name_en].filter(Boolean).join(' ')} (${m.member_code || m.membership_number || `ID ${m.id}`})`;
+                          const label = `${m.name_title ? `${m.name_title} ` : ''}${m.full_name_en || [m.first_name_en, m.middle_name_en, m.last_name_en].filter(Boolean).join(' ')} (${m.member_code || m.membership_number || '—'})`;
                           return (
                             <li key={m.id}>
                               <button

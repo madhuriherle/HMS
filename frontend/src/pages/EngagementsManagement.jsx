@@ -1749,7 +1749,7 @@ function CommitteeView({ canWrite, canDelete }) {
                       {m.hms_member_id ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-semibold">
                           <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                          <span>{m.hms_member_name || `ID ${m.hms_member_id}`}</span>
+                          <span>{m.hms_member_name || '—'}</span>
                           {m.hms_member_code && <span className="font-mono">({m.hms_member_code})</span>}
                         </span>
                       ) : (
@@ -1905,7 +1905,7 @@ function CommitteeView({ canWrite, canDelete }) {
                       <div>
                         <p className="text-xs font-bold text-[#180200]">{memberForm.hms_member_name}</p>
                         <p className="text-[11px] text-[#863221]">
-                          Membership: {memberForm.hms_member_code || `ID ${memberForm.hms_member_id}`}
+                          Membership: {memberForm.hms_member_code || '—'}
                         </p>
                       </div>
                       <button
@@ -1958,7 +1958,7 @@ function CommitteeView({ canWrite, canDelete }) {
                                 <div>
                                   <p className="font-semibold text-[#180200]">{name}</p>
                                   <p className="text-[10px] text-[#863221]">
-                                    {code ? `No: ${code}` : `App ID ${m.id}`}
+                                    {code ? `No: ${code}` : ''}
                                     {m.mobile ? ` · 📞 ${m.mobile}` : ''}
                                   </p>
                                 </div>

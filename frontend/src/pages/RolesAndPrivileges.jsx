@@ -1352,7 +1352,6 @@ export default function RolesAndPrivileges() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-[#180200]">Role Details</h3>
-                  <p className="text-xs text-[#863221]">ID: {viewingRole.id}</p>
                 </div>
               </div>
               <button

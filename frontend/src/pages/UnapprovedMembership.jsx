@@ -798,7 +798,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                       <td className="py-3.5 px-4">
                         <span className="font-bold text-[#180200] text-sm">{m.fullName || m.name}</span>
                         <div className="text-[11px] text-[#863221] mt-0.5 font-mono">
-                          ID: {m.id} · {m.registrationSource || '—'}
+                          {m.registrationSource || '—'}
                         </div>
                         {m.last_exported_on && (
                           <div className="text-[10px] text-[#863221] mt-0.5" title="The latest meeting PDF this applicant was on">
@@ -1170,7 +1170,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                     </span>
                   </div>
                   <p className="text-xs text-[#863221]">
-                    Application ID: <span className="font-mono">{viewingMember.id}</span> • Registered on {formatDate(viewingMember.registrationDate)}
+                    Registered on {formatDate(viewingMember.registrationDate)}
                   </p>
                 </div>
               </div>

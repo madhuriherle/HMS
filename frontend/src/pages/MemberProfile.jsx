@@ -1367,7 +1367,7 @@ export function UnapprovedPopup({ id, s, name, onClose }) {
       }
     >
       <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Panel icon={User} title="Basic details" tag={s.member_code || `ID ${s.id}`}>
+        <Panel icon={User} title="Basic details" tag={s.member_code || undefined}>
           {personal.loading ? <Empty>Loading…</Empty> : !p ? <Empty>Could not be loaded.</Empty> : (
             <>
               <Row label="Full name">{[p.name_title, p.first_name_en, p.middle_name_en, p.last_name_en].filter(Boolean).join(' ')}</Row>
@@ -1489,7 +1489,7 @@ export default function MemberProfile() {
                   {s.full_name_kn && <div className="text-xs text-[#863221]">{s.full_name_kn}</div>}
                   <p className="text-xs text-[#863221] mt-0.5 truncate">
                     {[
-                      s.member_code ? `${s.member_code}` : `ID ${s.id}`,
+                      s.member_code ? `${s.member_code}` : '',
                       s.active_membership?.type_name_en,
                       [s.locality, s.city].filter(Boolean).join(', '),
                       phone(s.mobile_country_code, s.mobile)

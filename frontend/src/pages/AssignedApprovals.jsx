@@ -183,8 +183,7 @@ export default function AssignedApprovals() {
                       <td className="py-3.5 px-4">
                         <span className="font-bold">{m.fullName || m.name}</span>
                         <div className="text-[11px] font-mono text-[#863221] mt-0.5">
-                          ID: {m.id}
-                          {m.mobile ? ` · ${m.mobile}` : ''}
+                          {m.mobile || ''}
                         </div>
                       </td>
                       <td className="py-3.5 px-4 text-xs font-semibold text-[#510601]">{m.membershipType || '—'}</td>

@@ -1064,11 +1064,6 @@ export default function RegisterNewMember() {
             <div className="px-6 sm:px-8 py-3.5 border-b border-[#E8DFD8] bg-[#FAF7F2]/40">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  {(isViewMode || isEditMode) && targetMember?.registrationNumber && (
-                    <span className="font-mono text-xs sm:text-sm font-bold bg-white text-[#510601] px-3 py-1 rounded-xl border border-[#E8DFD8] shadow-2xs" title="Record ID">
-                      ID: {targetMember.registrationNumber}
-                    </span>
-                  )}
                   {(isViewMode || isEditMode) && targetMember?.membershipNumber && targetMember.membershipNumber !== 'Not Assigned' && targetMember.approvalStatus === 'Approved' && (
                     <span className="font-mono text-xs sm:text-sm font-bold bg-emerald-50 text-emerald-800 px-3 py-1 rounded-xl border border-emerald-200" title="Membership Number">
                       {targetMember.membershipNumber}
@@ -1357,7 +1352,7 @@ export default function RegisterNewMember() {
                                   >
                                     {d.name || 'Unnamed'}
                                   </a>
-                                  <span className="font-mono font-semibold text-[#180200]">{d.membership_number || `ID ${d.id}`}</span>
+                                  <span className="font-mono font-semibold text-[#180200]">{d.membership_number || '—'}</span>
                                   {d.relation && <span>· {d.relation}</span>}
                                   {d.district && <span>· {d.district}</span>}
                                   <span className={String(d.approval_status).toUpperCase() === 'APPROVED' ? 'font-semibold text-emerald-700' : 'font-semibold text-amber-700'}>

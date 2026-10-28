@@ -275,6 +275,8 @@ class ReceiptAllocation(BaseModel):
 
 class ReceiptAllocationWithMember(ReceiptAllocation):
     member_name: Optional[str] = None
+    membership_number: Optional[str] = None
+    member_mobile: Optional[str] = None
     associate_name: Optional[str] = None
 
 

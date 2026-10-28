@@ -1225,7 +1225,6 @@ export default function MembershipTypeManagement() {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-[#180200]">Membership Type Details</h3>
-                  <p className="text-xs text-[#863221]">Tier ID: {viewingItem.id}</p>
                 </div>
               </div>
               <button

@@ -168,7 +168,7 @@ export default function DuplicateMembers() {
                           <Link to={`/dashboard/membership/profile/${m.id}`} target="_blank" rel="noopener noreferrer" className="text-[#510601] hover:underline">{m.name || '—'}</Link>
                           {m.same_name_count > 1 && <span className="ml-2 text-[10px] font-bold text-[#7D7068]">+{m.same_name_count - 1} with this exact name</span>}
                         </td>
-                        <td className="px-3 py-2">{m.membership_no || (m.approval === 'APPROVED' ? '—' : `ID: ${m.id}`)}</td>
+                        <td className="px-3 py-2">{m.membership_no || '—'}</td>
                         <td className="px-3 py-2">{m.old_no || '—'}</td>
                         <td className="px-3 py-2">{m.mobile || '—'}</td>
                         <td className="px-3 py-2">{formatDate(m.dob)}</td>
