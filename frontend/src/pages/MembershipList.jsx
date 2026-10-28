@@ -21,8 +21,6 @@ import {
 } from 'lucide-react';
 import { loadLocations, loadMembershipTypes, loadGothras } from '../utils/serverData';
 import PermissionGate from '../components/PermissionGate';
-import VerificationBadge from '../components/VerificationBadge';
-import VerifyMemberModal from '../components/VerifyMemberModal';
 import useAuth from '../hooks/useAuth';
 import useSwalConfirm from '../hooks/useSwalConfirm';
 import api from '../api';
@@ -172,7 +170,6 @@ export default function MembershipList() {
 
   // 4. Delete Confirmation Modal
   const [deleteDialog, setDeleteDialog] = useState(null); // member
-  const [verifyingId, setVerifyingId] = useState(null); // the KYC call popup
   const [, setDeleteReason] = useState('');
 
   // 5. Label Preview Modal
@@ -567,7 +564,6 @@ export default function MembershipList() {
                 <SortTh label="Member No." field="member_code" sort={sort} onSort={toggleSort} className="py-3 px-4" />
                 <SortTh label="Name" field="name" sort={sort} onSort={toggleSort} className="py-3 px-4" />
                 <SortTh label="Contact" field="mobile" sort={sort} onSort={toggleSort} className="py-3 px-4" />
-                <th className="py-3 px-4">KYC</th>
                 <th className="py-3 px-4">Address</th>
                 <th className="py-3 px-4">Type</th>
                 <th className="py-3 px-4 text-right">Actions</th>
@@ -575,10 +571,10 @@ export default function MembershipList() {
             </thead>
             <tbody className="divide-y divide-[#E8DFD8]">
               {loadingPage && paginatedMembers.length === 0 ? (
-                <tr><td colSpan={9} className="py-12 text-center text-sm text-[#863221]">Loading members…</td></tr>
+                <tr><td colSpan={8} className="py-12 text-center text-sm text-[#863221]">Loading members…</td></tr>
               ) : paginatedMembers.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="py-12 text-center text-[#863221]">
+                  <td colSpan="8" className="py-12 text-center text-[#863221]">
                     <div className="flex flex-col items-center justify-center">
                       <AlertCircle className="w-8 h-8 text-[#863221]/40 mb-2" />
                       <p className="font-semibold text-sm text-[#180200]">No members found</p>
@@ -639,9 +635,6 @@ export default function MembershipList() {
                           </div>
                         )}
                       </td>
-
-                      {/* KYC: the office's phone check */}
-                      <td className="py-3 px-4"><VerificationBadge status={m.verification_status} onClick={hasPermission('members.list.write') ? () => setVerifyingId(m.id) : undefined} /></td>
 
                       {/* Address: the street lines, then taluk / district, then state - PIN (all from the list call) */}
                       <td className="py-3 px-4 align-top">
@@ -720,8 +713,6 @@ export default function MembershipList() {
       </div>
 
       {/* View Member Profile is handled on dedicated full-screen page /dashboard/membership/profile/:id */}
-
-      {verifyingId && <VerifyMemberModal memberId={verifyingId} onClose={() => setVerifyingId(null)} onSaved={loadMembers} />}
 
       {/* ==================================================== */}
       {/* MODAL 3: LABEL PREVIEW & PRINT INTERFACE             */}
