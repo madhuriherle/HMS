@@ -4,6 +4,7 @@ import PageActions, { PageActionsSlot } from '../components/PageActions';
 import PageTitle from '../components/PageTitle';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
+import FilterMore from '../components/FilterMore';
 import Pager from '../components/Pager';
 import { formatMoney } from '../utils/money';
 import {
@@ -554,32 +555,10 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
         />
 
         <FilterSelect
-          value={talukId}
-          onChange={setTalukId}
-          options={[
-            { value: '', label: 'All Taluks' },
-            ...availableTaluks.map((t) => ({ value: String(t.id), label: t.name_en || t.name })),
-          ]}
-          widthClass="w-full sm:w-48"
-        />
-
-        <FilterSelect
-          value={gender}
-          onChange={setGender}
-          options={[
-            { value: '', label: 'All Genders' },
-            { value: 'Male', label: 'Male' },
-            { value: 'Female', label: 'Female' },
-            { value: 'Other', label: 'Other' },
-          ]}
-          widthClass="w-full sm:w-40"
-        />
-
-        <FilterSelect
           value={approvalStatus}
           onChange={setApprovalStatus}
           options={[
-            { value: '', label: 'All Approval Statuses' },
+            { value: '', label: 'All Approvals' },
             { value: 'APPROVED', label: 'Approved' },
             { value: 'UNAPPROVED', label: 'Unapproved' },
             { value: 'REJECTED', label: 'Rejected' },
@@ -591,21 +570,41 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
           value={membershipTypeId}
           onChange={setMembershipTypeId}
           options={[
-            { value: '', label: 'All Membership Types' },
+            { value: '', label: 'All Types' },
             ...membershipTypes.map((mt) => ({ value: String(mt.id), label: mt.name_en || mt.name })),
-          ]}
-          widthClass="w-full sm:w-52"
-        />
-
-        <FilterSelect
-          value={language}
-          onChange={setLanguage}
-          options={[
-            { value: 'en', label: 'English Headers' },
-            { value: 'kn', label: 'ಕನ್ನಡ ಹೆಡರ್ಸ್' },
           ]}
           widthClass="w-full sm:w-44"
         />
+
+        {/* the rarer filters behind one button, so the card stays in one line */}
+        <FilterMore count={[talukId, gender, language !== 'en' ? language : ''].filter(Boolean).length}>
+          <FilterSelect
+            value={talukId}
+            onChange={setTalukId}
+            options={[
+              { value: '', label: 'All Taluks' },
+              ...availableTaluks.map((t) => ({ value: String(t.id), label: t.name_en || t.name })),
+            ]}
+          />
+          <FilterSelect
+            value={gender}
+            onChange={setGender}
+            options={[
+              { value: '', label: 'All Genders' },
+              { value: 'Male', label: 'Male' },
+              { value: 'Female', label: 'Female' },
+              { value: 'Other', label: 'Other' },
+            ]}
+          />
+          <FilterSelect
+            value={language}
+            onChange={setLanguage}
+            options={[
+              { value: 'en', label: 'English Headers' },
+              { value: 'kn', label: 'ಕನ್ನಡ ಹೆಡರ್ಸ್' },
+            ]}
+          />
+        </FilterMore>
       </SearchFilterBar>
 
       {/* Standard HMS Table matching ReceiptTracking */}

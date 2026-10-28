@@ -432,11 +432,11 @@ export default function MembershipList() {
             setCurrentPage(1);
           }}
           options={[
-            { value: 'ALL', label: 'All Membership Types' },
+            { value: 'ALL', label: 'All Types' },
             ...membershipTypes.map((mt) => ({ value: mt.name, label: mt.name })),
             { value: 'None', label: 'None / Not Yet Reached' }
           ]}
-          widthClass="w-full sm:w-56"
+          widthClass="w-full sm:w-44"
         />
 
         {/* 2. Status Filter */}
@@ -452,21 +452,6 @@ export default function MembershipList() {
             { value: 'Inactive', label: 'Inactive' }
           ]}
           widthClass="w-full sm:w-36"
-        />
-
-        {/* 3. State Filter */}
-        <FilterSelect
-          value={stateFilter}
-          onChange={(val) => {
-            setStateFilter(val);
-            setDistrictFilter('ALL');
-            setCurrentPage(1);
-          }}
-          options={[
-            { value: 'ALL', label: 'All States' },
-            ...states.map((s) => ({ value: s.name, label: s.name }))
-          ]}
-          widthClass="w-full sm:w-44"
         />
 
         {/* 4. District Filter */}
@@ -491,12 +476,12 @@ export default function MembershipList() {
             setCurrentPage(1);
           }}
           options={[
-            { value: 'ALL', label: 'All Payment Status' },
+            { value: 'ALL', label: 'Payment Status' },
             { value: 'NO_RECEIPT', label: 'No receipt on record' },
             { value: 'MISMATCH', label: 'Payment mismatch' },
             { value: 'NOT_MAPPED', label: 'Receipt not mapped' }
           ]}
-          widthClass="w-full sm:w-52"
+          widthClass="w-full sm:w-44"
         />
 
       </SearchFilterBar>

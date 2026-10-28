@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
+import FilterMore from '../components/FilterMore';
 import DateInput from '../components/DateInput';
 import {
   User,
@@ -640,32 +641,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           widthClass="w-full sm:w-44"
         />}
 
-        {/* Meeting PDF: only the applicants that were on an exported PDF, or on the one exported on a given day */}
-        {statusFilter === 'UNAPPROVED' && <FilterSelect
-          value={exportFilter}
-          onChange={(val) => {
-            setExportFilter(val);
-            if (val !== 'EXPORTED') setExportedOn('');
-            setCurrentPage(1);
-          }}
-          options={[
-            { value: 'ALL', label: 'All (exported or not)' },
-            { value: 'EXPORTED', label: 'Only exported' },
-            { value: 'NOT_EXPORTED', label: 'Not exported yet' }
-          ]}
-          widthClass="w-full sm:w-48"
-        />}
-        {statusFilter === 'UNAPPROVED' && exportFilter === 'EXPORTED' && (
-          <div className="w-full sm:w-40">
-            <DateInput
-              value={exportedOn}
-              onChange={(e) => { setExportedOn(e.target.value); setCurrentPage(1); }}
-              placeholder="Exported on"
-              className="w-full h-9 px-3 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]"
-            />
-          </div>
-        )}
-
         {/* 1. Membership Type */}
         <FilterSelect
           value={typeFilter}
@@ -674,10 +649,10 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
             setCurrentPage(1);
           }}
           options={[
-            { value: 'ALL', label: 'All Membership Types' },
+            { value: 'ALL', label: 'All Types' },
             ...membershipTypes.map((mt) => ({ value: mt.name, label: mt.name }))
           ]}
-          widthClass="w-full sm:w-48"
+          widthClass="w-full sm:w-44"
         />
 
         {/* 2. Receipt Status (the Assigned queue is already limited to assigned receipts) */}
@@ -688,27 +663,12 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
             setCurrentPage(1);
           }}
           options={[
-            { value: 'ALL', label: 'All Receipt Status' },
+            { value: 'ALL', label: 'Receipt Status' },
             { value: 'Pending', label: 'Unassigned' },
             { value: 'Assigned', label: 'Assigned' }
           ]}
           widthClass="w-full sm:w-40"
         />}
-
-        {/* 3. State */}
-        <FilterSelect
-          value={stateFilter}
-          onChange={(val) => {
-            setStateFilter(val);
-            setDistrictFilter('ALL');
-            setCurrentPage(1);
-          }}
-          options={[
-            { value: 'ALL', label: 'All States' },
-            ...states.map((s) => ({ value: s.name, label: s.name }))
-          ]}
-          widthClass="w-full sm:w-44"
-        />
 
         {/* 4. District */}
         <FilterSelect
@@ -723,6 +683,33 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           ]}
           widthClass="w-full sm:w-48"
         />
+
+        {/* Meeting PDF (the rare filter) behind one button, so the card stays in one line: only the applicants that were on an exported PDF, or on the one exported on a given day */}
+        {statusFilter === 'UNAPPROVED' && (
+          <FilterMore count={exportFilter !== 'ALL' ? 1 : 0}>
+            <FilterSelect
+              value={exportFilter}
+              onChange={(val) => {
+                setExportFilter(val);
+                if (val !== 'EXPORTED') setExportedOn('');
+                setCurrentPage(1);
+              }}
+              options={[
+                { value: 'ALL', label: 'All (exported or not)' },
+                { value: 'EXPORTED', label: 'Only exported' },
+                { value: 'NOT_EXPORTED', label: 'Not exported yet' }
+              ]}
+            />
+            {exportFilter === 'EXPORTED' && (
+              <DateInput
+                value={exportedOn}
+                onChange={(e) => { setExportedOn(e.target.value); setCurrentPage(1); }}
+                placeholder="Exported on"
+                className="w-full h-9 px-3 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]"
+              />
+            )}
+          </FilterMore>
+        )}
       </SearchFilterBar>
 
       {/* ---------------------------------------------------- */}
