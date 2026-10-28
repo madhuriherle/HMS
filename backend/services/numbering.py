@@ -50,6 +50,10 @@ ALLOWED_DATE_PARTS = {
     "DAY": {"DATE_FULL", "DATE_DMY"},
 }
 
+# These numbers only have to be unique within their financial year (the database enforces that for receipts), so they may restart every
+# year with no year in the number: 0001, 0002 ... again from April.
+YEARLY_PLAIN_DOCS = ("RECEIPT", "OLD_RECEIPT")
+
 TEXT_RE = re.compile(r"^[A-Za-z0-9/._-]{0,12}$")
 
 
@@ -134,9 +138,9 @@ def validate(f: Fmt) -> None:
     for label, text in (("Prefix", f.prefix), ("Suffix", f.suffix)):
         if not TEXT_RE.match(text or ""):
             raise HTTPException(400, f"{label} may only have letters, digits and / . _ - (up to 12)")
-    # A receipt number only has to be unique within its financial year (the database enforces that), so receipts
-    # may restart every year with no year in the number: 0001, 0002 ... again from April.
-    plain_yearly_receipt = f.doc_type == "RECEIPT" and f.restart == "FY" and f.date_part == "NONE"
+    # A receipt number (and an unknown receipt number) only has to be unique within its financial year, so it may restart every
+    # year with no year in the number: 0001, 0002 ... again from April.
+    plain_yearly_receipt = f.doc_type in YEARLY_PLAIN_DOCS and f.restart == "FY" and f.date_part == "NONE"
     if f.date_part not in ALLOWED_DATE_PARTS[f.restart] and not plain_yearly_receipt:
         allowed = ", ".join(DATE_PARTS[p] for p in DATE_PARTS if p in ALLOWED_DATE_PARTS[f.restart])
         raise HTTPException(

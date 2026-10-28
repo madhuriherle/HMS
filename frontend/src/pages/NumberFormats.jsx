@@ -23,13 +23,15 @@ function FormatCard({ item, options, canWrite, onSaved }) {
   const [saving, setSaving] = useState(false);
   const timer = useRef(null);
 
-  const allowedDates = new Set(options.allowed_dates[form.restart] || []);
+  // receipt numbers only have to be unique inside their financial year, so "None" is also allowed when they restart every year
+  const datesFor = (restart) => new Set([...(options.allowed_dates[restart] || []), ...(restart === 'FY' && (options.yearly_plain_docs || []).includes(item.doc_type) ? ['NONE'] : [])]);
+  const allowedDates = datesFor(form.restart);
   const dirty = JSON.stringify(toBody(form)) !== JSON.stringify(toBody(item));
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
 
   // A restart rule only allows some dates in the number; move to one that is allowed.
   const setRestart = (restart) => {
-    const ok = new Set(options.allowed_dates[restart] || []);
+    const ok = datesFor(restart);
     set({ restart, date_part: ok.has(form.date_part) ? form.date_part : options.date_parts.find((d) => ok.has(d.value))?.value });
   };
 

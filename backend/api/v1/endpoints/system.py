@@ -176,6 +176,7 @@ def read_number_formats(
             "restarts": [{"value": k, "label": v} for k, v in numbering.RESTARTS.items()],
             "separators": numbering.SEPARATORS,
             "allowed_dates": {k: sorted(v) for k, v in numbering.ALLOWED_DATE_PARTS.items()},
+            "yearly_plain_docs": list(numbering.YEARLY_PLAIN_DOCS),   # these may restart every financial year with no date in the number
         },
     }
 

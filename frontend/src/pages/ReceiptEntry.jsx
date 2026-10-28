@@ -537,18 +537,19 @@ export default function ReceiptEntry() {
   const [financialYear, setFinancialYear] = useState('');
   // an old (dummy) receipt: typed in the old-receipt format; the last one entered is shown to follow the sequence
   const [oldInfo, setOldInfo] = useState(null);
-  const loadOldInfo = () =>
+  // the next unknown number for the receipt's date (its financial year, when the format restarts every year); replaceNumber puts it in the box
+  const loadOldInfo = (date, replaceNumber = false) =>
     api
-      .get('/receipts/old-number')
+      .get('/receipts/old-number', { params: /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) ? { date } : {} })
       .then(({ data }) => {
         setOldInfo(data);
-        setFormData((prev) => ({ ...prev, receiptNumber: prev.receiptNumber || data.next_number || data.prefix || '' }));
+        setFormData((prev) => ({ ...prev, receiptNumber: (replaceNumber ? '' : prev.receiptNumber) || data.next_number || data.prefix || '' }));
       })
       .catch(() => setOldInfo(null));
   const toggleOldReceipt = (checked) => {
     setFormData((prev) => ({ ...prev, isOldReceipt: checked, receiptNumber: '' }));
     setFormErrors((prev) => ({ ...prev, receiptNumber: '' }));
-    if (checked) loadOldInfo();
+    if (checked) loadOldInfo(formData.receiptDate);
     else {
       setOldInfo(null);
       loadReceiptDefaults(undefined, { keepDate: true });
@@ -816,8 +817,10 @@ export default function ReceiptEntry() {
       }
       // a different financial year has its own series: re-suggest unless the user typed a number
       if (value && value.length === 10 && value <= getTodayISODate()) {
-        // an Unknown receipt keeps its own (old-receipt) number when the date changes: the normal series must not replace it
+        // an Unknown receipt keeps its own (old-receipt) kind of number when the date changes: the normal series must not replace it.
+        // Its number follows the new date's financial year (a format that restarts every year numbers each year on its own)
         loadReceiptDefaults(value, { keepNumber: numberTouched.current || formData.isOldReceipt, keepDate: true });
+        if (formData.isOldReceipt && !numberTouched.current) loadOldInfo(value, true);
       }
     } else if (name === 'transactionDate') {
       setFormData((prev) => ({ ...prev, transactionDate: value }));
@@ -1175,7 +1178,7 @@ export default function ReceiptEntry() {
         handleClearForm();
         setFormData((prev) => ({ ...prev, ...keep }));
         loadReceiptDefaults(keep.receiptDate, { keepDate: true, keepNumber: keep.isOldReceipt });
-        if (keep.isOldReceipt) loadOldInfo();
+        if (keep.isOldReceipt) loadOldInfo(keep.receiptDate);
         await reloadData();
       } else {
         showToast(`Receipt ${receiptNo} saved successfully! Navigating to Receipt Tracking...`, 'success');

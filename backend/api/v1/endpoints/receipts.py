@@ -807,29 +807,33 @@ def payment_preview(
 
 @router.get("/old-number")
 def last_old_receipt_number(
+    date_: Optional[date] = Query(None, alias="date"),   # the receipt's date: its financial year decides the series when the format restarts every year
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ) -> Any:
-    """Old (dummy) receipts are numbered by hand: show the last one entered and the format, so the next follows it."""
+    """Old (dummy) receipts are numbered by hand: show the last one entered and the format, so the next follows it.
+    A format that restarts every financial year numbers each year on its own (NR-0001 again from April)."""
     from services import numbering
 
     fmt = numbering.get_format(db, "OLD_RECEIPT")
-    last = (
-        db.query(Receipt)
-        .filter(Receipt.is_old_receipt == True, Receipt.is_deleted == False)  # noqa: E712
-        .order_by(Receipt.id.desc())
-        .first()
-    )
+    on = date_ or date.today()
+    fy = receipt_numbers.financial_year_for(on)
+    yearly = fmt.restart == "FY"
+    base = db.query(Receipt).filter(Receipt.is_old_receipt == True)  # noqa: E712
+    if yearly:
+        base = base.filter(Receipt.financial_year == fy)
+    last = base.filter(Receipt.is_deleted == False).order_by(Receipt.id.desc()).first()  # noqa: E712
     # the next number follows the highest one used so far (deleted ones still hold their number)
-    used = [r[0] for r in db.query(Receipt.receipt_number).filter(Receipt.is_old_receipt == True).all()]  # noqa: E712
+    used = [r[0] for r in base.with_entities(Receipt.receipt_number).all()]
     highest = max((int(m[-1]) for m in (re.findall(r"\d+", n) for n in used) if m), default=None)
     next_n = fmt.start_value if highest is None else max(highest + 1, fmt.start_value)
     return {
         "last_number": last.receipt_number if last else None,
         "last_date": last.receipt_date if last else None,
+        "financial_year": fy,
         "prefix": f"{fmt.prefix}{fmt.separator}" if fmt.prefix else "",
-        "example": numbering.render(fmt, date.today(), fmt.start_value),
-        "next_number": numbering.render(fmt, date.today(), next_n),
+        "example": numbering.render(fmt, on, fmt.start_value),
+        "next_number": numbering.render(fmt, on, next_n),
     }
 
 
