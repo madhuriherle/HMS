@@ -816,7 +816,8 @@ export default function ReceiptEntry() {
       }
       // a different financial year has its own series: re-suggest unless the user typed a number
       if (value && value.length === 10 && value <= getTodayISODate()) {
-        loadReceiptDefaults(value, { keepNumber: numberTouched.current, keepDate: true });
+        // an Unknown receipt keeps its own (old-receipt) number when the date changes: the normal series must not replace it
+        loadReceiptDefaults(value, { keepNumber: numberTouched.current || formData.isOldReceipt, keepDate: true });
       }
     } else if (name === 'transactionDate') {
       setFormData((prev) => ({ ...prev, transactionDate: value }));
