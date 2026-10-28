@@ -53,6 +53,8 @@ class PostalCode(AuditMixin, Base):
     state_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("states.id"), nullable=False)
     district_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("districts.id"), nullable=False)
     taluk_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("taluks.id"), nullable=True)
+    # the village of the government directory this post office is named after (set by services/pincode_map.py)
+    village_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("villages.id"), nullable=True, index=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
 
 class MembershipType(AuditMixin, Base):
