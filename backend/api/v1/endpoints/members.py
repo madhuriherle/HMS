@@ -90,7 +90,9 @@ def read_members(
         wanted = payment_status.upper()
         if wanted in ("NO_RECEIPT", "MISMATCH"):
             from services import membership_credit
-            ids = [mid for mid, c in membership_credit.payment_check_rows(db).items()
+            # the applicants (unapproved list) are judged by the type they chose, the members by the type they hold
+            asked_of_applicants = bool(approval_status) and approval_status.upper() != "APPROVED"
+            ids = [mid for mid, c in membership_credit.payment_check_rows(db, applicants=asked_of_applicants).items()
                    if c["mismatch"] and (c["no_receipt"] if wanted == "NO_RECEIPT" else not c["no_receipt"])]
             query = query.filter(Member.id.in_(ids or [0]))
         elif wanted == "NOT_MAPPED":
@@ -330,6 +332,7 @@ def _attach_membership_types(db: Session, rows: list) -> None:
     _attach_places(db, rows)
     from services import membership_credit
     checks = membership_credit.payment_check_rows(db, ids)   # who paid less than the price of their joining era
+    checks.update(membership_credit.payment_check_rows(db, ids, applicants=True))   # and the applicants: less than the price of the type they chose
     for r in rows:
         if isinstance(r, dict):
             check = checks.get(r.get("id"))

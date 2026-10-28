@@ -54,3 +54,38 @@ def test_applicants_import_and_check(client, admin_headers):
         assert legacy_import.import_members(db, rows, 1, run_id="b" + s[-8:], applicants=True)["created"] == 0
     finally:
         db.close()
+
+
+def test_applicants_payment_status_filter_and_shortfall(client, admin_headers):
+    """The Unapproved list can be filtered by payment status, and its rows carry the shortfall (an applicant paying less than the price of the type they chose)."""
+    from db.session import SessionLocal
+    from models.masters import MembershipTypePrice, Particular
+    from services import legacy_import
+
+    s = _sfx()
+    name = "Payshort" + s[-5:]
+    made = _create_membership_type(client, admin_headers, "PS" + s[-5:], name)
+    rows = legacy_import.read_register(_register([
+        _row(970001, "SHORT PAYER", [(5101, datetime(2026, 3, 1), 400)], CusMemberType=name.upper()),
+        _row(970002, "FULL PAYER", [(5102, datetime(2026, 3, 2), 1000)], CusMemberType=name.upper()),
+        _row(970003, "NO RECEIPT", CusMemberType=name.upper()),
+    ]))
+    db = SessionLocal()
+    try:
+        db.add(MembershipTypePrice(membership_type_id=made["id"], amount=1000, effective_from=date(2000, 1, 1)))
+        if not db.query(Particular).filter(Particular.name_en == "Membership", Particular.parent_id.is_(None), Particular.is_deleted == False).first():  # noqa: E712
+            db.add(Particular(code="RT-" + s[-6:], name_en="Membership", status=True, pays_for_membership=True))
+        db.commit()
+        assert legacy_import.import_members(db, rows, 1, run_id="p" + s[-8:], applicants=True)["created"] == 3
+        legacy_import.import_receipts(db, rows, 1, applicants=True)
+    finally:
+        db.close()
+    got = client.get("/api/v1/members/", headers=admin_headers, params={"approval_status": "UNAPPROVED", "payment_status": "MISMATCH", "limit": 200})
+    assert got.status_code == 200, got.text
+    data = got.json()["data"] if isinstance(got.json(), dict) else got.json()
+    short = [m for m in data if str(m.get("legacy_ref_number")) == "970001"]
+    assert short and float(short[0]["payment_shortfall"]) == 600 and short[0]["payment_no_receipt"] is False
+    assert not [m for m in data if str(m.get("legacy_ref_number")) == "970002"]                          # paid in full: not listed
+    none = client.get("/api/v1/members/", headers=admin_headers, params={"approval_status": "UNAPPROVED", "payment_status": "NO_RECEIPT", "limit": 200}).json()
+    none = none["data"] if isinstance(none, dict) else none
+    assert [m for m in none if str(m.get("legacy_ref_number")) == "970003"]

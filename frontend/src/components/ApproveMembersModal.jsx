@@ -109,7 +109,12 @@ export default function ApproveMembersModal({
                 {members.map((m) => (
                   <div key={m.id} className="py-1 flex items-center justify-between">
                     <span className="font-semibold text-[#180200]">{m.fullName || m.name}</span>
-                    <span className="text-[11px] text-[#7D7068]">{m.membershipType || ''}</span>
+                    <span className="text-[11px] text-[#7D7068]">
+                      {m.payment_mismatch && (
+                        <b className="text-red-700 mr-2">{m.payment_no_receipt ? 'No payment' : `Short ₹${Number(m.payment_shortfall).toLocaleString('en-IN')}`}</b>
+                      )}
+                      {m.membershipType || ''}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -119,6 +124,13 @@ export default function ApproveMembersModal({
               <div className="font-bold text-[#180200] text-sm">
                 {singleMember.fullName || singleMember.name}
               </div>
+              {singleMember.payment_mismatch && (
+                <div className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">
+                  {singleMember.payment_no_receipt
+                    ? 'No payment on record for this applicant.'
+                    : `Paid ₹${Number(singleMember.payment_shortfall).toLocaleString('en-IN')} less than the price of the chosen type.`}
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-2 text-[#863221]">
                 <div>Type: <strong className="text-[#180200]">{singleMember.membershipType || '—'}</strong></div>
                 <div>Mobile: <strong className="text-[#180200] font-mono">{singleMember.mobile || singleMember.mobileNumber || '—'}</strong></div>

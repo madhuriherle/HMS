@@ -105,6 +105,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
       }
       if (receiptStatusFilter === 'Assigned') params.receipt_assigned = true;
       if (receiptStatusFilter === 'Pending') params.receipt_assigned = false;
+      if (paymentFilter !== 'ALL') params.payment_status = paymentFilter;
       Object.assign(params, meetingParams());
       const result = await loadUnapprovedPage(params);
       if (seq !== requestSeq.current) return; // a newer request is on its way
@@ -158,13 +159,14 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [stateFilter, setStateFilter] = useState('ALL');
   const [districtFilter, setDistrictFilter] = useState('ALL');
   const [receiptStatusFilter, setReceiptStatusFilter] = useState(assignedOnly ? 'Assigned' : 'ALL');
+  const [paymentFilter, setPaymentFilter] = useState('ALL'); // ALL | NO_RECEIPT | MISMATCH: does what they paid cover the price of the type they chose
 
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
 
   // the page is read again whenever the page, the search, a filter or the sort changes (default: newest first)
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const filterKey = [debouncedSearch, typeFilter, stateFilter, districtFilter, receiptStatusFilter, statusFilter, exportFilter, exportedOn, sort.by, sort.dir].join('|');
+  const filterKey = [debouncedSearch, typeFilter, stateFilter, districtFilter, receiptStatusFilter, paymentFilter, statusFilter, exportFilter, exportedOn, sort.by, sort.dir].join('|');
   const mastersReady = membershipTypes.length > 0 || states.length > 0;
   useEffect(() => {
     loadPage();
@@ -293,6 +295,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     setStateFilter('ALL');
     setDistrictFilter('ALL');
     setReceiptStatusFilter('ALL');
+    setPaymentFilter('ALL');
     setStatusFilter('UNAPPROVED');
     setExportFilter('ALL');
     setExportedOn('');
@@ -491,6 +494,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
       }
       if (receiptStatusFilter === 'Assigned') base.receipt_assigned = true;
       if (receiptStatusFilter === 'Pending') base.receipt_assigned = false;
+      if (paymentFilter !== 'ALL') base.payment_status = paymentFilter;
       Object.assign(base, meetingParams());
       const ids = [];
       for (let page = 1; page <= pages; page += 1) {
@@ -577,7 +581,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           (typeFilter !== 'ALL' ? 1 : 0) +
           (stateFilter !== 'ALL' ? 1 : 0) +
           (districtFilter !== 'ALL' ? 1 : 0) +
-          (receiptStatusFilter !== 'ALL' ? 1 : 0)
+          (receiptStatusFilter !== 'ALL' ? 1 : 0) +
+          (paymentFilter !== 'ALL' ? 1 : 0)
         }
         onResetFilters={handleClearFilters}
         rightSlot={
@@ -669,6 +674,21 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           ]}
           widthClass="w-full sm:w-40"
         />}
+
+        {/* 3. Payment Status: no receipt on record, or the receipts pay less than the price of the type they chose */}
+        <FilterSelect
+          value={paymentFilter}
+          onChange={(val) => {
+            setPaymentFilter(val);
+            setCurrentPage(1);
+          }}
+          options={[
+            { value: 'ALL', label: 'Payment Status' },
+            { value: 'NO_RECEIPT', label: 'No receipt on record' },
+            { value: 'MISMATCH', label: 'Payment mismatch' }
+          ]}
+          widthClass="w-full sm:w-44"
+        />
 
         {/* 4. District */}
         <FilterSelect
@@ -816,6 +836,11 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                         {m.assignedReceiptNumber && (
                           <div className="text-[10px] font-mono text-[#510601] font-bold mt-0.5">
                             {m.assignedReceiptNumber}
+                          </div>
+                        )}
+                        {m.payment_mismatch && (
+                          <div className="text-[10px] font-bold text-red-700 mt-0.5">
+                            {m.payment_no_receipt ? 'No payment on record' : `Short by ₹${Number(m.payment_shortfall).toLocaleString('en-IN')}`}
                           </div>
                         )}
                       </td>
