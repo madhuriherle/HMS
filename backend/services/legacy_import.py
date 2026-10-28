@@ -1133,3 +1133,46 @@ def reconcile_applicants(db, rows: list) -> dict:
                                           "same name": ", ".join(members_by_name.get(_norm_name(m["name"]), []))})
     out["counts"] = dict(out["counts"])
     return out
+
+
+def learn_kannada_words(old_rows: list, unicode_rows: list) -> dict:
+    """Old-font Kannada word -> Unicode word, learned from the members whose names exist in both registers (same words in the same order).
+    A word that was converted to two different spellings keeps the commoner one; the second dict returned lists such conflicts."""
+    uni = {int(_num(r.get("CusNo"))): _s(r.get("CusNameKannada")) for r in unicode_rows}
+    votes = defaultdict(Counter)
+    for r in old_rows:
+        lo, un = _s(r.get("CusNameKannada")), uni.get(int(_num(r.get("CusNo"))), "")
+        if not lo or not _KANNADA.search(un):
+            continue
+        lw, uw = lo.split(" "), un.split(" ")
+        if len(lw) == len(uw):
+            for a, b in zip(lw, uw):
+                votes[a][b] += 1
+    words = {a: c.most_common(1)[0][0] for a, c in votes.items()}
+    conflicts = {a: dict(c) for a, c in votes.items() if len(c) > 1}
+    return words, conflicts
+
+
+def backfill_applicant_kannada(db, app_rows: list, words: dict) -> dict:
+    """The Kannada name of the applicants (applications register): a name whose every word is known is written in Unicode; a name with an
+    unknown word is cleared (the old-font text is unreadable) and returned for the office to type."""
+    from models.members import Member
+
+    by_ref = {ref: i for i, ref in db.query(Member.id, Member.legacy_ref_number).filter(Member.registration_source == "MIGRATION", Member.approval_status != "APPROVED",
+                                                                                     Member.legacy_ref_number != None).all()}  # noqa: E711
+    done, left = 0, []
+    for r in app_rows:
+        ref = str(int(_num(r.get("CusNo"))))
+        mid = by_ref.get(ref)
+        old = _s(r.get("CusNameKannada"))
+        if mid is None or not old:
+            continue
+        ws = old.split(" ")
+        if all(w in words for w in ws):
+            db.query(Member).filter(Member.id == mid).update({"full_name_kn": " ".join(words[w] for w in ws)}, synchronize_session=False)
+            done += 1
+        else:
+            db.query(Member).filter(Member.id == mid).update({"full_name_kn": None}, synchronize_session=False)
+            left.append({"application_no": ref, "name": _s(r.get("CusName")), "unknown_words": [w for w in ws if w not in words]})
+    db.commit()
+    return {"converted": done, "left_blank": len(left), "left": left}
