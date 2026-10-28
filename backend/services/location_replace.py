@@ -27,10 +27,14 @@ DISTRICT_ALIAS = {
 TALUK_ALIAS = {
     "mangalore": "mangaluru", "sullia": "sulya", "raibag": "raybag", "saundatti": "savadatti", "hubli": "hubballiurban", "krnagar": "krishnarajanagara",
     "bangalorenorth": "bengalurunorth", "bangaloresouth": "bengalurusouth",
+    # old names of the district towns (the taluk of the same name), and old spellings
+    "shimoga": "shivamogga", "belgaum": "belagavi", "bellary": "ballari", "mysore": "mysuru", "bijapur": "vijayapura", "gulbarga": "kalaburagi",
+    "gangavathi": "gangawati", "deodurga": "devadurga", "kalgahtagi": "kalghatgi", "changanacherry": "changanassery",
+    "mukundapuramtaluk": "mukundapuram", "chalakudi": "chalakkudy",
 }
 # decided by hand: old taluk -> the new taluk it is (the automatic spelling match is not safe for these)
 TALUK_OVERRIDE = {
-    "hospet": "hosapete", "hbhalli": "hagaribommanahalli", "huvinahadagalli": "hadagalli", "hungundtaluk": "hungund", "krpete": "krishnarajpet",
+    "hospet": "hosapete", "hbhalli": "hagaribommanahalli", "huvinahadagali": "hadagalli", "joida": "supa", "hungundtaluk": "hungund", "krpete": "krishnarajpet",
     "bbagewadi": "basavanabagevadi", "cnhalli": "chiknayakanhalli", "kusthgati": "kushtagi", "hdkote": "heggadadevankote",
     "tnarasipura": "tirumakudalnarsipur", "bellandur": "bengalurueast", "manjeri": "ernad", "chirayinkil": "chirayinkeezhu", "quilandy": "koyilandi",
     "adichanallur": "kollam", "ambalapuzha": "ambalappuzha",
@@ -144,7 +148,7 @@ def replace_state(db, state_name: str, data: dict, user_id: int, apply: bool = T
         if key in cand:
             hit = (dk, key)
         else:
-            near = get_close_matches(key, list(cand), 1, 0.85)
+            near = get_close_matches(key, list(cand), 1, 0.8)
             if near:
                 hit = (dk, near[0])
             elif len(by_taluk_key.get(key, [])) == 1:        # the same name in another district: the taluk moved there
