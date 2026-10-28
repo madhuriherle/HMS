@@ -37,6 +37,19 @@ def test_applicants_import_and_check(client, admin_headers):
         more = legacy_import.read_register(_register([_row(950003, "APPLICANT THREE", [(4103, datetime(2026, 3, 3), 100)])]))
         miss = legacy_import.reconcile_applicants(db, rows + more)
         assert miss["counts"]["applicant missed"] == 1 and miss["counts"]["receipt missed"] == 1
+        # an applicant whose receipt number and date are already on another receipt (a member's): a receipt of their own, number/2; the other is untouched
+        existing = Receipt(receipt_number="4104", receipt_date=date(2026, 3, 4), financial_year="2025-26", receipt_type="MEMBERSHIP", source="OLD_REGISTER",
+                           gross_amount=700, discount_amount=0, net_amount=700, payment_status="SUCCESS", receipt_status="ASSIGNED", payment_mode="OTHER")
+        db.add(existing)
+        db.commit()
+        clash = legacy_import.read_register(_register([_row(950004, "APPLICANT FOUR", [(4104, datetime(2026, 3, 4), 1000)])]))
+        assert legacy_import.import_members(db, clash, 1, run_id="c" + s[-8:], applicants=True)["created"] == 1
+        assert legacy_import.import_receipts(db, clash, 1, applicants=True)["created"] == 1
+        four = db.query(Member).filter(Member.legacy_ref_number == "950004").one()
+        mine = db.query(Receipt).join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id).filter(ReceiptAllocation.member_id == four.id).one()
+        db.refresh(existing)
+        assert mine.receipt_number == "4104/2" and float(mine.net_amount) == 1000 and float(existing.net_amount) == 700
+        assert legacy_import.import_receipts(db, clash, 1, applicants=True)["created"] == 0            # a repeated run makes no second one
         # a second run adds nothing
         assert legacy_import.import_members(db, rows, 1, run_id="b" + s[-8:], applicants=True)["created"] == 0
     finally:

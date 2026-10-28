@@ -620,9 +620,11 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
     else:
         ids = {mno: (i, mno, nm) for i, mno, nm in
                db.query(Member.id, Member.membership_number, Member.full_name_en).filter(Member.registration_source == "MIGRATION", Member.membership_number != None).all()}  # noqa: E711
-    # lines of this import that are already in: (member, date, number); a dummy-numbered one is (member, date, "")
-    have = {(m, d, "" if old else n) for m, d, n, old in db.query(ReceiptAllocation.member_id, Receipt.receipt_date, Receipt.receipt_number, Receipt.is_old_receipt)
-            .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id).filter(Receipt.source == SOURCE, Receipt.is_deleted == False).all()}  # noqa: E712
+    # lines of this import that are already in: how many receipts each (member, date) has. A register line is skipped while that many are
+    # still unaccounted for, whatever number the receipt carries (a made-up number or a tail), so a repeated run never makes a second one.
+    have = Counter((m, d) for m, d in db.query(ReceiptAllocation.member_id, Receipt.receipt_date)
+                   .join(Receipt, Receipt.id == ReceiptAllocation.receipt_id).filter(Receipt.source == SOURCE, Receipt.is_deleted == False).all())  # noqa: E712
+    seen = Counter()
 
     def next_dummy(fy_start: int) -> str:
         code = f"{fy_start % 100:02d}"
@@ -643,7 +645,8 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
                 not_imported.append({**ln, "why": "member is not imported yet"})
                 continue
             real = bool(ln["number"]) and ln["kind"] != "NUMBER_TAKEN"
-            if (mid[0], ln["date"], ln["number"] if real else "") in have:
+            if seen[(mid[0], ln["date"])] < have[(mid[0], ln["date"])]:
+                seen[(mid[0], ln["date"])] += 1
                 continue
             key = (financial_year_start(ln["date"]), ln["number"], ln["date"]) if real else ("dummy", ln["cus_no"], ln["slot"])
             if key not in groups:
@@ -669,36 +672,14 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
             rtype = "SCHOLARSHIP" if sch > 0 and don == 0 and pat == 0 else "GENERAL_DONATION"
         notes = " | ".join(dict.fromkeys(x for x in [l["note"] for _m, l in members] if x))
         fy = receipt_numbers.financial_year_for(first["date"])
-        # a receipt of this number already made by an earlier run (a shared receipt whose first member was done then): the
-        # members still missing are added to it
-        earlier = None if key[0] == "dummy" else (
-            db.query(Receipt).filter(Receipt.financial_year == fy, Receipt.receipt_number == number, Receipt.source == SOURCE,
-                                     Receipt.is_deleted == False).first())  # noqa: E712
         dummy_now = key[0] == "dummy"
-        if earlier is not None and earlier.receipt_date != first["date"]:
-            # the number belongs to another date that year (an earlier run saw fewer members): this one becomes an unknown receipt
-            number, earlier, dummy_now = next_dummy(financial_year_start(first["date"])), None, True
-        if earlier is None and not dummy_now and db.query(Receipt.id).filter(Receipt.financial_year == fy, Receipt.receipt_number == number).first():
-            # the number is held by a receipt that is not from this import (one entered in the system): an unknown receipt instead
-            number, dummy_now = next_dummy(financial_year_start(first["date"])), True
-        if earlier is not None:
-            try:
-                with db.begin_nested():
-                    for (mid, _mno, _name), ln in members:
-                        own = ln["membership"] + ln["upgrade"] + ln["scholarship"] + ln["donation"] + ln["patrika"]
-                        db.add(ReceiptAllocation(receipt_id=earlier.id, member_id=mid, allocated_amount=(ln["membership"] + ln["upgrade"] or own), created_by=user_id))
-                    next_line = (db.query(func.max(ReceiptItem.line_no)).filter(ReceiptItem.receipt_id == earlier.id).scalar() or 0) + 1
-                    db.add(ReceiptItem(receipt_id=earlier.id, item_type="MEMBERSHIP", particular_id=p["membership"].id, particular_name=p["membership"].name_en,
-                                       description="Added from the old register (same receipt)", amount=mem + up, line_no=next_line,
-                                       pays_for_membership=bool(p["membership"].pays_for_membership), created_by=user_id))
-                    earlier.gross_amount = float(earlier.gross_amount) + mem + up
-                    earlier.net_amount = float(earlier.net_amount) + mem + up
-            except Exception as exc:
-                skipped.append({"receipt": number, "date": str(first["date"]), "members": [m[0][0] for m in members], "reason": str(exc)[:200]})
-                continue
-            created += 1
-            shared += 1
-            continue
+        if not dummy_now and db.query(Receipt.id).filter(Receipt.financial_year == fy, Receipt.receipt_number == number).first():
+            # the number is already held by another receipt (one of a member, or entered in the system): this record keeps the register's number
+            # with a tail, number/2, number/3 ... (every register record is a receipt of its own)
+            k = 2
+            while db.query(Receipt.id).filter(Receipt.financial_year == fy, Receipt.receipt_number == f"{number}/{k}").first():
+                k += 1
+            number = f"{number}/{k}"
         try:
             with db.begin_nested():
                 r = Receipt(
