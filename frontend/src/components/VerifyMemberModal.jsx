@@ -398,42 +398,20 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
               <label className="block">
                 <span className={headingClass}>Pincode / Post office</span>
                 <select
-                  value={chosenPinId && pinOptions.some((p) => p.id === chosenPinId) ? String(chosenPinId) : ''}
+                  value={chosenPinId ? String(chosenPinId) : ''}
                   onChange={(e) => onPickPostOffice(e.target.value)}
                   disabled={!form.taluk_id}
                   className={`${inputClass} mt-1 disabled:opacity-50`}
                 >
                   <option value="">{!form.taluk_id ? 'Select a taluk first' : pinOptions.length ? 'Select pincode / post office' : 'No pincodes for this taluk'}</option>
+                  {chosenPinId && form.pincode && !pinOptions.some((p) => p.id === chosenPinId) && (
+                    <option value={chosenPinId}>{form.pincode} — {form.locality || 'current'}</option>
+                  )}
                   {pinOptions.map((p) => (
                     <option key={p.id} value={p.id}>{p.postalCode} — {p.area}</option>
                   ))}
                 </select>
               </label>
-
-              <div className="grid grid-cols-[100px_minmax(0,1fr)] gap-2">
-                <label className="block">
-                  <span className={headingClass}>Pincode</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="6 digits"
-                    value={form.pincode}
-                    onChange={(e) => onPinChange(e.target.value)}
-                    className={`${inputClass} mt-1 font-mono`}
-                  />
-                </label>
-                <label className="block">
-                  <span className={headingClass}>Village / Area</span>
-                  <input
-                    type="text"
-                    placeholder="Village or locality"
-                    value={form.locality}
-                    onChange={(e) => setForm({ ...form, locality: e.target.value })}
-                    className={`${inputClass} mt-1`}
-                  />
-                </label>
-              </div>
             </div>
           </div>
 
