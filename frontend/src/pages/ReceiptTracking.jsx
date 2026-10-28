@@ -40,16 +40,7 @@ const getCurrentFY = (date = new Date()) => {
   return `${start}-${String(start + 1).slice(-2)}`;
 };
 
-const fyOf = (iso) => {
-  if (!iso || String(iso).length < 7) return '';
-  const y = Number(String(iso).slice(0, 4));
-  const m = Number(String(iso).slice(5, 7));
-  const startMonth = currentRules()?.financial_year?.start_month || 4;
-  const start = m >= startMonth ? y : y - 1;
-  return `${start}-${String(start + 1).slice(-2)}`;
-};
 
-const csvCell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
 
 
 // Helper to format date string (YYYY-MM-DD to DD-MM-YYYY)
@@ -128,6 +119,7 @@ export default function ReceiptTracking() {
   const [subTypeFilter, setSubTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL'); // ALL, Assigned, Unassigned
   const [fyFilter, setFyFilter] = useState(() => getCurrentFY());
+  const [monthFilter, setMonthFilter] = useState('ALL'); // ALL or a month number 1-12 (April to March within the period)
   const [modeFilter, setModeFilter] = useState('ALL');
   const [numberFilter, setNumberFilter] = useState('ALL'); // ALL, KNOWN, UNKNOWN (dummy number), ZERO (no amount)
   const [fromDate, setFromDate] = useState('');
@@ -161,6 +153,7 @@ export default function ReceiptTracking() {
       ...(subTypeFilter !== 'ALL' ? { sub_type: subTypeFilter } : {}),
       ...(statusFilter !== 'ALL' ? { receipt_status: statusCode[statusFilter] } : {}),
       ...(fyFilter !== 'ALL' ? { fy: fyFilter } : {}),
+      ...(monthFilter !== 'ALL' && (periodMode === 'FY' || periodMode === 'ALL') ? { month: Number(monthFilter) } : {}),
       ...(modeFilter !== 'ALL' ? { mode: modeFilter } : {}),
       ...(numberFilter !== 'ALL' ? { number_kind: numberFilter } : {}),
       ...(fromDate ? { from_date: fromDate } : {}),
@@ -168,7 +161,7 @@ export default function ReceiptTracking() {
       ...sortParams,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, particularsFilter, subTypeFilter, statusFilter, fyFilter, modeFilter, numberFilter, fromDate, toDate, sort.by, sort.dir]);
+  }, [debouncedSearch, particularsFilter, subTypeFilter, statusFilter, fyFilter, monthFilter, periodMode, modeFilter, numberFilter, fromDate, toDate, sort.by, sort.dir]);
 
   const requestSeq = useRef(0);
   // Load more: page 1 replaces the list, a later page is added under it; reloadAll (after an edit or a delete) asks pages 1..page again
@@ -303,38 +296,19 @@ export default function ReceiptTracking() {
   // ----------------------------------------------------
   // EXPORT, DAY BOOK
   // ----------------------------------------------------
+  // The Export is made by the server (every field of every receipt in the filtered list, as an Excel file)
   const exportVisibleReceipts = async () => {
-    let everything = [];
     try {
-      for (let n = 1; n <= 200; n += 1) {
-        const chunk = await fetchReceiptPage({ ...listParams, page: n, limit: 200 });
-        everything = everything.concat(chunk.rows);
-        if (n >= chunk.pages) break;
-      }
+      const { data: blob } = await api.get('/receipts/tracking', { params: { ...listParams, export: 'excel' }, responseType: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `receipts-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showToast(`Exported ${total} receipt(s).`);
     } catch (error) {
       showToast(apiErrorMessage(error, 'Could not export the receipts.'), 'error');
-      return;
     }
-    const head = ['Receipt No', 'Date', 'Financial Year', 'Name', 'Mobile', 'Particulars', 'Amount', 'Payment Mode', 'Reference', 'Status'];
-    const rows = everything.map((r) => [
-      r.receiptNumber,
-      r.receiptDate,
-      fyOf(r.receiptDate),
-      r.name,
-      r.mobile,
-      r.items?.length > 1 ? r.items.map((i) => `${i.particular} ${i.amount}`).join('; ') : r.particulars,
-      r.amount,
-      r.paymentMode,
-      r.transactionId,
-      r.receiptStatus === 'CANCELLED' ? 'Cancelled' : isReceiptUnmapped(r) ? 'Unassigned' : 'Assigned'
-    ]);
-    const csv = [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
-    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `receipts-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    showToast(`Exported ${rows.length} receipt(s).`);
   };
 
   const loadDayBook = async (date) => {
@@ -439,6 +413,7 @@ export default function ReceiptTracking() {
           (subTypeFilter !== 'ALL' ? 1 : 0) +
           (statusFilter !== 'ALL' ? 1 : 0) +
           (periodMode !== 'FY' || fyFilter !== getCurrentFY() ? 1 : 0) +
+          (monthFilter !== 'ALL' ? 1 : 0) +
           (modeFilter !== 'ALL' ? 1 : 0) +
           (numberFilter !== 'ALL' ? 1 : 0)
         }
@@ -449,6 +424,7 @@ export default function ReceiptTracking() {
           setSubTypeFilter('ALL');
           setStatusFilter('ALL');
           setFyFilter(currentFY);
+          setMonthFilter('ALL');
           setModeFilter('ALL');
           setNumberFilter('ALL');
           setFromDate('');
@@ -490,6 +466,19 @@ export default function ReceiptTracking() {
           ]}
           widthClass="w-full sm:w-44"
         />
+        {/* Month: the months of the financial year, April to March */}
+        {(periodMode === 'FY' || periodMode === 'ALL') && (
+          <FilterSelect
+            value={monthFilter}
+            onChange={setMonthFilter}
+            options={[
+              { value: 'ALL', label: 'All Months' },
+              ...[[4, 'April'], [5, 'May'], [6, 'June'], [7, 'July'], [8, 'August'], [9, 'September'], [10, 'October'], [11, 'November'], [12, 'December'], [1, 'January'], [2, 'February'], [3, 'March']]
+                .map(([n, label]) => ({ value: String(n), label }))
+            ]}
+            widthClass="w-full sm:w-36"
+          />
+        )}
         {periodMode === 'CUSTOM' && (
           <>
             <input

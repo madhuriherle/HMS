@@ -64,14 +64,58 @@ def _allocated_member_ids(db: Session, receipt_id: int) -> list:
 
 
 def _sort_receipts(q, sort_by, sort_dir):
-    """Newest receipt (entry order) first, or the column the caller asked for."""
+    """Newest financial year first and, inside a year, the highest receipt number first (old receipt at the bottom, new on top);
+    unknown (old) receipt numbers such as NR-0001 or FY24-001 come after the real ones of their year. Or the column the caller asked for.
+    Receipt numbers are compared as numbers (0031 < 998 < 1058), not as text."""
     from core.sorting import sort_query
+    direction = (sort_dir or "desc").lower()
+    if direction not in ("asc", "desc"):
+        raise HTTPException(400, "sort_dir must be asc or desc")
+    if not sort_by or sort_by == "receipt_number":
+        asc = bool(sort_by) and direction == "asc"
+        digits = func.ltrim(Receipt.receipt_number, "0")
+        pick = (lambda c: c.asc()) if asc else (lambda c: c.desc())
+        return q.order_by(pick(Receipt.financial_year), (Receipt.is_old_receipt.desc() if asc else Receipt.is_old_receipt.asc()),
+                          pick(func.length(digits)), pick(digits), pick(Receipt.id))
     return sort_query(
         q, sort_by=sort_by, sort_dir=sort_dir, tiebreak=Receipt.id,
         allowed={"id": Receipt.id, "receipt_date": Receipt.receipt_date, "receipt_number": Receipt.receipt_number,
                  "amount": Receipt.net_amount, "payer_name": Receipt.payer_name, "payment_status": Receipt.payment_status},
         newest_first=(Receipt.id.desc(),),
     )
+
+
+def _export_rows(db: Session, rows, data) -> list:
+    """The Receipt Tracking export: one row per receipt with every field it holds (the particular lines written out)."""
+    from models.users import User
+
+    users = {uid: name for uid, name in db.query(User.id, User.name).filter(User.id.in_({r.created_by for r in rows if r.created_by})).all()} if rows else {}
+
+    def lines_text(items):
+        return "; ".join(
+            f"{it['particular']}{' (' + it['sub_type'] + ')' if it.get('sub_type') else ''}: {it['amount']:g}" for it in items)
+
+    out = []
+    for r, d in zip(rows, data):
+        items = d["items"]
+        out.append({
+            "Receipt No": r.receipt_number, "Date": r.receipt_date, "Financial Year": r.financial_year, "Receipt Type": r.receipt_type,
+            "Particulars": ", ".join(dict.fromkeys(i["particular"] for i in items if i.get("particular"))),
+            "Particular Lines": lines_text(items),
+            "Amount": float(r.net_amount), "Gross Amount": float(r.gross_amount), "Discount": float(r.discount_amount or 0),
+            "Payer Name": r.payer_name, "Payer Mobile": r.payer_mobile, "Payer Membership No": r.payer_membership_no,
+            "Address": r.payer_address, "PAN": r.payer_pan,
+            "Linked Member": d["member_name"], "Linked Membership No": d["membership_number"] or d["member_code"],
+            "Payment Mode": r.payment_mode, "Bank Account": r.bank_account, "Transaction Id": r.transaction_reference,
+            "Transaction Date": r.transaction_date, "Cheque No": r.cheque_number, "Cheque Date": r.cheque_date,
+            "Period From Date": r.period_from_date, "Period From Time": d["period_from_time"],
+            "Period To Date": r.period_to_date, "Period To Time": d["period_to_time"],
+            "Description": "; ".join(i["description"] for i in items if i.get("description") and i["description"] != i.get("particular")),
+            "Notes": r.notes, "Receipt Status": r.receipt_status, "Payment Status": r.payment_status, "Source": r.source,
+            "Unknown Receipt": "Yes" if r.is_old_receipt else "No", "Renewal": "Yes" if r.is_renewal else "No",
+            "Entered By": users.get(r.created_by, ""), "Entered On": r.created_at, "Updated On": r.updated_at,
+        })
+    return out
 
 
 def _validate_lines(db: Session, items, net: float) -> None:
@@ -514,6 +558,7 @@ def read_receipt_tracking(
             "receipt_status": r.receipt_status,
             "payer_pan": r.payer_pan,
             "payer_mobile": r.payer_mobile,
+            "payer_address": r.payer_address,
             "payer_membership_no": r.payer_membership_no,
             "period_from_date": r.period_from_date,
             "period_to_date": r.period_to_date,
@@ -551,7 +596,7 @@ def read_receipt_tracking(
                 "member_id": member_id, "from_date": from_date, "to_date": to_date,
                 "search": search,
             },
-            data, "receipt_tracking",
+            _export_rows(db, rows, data), "receipt_tracking",
         )
 
     return {

@@ -185,6 +185,7 @@ export const normalizeReceipt = (receipt) => ({
   membershipNo: firstDefined(receipt.membership_number, receipt.member_code, receipt.payer_membership_no, receipt.membershipNo, ''),
   memberId: firstDefined(receipt.member_id, receipt.memberId, null),
   mobile: firstDefined(receipt.payer_mobile, receipt.mobile, ''),
+  address: firstDefined(receipt.payer_address, ''),
   // the particular named on the receipt's first line (imported receipts all carry the type OTHER), else the head type
   particulars: (receipt.items || [])[0]?.particular || receiptTypeFromApi(firstDefined(receipt.receipt_type, receipt.particulars, 'MEMBERSHIP')),
   amount: Number(firstDefined(receipt.amount, receipt.net_amount, receipt.gross_amount, 0)),
@@ -242,6 +243,7 @@ export const receiptToApiPayload = (formData, selectedMember = null) => {
     is_cancelled: Boolean(formData.isCancelled),
     payer_pan: (formData.panNo || '').trim() || null,
     payer_mobile: (formData.mobile || '').trim() || null,
+    payer_address: (formData.address || '').trim() || null,
     payer_membership_no: (formData.membershipNo || '').trim() || null,
     notes: baseNotes || null,
     period_from_date: formData.periodFromDate || null,

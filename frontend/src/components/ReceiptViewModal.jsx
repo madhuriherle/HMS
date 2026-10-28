@@ -87,6 +87,12 @@ export default function ReceiptViewModal({ receipt, onClose, onChange = null, ch
                   <span className="text-[10px] uppercase font-bold text-[#863221]">Mobile</span>
                   <p className="font-mono mt-0.5">{receipt.mobile || '—'}</p>
                 </div>
+                {receipt.address && (
+                  <div className="col-span-2">
+                    <span className="text-[10px] uppercase font-bold text-[#863221]">Address</span>
+                    <p className="mt-0.5 whitespace-pre-line">{receipt.address}</p>
+                  </div>
+                )}
                 {receipt.panNo && (
                   <div>
                     <span className="text-[10px] uppercase font-bold text-[#863221]">PAN</span>

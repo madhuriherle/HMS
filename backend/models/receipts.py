@@ -23,6 +23,7 @@ class Receipt(AuditMixin, Base):
     # What was typed on the entry form about the payer (kept even when the receipt is mapped to a member).
     payer_pan: Mapped[str] = mapped_column(String(10), nullable=True)
     payer_mobile: Mapped[str] = mapped_column(String(20), nullable=True)
+    payer_address: Mapped[str] = mapped_column(Text, nullable=True)
     payer_membership_no: Mapped[str] = mapped_column(String(30), nullable=True)
     gross_amount: Mapped[float] = mapped_column(Numeric(12,2), nullable=False)
     discount_amount: Mapped[float] = mapped_column(Numeric(12,2), default=0)

@@ -68,6 +68,7 @@ class ReceiptBase(BaseModel):
     transaction_date: Optional[date] = None
     payer_pan: Optional[str] = Field(None, max_length=10)
     payer_mobile: Optional[str] = Field(None, max_length=20)
+    payer_address: Optional[str] = Field(None, max_length=500)
     payer_membership_no: Optional[str] = Field(None, max_length=30)
     gross_amount: float
     discount_amount: float = 0.0
@@ -188,6 +189,7 @@ class ReceiptUpdate(BaseModel):
     transaction_date: Optional[date] = None
     payer_pan: Optional[str] = Field(None, max_length=10)
     payer_mobile: Optional[str] = Field(None, max_length=20)
+    payer_address: Optional[str] = Field(None, max_length=500)
     payer_membership_no: Optional[str] = Field(None, max_length=30)
     items: Optional[List[ReceiptItemBase]] = None
     gross_amount: Optional[float] = None

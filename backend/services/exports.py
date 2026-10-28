@@ -34,6 +34,8 @@ def _dates_as_dd_mm_yyyy(df: pd.DataFrame) -> pd.DataFrame:
     import datetime as _dt
 
     def fmt(v):
+        if v is pd.NaT:
+            return None     # a blank date (pandas turns it into NaT) stays blank
         if isinstance(v, _dt.datetime):
             return v.strftime("%d-%m-%Y %H:%M:%S")
         if isinstance(v, _dt.date):

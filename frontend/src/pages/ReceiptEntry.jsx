@@ -285,6 +285,7 @@ export default function ReceiptEntry() {
     panNo: '', // Strictly MANUAL entry
     membershipNo: '',
     mobile: '',
+    address: '',
     membershipType: '',
     membershipTypeId: '',
     particulars: '',
@@ -510,6 +511,8 @@ export default function ReceiptEntry() {
       name: member.fullName || member.name || '',
       membershipNo: memNo,
       mobile: member.mobile || '',
+      // the member's address as one line (street, place, taluk, district, pincode); it can be changed for this receipt
+      address: [member.address || member.addressLine, member.locality, member.talukName || member.taluk, member.districtName || member.district, member.postalCode || member.pinCode].filter(Boolean).join(', '),
       membershipType: memType,
       membershipTypeId: member.membershipTypeId || ''
     }));
@@ -561,6 +564,7 @@ export default function ReceiptEntry() {
       panNo: '',
       membershipNo: '',
       mobile: '',
+      address: '',
       membershipType: '',
       membershipTypeId: '',
       paymentReceivedDetails: (prev.paymentReceivedDetails || '').startsWith('Membership payment for') ? '' : prev.paymentReceivedDetails,
@@ -684,6 +688,7 @@ export default function ReceiptEntry() {
           panNo: raw.payer_pan || '',
           membershipNo: raw.payer_membership_no || '',
           mobile: raw.payer_mobile || '',
+          address: raw.payer_address || '',
           particulars: first.particular,
           donationSubType: first.subType,
           othersDescription: first.description,
@@ -1071,6 +1076,7 @@ export default function ReceiptEntry() {
           panNo: formData.panNo.trim(),
           membershipNo: formData.membershipNo.trim(),
           mobile: formData.mobile.trim(),
+          address: (formData.address || '').trim(),
           particulars: formData.particulars,
           lines: entered,
           paymentMode: formData.paymentMode,
@@ -1125,6 +1131,7 @@ export default function ReceiptEntry() {
       panNo: formData.panNo.trim(),
       membershipNo: formData.membershipNo.trim(),
       mobile: formData.mobile.trim(),
+      address: (formData.address || '').trim(),
       particulars: formData.particulars,
       donationSubType: hasActiveSubTypes ? formData.donationSubType : '',
       othersDescription: Boolean(currentParticularObj?.needsDescription) && !hasActiveSubTypes ? formData.othersDescription.trim() : '',
@@ -1247,6 +1254,7 @@ export default function ReceiptEntry() {
       panNo: formData.panNo.trim(),
       membershipNo: formData.membershipNo.trim(),
       mobile: formData.mobile.trim(),
+      address: (formData.address || '').trim(),
       particulars: formData.particulars,
       amount: receiptTotal,
       lines: [
@@ -1351,6 +1359,7 @@ export default function ReceiptEntry() {
       panNo: raw.payer_pan || '',
       membershipNo: raw.payer_membership_no || '',
       mobile: raw.payer_mobile || '',
+      address: raw.payer_address || '',
       particulars: first.particular,
       donationSubType: first.subType,
       othersDescription: first.description,
@@ -1924,6 +1933,19 @@ export default function ReceiptEntry() {
                       )}
                     </div>
                   )}
+                </div>
+
+                {/* Address: filled from the member when one is picked; it can be typed or changed for this receipt */}
+                <div>
+                  <label className="block text-xs font-bold text-[#180200] mb-1">Address</label>
+                  <textarea
+                    name="address"
+                    rows={2}
+                    maxLength={500}
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] focus:border-[#510601] focus:ring-1 focus:ring-[#510601] focus:bg-white rounded-xl text-xs sm:text-sm text-[#180200] focus:outline-none transition-colors"
+                  />
                 </div>
 
                 {/* Row 4: Particulars (with sub-type), Amount & Multi-Line Items */}
