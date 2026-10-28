@@ -8,9 +8,9 @@ puts them in one Excel file. The rules (agreed with the office):
   * up to 6 receipt lines per member; a line with a date but no number gets a dummy number FY43-001 (the last two
     digits of the financial year, then a running number) and keeps its amount (0 when there is none);
   * receipts before 1943 or after today are wrong dates and are not imported (the member is);
-  * one receipt number is unique inside a financial year: lines with the same number and the same date are ONE
-    receipt shared by several members; the same number on another date keeps the register's number with a tail: the earliest date
-    has 2026, the next 2026/2, then 2026/3 (the register number is never replaced by a made-up one);
+  * every register record is a receipt of its own (the register never says that two members paid together). A receipt number is unique
+    inside a financial year, so when several records carry the same number the earliest keeps it and the next ones have the register
+    number with a tail: 2026, 2026/2, 2026/3 (by date, then by membership number); a register number is never replaced by a made-up one;
   * the payment is judged at the price on the date of the member's latest receipt, as everywhere in the system.
 """
 import io
@@ -205,17 +205,16 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
             by_number[(financial_year_start(ln["date"]), ln["number"])].append(ln)
     shared, conflicts = [], []
     for key, group in by_number.items():
-        dates = sorted({g["date"] for g in group})
-        for idx, dt in enumerate(dates):
-            on_date = [g for g in group if g["date"] == dt]
-            if len(on_date) > 1:   # one receipt shared by several members
+        ordered = sorted(group, key=lambda g: (g["date"], g["cus_no"], g["slot"]))
+        for dt in sorted({g["date"] for g in ordered}):
+            on_date = [g for g in ordered if g["date"] == dt]
+            if len(on_date) > 1:   # the same number and date on several members: listed, each member still has a receipt of their own
                 shared.append({"fy": key[0], "number": key[1], "date": dt, "members": [g["cus_no"] for g in on_date]})
-            if len(dates) > 1:
-                for ln in on_date:
-                    ln["repeat"] = True
-            if idx:   # the number is used on an earlier date too: this later date is number/2, number/3 ... (the earliest keeps the plain number)
-                for ln in on_date:
-                    conflicts.append({**ln, "fy": key[0], "why": f"number {key[1]} is also used on {dates[0]:%d-%m-%Y}: this receipt is {key[1]}/{idx + 1}"})
+        if len(ordered) > 1:
+            for idx, ln in enumerate(ordered):
+                ln["repeat"] = True
+                if idx:   # a register record is a receipt of its own: the first (earliest) keeps the number, the next are number/2, number/3 ...
+                    conflicts.append({**ln, "fy": key[0], "why": f"number {key[1]} is also on another record: this receipt is {key[1]}/{idx + 1}"})
                     ln["number"] = f"{key[1]}/{idx + 1}"
 
     dummies = []
@@ -596,7 +595,7 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
     """Create the receipts of the old register for the members already imported. Lines with no date are not imported (the
     office chose to ignore them) and neither are dates before 1943 or in the future: they are returned in the lists.
     A receipt number is kept; with none (or one already used on another date that year) the receipt gets FY43-001 and is
-    marked unknown. One number on one date for several members is one receipt shared by them. The members' types are
+    marked unknown. Every register record is a receipt of its own (a repeated number gets /2, /3). The members' types are
     never changed. A member who already has receipts from this import is left out, so the run can be repeated."""
     from sqlalchemy import func
     from models.members import Member
@@ -1045,7 +1044,7 @@ def split_upgrade_into_patrika(db, rows: list, user_id: int) -> dict:
 
 
 def reimport_shared_members(db, rows: list, user_id: int) -> dict:
-    """Make the receipts of repeated register numbers again with the current rule (shared on one date, number/2 on a later date): the
+    """Make the receipts of repeated register numbers again with the current rule (each record its own receipt, number/2, number/3): the
     old-register receipts of those lines are set aside (deleted, number renamed SETASIDE-<id>) and the members are imported again.
     Nothing else is touched."""
     from models.members import Member

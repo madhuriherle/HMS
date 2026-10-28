@@ -69,12 +69,14 @@ def test_receipts_import(client, admin_headers):
         legacy_import.import_members(db, rows, 1, run_id="r" + s[-8:])
         out = legacy_import.import_receipts(db, rows, 1)
         assert out["ignored_undated"] == 1 and out["not_imported_other"] == 1, {k: v for k, v in out.items() if k != "plan"}
-        assert out["created"] == 4 and out["shared"] == 1 and out["dummy"] == 1, {k: v for k, v in out.items() if k != "plan"}
+        assert out["created"] == 5 and out["shared"] == 0 and out["dummy"] == 1, {k: v for k, v in out.items() if k != "plan"}
         ids = {m.membership_number: m.id for m in db.query(Member).filter(Member.membership_number.in_(["920001", "920002", "920003", "920004"])).all()}
-        shared = db.query(Receipt).filter(Receipt.receipt_number == "777", Receipt.source == "OLD_REGISTER").one()
-        assert float(shared.net_amount) == 200 and shared.receipt_status == "ASSIGNED" and shared.is_old_receipt is False
-        allocs = db.query(ReceiptAllocation).filter(ReceiptAllocation.receipt_id == shared.id).all()
-        assert sorted(float(a.allocated_amount) for a in allocs) == [100.0, 100.0]
+        # two records with the number 777 on one date: each is a receipt of its own, the first keeps 777, the next is 777/2
+        for number in ("777", "777/2"):
+            own = db.query(Receipt).filter(Receipt.receipt_number == number, Receipt.source == "OLD_REGISTER").one()
+            assert float(own.net_amount) == 100 and own.receipt_status == "ASSIGNED" and own.is_old_receipt is False
+            allocs = db.query(ReceiptAllocation).filter(ReceiptAllocation.receipt_id == own.id).all()
+            assert [float(a.allocated_amount) for a in allocs] == [100.0]
         dummy = db.query(Receipt).join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id).filter(
             ReceiptAllocation.member_id == ids["920001"], Receipt.is_old_receipt == True).one()  # noqa: E712
         assert dummy.receipt_number == "FY91-001" and float(dummy.net_amount) == 0 and dummy.receipt_date == date(1991, 7, 1)
@@ -90,7 +92,7 @@ def test_receipts_import(client, admin_headers):
         db.close()
 
 
-def test_receipts_import_adds_to_a_shared_receipt_of_an_earlier_run(client, admin_headers):
+def test_receipts_import_gives_each_record_its_own_receipt_across_runs(client, admin_headers):
     from datetime import date
     from db.session import SessionLocal
     from models.masters import Particular
@@ -110,10 +112,11 @@ def test_receipts_import_adds_to_a_shared_receipt_of_an_earlier_run(client, admi
             db.commit()
         legacy_import.import_members(db, rows, 1, run_id="q" + s[-8:])
         assert legacy_import.import_receipts(db, rows[:1], 1)["created"] == 1          # the first member alone
-        assert legacy_import.import_receipts(db, rows, 1)["created"] == 1              # the second joins the same receipt
-        r = db.query(Receipt).filter(Receipt.receipt_number == "888", Receipt.receipt_date == date(1984, 5, 1)).one()
-        assert float(r.net_amount) == 200
-        assert db.query(ReceiptAllocation).filter(ReceiptAllocation.receipt_id == r.id).count() == 2
+        assert legacy_import.import_receipts(db, rows, 1)["created"] == 1              # the second has a receipt of their own: 888/2
+        for number in ("888", "888/2"):
+            r = db.query(Receipt).filter(Receipt.receipt_number == number, Receipt.receipt_date == date(1984, 5, 1)).one()
+            assert float(r.net_amount) == 100
+            assert db.query(ReceiptAllocation).filter(ReceiptAllocation.receipt_id == r.id).count() == 1
     finally:
         db.close()
 
