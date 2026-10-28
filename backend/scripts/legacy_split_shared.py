@@ -1,5 +1,4 @@
-"""Make each member of a shared old-register receipt have a receipt of their own (the first keeps the number, the others a dummy number):
-python scripts/legacy_split_shared.py MstMember.xlsx. Safe to repeat."""
+"""Make the receipts of the members who share a register number again with the current rule: python scripts/legacy_split_shared.py MstMember.xlsx."""
 import sys
 from pathlib import Path
 
@@ -12,6 +11,6 @@ from services import legacy_import  # noqa: E402
 rows = legacy_import.read_register(Path(sys.argv[1]).read_bytes())
 db = SessionLocal()
 try:
-    print(legacy_import.split_shared_receipts(db, rows, 1))
+    print(legacy_import.reimport_shared_members(db, rows, 1))
 finally:
     db.close()
