@@ -33,6 +33,18 @@ class Taluk(AuditMixin, Base):
     code: Mapped[str] = mapped_column(String(20), nullable=True)
     status: Mapped[bool] = mapped_column(Boolean, default=True)
 
+class Village(AuditMixin, Base):
+    """A village of the government's Local Government Directory, with the taluk it is in (used to suggest a taluk, and to check one)."""
+    __tablename__ = "villages"
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
+    state_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("states.id"), nullable=False)
+    district_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("districts.id"), nullable=False)
+    taluk_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("taluks.id"), nullable=False, index=True)
+    name_en: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
+    name_kn: Mapped[str] = mapped_column(String(200), nullable=True)
+    lgd_code: Mapped[str] = mapped_column(String(20), nullable=True, index=True)
+    status: Mapped[bool] = mapped_column(Boolean, default=True)
+
 class PostalCode(AuditMixin, Base):
     __tablename__ = "postal_codes"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, index=True)
