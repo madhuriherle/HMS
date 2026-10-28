@@ -115,8 +115,13 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
         problems.append({"cus_no": m["cus_no"], "old_no": m["old_no"] or "", "name": m["name"], "problem": what})
 
     for r in rows:
-        cus_no = int(_num(r.get("CusNo")))
-        old_no = int(_num(r.get("CusNoOld"))) or None
+        cus_no_raw = _num(r.get("CusNo"))
+        old_no_raw = _num(r.get("CusNoOld"))
+        if cus_no_raw == 0 and old_no_raw != 0:
+            cus_no = int(old_no_raw)
+        else:
+            cus_no = int(cus_no_raw)
+        old_no = int(old_no_raw) or None
         raw_type = _s(r.get("CusMemberType")).upper()
         type_key = TYPE_FIXES.get(raw_type, raw_type)
         mobile = None
@@ -394,8 +399,13 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
     created, skipped, warnings = 0, [], []
     deleted = expired = 0
     for n, r in enumerate(rows, 1):
-        cus_no = str(int(_num(r.get("CusNo"))))
-        old_no = str(int(_num(r.get("CusNoOld")))) if _num(r.get("CusNoOld")) else None
+        cus_no_raw = _num(r.get("CusNo"))
+        old_no_raw = _num(r.get("CusNoOld"))
+        if cus_no_raw == 0 and old_no_raw != 0:
+            cus_no = str(int(old_no_raw))
+        else:
+            cus_no = str(int(cus_no_raw))
+        old_no = str(int(old_no_raw)) if old_no_raw else None
         if cus_no in have_no:
             skipped.append({"membership_number": cus_no, "reason": "Already imported (membership number exists)"})
             continue
