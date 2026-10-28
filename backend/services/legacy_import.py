@@ -9,7 +9,8 @@ puts them in one Excel file. The rules (agreed with the office):
     digits of the financial year, then a running number) and keeps its amount (0 when there is none);
   * receipts before 1943 or after today are wrong dates and are not imported (the member is);
   * one receipt number is unique inside a financial year: lines with the same number and the same date are ONE
-    receipt shared by several members, the same number on another date gets a dummy number;
+    receipt shared by several members; the same number on another date keeps the register's number with a tail: the earliest date
+    has 2026, the next 2026/2, then 2026/3 (the register number is never replaced by a made-up one);
   * the payment is judged at the price on the date of the member's latest receipt, as everywhere in the system.
 """
 import io
@@ -204,14 +205,18 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
             by_number[(financial_year_start(ln["date"]), ln["number"])].append(ln)
     shared, conflicts = [], []
     for key, group in by_number.items():
-        first_date = Counter(g["date"] for g in group).most_common(1)[0][0]
-        on_first = [g for g in group if g["date"] == first_date]
-        if len(on_first) > 1:   # one receipt shared by several members
-            shared.append({"fy": key[0], "number": key[1], "date": first_date, "members": [g["cus_no"] for g in on_first]})
-        for ln in group:
-            if ln["date"] != first_date:
-                ln["kind"] = "NUMBER_TAKEN"
-                conflicts.append({**ln, "fy": key[0], "why": f"number {key[1]} is used on {first_date:%d-%m-%Y} in the same financial year"})
+        dates = sorted({g["date"] for g in group})
+        for idx, dt in enumerate(dates):
+            on_date = [g for g in group if g["date"] == dt]
+            if len(on_date) > 1:   # one receipt shared by several members
+                shared.append({"fy": key[0], "number": key[1], "date": dt, "members": [g["cus_no"] for g in on_date]})
+            if len(dates) > 1:
+                for ln in on_date:
+                    ln["repeat"] = True
+            if idx:   # the number is used on an earlier date too: this later date is number/2, number/3 ... (the earliest keeps the plain number)
+                for ln in on_date:
+                    conflicts.append({**ln, "fy": key[0], "why": f"number {key[1]} is also used on {dates[0]:%d-%m-%Y}: this receipt is {key[1]}/{idx + 1}"})
+                    ln["number"] = f"{key[1]}/{idx + 1}"
 
     dummies = []
     seq = defaultdict(int, dummy_used)
@@ -1025,17 +1030,27 @@ def split_upgrade_into_patrika(db, rows: list, user_id: int) -> dict:
 
 
 def reimport_shared_members(db, rows: list, user_id: int) -> dict:
-    """Make the receipts of the members who share a number in the register again with the current rule: the old-register receipts of those
-    members are set aside (deleted, number renamed SETASIDE-<id>) and the members are imported again. Nothing else is touched."""
+    """Make the receipts of repeated register numbers again with the current rule (shared on one date, number/2 on a later date): the
+    old-register receipts of those lines are set aside (deleted, number renamed SETASIDE-<id>) and the members are imported again.
+    Nothing else is touched."""
     from models.members import Member
     from models.receipts import Receipt, ReceiptAllocation
 
-    numbers = {str(int(c)) for g in build_plan(db, rows)["shared"] for c in g["members"]}
+    plan = build_plan(db, rows)
+    pairs = {(str(int(g["members"][i])), g["date"]) for g in plan["shared"] for i in range(len(g["members"]))}
+    pairs |= {(str(int(m["cus_no"])), ln["date"]) for m in plan["members"] for ln in m["lines"] if ln.get("repeat")}
+    numbers = {n for n, _d in pairs}
     if not numbers:
         return {"set_aside": 0}
-    ids = [i for (i,) in db.query(Member.id).filter(Member.membership_number.in_(numbers)).all()]
-    rids = [r for (r,) in db.query(ReceiptAllocation.receipt_id).join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
-            .filter(ReceiptAllocation.member_id.in_(ids), Receipt.source == SOURCE, Receipt.is_deleted == False).distinct().all()]  # noqa: E712
+    ids = {mn: i for i, mn in db.query(Member.id, Member.membership_number).filter(Member.membership_number.in_(numbers)).all()}
+    rids = set()
+    for mn, d in pairs:
+        if mn not in ids:
+            continue
+        for (rid,) in (db.query(ReceiptAllocation.receipt_id).join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
+                       .filter(ReceiptAllocation.member_id == ids[mn], Receipt.receipt_date == d, Receipt.source == SOURCE,
+                               Receipt.is_deleted == False).all()):  # noqa: E712
+            rids.add(rid)
     for rid in rids:
         r = db.get(Receipt, rid)
         r.receipt_number = f"SETASIDE-{rid}"

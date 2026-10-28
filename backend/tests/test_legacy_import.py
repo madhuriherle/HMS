@@ -37,7 +37,7 @@ def test_register_rules(client):
         _row(1, "ASHA RAO", [(100, datetime(1980, 5, 1), 200)], CusMobile="9876543210"),
         _row(2, "ASHA RAO", [(None, datetime(1980, 6, 1), 0)], CusMobile="9876543210"),            # date only -> dummy, amount 0
         _row(3, "BHARATH", [(100, datetime(1980, 5, 1), 100)]),                                        # same number + date: one shared receipt
-        _row(4, "CHARAN", [(100, datetime(1980, 9, 9), 100)]),                                         # same number, another date: dummy number
+        _row(4, "CHARAN", [(100, datetime(1980, 9, 9), 100)]),                                         # same number, a later date: 100/2 (the register number with a tail)
         _row(5, "DEEPA", [(7, datetime(1927, 1, 1), 100), (8, datetime(2301, 1, 1), 100), (9, None, 100)]),   # wrong dates, no date
         _row(6, "ESHA", [(11, datetime(2001, 4, 1), 0)], CusMemberType="POSHAK", DeleteMark="*"),     # zero amount, typo type
     ]))
@@ -48,8 +48,11 @@ def test_register_rules(client):
         db.close()
     c = plan["counts"]
     assert c["members"] == 6 and c["deleted"] == 1
-    assert sorted(d["dummy"] for d in plan["dummies"]) == ["FY80-001", "FY80-002"]
-    assert {d["cus_no"] for d in plan["dummies"]} == {2, 4}
+    assert sorted(d["dummy"] for d in plan["dummies"]) == ["FY80-001"]
+    assert {d["cus_no"] for d in plan["dummies"]} == {2}
+    charan = next(ln for m in plan["members"] if m["cus_no"] == 4 for ln in m["lines"])
+    asha = next(ln for m in plan["members"] if m["cus_no"] == 1 for ln in m["lines"])
+    assert charan["number"] == "100/2" and asha["number"] == "100"       # the earliest date keeps the plain number
     assert c["receipts_shared_by_members"] == 1 and plan["shared"][0]["members"] == [1, 3]
     assert c["receipts_wrong_date"] == 2 and c["receipts_no_date"] == 1
     assert c["receipts_zero_amount"] == 1
