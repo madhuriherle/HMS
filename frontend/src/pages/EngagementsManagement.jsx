@@ -96,7 +96,7 @@ function AffiliationsView({ canWrite, canDelete }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [magFilter, setMagFilter] = useState('ALL');
-  const [filtersOpen, setFiltersOpen] = useState(true); // the filters card is always shown
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   // Modal states
   const [formModalOpen, setFormModalOpen] = useState(false);
@@ -557,7 +557,7 @@ function AssociatesView({ canWrite, canDelete }) {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [magFilter, setMagFilter] = useState('ALL');
-  const [filtersOpen, setFiltersOpen] = useState(true); // the filters card is always shown
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAssoc, setEditingAssoc] = useState(null);
@@ -946,7 +946,7 @@ function PressMediaView({ canWrite, canDelete }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [magFilter, setMagFilter] = useState('ALL');
-  const [filtersOpen, setFiltersOpen] = useState(true); // the filters card is always shown
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPress, setEditingPress] = useState(null);
@@ -1307,7 +1307,7 @@ function CommitteeView({ canWrite, canDelete }) {
   const [loading, setLoading] = useState(true);
 
   // Filters
-  const [filtersOpen, setFiltersOpen] = useState(true); // the filters card is always shown
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState('ALL');
   const [selectedTermFilter, setSelectedTermFilter] = useState('ALL');
 

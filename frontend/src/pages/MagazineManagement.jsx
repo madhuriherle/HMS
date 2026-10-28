@@ -258,7 +258,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
   const [, setSummary] = useState({ total: 0, active: 0, paused: 0, stopped: 0 });
   const [loadingRows, setLoadingRows] = useState(true);
   const [search, setSearch] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(true); // the filters card is always shown
+  const [filtersOpen, setFiltersOpen] = useState(false); // the filters are shown only when the filter icon is clicked
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');

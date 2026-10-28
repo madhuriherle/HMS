@@ -97,7 +97,7 @@ export default function RecycleBin() {
   });
 
   const all = types.reduce((n, t) => n + t.count, 0);
-  const [filtersOpen, setFiltersOpen] = useState(true); // the filters card is always shown
+  const [filtersOpen, setFiltersOpen] = useState(false); // the type filter shows only when the filter icon is clicked
 
   return (
     <PermissionGate required="system.recycle_bin.read" title="Access Restricted" message="You need the Recycle Bin privilege to open this screen.">

@@ -42,7 +42,7 @@ export default function BulkReceiptMapping() {
   const [activeReceiptForManual, setActiveReceiptForManual] = useState(null);
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
   const [memberSearchResults, setMemberSearchResults] = useState([]);
-  const [filtersOpen, setFiltersOpen] = useState(true); // the filters card is always shown
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [memberPage, setMemberPage] = useState(1);
   const [memberPages, setMemberPages] = useState(1);
   const [memberTotal, setMemberTotal] = useState(0);

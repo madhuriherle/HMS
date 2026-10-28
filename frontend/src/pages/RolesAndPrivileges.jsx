@@ -214,7 +214,7 @@ export default function RolesAndPrivileges() {
   };
 
   const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL';
-  const [filtersOpen, setFiltersOpen] = useState(true); // the filters card is always shown
+  const [filtersOpen, setFiltersOpen] = useState(false); // the filters show only when the filter icon is clicked
 
   const filteredRoles = useMemo(() => {
     return roles.filter((role) => {
