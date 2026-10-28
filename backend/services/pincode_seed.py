@@ -4,8 +4,8 @@ Source: the all-India post office CSV (office name, pincode, district, state, la
 village it is named after) from the government directory loaded in `villages`:
   1. the post office name is the name of one village of its district  -> that village and its taluk;
   2. several villages have that name  -> the one in a taluk that the matched post offices of the same pincode sit in (when that is one);
-  3. no village of that name (Kota S.O, a town or a locality)  -> the taluk of the nearest matched post office of the district within
-     NEAR_KM, else the taluk the matched post offices of its pincode all share;
+  3. no village of that name (Kota S.O, a town or a locality)  -> the taluk the matched post offices of its pincode all share, else the
+     taluk of the nearest matched post office of the district within NEAR_KM;
   4. none of these  -> no taluk, listed for the office. Nothing is guessed.
 The old rows of those two states are marked deleted (not erased); members are moved to the new row of their pincode and post office, and
 take its taluk and district. A pincode that is in no new row and has members keeps its old row. Safe to repeat.
@@ -110,15 +110,15 @@ def plan(db, rows: list) -> dict:
         if o["taluk_id"]:
             continue
         best = None
-        if o["xy"]:
+        if len(by_pin.get(o["pincode"], ())) == 1:
+            o["taluk_id"], o["how"] = next(iter(by_pin[o["pincode"]])), "its pincode"
+        elif o["xy"]:
             for a in anchors.get(o["district_id"], ()):
                 d = _km(o["xy"], a["xy"])
                 if d <= NEAR_KM and (best is None or d < best[0]):
                     best = (d, a)
         if best:
             o["taluk_id"], o["how"] = best[1]["taluk_id"], "nearest post office"
-        elif len(by_pin.get(o["pincode"], ())) == 1:
-            o["taluk_id"], o["how"] = next(iter(by_pin[o["pincode"]])), "its pincode"
         if o["hits"] and o["taluk_id"]:
             mine = [h for h in o["hits"] if h[1] == o["taluk_id"]]
             if len(mine) == 1:
