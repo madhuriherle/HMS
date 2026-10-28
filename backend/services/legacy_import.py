@@ -8,8 +8,9 @@ puts them in one Excel file. The rules (agreed with the office):
   * up to 6 receipt lines per member; a line with a date but no number gets a dummy number FY43-001 (the last two
     digits of the financial year, then a running number) and keeps its amount (0 when there is none);
   * receipts before 1943 or after today are wrong dates and are not imported (the member is);
-  * one receipt number is unique inside a financial year: lines with the same number and the same date are ONE
-    receipt shared by several members, the same number on another date gets a dummy number;
+  * one receipt number is unique inside a financial year and a receipt is one member's: when several members carry the same number
+    on the same date the first member keeps the number and each of the others gets a receipt of their own with a dummy number (the
+    register cannot show that they really paid together); the same number on another date gets a dummy number too;
   * the payment is judged at the price on the date of the member's latest receipt, as everywhere in the system.
 """
 import io
@@ -201,8 +202,11 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
     for key, group in by_number.items():
         first_date = Counter(g["date"] for g in group).most_common(1)[0][0]
         on_first = [g for g in group if g["date"] == first_date]
-        if len(on_first) > 1:   # one receipt shared by several members
+        if len(on_first) > 1:   # one number on one date for several members: the first keeps it, the others get their own receipt
             shared.append({"fy": key[0], "number": key[1], "date": first_date, "members": [g["cus_no"] for g in on_first]})
+            for ln in on_first[1:]:
+                ln["kind"] = "NUMBER_TAKEN"
+                conflicts.append({**ln, "fy": key[0], "why": f"number {key[1]} is also on {first_date:%d-%m-%Y} for another member: this member has their own receipt"})
         for ln in group:
             if ln["date"] != first_date:
                 ln["kind"] = "NUMBER_TAKEN"
@@ -566,7 +570,8 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
     """Create the receipts of the old register for the members already imported. Lines with no date are not imported (the
     office chose to ignore them) and neither are dates before 1943 or in the future: they are returned in the lists.
     A receipt number is kept; with none (or one already used on another date that year) the receipt gets FY43-001 and is
-    marked unknown. One number on one date for several members is one receipt shared by them. The members' types are
+    marked unknown. One number on one date for several members: the first member has it, each other member a receipt of their own with
+    a dummy number (split_shared_receipts does that for receipts an earlier run made shared). The members' types are
     never changed. A member who already has receipts from this import is left out, so the run can be repeated."""
     from sqlalchemy import func
     from models.members import Member
@@ -1012,3 +1017,29 @@ def split_upgrade_into_patrika(db, rows: list, user_id: int) -> dict:
         moved += took
     db.commit()
     return {"receipts_changed": changed, "amount_moved_to_patrika_nidhi": round(moved, 2), "slots_without_a_receipt": missing}
+
+
+def split_shared_receipts(db, rows: list, user_id: int) -> dict:
+    """Receipts of this import that an earlier run made shared by several members become one receipt per member: the first member keeps
+    the number, the others get a receipt of their own with a dummy number. The shared receipt is set aside (deleted, its number renamed
+    SPLIT-<id>) and the members it covered are imported again with the current rule; nothing else is touched."""
+    from models.members import Member
+    from models.receipts import Receipt, ReceiptAllocation
+    from sqlalchemy import func
+
+    shared_ids = [rid for (rid,) in db.query(ReceiptAllocation.receipt_id).join(Receipt, Receipt.id == ReceiptAllocation.receipt_id)
+                  .filter(Receipt.source == SOURCE, Receipt.is_deleted == False)  # noqa: E712
+                  .group_by(ReceiptAllocation.receipt_id).having(func.count(ReceiptAllocation.id) > 1).all()]
+    if not shared_ids:
+        return {"split": 0}
+    numbers = {m for (m,) in db.query(Member.membership_number).join(ReceiptAllocation, ReceiptAllocation.member_id == Member.id)
+               .filter(ReceiptAllocation.receipt_id.in_(shared_ids)).all()}
+    for rid in shared_ids:
+        r = db.get(Receipt, rid)
+        r.receipt_number = f"SPLIT-{rid}"
+        r.is_deleted = True
+        db.query(ReceiptAllocation).filter(ReceiptAllocation.receipt_id == rid).delete(synchronize_session=False)
+    db.commit()
+    subset = [r for r in rows if str(int(r["CusNo"])) in numbers] if rows and "CusNo" in rows[0] else rows
+    out = import_receipts(db, subset, user_id)
+    return {"split": len(shared_ids), "members": len(numbers), "created": out["created"], "dummy": out["dummy"], "skipped": out["skipped"]}
