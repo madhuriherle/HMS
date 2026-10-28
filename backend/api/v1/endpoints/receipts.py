@@ -1571,7 +1571,7 @@ def read_receipt_allocations(
     if member_ids:
         for m in db.query(Member).filter(Member.id.in_(member_ids)).all():
             names[m.id] = m.display_name
-            membership_numbers[m.id] = m.membership_number or m.member_code or f"ID: {m.id}"
+            membership_numbers[m.id] = m.membership_number or m.member_code or None
             mobiles[m.id] = m.mobile or ""
     if associate_ids:
         for a in db.query(Associate).filter(Associate.id.in_(associate_ids)).all():

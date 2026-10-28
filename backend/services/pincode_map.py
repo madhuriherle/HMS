@@ -30,7 +30,15 @@ def post_office_key(name: str) -> str:
 def map_pincodes(db, apply: bool = True) -> dict:
     from models.masters import PostalCode, Taluk, Village
     from models.members import Member
+    from sqlalchemy import func
 
+    # a deleted (merged) taluk's pincodes, villages and members go to the live taluk of the same name in the same district
+    dead = {t.id: t for t in db.query(Taluk).filter(Taluk.is_deleted == True).all()}  # noqa: E712
+    for t in dead.values():
+        live = db.query(Taluk).filter(Taluk.district_id == t.district_id, func.lower(Taluk.name_en) == (t.name_en or "").lower(), Taluk.is_deleted == False, Taluk.id != t.id).first()  # noqa: E712
+        if live:
+            for model in (PostalCode, Village, Member):
+                db.query(model).filter(model.taluk_id == t.id).update({"taluk_id": live.id}, synchronize_session=False)
     by_district = defaultdict(lambda: defaultdict(list))       # district id -> name key -> [(village id, taluk id)]
     for vid, did, tid, name in db.query(Village.id, Village.district_id, Village.taluk_id, Village.name_en).filter(Village.is_deleted == False).all():  # noqa: E712
         by_district[did][_letters(name)].append((vid, tid))

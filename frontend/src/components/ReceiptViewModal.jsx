@@ -150,8 +150,7 @@ export default function ReceiptViewModal({ receipt, onClose, onChange = null, ch
                             {a.member_name || a.associate_name || 'Member'}
                           </div>
                           <div className="text-[11px] text-[#7D7068] font-mono">
-                            {a.membership_number ? `No: ${a.membership_number}` : (a.member_id ? `ID: ${a.member_id}` : '')}
-                            {a.member_mobile ? ` · ${a.member_mobile}` : ''}
+                            {[a.membership_number && `No: ${a.membership_number}`, a.member_mobile].filter(Boolean).join(' · ')}
                           </div>
                         </div>
                       </div>
