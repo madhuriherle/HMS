@@ -1,5 +1,6 @@
-import React from 'react';
-import { CreditCard, FileText, User, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CreditCard, ExternalLink, FileText, User, Users, X } from 'lucide-react';
+import api from '../api';
 import Modal from './Modal';
 import ModalFooter from './ModalFooter';
 import { formatMoney } from '../utils/money';
@@ -37,6 +38,26 @@ const fullLabel = (i) => (lineLabel(i) !== i.particular ? `${i.particular} › $
  * receipt row as the Receipt Tracking list returns it (normalised); the popup is closed with `onClose`.
  */
 export default function ReceiptViewModal({ receipt, onClose, onChange = null, changeTitle = '' }) {
+  const [allocations, setAllocations] = useState([]);
+
+  useEffect(() => {
+    if (!receipt?.id) {
+      setAllocations([]);
+      return;
+    }
+    let current = true;
+    api.get(`/receipts/${receipt.id}/allocations`)
+      .then((res) => {
+        if (!current) return;
+        setAllocations(res.data || []);
+      })
+      .catch(() => {
+        if (!current) return;
+        setAllocations([]);
+      });
+    return () => { current = false; };
+  }, [receipt?.id]);
+
   return (
     <Modal isOpen={Boolean(receipt)} onClose={onClose}>
       {receipt && (
@@ -58,7 +79,7 @@ export default function ReceiptViewModal({ receipt, onClose, onChange = null, ch
             </div>
             <button
               onClick={() => onClose()}
-              className="p-1.5 rounded-lg text-stone-400 hover:text-[#510601] hover:bg-stone-100 transition-colors"
+              className="p-1.5 rounded-lg text-stone-400 hover:text-[#510601] hover:bg-stone-100 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -101,6 +122,60 @@ export default function ReceiptViewModal({ receipt, onClose, onChange = null, ch
                 )}
               </div>
             </div>
+
+            {/* Shared Members Section (appears when receipt is shared by multiple members) */}
+            {allocations.length > 1 && (
+              <div className="bg-[#FAF7F2] rounded-xl p-4 border border-[#E8DFD8] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Shared by {allocations.length} Members</span>
+                  </span>
+                  <span className="text-[10px] font-semibold text-[#863221] bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                    Multi-member Receipt
+                  </span>
+                </div>
+                <p className="text-xs text-[#7D7068]">
+                  This receipt payment covers multiple members. Click to view their profile:
+                </p>
+                <div className="divide-y divide-[#E8DFD8] bg-white rounded-xl border border-[#E8DFD8] overflow-hidden">
+                  {allocations.map((a, i) => (
+                    <div key={a.id || i} className="flex items-center justify-between px-3.5 py-2.5 hover:bg-[#FAF7F2] transition-colors">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-6 h-6 rounded-full bg-[#510601]/10 text-[#510601] flex items-center justify-center font-bold text-xs shrink-0">
+                          {i + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="font-bold text-[#180200] truncate">
+                            {a.member_name || a.associate_name || 'Member'}
+                          </div>
+                          <div className="text-[11px] text-[#7D7068] font-mono">
+                            {a.membership_number ? `No: ${a.membership_number}` : (a.member_id ? `ID: ${a.member_id}` : '')}
+                            {a.member_mobile ? ` · ${a.member_mobile}` : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 ml-3">
+                        <span className="font-mono font-bold text-[#510601]">
+                          {formatMoney(a.allocated_amount)}
+                        </span>
+                        {a.member_id && (
+                          <a
+                            href={`/dashboard/membership/profile/${a.member_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1 bg-white border border-[#510601] text-[#510601] hover:bg-[#510601] hover:text-white rounded-lg text-[11px] font-bold transition-all inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                          >
+                            <span>View Profile</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Payment Details */}
             <div className="bg-white rounded-xl p-4 border border-[#E8DFD8] space-y-2.5">

@@ -37,13 +37,14 @@ def map_pincodes(db, apply: bool = True) -> dict:
     pcs = db.query(PostalCode).filter(PostalCode.is_deleted == False).all()  # noqa: E712
     out = {"pincodes": len(pcs), "pointed at a village (same taluk)": 0, "pointed at a village (taluk changed)": 0, "several villages, left for the office": 0,
            "no village of that name": 0, "members moved with their pincode": 0}
-    review = []
+    review, changes, unmatched = [], [], []
     changed_taluk = {}
     for pc in pcs:
         key = post_office_key(pc.post_office_name)
         names = by_district.get(pc.district_id)
         if not key or not names:
             out["no village of that name"] += 1
+            unmatched.append((pc.pincode, pc.post_office_name, pc.taluk_id))
             continue
         hits = names.get(key)
         if not hits:
@@ -51,6 +52,7 @@ def map_pincodes(db, apply: bool = True) -> dict:
             hits = names[near[0]] if near else None
         if not hits:
             out["no village of that name"] += 1
+            unmatched.append((pc.pincode, pc.post_office_name, pc.taluk_id))
             continue
         if len(hits) > 1:
             same = [h for h in hits if h[1] == pc.taluk_id]
@@ -66,6 +68,7 @@ def map_pincodes(db, apply: bool = True) -> dict:
         else:
             out["pointed at a village (taluk changed)"] += 1
             changed_taluk[pc.id] = (pc.taluk_id, tid)
+            changes.append((pc.pincode, pc.post_office_name, pc.taluk_id, tid))
         pc.village_id = vid
         pc.taluk_id = tid
     # members linked to a pincode whose taluk changed follow it (only when they still hold the old taluk)
@@ -84,6 +87,8 @@ def map_pincodes(db, apply: bool = True) -> dict:
             db.query(PostalCode).filter(PostalCode.taluk_id == t.id, or_(PostalCode.district_id.is_(None), PostalCode.district_id != t.district_id)).update(
                 {"district_id": t.district_id}, synchronize_session=False)
     out["review"] = review
+    out["changes"] = changes
+    out["unmatched"] = unmatched
     if apply:
         db.commit()
     else:
