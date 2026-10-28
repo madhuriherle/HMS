@@ -16,8 +16,8 @@ Idempotency is the caller's job: both endpoints refuse already-APPROVED
 members with a 409 rather than double-numbering.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import date, datetime, timezone
+from typing import Optional, Union
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -56,7 +56,7 @@ def approval_gaps(member: Member) -> list:
     return [label for attr, label in REQUIRED_FOR_APPROVAL if not str(getattr(member, attr, None) or "").strip()]
 
 
-def activate_member(db: Session, member: Member, *, activated_by: int, reason: Optional[str] = None) -> Member:
+def activate_member(db: Session, member: Member, *, activated_by: int, reason: Optional[str] = None, approved_date: Optional[Union[date, datetime]] = None) -> Member:
     """Apply the activation mutations. Does NOT commit — the caller owns the
     transaction (and, for the WhatsApp activation message, the background
     task queue)."""
@@ -67,6 +67,15 @@ def activate_member(db: Session, member: Member, *, activated_by: int, reason: O
         name = member.display_name or f"Member {member.id}"
         raise HTTPException(400, f"Cannot approve {name}: missing {', '.join(gaps)}")
     now = datetime.now(timezone.utc)
+    if approved_date:
+        if isinstance(approved_date, datetime):
+            approval_dt = approved_date if approved_date.tzinfo else approved_date.replace(tzinfo=timezone.utc)
+        elif isinstance(approved_date, date):
+            approval_dt = datetime.combine(approved_date, now.time()).replace(tzinfo=timezone.utc)
+        else:
+            approval_dt = now
+    else:
+        approval_dt = now
     old_status = member.approval_status
 
     # Auto-generate member_code
@@ -79,7 +88,7 @@ def activate_member(db: Session, member: Member, *, activated_by: int, reason: O
         member.member_code = code
     member.approval_status = "APPROVED"
     member.approved_by = activated_by
-    member.approved_at = now
+    member.approved_at = approval_dt
     db.add(MemberApprovalHistory(
         member_id=member.id,
         action="APPROVE",
@@ -87,7 +96,7 @@ def activate_member(db: Session, member: Member, *, activated_by: int, reason: O
         new_status="APPROVED",
         reason=reason or "Approved",
         acted_by=activated_by,
-        acted_at=now,
+        acted_at=approval_dt,
         created_by=activated_by,
     ))
 
@@ -105,7 +114,7 @@ def activate_member(db: Session, member: Member, *, activated_by: int, reason: O
     for membership in memberships:
         membership.membership_number = membership_number_for(db, member, exclude_id=membership.id)
         db.flush()  # a second membership of this member must see the number as taken
-        membership.activated_at = now
+        membership.activated_at = approval_dt
         membership.updated_by = activated_by
 
     # receipts mapped to this member refresh their status (ASSIGNED or CANCELLED)

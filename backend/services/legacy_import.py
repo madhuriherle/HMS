@@ -16,6 +16,8 @@ from collections import Counter, defaultdict
 from datetime import date, datetime
 from typing import Any, Optional
 
+# the old register wrote Patrika Nidhi (the magazine fund) payments in the upgrade or the donation column with this note
+_PATRIKA = re.compile(r"patrika|\bp\.?\s*nidhi\b", re.I)
 _KANNADA = re.compile("[\u0C80-\u0CFF]")
 FIRST_YEAR = 1943          # the Sabha began in 1943: no receipt can be older
 SLOTS = range(1, 7)
@@ -168,7 +170,9 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
             line = {"cus_no": cus_no, "name": m["name"], "slot": j, "number": number, "date": d, "raw_date": _s(dt),
                     "membership": mem, "upgrade": up, "other": extra, "note": _s(r.get(f"CusReceiptNote{j}")), "kind": "OK",
                     "scholarship": _num(r.get(f"CusScholarAmt{j}")),
-                    "donation": sum(_num(r.get(f"CusDon{k}Amt{j}")) for k in (1, 2, 3))}
+                    "donation": sum(_num(r.get(f"CusDon{k}Amt{j}")) for k in (1, 2, 3)), "patrika": 0.0}
+            if _PATRIKA.search(line["note"]):
+                line["patrika"], line["upgrade"], line["donation"] = line["upgrade"] + line["donation"], 0.0, 0.0
             m["lines"].append(line)
 
     # --- receipts: wrong dates, missing dates, shared and repeated numbers, dummy numbers
@@ -548,9 +552,10 @@ def _particulars(db, user_id: int) -> dict:
         raise RuntimeError("The Membership particular is missing")
     donation = find("Donation") or make("Donation")
     general_donation = find("General Donation", donation.id) or make("General Donation", donation.id)
+    patrika_nidhi = find("Patrika Nidhi", donation.id) or make("Patrika Nidhi", donation.id)
     scholarship = find("Scholarship") or make("Scholarship")
     general_scholarship = find("General", scholarship.id) or make("General", scholarship.id)
-    return {"membership": membership, "donation": donation, "general_donation": general_donation,
+    return {"membership": membership, "donation": donation, "general_donation": general_donation, "patrika_nidhi": patrika_nidhi,
             "scholarship": scholarship, "general_scholarship": general_scholarship}
 
 
@@ -609,11 +614,12 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
         up = sum(l["upgrade"] for _m, l in members)
         sch = sum(l["scholarship"] for _m, l in members)
         don = sum(l["donation"] for _m, l in members)
-        total = mem + up + sch + don
+        pat = sum(l["patrika"] for _m, l in members)
+        total = mem + up + sch + don + pat
         if mem + up > 0 or total == 0:
             rtype = "MEMBERSHIP"
         else:
-            rtype = "SCHOLARSHIP" if sch > 0 and don == 0 else "GENERAL_DONATION"
+            rtype = "SCHOLARSHIP" if sch > 0 and don == 0 and pat == 0 else "GENERAL_DONATION"
         notes = " | ".join(dict.fromkeys(x for x in [l["note"] for _m, l in members] if x))
         fy = receipt_numbers.financial_year_for(first["date"])
         # a receipt of this number already made by an earlier run (a shared receipt whose first member was done then): the
@@ -632,7 +638,7 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
             try:
                 with db.begin_nested():
                     for (mid, _mno, _name), ln in members:
-                        own = ln["membership"] + ln["upgrade"] + ln["scholarship"] + ln["donation"]
+                        own = ln["membership"] + ln["upgrade"] + ln["scholarship"] + ln["donation"] + ln["patrika"]
                         db.add(ReceiptAllocation(receipt_id=earlier.id, member_id=mid, allocated_amount=(ln["membership"] + ln["upgrade"] or own), created_by=user_id))
                     next_line = (db.query(func.max(ReceiptItem.line_no)).filter(ReceiptItem.receipt_id == earlier.id).scalar() or 0) + 1
                     db.add(ReceiptItem(receipt_id=earlier.id, item_type="MEMBERSHIP", particular_id=p["membership"].id, particular_name=p["membership"].name_en,
@@ -681,8 +687,10 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
                     item("SCHOLARSHIP", p["scholarship"], p["general_scholarship"], sch, notes or None)
                 if don > 0:
                     item("DONATION", p["donation"], p["general_donation"], don, notes or None)
+                if pat > 0:
+                    item("DONATION", p["donation"], p["patrika_nidhi"], pat, notes or None)
                 for (mid, mno, _name), ln in members:
-                    own = ln["membership"] + ln["upgrade"] + ln["scholarship"] + ln["donation"]
+                    own = ln["membership"] + ln["upgrade"] + ln["scholarship"] + ln["donation"] + ln["patrika"]
                     # on a receipt shared by several members each one is given the membership money of their own line
                     share = own if len(members) == 1 else (ln["membership"] + ln["upgrade"] or own)
                     db.add(ReceiptAllocation(receipt_id=r.id, member_id=mid, allocated_amount=share, created_by=user_id))
@@ -871,3 +879,66 @@ def merge_same_particular_lines(db) -> dict:
     receipts = len(seen_receipts)
     db.commit()
     return {"receipts_changed": receipts, "lines_removed": lines_removed}
+
+
+def retag_patrika_receipts(db, rows: list, user_id: int) -> dict:
+    """Receipts already imported whose register row carries a Patrika Fund / Patrika Nidhi note: the upgrade or donation money of
+    that row moves to Donation > Patrika Nidhi (it was counted as membership, or as a general donation). Totals do not change.
+    Found by receipt number and date; a shared receipt is split by row. Safe to repeat."""
+    from datetime import timezone
+    from models.receipts import Receipt, ReceiptItem
+
+    p = _particulars(db, user_id)
+    pat_sub = p["patrika_nidhi"]
+    now = datetime.now(timezone.utc)
+    fixed, moved, missing = 0, 0.0, 0
+    for r in rows:
+        for j in SLOTS:
+            if not _PATRIKA.search(_s(r.get(f"CusReceiptNote{j}"))):
+                continue
+            number, d = _s(r.get(f"CusReceiptNo{j}")), _as_date(r.get(f"CusReceiptDate{j}"))
+            up = _num(r.get(f"CusMemUpAmt{j}"))
+            don = sum(_num(r.get(f"CusDon{k}Amt{j}")) for k in (1, 2, 3))
+            if not number or d is None or not (up or don):
+                continue
+            rec = (db.query(Receipt).filter(Receipt.receipt_number == number, Receipt.receipt_date == d, Receipt.source == SOURCE,
+                                            Receipt.is_deleted == False).first())  # noqa: E712
+            if rec is None:
+                missing += 1
+                continue
+            items = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == rec.id, ReceiptItem.is_deleted == False).order_by(ReceiptItem.line_no).all()  # noqa: E712
+            if any(i.particular_name == "Donation" and i.sub_particular_id == pat_sub.id for i in items) and not up and not don:
+                continue
+
+            def take(match, amount):
+                left = amount
+                for i in items:
+                    if left <= 0:
+                        break
+                    if i.is_deleted or not match(i):
+                        continue
+                    cut = min(float(i.amount), left)
+                    left -= cut
+                    i.amount = float(i.amount) - cut
+                    if i.amount <= 0.0001:
+                        i.is_deleted, i.deleted_at = True, now
+                return amount - left
+
+            got = take(lambda i: i.particular_name == "Membership" and (i.item_type or "").upper() in ("TYPE_CHANGE", "MEMBERSHIP"), up)
+            got += take(lambda i: i.particular_name == "Donation" and i.sub_particular_id != pat_sub.id, don)
+            if got <= 0:
+                continue
+            line_no = max([i.line_no or 0 for i in items] + [0]) + 1
+            existing = next((i for i in items if not i.is_deleted and i.particular_name == "Donation" and i.sub_particular_id == pat_sub.id), None)
+            if existing is not None:
+                existing.amount = float(existing.amount) + got
+            else:
+                db.add(ReceiptItem(receipt_id=rec.id, item_type="DONATION", particular_id=p["donation"].id, particular_name=p["donation"].name_en,
+                                   sub_particular_id=pat_sub.id, sub_particular_name=pat_sub.name_en, description=_s(r.get(f"CusReceiptNote{j}")) or None,
+                                   amount=got, line_no=line_no, pays_for_membership=bool(p["donation"].pays_for_membership), created_by=user_id))
+            if not any(not i.is_deleted and (i.item_type or "").upper() in ("MEMBERSHIP", "TYPE_CHANGE") for i in items):
+                rec.receipt_type = "GENERAL_DONATION"
+            fixed += 1
+            moved += got
+    db.commit()
+    return {"receipts_changed": fixed, "amount_moved_to_patrika_nidhi": moved, "receipts_not_found": missing}

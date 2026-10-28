@@ -7,6 +7,7 @@ import useAuth from '../hooks/useAuth';
 import { loadUnapprovedPage } from '../utils/serverData';
 import { fetchReceiptRow } from '../utils/apiAdapters';
 import ReceiptViewModal from '../components/ReceiptViewModal';
+import ApproveMembersModal from '../components/ApproveMembersModal';
 import Pager from '../components/Pager';
 import { confirmYesNo } from '../utils/dialogs';
 import { notify } from '../utils/notify';
@@ -101,30 +102,15 @@ export default function AssignedApprovals() {
       return next;
     });
 
-  const approve = async (list) => {
-    if (!list.length || busy) return;
-    const names = list.length === 1 ? list[0].fullName || list[0].name : `${list.length} members`;
-    const ok = await confirmYesNo({
-      title: `Approve ${names}?`,
-      text: 'Each member gets their permanent membership number.',
-      confirmText: 'Yes, approve'
-    });
-    if (!ok) return;
-    setBusy(true);
-    let done = 0;
-    const failed = [];
-    for (const m of list) {
-      try {
-        await api.put(`/members/${m.id}/approve`, null, { params: { reason: 'Approved from Assigned for Approval' } });
-        done += 1;
-      } catch (error) {
-        failed.push(`${m.fullName || m.name}: ${error.response?.data?.detail || 'failed'}`);
-      }
-    }
-    setBusy(false);
+  const [approvingMembers, setApprovingMembers] = useState(null);
+
+  const approve = (list) => {
+    if (!list.length) return;
+    setApprovingMembers(list);
+  };
+
+  const handleApproved = async () => {
     setSelected(new Set());
-    if (failed.length) notify(`Approved ${done}. ${failed.join('; ')}`, 'error');
-    else notify(list.length === 1 ? `${names} approved.` : `${done} members approved.`);
     await load();
   };
 
@@ -264,6 +250,12 @@ export default function AssignedApprovals() {
         </div>
       </div>
       <ReceiptViewModal receipt={viewingReceipt} onClose={() => setViewingReceipt(null)} />
+      <ApproveMembersModal
+        isOpen={Boolean(approvingMembers)}
+        members={approvingMembers || []}
+        onClose={() => setApprovingMembers(null)}
+        onApproved={handleApproved}
+      />
     </PermissionGate>
   );
 }

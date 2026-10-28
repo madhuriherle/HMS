@@ -1434,6 +1434,7 @@ def approve_member(
     background_tasks: BackgroundTasks,
     id: int,
     reason: Optional[str] = Query(None, description="Approval reason or note"),
+    approved_date: Optional[date] = Query(None, description="Approval date (YYYY-MM-DD)"),
 ) -> Any:
     """Approve a member and auto-assign membership number."""
     member = crud_members.member.get(db=db, id=id)
@@ -1443,7 +1444,7 @@ def approve_member(
     # Shared activation core with POST /receipts/{id}/activate-member so the
     # two entry points can never drift.
     from services.member_activation import activate_member
-    member = activate_member(db, member, activated_by=current_user.id, reason=reason)
+    member = activate_member(db, member, activated_by=current_user.id, reason=reason, approved_date=approved_date)
 
     db.commit()
     db.refresh(member)

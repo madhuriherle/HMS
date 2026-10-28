@@ -204,3 +204,45 @@ def test_receipt_lines_are_one_per_particular(client, admin_headers):
         assert legacy_import.merge_same_particular_lines(db)["lines_removed"] == 0      # a second run changes nothing
     finally:
         db.close()
+
+
+def test_patrika_nidhi_receipts(client, admin_headers):
+    """A register row noted PATRIKA FUND keeps its upgrade / donation money as Donation > Patrika Nidhi, not membership."""
+    from datetime import date
+    from db.session import SessionLocal
+    from models.receipts import Receipt, ReceiptItem
+    from services import legacy_import
+
+    s = _sfx()
+    _create_membership_type(client, admin_headers, "PN" + s[-5:], "Ajeeva")
+    rows = legacy_import.read_register(_register([
+        _row(970001, "PRATHAP P", [(8801, datetime(2009, 8, 5), 0)], CusMemUpAmt1=100, CusReceiptNote1="PATRIKA FUND"),
+        _row(970002, "QUEEN Q", [(8802, datetime(2009, 9, 5), 400)], CusMemUpAmt1=100),
+    ]))
+    db = SessionLocal()
+    try:
+        legacy_import.import_members(db, rows, 1, run_id="y" + s[-8:])
+        legacy_import.import_receipts(db, rows, 1)
+        pat = db.query(Receipt).filter(Receipt.receipt_number == "8801", Receipt.receipt_date == date(2009, 8, 5)).one()
+        lines = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == pat.id, ReceiptItem.is_deleted == False).all()  # noqa: E712
+        assert [(i.particular_name, i.sub_particular_name, float(i.amount), i.item_type) for i in lines] == [("Donation", "Patrika Nidhi", 100.0, "DONATION")]
+        assert pat.receipt_type == "GENERAL_DONATION" and float(pat.net_amount) == 100
+        normal = db.query(Receipt).filter(Receipt.receipt_number == "8802").one()
+        assert [(i.particular_name, float(i.amount)) for i in db.query(ReceiptItem).filter(ReceiptItem.receipt_id == normal.id, ReceiptItem.is_deleted == False)] == [("Membership", 500.0)]  # noqa: E712
+
+        # a receipt imported the old way (the money as a membership upgrade line) is moved
+        for i in lines:
+            i.is_deleted = True
+        db.add(ReceiptItem(receipt_id=pat.id, item_type="TYPE_CHANGE", particular_id=db.query(ReceiptItem.particular_id).filter(ReceiptItem.receipt_id == normal.id).scalar(),
+                           particular_name="Membership", description="Upgrade amount (old register)", amount=100, line_no=1, pays_for_membership=True, created_by=1))
+        pat.receipt_type = "MEMBERSHIP"
+        db.commit()
+        out = legacy_import.retag_patrika_receipts(db, rows, 1)
+        assert out["receipts_changed"] == 1 and out["amount_moved_to_patrika_nidhi"] == 100, out
+        lines = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == pat.id, ReceiptItem.is_deleted == False).all()  # noqa: E712
+        assert [(i.particular_name, i.sub_particular_name, float(i.amount)) for i in lines] == [("Donation", "Patrika Nidhi", 100.0)]
+        db.refresh(pat)
+        assert pat.receipt_type == "GENERAL_DONATION" and float(pat.net_amount) == 100
+        assert legacy_import.retag_patrika_receipts(db, rows, 1)["receipts_changed"] == 0     # a second run changes nothing
+    finally:
+        db.close()

@@ -41,6 +41,7 @@ import { formatMoney } from '../utils/money';
 
 import ModalFooter from '../components/ModalFooter';
 import ReceiptViewModal from '../components/ReceiptViewModal';
+import ApproveMembersModal from '../components/ApproveMembersModal';
 import { fetchReceiptRow } from '../utils/apiAdapters';
 // ----------------------------------------------------
 // A receipt carries no member link of its own: one entered before the member existed only holds what
@@ -186,8 +187,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   // 1. View Details Modal
   const [viewingMember, setViewingMember] = useState(null);
 
-  // 2. Approve Confirmation Modal
-  const [approveDialog, setApproveDialog] = useState(null); // Member object to approve
+  // 2. Approve Confirmation Modal (Single & Bulk)
+  const [approveModalMembers, setApproveModalMembers] = useState(null);
 
   // 3. Receipt Validation Block Alert Modal
   const [validationBlockDialog, setValidationBlockDialog] = useState(null); // Member object blocked
@@ -428,7 +429,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     }
 
     // 2. Open Approval Confirmation Dialog
-    setApproveDialog(member);
+    setApproveModalMembers([member]);
   };
 
   // Disagree = the meeting said no: the applicant moves under Rejected (the server records the reason and frees the receipt)
@@ -514,30 +515,8 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     }
   };
 
-  const handleConfirmApproval = async () => {
-    if (!approveDialog) return;
-    const memberToApprove = approveDialog;
-    try {
-      const { data } = await api.put(`/members/${memberToApprove.id}/approve`, null, { params: { reason: 'Approved via UI' } });
-      if (selectedIds.has(memberToApprove.id)) {
-        const next = new Set(selectedIds);
-        next.delete(memberToApprove.id);
-        setSelectedIds(next);
-      }
-      showToast(
-        `Membership for ${memberToApprove.fullName} approved successfully! Moved to Membership List${data?.member_code ? ` (${data.member_code})` : ''}.`,
-        'success'
-      );
-      if (viewingMember) setViewingMember(null);
-      await reloadData();
-    } catch (error) {
-      showToast(error.response?.data?.detail || 'Error approving membership', 'error');
-    }
-    setApproveDialog(null);
-  };
-
   // Bulk Approval for selected items in selection mode
-  const handleBulkApprove = async () => {
+  const handleBulkApprove = () => {
     const selectedMembers = [...selectedIds].map((id) => selectedCache.current.get(id)).filter(Boolean);
     if (selectedMembers.length === 0) return;
 
@@ -550,17 +529,18 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
       return;
     }
 
-    let approvedCount = 0;
-    for (const m of selectedMembers) {
-      try {
-        await api.put(`/members/${m.id}/approve`, null, { params: { reason: 'Bulk approved via UI' } });
-        approvedCount++;
-      } catch (err) {
-        console.error(`Failed to approve member ${m.id}`, err);
-      }
+    setApproveModalMembers(selectedMembers);
+  };
+
+  const handleApproved = async ({ approvedIds }) => {
+    if (approvedIds && approvedIds.length > 0) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        approvedIds.forEach((id) => next.delete(id));
+        return next;
+      });
     }
-    showToast(`Successfully approved ${approvedCount} member(s)!`, 'success');
-    setSelectedIds(new Set());
+    if (viewingMember) setViewingMember(null);
     await reloadData();
   };
 
@@ -575,17 +555,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
       confirmText: 'Assign a receipt',
     }),
     () => openAssignReceipt(validationBlockDialog)
-  );
-
-  useSwalConfirm(
-    approveDialog,
-    () => setApproveDialog(null),
-    (d) => ({
-      title: 'Agree to the membership?',
-      text: `Agree to ${d.fullName || d.name} (${d.membershipType})? The member is approved and moves to the Membership List.`,
-      confirmText: 'Yes, agree',
-    }),
-    handleConfirmApproval
   );
 
   return (
@@ -1375,6 +1344,14 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
             <ModalFooter kind="view" onCancel={() => setViewingMember(null)} />
           </div>
       )}
+
+      {/* APPROVAL CONFIRMATION MODAL (SINGLE & BULK) */}
+      <ApproveMembersModal
+        isOpen={Boolean(approveModalMembers)}
+        members={approveModalMembers || []}
+        onClose={() => setApproveModalMembers(null)}
+        onApproved={handleApproved}
+      />
 
       {/* ==================================================== */}
       {/* FLOATING TOAST NOTIFICATION                          */}
