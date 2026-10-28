@@ -6,14 +6,17 @@ followed (parents first):
     allocations, receipt lines, magazine subscriptions...), and the rows that point at those in turn;
   * a row that points at a removed row through a nullable column is kept and the link is set to NULL (a test member whose father was an
     imported member, a test receipt mapped to an imported member).
-Nothing is deleted from tables that no removed row points into. dry=True counts and rolls back.
+Nothing is deleted from tables that no removed row points into. dry=True counts and rolls back. others=True removes everything that is
+NOT the import instead (test data), keeping the imported members and receipts.
 """
 from sqlalchemy import text
 
 SEEDS = {"members": "registration_source = 'MIGRATION'", "receipts": "source = 'OLD_REGISTER'"}
+# the other way round: everything that is not the import (test members and receipts entered by hand, and what hangs on them)
+OTHERS = {"members": "registration_source IS DISTINCT FROM 'MIGRATION'", "receipts": "source IS DISTINCT FROM 'OLD_REGISTER'"}
 
 
-def wipe(db, dry: bool = False) -> dict:
+def wipe(db, dry: bool = False, others: bool = False) -> dict:
     from sqlalchemy import inspect
 
     insp = inspect(db.get_bind())
@@ -28,7 +31,7 @@ def wipe(db, dry: bool = False) -> dict:
         db.execute(text(f"CREATE TEMP TABLE d_{name} AS {select_sql}"))
         doomed[name] = f"d_{name}"
 
-    for name, where in SEEDS.items():
+    for name, where in (OTHERS if others else SEEDS).items():
         mk(name, f"SELECT id FROM {name} WHERE {where}")
         order.append(name)
     # follow the links parents first: a row that must have its parent goes with it

@@ -34,5 +34,12 @@ def test_wipe_only_the_import(client, admin_headers):
         assert db.get(Member, ids[0]) is None and db.get(Receipt, ids[2]) is None
         assert db.get(Member, ids[1]) is not None and db.get(Receipt, ids[3]) is not None   # test data stays
         assert db.query(ReceiptAllocation).filter(ReceiptAllocation.receipt_id == ids[2]).count() == 0
+        # and the other way round (a dry run: the shared test database must keep its other rows): the test data would go, an import stays
+        keep2 = Member(first_name_en="TestKeepTwo" + tag, registration_source="ONLINE")
+        db.add(keep2)
+        db.commit()
+        out2 = legacy_wipe.wipe(db, dry=True, others=True)
+        db.expire_all()
+        assert out2.get("members", 0) >= 1 and db.get(Member, keep2.id) is not None       # counted, nothing removed
     finally:
         db.close()
