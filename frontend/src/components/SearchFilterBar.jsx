@@ -3,9 +3,9 @@ import { Search, X, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import PageTitle from './PageTitle';
 
 /**
- * The toolbar of a list screen. The title goes to the top bar; the search box, the filters, one reset icon and the action
- * buttons sit together in ONE white card, one row (it wraps on a narrow screen). With filtersAlwaysShown={false} the old
- * look comes back: the filters hide behind a filter icon and open in the same row.
+ * The toolbar of a list screen. The title goes to the top bar; the search box, the filter icon and the action buttons sit in one
+ * row. The filters are hidden until the filter icon is clicked; they then open in a white card right under the toolbar (the dropdowns
+ * and one reset icon). With filtersAlwaysShown the filters never hide: one card, one row.
  */
 export default function SearchFilterBar({
   title,
@@ -19,7 +19,7 @@ export default function SearchFilterBar({
   rightSlot,
   leftSlot,
   searchInHeader = false, // kept for the screens that pass it: the search box is always in the toolbar row now
-  filtersAlwaysShown = true, // every list screen: one white card, one row - search, the filters, a reset icon and the action buttons (no filter icon). Pass false only for the old hide-and-show filter icon
+  filtersAlwaysShown = false, // true: one card in one row - search, the filters, a reset icon and the action buttons (no filter icon)
   className = ''
 }) {
   const [filtersToggled, setFiltersOpen] = useState(false);
@@ -27,7 +27,7 @@ export default function SearchFilterBar({
   const filtersOpen = !filtersAlwaysShown && filtersToggled;
 
   const searchBox = onSearchChange !== undefined && (
-    <div className={filtersOpen ? 'hidden 2xl:block relative min-w-[200px] flex-1 max-w-sm' : 'relative min-w-[200px] flex-1 max-w-sm'}>
+    <div className="relative min-w-[200px] flex-1 max-w-sm">
       <Search className="w-4 h-4 text-[#863221]/50 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
       <input
         type="text"
@@ -115,17 +115,19 @@ export default function SearchFilterBar({
           <div className="flex items-center gap-3 min-w-0">{leftSlot}</div>
           {(searchBox || filterButton || rightSlot) && (
             <div className="flex items-center gap-2.5 flex-wrap justify-end ml-auto">
-              {hasFilters && filtersOpen && (
-                <>
-                  {children}
-                  {resetIcon}
-                </>
-              )}
               {searchBox}
               {filterButton}
               {rightSlot}
             </div>
           )}
+        </div>
+      )}
+
+      {/* The filters, opened by the filter icon: one white card under the toolbar */}
+      {hasFilters && filtersOpen && (
+        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-3 flex items-center gap-2.5 flex-wrap">
+          {children}
+          {resetIcon}
         </div>
       )}
     </div>
