@@ -456,6 +456,8 @@ def read_postal_codes(
         q = q.filter(PostalCode.district_id == district_id)
     if taluk_id:
         q = q.filter(PostalCode.taluk_id == taluk_id)
+        if not pincode_starts:   # the pincodes of a taluk, in PIN order (the KYC popup lists them under the taluk)
+            q = q.order_by(PostalCode.pincode, PostalCode.post_office_name, PostalCode.id)
     if search:
         q = q.filter(PostalCode.post_office_name.ilike(f"%{search}%"))
 

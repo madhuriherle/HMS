@@ -5,7 +5,7 @@ import ModalFooter from './ModalFooter';
 import { VERIFICATION } from './VerificationBadge';
 import { confirmAction } from '../utils/actionConfirm';
 import { formatDateTime } from '../utils/dateUtils';
-import { lookupPin, loadLocations } from '../utils/serverData';
+import { lookupPin, loadLocations, searchPostalCodes } from '../utils/serverData';
 import { notify } from '../utils/notify';
 
 // Helpers to extract and reconstruct full name
@@ -46,6 +46,7 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
     pincode: ''
   });
   const [chosenPinId, setChosenPinId] = useState(null);
+  const [pinOptions, setPinOptions] = useState([]);   // the pincodes and post offices under the chosen taluk
   const [calls, setCalls] = useState([]);
   const [status, setStatus] = useState('VERIFIED');
   const [remark, setRemark] = useState('');
@@ -113,25 +114,49 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
     }
   };
 
+  // a new state, district or taluk: the pincode no longer belongs to it, so it is cleared and picked again from the taluk's list
+  const clearPin = () => { setChosenPinId(null); };
   const onStateChange = (newStId) => {
+    clearPin();
     setForm((prev) => ({
       ...prev,
       state_id: newStId,
       district_id: '',
-      taluk_id: ''
+      taluk_id: '',
+      pincode: ''
     }));
   };
 
   const onDistrictChange = (newDtId) => {
+    clearPin();
     setForm((prev) => ({
       ...prev,
       district_id: newDtId,
-      taluk_id: ''
+      taluk_id: '',
+      pincode: ''
     }));
   };
 
   const onTalukChange = (newTkId) => {
-    setForm((prev) => ({ ...prev, taluk_id: newTkId }));
+    clearPin();
+    setForm((prev) => ({ ...prev, taluk_id: newTkId, pincode: '' }));
+  };
+
+  // the pincodes and post offices under the chosen taluk
+  useEffect(() => {
+    if (!form.taluk_id) { setPinOptions([]); return undefined; }
+    let current = true;
+    searchPostalCodes({ taluk_id: Number(form.taluk_id) }, 200)
+      .then((rows) => { if (current) setPinOptions(rows); })
+      .catch(() => { if (current) setPinOptions([]); });
+    return () => { current = false; };
+  }, [form.taluk_id]);
+
+  const onPickPostOffice = (id) => {
+    const row = pinOptions.find((p) => String(p.id) === String(id));
+    if (!row) { clearPin(); setForm((prev) => ({ ...prev, pincode: '' })); return; }
+    setChosenPinId(row.id);
+    setForm((prev) => ({ ...prev, pincode: row.postalCode, locality: row.area || prev.locality }));
   };
 
   // Filtered dropdown lists based on normal membership hierarchy
@@ -185,6 +210,12 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
     // 7. Pincode
     if (form.pincode && form.pincode.length === 6 && form.pincode !== (member.pincode || '')) {
       if (chosenPinId) changed.pincode_id = chosenPinId;
+    }
+
+    // a new taluk needs the pincode / post office picked again, or the old pincode would stay with the wrong taluk
+    if (changed.taluk_id && pinOptions.length > 0 && !chosenPinId) {
+      notify('Pick the pincode / post office of the new taluk.', 'error');
+      return;
     }
 
     const reason = await confirmAction('put', `/members/${memberId}/verification`);
@@ -360,6 +391,21 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
                   <option value="">Select Taluk</option>
                   {filteredTaluks.map((t) => (
                     <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className={headingClass}>Pincode / Post office</span>
+                <select
+                  value={chosenPinId && pinOptions.some((p) => p.id === chosenPinId) ? String(chosenPinId) : ''}
+                  onChange={(e) => onPickPostOffice(e.target.value)}
+                  disabled={!form.taluk_id}
+                  className={`${inputClass} mt-1 disabled:opacity-50`}
+                >
+                  <option value="">{!form.taluk_id ? 'Select a taluk first' : pinOptions.length ? 'Select pincode / post office' : 'No pincodes for this taluk'}</option>
+                  {pinOptions.map((p) => (
+                    <option key={p.id} value={p.id}>{p.postalCode} — {p.area}</option>
                   ))}
                 </select>
               </label>
