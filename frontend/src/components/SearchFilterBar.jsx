@@ -3,9 +3,9 @@ import { Search, X, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import PageTitle from './PageTitle';
 
 /**
- * The toolbar of a list screen. The title goes to the top bar; the search box, the filter icon and the action buttons sit
- * in one row. The filters (the dropdowns and one reset icon) are hidden until the filter icon is clicked, and then they
- * open in the SAME row; the search box steps aside while they are open unless the screen is wide enough for both.
+ * The toolbar of a list screen. The title goes to the top bar; the search box, the filters, one reset icon and the action
+ * buttons sit together in ONE white card, one row (it wraps on a narrow screen). With filtersAlwaysShown={false} the old
+ * look comes back: the filters hide behind a filter icon and open in the same row.
  */
 export default function SearchFilterBar({
   title,
@@ -19,7 +19,7 @@ export default function SearchFilterBar({
   rightSlot,
   leftSlot,
   searchInHeader = false, // kept for the screens that pass it: the search box is always in the toolbar row now
-  filtersAlwaysShown = false, // one card in one row: search, the filters, a reset icon and the action buttons (no filter icon)
+  filtersAlwaysShown = true, // every list screen: one white card, one row - search, the filters, a reset icon and the action buttons (no filter icon). Pass false only for the old hide-and-show filter icon
   className = ''
 }) {
   const [filtersToggled, setFiltersOpen] = useState(false);
