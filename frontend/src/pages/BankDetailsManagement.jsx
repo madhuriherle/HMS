@@ -125,7 +125,7 @@ export default function BankDetailsManagement() {
   };
 
   const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL';
-  const [filtersOpen, setFiltersOpen] = useState(false); // the filters show only when the filter icon is clicked
+  const [filtersOpen, setFiltersOpen] = useState(true); // the filters card is always shown
 
   const filteredData = useMemo(() => {
     return paymentConfigs.filter((item) => {

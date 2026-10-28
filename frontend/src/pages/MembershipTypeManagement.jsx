@@ -129,7 +129,7 @@ export default function MembershipTypeManagement() {
   };
 
   const hasActiveFilters = searchQuery !== '' || statusFilter !== 'ALL';
-  const [filtersOpen, setFiltersOpen] = useState(false); // the filters show only when the filter icon is clicked
+  const [filtersOpen, setFiltersOpen] = useState(true); // the filters card is always shown
 
   const filteredData = useMemo(() => {
     return membershipTypes.filter((item) => {

@@ -119,9 +119,9 @@ export default function AssignedApprovals() {
   return (
     <PermissionGate required="members.assigned.read">
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-end gap-3 -mb-2">
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-72">
+        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-3 flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-2 w-full">
+            <div className="relative flex-1 max-w-sm">
               <Search className="w-4 h-4 text-[#863221]/50 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -137,7 +137,7 @@ export default function AssignedApprovals() {
                 onClick={() => approve(chosen)}
                 disabled={chosen.length === 0 || busy}
                 title={'Approve the ticked members'}
-                className="disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 rounded-xl bg-[#510601] hover:bg-[#8C1801] text-white text-xs sm:text-sm font-bold shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+                className="ml-auto disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 rounded-xl bg-[#510601] hover:bg-[#8C1801] text-white text-xs sm:text-sm font-bold shadow-sm transition-colors cursor-pointer inline-flex items-center gap-1.5 shrink-0"
               >
                 <Check className="w-3.5 h-3.5" />
                 <span>Approve selected{chosen.length ? ` (${chosen.length})` : ''}</span>

@@ -97,7 +97,7 @@ export default function LocationSetup() {
   const [pinPrefixes, setPinPrefixes] = useState([]); // the first two digits that exist in the PIN master
   const [postalPincodeFilter, setPostalPincodeFilter] = useState('');
   const [postalStatusFilter, setPostalStatusFilter] = useState('ALL');
-  const [postalFiltersOpen, setPostalFiltersOpen] = useState(false); // the PIN filters show only when the filter icon is clicked
+  const [postalFiltersOpen, setPostalFiltersOpen] = useState(true); // the PIN filters card is always shown
 
   // Pagination for PIN Directory Table
   const [postalCurrentPage, setPostalCurrentPage] = useState(1);

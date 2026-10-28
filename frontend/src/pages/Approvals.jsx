@@ -299,7 +299,7 @@ export default function Approvals() {
   // Filters
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('PENDING'); // Default to PENDING
-  const [filtersOpen, setFiltersOpen] = useState(false); // the status filter shows only when the filter icon is clicked
+  const [filtersOpen, setFiltersOpen] = useState(true); // the filters card is always shown
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modal View / Comparison State
