@@ -175,38 +175,6 @@ export default function ReceiptEntry() {
   const [selectedMemberReceipts, setSelectedMemberReceipts] = useState([]); // receipts of the member picked
   const [viewingReceipt, setViewingReceipt] = useState(null);
   const [memberReceiptsLoading, setMemberReceiptsLoading] = useState(false);
-
-  useEffect(() => {
-    if (!selectedMember?.id) {
-      setSelectedMemberReceipts([]);
-      return;
-    }
-    let alive = true;
-    setMemberReceiptsLoading(true);
-    api
-      .get('/receipts/tracking', { params: { member_ids: selectedMember.id, limit: 50 } })
-      .then(({ data }) => {
-        if (alive) {
-          setSelectedMemberReceipts(data?.data || []);
-        }
-      })
-      .catch(() => {
-        if (alive) setSelectedMemberReceipts([]);
-      })
-      .finally(() => {
-        if (alive) setMemberReceiptsLoading(false);
-      });
-    return () => { alive = false; };
-  }, [selectedMember?.id]);
-
-  const openReceipt = async (r) => {
-    try {
-      const full = await fetchReceiptRow({ id: r.id || r.receipt_id, number: r.receipt_number, memberId: selectedMember?.id });
-      setViewingReceipt(full || r);
-    } catch {
-      setViewingReceipt(r);
-    }
-  };
   const [, setMembershipTypes] = useState([]);
   const [paymentModeConfigs, setPaymentModeConfigs] = useState([]);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [], postalCodes: [] });
@@ -252,6 +220,38 @@ export default function ReceiptEntry() {
 
   // Selected Member State & Lookup State
   const [selectedMember, setSelectedMember] = useState(null);
+
+  useEffect(() => {
+    if (!selectedMember?.id) {
+      setSelectedMemberReceipts([]);
+      return;
+    }
+    let alive = true;
+    setMemberReceiptsLoading(true);
+    api
+      .get('/receipts/tracking', { params: { member_ids: selectedMember.id, limit: 50 } })
+      .then(({ data }) => {
+        if (alive) {
+          setSelectedMemberReceipts(data?.data || []);
+        }
+      })
+      .catch(() => {
+        if (alive) setSelectedMemberReceipts([]);
+      })
+      .finally(() => {
+        if (alive) setMemberReceiptsLoading(false);
+      });
+    return () => { alive = false; };
+  }, [selectedMember?.id]);
+
+  const openReceipt = async (r) => {
+    try {
+      const full = await fetchReceiptRow({ id: r.id || r.receipt_id, number: r.receipt_number, memberId: selectedMember?.id });
+      setViewingReceipt(full || r);
+    } catch {
+      setViewingReceipt(r);
+    }
+  };
   const [, setLookupMembershipNo] = useState('');
   const [numberCheck, setNumberCheck] = useState(null); // is the typed receipt number free in its financial year?
   const [, setLookupError] = useState('');
