@@ -266,7 +266,7 @@ export default function MembershipList() {
 
 
   const handleOpenEditModal = (member) => {
-    navigate(`/dashboard/membership/edit/${member.id}`);
+    window.open(`/dashboard/membership/edit/${member.id}`, '_blank');
   };
 
 
@@ -537,14 +537,15 @@ export default function MembershipList() {
                   ) : null}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => navigate(`/dashboard/membership/profile/${singleMatchMember.id}`)}
+              <Link
+                to={`/dashboard/membership/profile/${singleMatchMember.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="w-full flex items-center justify-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
               >
                 <Eye className="w-3.5 h-3.5" />
                 <span>View Profile</span>
-              </button>
+              </Link>
             </div>
           </aside>
         )}
@@ -619,6 +620,8 @@ export default function MembershipList() {
                         {m.payment_mismatch && (
                           <Link
                             to={`/dashboard/membership/profile/${m.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="block mt-0.5 text-[11px] font-bold text-[#510601] underline hover:text-[#180200]"
                             title="Paid less than the price of the year they joined, so an old receipt is probably missing. Add it on Receipt Entry as an Unknown receipt."
                           >
@@ -664,25 +667,27 @@ export default function MembershipList() {
                       {/* Action Buttons: View, Edit, Delete */}
                       <td className="py-3 px-4 text-right whitespace-nowrap w-px">
                         <div className="flex flex-nowrap items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
+                          <Link
+                            to={`/dashboard/membership/profile/${m.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
                             className="btn-act"
                             title="View Member Profile"
                           >
                             <Eye className="w-3.5 h-3.5" />
                             <span>View</span>
-                          </button>
+                          </Link>
                           {hasPermission('members.list.write') && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(m)}
+                            <Link
+                              to={`/dashboard/membership/edit/${m.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="btn-act"
                               title={'Edit Member'}
                             >
                               <Pencil className="w-3.5 h-3.5" />
                               <span>Edit</span>
-                            </button>
+                            </Link>
                           )}
                           {hasPermission('members.list.delete') && (
                             <button

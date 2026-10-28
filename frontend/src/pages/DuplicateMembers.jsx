@@ -165,7 +165,7 @@ export default function DuplicateMembers() {
                     {g.members.map((m) => (
                       <tr key={m.id} className="hover:bg-[#FAF7F2]">
                         <td className="px-4 py-2 font-semibold text-[#180200]">
-                          <Link to={`/dashboard/membership/profile/${m.id}`} className="text-[#510601] hover:underline">{m.name || '—'}</Link>
+                          <Link to={`/dashboard/membership/profile/${m.id}`} target="_blank" rel="noopener noreferrer" className="text-[#510601] hover:underline">{m.name || '—'}</Link>
                           {m.same_name_count > 1 && <span className="ml-2 text-[10px] font-bold text-[#7D7068]">+{m.same_name_count - 1} with this exact name</span>}
                         </td>
                         <td className="px-3 py-2">{m.membership_no || (m.approval === 'APPROVED' ? '—' : `ID: ${m.id}`)}</td>
