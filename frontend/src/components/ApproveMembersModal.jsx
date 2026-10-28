@@ -127,9 +127,6 @@ export default function ApproveMembersModal({
               </div>
             </>
           )}
-          <p className="text-[11px] text-[#7D7068] pt-1 border-t border-[#E8DFD8]/80 leading-normal">
-            Approving assigns the permanent membership number and moves the applicant to the active Membership List.
-          </p>
         </div>
 
         {/* Approval Date Selection */}
@@ -146,9 +143,6 @@ export default function ApproveMembersModal({
             className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] font-medium"
             required
           />
-          <p className="text-[11px] text-[#7D7068] mt-1">
-            Defaults to today. You can select an earlier date if this was decided in a prior committee meeting.
-          </p>
         </div>
 
         {/* Approval Note / Resolution */}
@@ -164,9 +158,6 @@ export default function ApproveMembersModal({
             placeholder="e.g. EC Meeting Res #4, Approved by Executive Committee..."
             className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] placeholder:text-[#9E8B7F]"
           />
-          <p className="text-[11px] text-[#7D7068] mt-1">
-            This note will be recorded in the member's approval history for audit.
-          </p>
         </div>
       </div>
     </Modal>
