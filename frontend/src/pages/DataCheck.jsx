@@ -29,7 +29,6 @@ const TABS = [
     extra: [{ head: 'Alternate number', cell: (m) => m.alternate_mobile || '—', nowrap: true, mono: true }] },
   { id: 'no_address', label: 'No address', hint: 'The member has no address.',
     extra: [{ head: 'Pincode / district missing', cell: (m) => (m.missing || []).join(', ') || '—' }] },
-  { id: 'odd_name', label: 'Odd characters in name', hint: 'The name has something other than letters, spaces, dots, apostrophes or hyphens (a digit, a slash, a stray symbol).', extra: [] }
 ];
 
 export default function DataCheck() {

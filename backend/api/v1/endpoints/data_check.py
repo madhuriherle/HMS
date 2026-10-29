@@ -13,7 +13,7 @@ router = APIRouter()
 
 @router.get("/members")
 def members_with_wrong_data(
-    kind: str = "future_dob",       # future_dob | under_18 | very_old | alt_number | bad_email | no_place | print_no_address | odd_name | no_mobile | no_address | no_dob
+    kind: str = "future_dob",       # future_dob | under_18 | very_old | alt_number | bad_email | no_place | print_no_address | no_mobile | no_address | no_dob
     search: Optional[str] = None,   # a name, mobile or membership number
     page: int = 1, limit: int = 25,
     export: Optional[str] = None,   # "excel": every row of the list

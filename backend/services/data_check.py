@@ -18,7 +18,6 @@ KINDS = {
     "bad_email": "Email address is not in a valid format",
     "no_place": "No pincode or no district",
     "print_no_address": "Printed magazine but no address",
-    "odd_name": "Odd characters in the name",
     "no_mobile": "No mobile number",
     "no_address": "No address",
     "no_dob": "No date of birth",
@@ -62,9 +61,6 @@ def _filter(kind: str, db: Session):
         return or_(Member.mobile.is_(None), func.trim(Member.mobile) == "")
     if kind == "no_address":
         return or_(Member.address_line1.is_(None), func.trim(Member.address_line1) == "")
-    if kind == "odd_name":
-        # anything but letters, spaces, dots, apostrophes and hyphens
-        return Member.full_name_en.op("~")(r"[^A-Za-z .'-]") if pg else Member.full_name_en.op("GLOB")("*[^A-Za-z .'-]*")
     raise ValueError("kind must be one of: " + ", ".join(KINDS))
 
 
