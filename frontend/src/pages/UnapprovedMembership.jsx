@@ -126,13 +126,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   };
   const reloadData = loadPage; // after an action the same page is read again
 
-  // the format of the file, loaded when the import popup opens
-  useEffect(() => {
-    if (!appImportOpen || appFormat) return;
-    api.get('/members/unapproved-applications/import/format').then(({ data }) => setAppFormat(data)).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appImportOpen]);
-
   const downloadAppTemplate = async () => {
     try {
       const { data } = await api.get('/members/unapproved-applications/import/template', { responseType: 'blob' });
@@ -291,6 +284,12 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [appImporting, setAppImporting] = useState(false);
   const [appPreviewing, setAppPreviewing] = useState(false);
   const [appFormat, setAppFormat] = useState(null); // the columns the import reads, from the server
+  // the format of the file, loaded when the import popup opens
+  useEffect(() => {
+    if (!appImportOpen || appFormat) return;
+    api.get('/members/unapproved-applications/import/format').then(({ data }) => setAppFormat(data)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appImportOpen]);
   useEffect(() => { if (!assigningMember) setReplacingReceipt(null); }, [assigningMember]);
   // the API behind Map enforces receipts.write; the sibling Bulk Mapping screen uses the page privilege,
   // so either one is enough to press it
