@@ -1752,8 +1752,8 @@ export default function RegisterNewMember() {
                       className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
                     {(formData.taluk || formData.district) && (
-                      <p className="text-xs text-stone-600 mt-1 flex items-center gap-1.5 font-medium">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                      <p className="text-xs text-stone-600 mt-1 font-medium leading-relaxed">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5 align-middle"></span>
                         Taluk: <span className="text-[#510601] font-semibold">{formData.taluk || '—'}</span> &bull; District: <span className="text-[#510601] font-semibold">{formData.district || '—'}</span>
                       </p>
                     )}
