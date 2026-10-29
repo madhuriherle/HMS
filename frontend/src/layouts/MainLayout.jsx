@@ -107,7 +107,7 @@ export default function MainLayout() {
           />
         )}
         
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} collapsed={collapsed} onExpand={() => setCollapsedSaved(false)} />
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} collapsed={collapsed} onToggle={() => setCollapsedSaved(!collapsed)} onExpand={() => setCollapsedSaved(false)} />
 
         <div className="flex flex-col flex-1 w-full overflow-hidden relative min-w-0">
           {/* Main Application Top Header with Logged-in User Profile */}
@@ -118,15 +118,6 @@ export default function MainLayout() {
                 onClick={() => setSidebarOpen(true)}
                 className="lg:hidden p-2 rounded-lg bg-stone-50 border border-[#E8DFD8] shadow-2xs text-[#180200] hover:text-[#510601] hover:bg-stone-100 focus:outline-none"
                 aria-label="Open navigation menu"
-              >
-                <Menu className="h-5 w-5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setCollapsedSaved(!collapsed)}
-                className="hidden lg:inline-flex p-2 rounded-lg bg-stone-50 border border-[#E8DFD8] shadow-2xs text-[#180200] hover:text-[#510601] hover:bg-stone-100 focus:outline-none cursor-pointer"
-                aria-label={collapsed ? 'Expand the menu' : 'Collapse the menu'}
-                title={collapsed ? 'Expand the menu' : 'Collapse the menu'}
               >
                 <Menu className="h-5 w-5" />
               </button>

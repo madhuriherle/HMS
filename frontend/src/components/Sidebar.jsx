@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Circle, List, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Circle, List, Menu, X } from 'lucide-react';
 import { MENU_ICONS } from '../utils/menuIcons';
 import clsx from 'clsx';
 import api from '../api';
@@ -69,7 +69,7 @@ function CollapsedTip({ tip }) {
   );
 }
 
-export default function Sidebar({ isOpen, onClose, collapsed = false, onExpand }) {
+export default function Sidebar({ isOpen, onClose, collapsed = false, onToggle, onExpand }) {
   const location = useLocation();
   const [tip, setTip] = useState(null);
   const showTip = (name) => (e) => {
@@ -151,18 +151,28 @@ export default function Sidebar({ isOpen, onClose, collapsed = false, onExpand }
       )}
     >
       {/* Brand Header */}
-      <div className={clsx('flex h-16 shrink-0 items-center justify-between border-b border-[#8C1801] bg-[#200200] px-4 py-1.5', collapsed && 'lg:px-2')}>
+      <div className={clsx('flex h-16 shrink-0 items-center justify-between border-b border-[#8C1801] bg-[#200200] px-4 py-1.5', collapsed && 'lg:justify-center lg:px-2')}>
+        {/* small hamburger at the left of the header: collapses / opens the menu (desktop) */}
+        <button
+          type="button"
+          onClick={onToggle}
+          className="hidden lg:inline-flex shrink-0 mr-3 p-1 text-[#FAF7F2]/80 hover:text-white focus:outline-none cursor-pointer"
+          style={collapsed ? { marginRight: 0 } : undefined}
+          aria-label={collapsed ? 'Open the menu' : 'Collapse the menu'}
+          title={collapsed ? 'Open the menu' : 'Collapse the menu'}
+        >
+          <Menu className="h-5 w-5" />
+        </button>
         <NavLink
           to="/dashboard"
           onClick={handleNavClick}
-          className={clsx('flex items-center justify-start flex-1 h-full min-w-0', collapsed && 'lg:overflow-hidden')}
+          className={clsx('flex items-center justify-start flex-1 h-full min-w-0', collapsed && 'lg:hidden')}
           title="Shri Akhila Havyaka Mahasabha"
         >
-          {/* collapsed: only the flame at the left of the logo shows */}
           <img
             src={fullLogo}
             alt="Shri Akhila Havyaka Mahasabha (R.)"
-            className={clsx('filter drop-shadow-sm', collapsed ? 'lg:h-10 lg:w-12 lg:max-w-none lg:object-cover lg:object-left' : 'w-full max-h-11 object-contain')}
+            className="w-full max-h-11 object-contain filter drop-shadow-sm"
           />
         </NavLink>
 
