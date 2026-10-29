@@ -14,6 +14,7 @@ import {
   Printer,
 } from 'lucide-react';
 import api from '../api';
+import SearchableFormSelect from '../components/SearchableFormSelect';
 import { notify } from '../utils/notify';
 import { apiErrorMessage } from '../utils/apiError';
 import {
@@ -1617,7 +1618,6 @@ export default function RegisterNewMember() {
                   {/* Place, top down: State, District, Taluk, Pincode / post office */}
                   <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {(() => {
-                      const selectClass = 'w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all disabled:opacity-50 cursor-pointer';
                       const labelClass = 'block text-sm text-[#3D140C] mb-1.5 font-semibold';
                       const districts = locations.districts.filter((d) => !formData.stateId || String(d.stateId) === String(formData.stateId));
                       const taluks = locations.taluks.filter((x) => !formData.districtId || String(x.districtId) === String(formData.districtId));
@@ -1625,39 +1625,52 @@ export default function RegisterNewMember() {
                         <>
                           <div>
                             <label className={labelClass}>State:</label>
-                            <select value={formData.stateId} onChange={(e) => onStateChange(e.target.value)} className={selectClass}>
-                              <option value="">Select State</option>
-                              {locations.states.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                            </select>
+                            <SearchableFormSelect
+                              value={formData.stateId}
+                              onChange={onStateChange}
+                              options={locations.states.map((x) => ({ value: String(x.id), label: x.name }))}
+                              placeholder="Select State"
+                              searchPlaceholder="Search state…"
+                            />
                           </div>
                           <div>
                             <label className={labelClass}>District:</label>
-                            <select value={formData.districtId} onChange={(e) => onDistrictChange(e.target.value)} disabled={!formData.stateId} className={selectClass}>
-                              <option value="">Select District</option>
-                              {districts.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                            </select>
+                            <SearchableFormSelect
+                              value={formData.districtId}
+                              onChange={onDistrictChange}
+                              disabled={!formData.stateId}
+                              options={districts.map((x) => ({ value: String(x.id), label: x.name }))}
+                              placeholder="Select District"
+                              searchPlaceholder="Search district…"
+                            />
                           </div>
                           <div>
                             <label className={labelClass}>Taluk:</label>
-                            <select value={formData.talukId} onChange={(e) => onTalukChange(e.target.value)} disabled={!formData.districtId} className={selectClass}>
-                              <option value="">Select Taluk</option>
-                              {taluks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-                            </select>
+                            <SearchableFormSelect
+                              value={formData.talukId}
+                              onChange={onTalukChange}
+                              disabled={!formData.districtId}
+                              options={taluks.map((x) => ({ value: String(x.id), label: x.name }))}
+                              placeholder="Select Taluk"
+                              searchPlaceholder="Search taluk…"
+                            />
                           </div>
                           <div>
                             <label className={labelClass}>Pincode / Post Office:</label>
-                            <select
+                            <SearchableFormSelect
                               value={formData.pincodeId}
-                              onChange={(e) => onPickPostOffice(e.target.value)}
+                              onChange={onPickPostOffice}
                               disabled={!formData.talukId}
-                              className={`${selectClass} ${formErrors.postalCode ? 'border-red-500 ring-2 ring-red-500/20' : ''}`}
-                            >
-                              <option value="">{!formData.talukId ? 'Select a taluk first' : pinOptions.length ? 'Select pincode / post office' : 'No pincodes for this taluk'}</option>
-                              {formData.pincodeId && !pinOptions.some((x) => String(x.id) === String(formData.pincodeId)) && (
-                                <option value={formData.pincodeId}>{formData.postalCode} — {formData.locality || 'current'}</option>
-                              )}
-                              {pinOptions.map((x) => <option key={x.id} value={x.id}>{x.postalCode} — {x.area}</option>)}
-                            </select>
+                              hasError={Boolean(formErrors.postalCode)}
+                              options={[
+                                ...(formData.pincodeId && !pinOptions.some((x) => String(x.id) === String(formData.pincodeId))
+                                  ? [{ value: String(formData.pincodeId), label: `${formData.postalCode} — ${formData.locality || 'current'}` }]
+                                  : []),
+                                ...pinOptions.map((x) => ({ value: String(x.id), label: `${x.postalCode} — ${x.area}` }))
+                              ]}
+                              placeholder={!formData.talukId ? 'Select a taluk first' : pinOptions.length ? 'Select pincode / post office' : 'No pincodes for this taluk'}
+                              searchPlaceholder="Search pincode or post office…"
+                            />
                             {formErrors.postalCode && <p className="text-[11px] text-red-600 mt-1">{formErrors.postalCode}</p>}
                           </div>
                         </>

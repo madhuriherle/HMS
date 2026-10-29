@@ -109,6 +109,7 @@ export default function SearchableFormSelect({
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder={searchPlaceholder || 'Search…'}
                   className="w-full pl-8 pr-7 py-1.5 text-xs bg-white border border-[#E8DFD8] rounded-lg text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601]"
                 />
                 {searchTerm && (
