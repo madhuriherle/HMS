@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Eye, Loader2, Search } from 'lucide-react';
+import { ArrowLeft, Eye, Loader2, Pencil, Search } from 'lucide-react';
 import api from '../api';
 import Pager from '../components/Pager';
 import ReceiptViewModal from '../components/ReceiptViewModal';
+import useAuth from '../hooks/useAuth';
 import { fetchReceiptPage } from '../utils/apiAdapters';
 import { notify } from '../utils/notify';
 import { formatDate } from '../utils/dateUtils';
@@ -12,6 +13,8 @@ import { formatMoney } from '../utils/money';
 // Register numbers the office used more than once (32170, 32170/2 ...): each number is a heading with every record that used it
 // under it. Only a pointer for the office: nothing is changed here.
 export default function RepeatedReceipts() {
+  const { hasPermission } = useAuth();
+  const canEdit = hasPermission('receipts.tracking.write');
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [page, setPage] = useState(1);
@@ -101,8 +104,16 @@ export default function RepeatedReceipts() {
                         <td className="px-3 py-2 text-right font-mono whitespace-nowrap">{formatMoney(i.amount)}</td>
                         <td className="px-3 py-2">{i.payment_mode || '—'}</td>
                         <td className="px-3 py-2">{i.receipt_status ? i.receipt_status.charAt(0) + i.receipt_status.slice(1).toLowerCase() : '—'}</td>
-                        <td className="px-3 py-2 text-right">
-                          <button type="button" onClick={() => openReceipt(i.id)} className="btn-act" title="Open the receipt"><Eye className="w-3.5 h-3.5" /><span>View</span></button>
+                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button type="button" onClick={() => openReceipt(i.id)} className="btn-act" title="Open the receipt"><Eye className="w-3.5 h-3.5" /><span>View</span></button>
+                            {/* the usual Receipt Edit screen, in a new tab so this list stays where it is; a cancelled receipt cannot be edited */}
+                            {canEdit && i.receipt_status !== 'CANCELLED' && (
+                              <a href={`/dashboard/receipts/edit/${i.id}`} target="_blank" rel="noopener noreferrer" className="btn-act" title="Edit the receipt (opens in a new tab)">
+                                <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
+                              </a>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
