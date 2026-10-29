@@ -196,7 +196,6 @@ export default function RegisterNewMember() {
     whatsappOwnerRelation: 'Self',
     whatsappOwnerName: '',
     qualification: '',
-    employment: '',
     magazineNeeded: 'YES',
     magazineDeliveryChoice: 'COMMUNICATION',
     magazineDeliveryAddress: '',
@@ -221,8 +220,6 @@ export default function RegisterNewMember() {
   const [formErrors, setFormErrors] = useState({});
   const [isWhatsAppSameAsMobile, setIsWhatsAppSameAsMobile] = useState(true); // a new member: WhatsApp follows the mobile until changed
 
-  // the locality last filled in from a post office, so it can be cleared again when the place changes (a typed one is kept)
-  const autoLocality = useRef('');
 
   // New registration: default to the first active membership type and its price
   useEffect(() => {
@@ -345,7 +342,6 @@ export default function RegisterNewMember() {
           whatsappOwnerRelation: m.whatsapp_owner_relation || 'Self',
           whatsappOwnerName: m.whatsapp_owner_name || '',
           qualification: m.qualification_text || '',
-          employment: m.occupation || '',
           magazineNeeded: m.magazine_needed === false ? 'NO' : 'YES',
           magazineDeliveryChoice: 'COMMUNICATION',
           magazineDeliveryAddress: m.magazine_delivery_address || '',
@@ -633,7 +629,8 @@ export default function RegisterNewMember() {
   }, [formData.talukId]);
 
   const nameOfPlace = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '';
-  const clearPostOffice = (prev) => ({ ...prev, pincodeId: '', postalCode: '', locality: prev.locality && prev.locality !== autoLocality.current ? prev.locality : '' });
+  // there is no Locality box: the locality is the post office picked (cleared with it)
+  const clearPostOffice = (prev) => ({ ...prev, pincodeId: '', postalCode: '', locality: '' });
   const onStateChange = (id) => {
     setFormData((prev) => ({ ...clearPostOffice(prev), stateId: id, districtId: '', talukId: '', state: nameOfPlace(locations.states, id), district: '', taluk: '' }));
     if (formErrors.postalCode) setFormErrors((prev) => ({ ...prev, postalCode: '' }));
@@ -647,14 +644,7 @@ export default function RegisterNewMember() {
   const onPickPostOffice = (id) => {
     const row = pinOptions.find((x) => String(x.id) === String(id));
     if (!row) { setFormData((prev) => clearPostOffice(prev)); return; }
-    const wasAuto = autoLocality.current;
-    autoLocality.current = row.area || '';
-    setFormData((prev) => ({
-      ...prev,
-      pincodeId: String(row.id),
-      postalCode: row.postalCode,
-      locality: prev.locality && prev.locality !== wasAuto ? prev.locality : row.area || ''
-    }));
+    setFormData((prev) => ({ ...prev, pincodeId: String(row.id), postalCode: row.postalCode, locality: row.area || '' }));
     if (formErrors.postalCode) setFormErrors((prev) => ({ ...prev, postalCode: '' }));
   };
 
@@ -855,7 +845,6 @@ export default function RegisterNewMember() {
       referred_by_name: (formData.referredMembershipName || '').trim() || null,
       gotra_text: formData.gothra || null,
       qualification_text: formData.qualification || null,
-      occupation: formData.employment.trim() || null,
       designation: (formData.designation || '').trim() || null,
       native_same_as_current: !!formData.nativeSame,
       native_address: (formData.nativeSame ? formData.address : formData.nativeAddress || '').trim() || null,
@@ -1684,20 +1673,6 @@ export default function RegisterNewMember() {
                     })()}
                   </div>
 
-                  {/* Locality (the post office fills it; it can be changed) */}
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Locality:
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.locality}
-                      onChange={(e) => setFormData({ ...formData, locality: e.target.value })}
-
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
-                    />
-                  </div>
-
                   {/* Post Office / Locality (Kannada) */}
                   {SHOW_KANNADA_FIELDS && (
                   <div>
@@ -1736,30 +1711,16 @@ export default function RegisterNewMember() {
                     )}
                   </div>
 
-                  {/* Designation */}
+                  {/* Occupation / Designation: one field (the old register's Designation) */}
                   <div>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Designation:
+                      Occupation / Designation:
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. Advocate, Teacher"
+                      placeholder="e.g. Advocate, Teacher, Business"
                       value={formData.designation}
                       onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
-                    />
-                  </div>
-
-                  {/* Employment */}
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Employment:
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Occupation / Profession"
-                      value={formData.employment}
-                      onChange={(e) => setFormData({ ...formData, employment: e.target.value })}
                       className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
                   </div>
