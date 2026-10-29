@@ -633,21 +633,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           )
         }
       >
-        {/* 0. Pending or Rejected (the Assigned queue only holds applicants still to be decided) */}
-        {!assignedOnly && <FilterSelect
-          value={statusFilter}
-          onChange={(val) => {
-            setStatusFilter(val);
-            setSelectedIds(new Set());
-            setCurrentPage(1);
-          }}
-          options={[
-            { value: 'UNAPPROVED', label: 'Awaiting decision' },
-            { value: 'REJECTED', label: 'Rejected' }
-          ]}
-          widthClass="w-full sm:w-44"
-        />}
-
         {/* 1. Membership Type */}
         <FilterSelect
           value={typeFilter}
@@ -681,7 +666,22 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
 
         {/* The rarer filters behind one button, so the card stays in one line: the district, and the meeting PDF (only the applicants that
             were on an exported PDF, or on the one exported on a given day) */}
-        <FilterMore count={(districtFilter !== 'ALL' ? 1 : 0) + (statusFilter === 'UNAPPROVED' && exportFilter !== 'ALL' ? 1 : 0)}>
+        <FilterMore count={(statusFilter !== 'UNAPPROVED' ? 1 : 0) + (districtFilter !== 'ALL' ? 1 : 0) + (statusFilter === 'UNAPPROVED' && exportFilter !== 'ALL' ? 1 : 0)}>
+          {/* Awaiting decision is the normal list; the rejected applicants (who can be re-opened) are one choice away */}
+          {!assignedOnly && (
+            <FilterSelect
+              value={statusFilter}
+              onChange={(val) => {
+                setStatusFilter(val);
+                setSelectedIds(new Set());
+                setCurrentPage(1);
+              }}
+              options={[
+                { value: 'UNAPPROVED', label: 'Awaiting decision' },
+                { value: 'REJECTED', label: 'Rejected' }
+              ]}
+            />
+          )}
           <FilterSelect
             value={districtFilter}
             onChange={(val) => {
@@ -703,9 +703,9 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                   setCurrentPage(1);
                 }}
                 options={[
-                  { value: 'ALL', label: 'Meeting PDF: all' },
-                  { value: 'EXPORTED', label: 'Meeting PDF: only exported' },
-                  { value: 'NOT_EXPORTED', label: 'Meeting PDF: not exported yet' }
+                  { value: 'ALL', label: 'Exported for approval: all' },
+                  { value: 'EXPORTED', label: 'Exported for approval: yes' },
+                  { value: 'NOT_EXPORTED', label: 'Exported for approval: not yet' }
                 ]}
               />
               {exportFilter === 'EXPORTED' && (
@@ -796,11 +796,11 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                         {/* a small mark for an applicant who was on a meeting PDF; the date shows on hover */}
                         {m.last_exported_on && (
                           <span
-                            className="inline-flex items-center justify-center w-6 h-6 ml-2 -mt-0.5 align-middle rounded-md bg-[#FBEFEA] border border-[#F0D5CB] text-[#B4412A] cursor-default"
-                            title={`On the meeting PDF of ${formatDate(m.last_exported_on)}`}
-                            aria-label={`On the meeting PDF of ${formatDate(m.last_exported_on)}`}
+                            className="inline-flex items-center justify-center w-5 h-5 ml-1.5 -my-1 align-middle rounded bg-[#FBEFEA] border border-[#F0D5CB] text-[#B4412A] cursor-default"
+                            title={`Exported for approval · ${formatDate(m.last_exported_on)}`}
+                            aria-label={`Exported for approval on ${formatDate(m.last_exported_on)}`}
                           >
-                            <FileText className="w-3.5 h-3.5" />
+                            <FileText className="w-3 h-3" />
                           </span>
                         )}
                         {/* only a real source (an online or office registration); an imported applicant has none to show */}
