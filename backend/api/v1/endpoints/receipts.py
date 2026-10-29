@@ -26,7 +26,7 @@ from services.sequences import generate_next_number
 from services import approval_gate
 from services.exports import render_export
 from datetime import date, datetime, timedelta, timezone
-from sqlalchemy import case, func, or_
+from sqlalchemy import func, or_
 from models.masters import MembershipType, Particular, PaymentMode
 
 from services import membership_credit, receipt_status
@@ -341,27 +341,6 @@ def create_receipt(
 
 # A register number used again keeps the earliest record and the others get a tail: 32170, 32170/2, 32170/3 ...
 _TAIL = re.compile(r"^(.+)/([0-9]+)$")
-_REPEAT_NAMES = ("REPEAT", "REPEAT_2", "REPEAT_3", "REPEAT_4PLUS")
-
-
-def _repeat_kinds(db: Session) -> dict:
-    """The SQL test for each repeat filter. PostgreSQL uses a regular expression; SQLite (the test database) has no
-    regex operator, so it gets the same test with GLOB / LIKE."""
-    n = Receipt.receipt_number
-    if db.get_bind().dialect.name == "postgresql":
-        return {
-            "REPEAT": n.op("~")(r"/[0-9]+$"),
-            "REPEAT_2": n.op("~")(r".+/2$"),
-            "REPEAT_3": n.op("~")(r".+/3$"),
-            "REPEAT_4PLUS": n.op("~")(r".+/([4-9]|[1-9][0-9]+)$"),
-        }
-    tail = n.op("GLOB")("*/[0-9]*")
-    return {
-        "REPEAT": tail,
-        "REPEAT_2": n.like("%/2"),
-        "REPEAT_3": n.like("%/3"),
-        "REPEAT_4PLUS": tail & ~n.like("%/2") & ~n.like("%/3"),
-    }
 
 
 def repeat_base(number: Optional[str]) -> Optional[str]:
@@ -372,6 +351,36 @@ def repeat_base(number: Optional[str]) -> Optional[str]:
 def repeat_tail(number: Optional[str]) -> Optional[int]:
     m = _TAIL.match(number or "")
     return int(m.group(2)) if m else None
+
+
+@router.get("/repeats")
+def repeated_receipt_numbers(
+    kind: str = "ALL",            # ALL | 2 | 3 | 4PLUS: the highest tail the number reached (/2, /3, /4 or more)
+    search: Optional[str] = None,  # a receipt number, name or mobile inside the group
+    fy: Optional[str] = None,      # financial year "2025-26"
+    page: int = 1, limit: int = 20,
+    export: Optional[str] = None,  # "excel": every group as one sheet
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Register numbers used more than once (32170, 32170/2 ...), one group per number. The page is a slice of the GROUPS
+    (at most 200); nothing is merged or changed."""
+    from core.pagination import LIST_PAGE_MAX
+    from fastapi.responses import Response
+    from services import repeat_receipts
+
+    page, limit = max(1, page), max(1, min(limit, LIST_PAGE_MAX))
+    try:
+        out = repeat_receipts.find_groups(db, kind, search, fy, page, limit, everything=bool(export))
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if export:
+        return Response(
+            content=repeat_receipts.groups_xlsx(out["groups"]),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename=repeated_receipt_numbers.xlsx"},
+        )
+    return {**out, "page": page, "limit": limit, "pages": max(1, -(-out["total"] // limit))}
 
 
 @router.get("/{id}/same-number")
@@ -459,14 +468,11 @@ def read_receipt_tracking(
         filters.append(Receipt.id == receipt_id)
     if receipt_status:
         filters.append(Receipt.receipt_status == receipt_status.upper())
-    kind_filter = None  # added last, so the repeat counts below can be counted without it
-    repeat_kinds = _repeat_kinds(db)
     if number_kind:
         kind = number_kind.upper()
-        if kind not in ("UNKNOWN", "KNOWN", "ZERO") and kind not in repeat_kinds:
-            raise HTTPException(400, "number_kind must be UNKNOWN, KNOWN, ZERO, REPEAT, REPEAT_2, REPEAT_3 or REPEAT_4PLUS")
-        kind_filter = repeat_kinds[kind] if kind in repeat_kinds else (
-            Receipt.net_amount == 0 if kind == "ZERO" else Receipt.is_old_receipt == (kind == "UNKNOWN"))  # noqa: E712
+        if kind not in ("UNKNOWN", "KNOWN", "ZERO"):
+            raise HTTPException(400, "number_kind must be UNKNOWN, KNOWN or ZERO")
+        filters.append(Receipt.net_amount == 0 if kind == "ZERO" else Receipt.is_old_receipt == (kind == "UNKNOWN"))  # noqa: E712
     if member_ids:
         wanted = [int(x) for x in member_ids.split(",") if x.strip().isdigit()][:LIST_PAGE_MAX]
         filters.append(Receipt.id.in_(
@@ -556,15 +562,6 @@ def read_receipt_tracking(
             ),
         ))
 
-    # How many receipts carry a repeat tail (/2, /3 ...) under every other filter, for the chips above the list.
-    repeat_counts = dict(zip(
-        ("repeat", "repeat_2", "repeat_3", "repeat_4plus"),
-        db.query(*[func.coalesce(func.sum(case((repeat_kinds[k], 1), else_=0)), 0) for k in _REPEAT_NAMES]).filter(*filters).one(),
-    ))
-    repeat_counts = {k: int(v or 0) for k, v in repeat_counts.items()}
-    if kind_filter is not None:
-        filters.append(kind_filter)
-
     # Per-mode summary over the SAME filter set, before pagination narrows it.
     mode_summary = dict(
         db.query(Receipt.payment_mode, func.count())
@@ -651,8 +648,6 @@ def read_receipt_tracking(
             "cheque_date": r.cheque_date,
             "is_renewal": r.is_renewal,
             "is_old_receipt": r.is_old_receipt,
-            "repeat_of": repeat_base(r.receipt_number),  # the number this one repeats (32170 for 32170/2), else None
-            "repeat_no": repeat_tail(r.receipt_number),  # 2 for 32170/2, else None
             "source": r.source,
             # Payee columns: a member (profile-linked) or an associate
             # (non-member donor). payee_type tells the UI which detail to open.
@@ -690,7 +685,6 @@ def read_receipt_tracking(
             "by_payment_mode": mode_summary,
             "by_status": {k or "UNASSIGNED": v for k, v in by_status.items()},
             "total_amount": total_amount,
-            "repeat_counts": repeat_counts,
         },
         "total": total,
         "page": page,

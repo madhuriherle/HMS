@@ -1,4 +1,4 @@
-"""A register number used again keeps a tail (32170, 32170/2 ...): the tracking filter, the chip counts and the same-number lookup."""
+"""A register number used again keeps a tail (32170, 32170/2 ...): the repeated numbers list and the same-number lookup."""
 from datetime import date
 
 from test_frontend_contract import _sfx
@@ -29,26 +29,25 @@ def test_repeat_filter_counts_and_same_number(client, admin_headers):
     finally:
         db.close()
 
-    def listed(kind):
-        r = client.get("/api/v1/receipts/tracking", headers=admin_headers, params={"number_kind": kind, "search": tag, "fy": "2031-32", "limit": 50})
+    def groups(**params):
+        r = client.get("/api/v1/receipts/repeats", headers=admin_headers, params={"search": tag, "fy": "2031-32", "limit": 50, **params})
         assert r.status_code == 200, r.text
         return r.json()
 
-    rep = listed("REPEAT")
-    assert {row["receipt_number"] for row in rep["data"]} == {tag + "/2", tag + "/3", tag + "/4"}
-    assert {row["receipt_number"] for row in listed("REPEAT_2")["data"]} == {tag + "/2"}
-    assert {row["receipt_number"] for row in listed("REPEAT_3")["data"]} == {tag + "/3"}
-    assert {row["receipt_number"] for row in listed("REPEAT_4PLUS")["data"]} == {tag + "/4"}
-    # a repeat names the number it repeats; the first one is not a repeat
-    by_no = {row["receipt_number"]: row for row in rep["data"]}
-    assert by_no[tag + "/3"]["repeat_of"] == tag and by_no[tag + "/3"]["repeat_no"] == 3
-    allrows = {row["receipt_number"]: row for row in client.get("/api/v1/receipts/tracking", headers=admin_headers, params={"search": tag, "fy": "2031-32", "limit": 50}).json()["data"]}
-    assert allrows[tag]["repeat_of"] is None and allrows[tag + "X"]["repeat_of"] is None
-    # the chip counts follow the other filters, not the repeat choice itself
-    counts = listed("KNOWN")["summary"]["repeat_counts"]
-    assert counts["repeat"] == 3 and counts["repeat_2"] == 1 and counts["repeat_3"] == 1 and counts["repeat_4plus"] == 1
-    assert listed("REPEAT_2")["summary"]["repeat_counts"] == counts
-    assert client.get("/api/v1/receipts/tracking", headers=admin_headers, params={"number_kind": "NOPE"}).status_code == 400
+    out = groups()
+    assert out["total"] == 1 and out["counts"] == {"ALL": 1, "2": 0, "3": 0, "4PLUS": 1}
+    g = out["groups"][0]
+    assert g["number"] == tag and g["count"] == 4 and g["has_original"] and g["financial_year"] == "2031-32"
+    assert [i["receipt_number"] for i in g["items"]] == [tag, tag + "/2", tag + "/3", tag + "/4"]
+    assert g["alike"] == [tag + "/2", tag + "/3", tag + "/4"]    # the same name and amount as the first
+    # the level filter: this number reached /4, so it shows under 4PLUS only; the same text in another year is another number
+    assert groups(kind="4PLUS")["total"] == 1 and groups(kind="2")["total"] == 0 and groups(kind="3")["total"] == 0
+    assert groups(fy="2032-33")["groups"][0]["items"][0]["receipt_number"] == tag + "/2" and not groups(fy="2032-33")["groups"][0]["has_original"]
+    assert groups(search="Nobody Has This Name")["total"] == 0
+    assert groups(search="Repeat Payer")["total"] >= 1
+    assert client.get("/api/v1/receipts/repeats", headers=admin_headers, params={"kind": "NOPE"}).status_code == 400
+    x = client.get("/api/v1/receipts/repeats", headers=admin_headers, params={"search": tag, "export": "excel"})
+    assert x.status_code == 200 and x.content[:2] == b"PK"
 
     # the same-number lookup: every live receipt of the number in that financial year, the first one first
     for key in ("first", "third"):

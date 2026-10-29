@@ -28,7 +28,6 @@ import { formatMoney } from '../utils/money';
 import { memberName } from '../utils/memberName';
 import { fetchReceiptRow } from '../utils/apiAdapters';
 import ReceiptViewModal from '../components/ReceiptViewModal';
-import RepeatNumber from '../components/RepeatNumber';
 
 const inr = formatMoney;
 
@@ -690,7 +689,7 @@ function MembershipTab({ id }) {
                       <tr key={r.receipt_id} className="border-b last:border-b-0 border-[#E8DFD8]/60">
                         <td className="py-2 pr-3 whitespace-nowrap">{formatDate(r.receipt_date)} <span className="text-[#863221]">(FY {r.financial_year})</span></td>
                         <td className="py-2 pr-3 font-mono font-bold">
-                          <RepeatNumber number={r.receipt_number} />
+                          {r.receipt_number}
                           {r.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200" title="Old receipt added afterwards (dummy)">UNKNOWN</span>}
                         </td>
                         <td className="py-2 pr-3 text-right font-mono">{inr(r.paid)}</td>

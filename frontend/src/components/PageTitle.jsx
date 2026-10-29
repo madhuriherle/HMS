@@ -52,6 +52,7 @@ export const ROUTE_TITLE_MAP = [
   { match: (p) => p.startsWith('/dashboard/membership/assigned'), title: 'Assigned for Approval' },
   { match: (p) => p.startsWith('/dashboard/receipts/entry') || p.startsWith('/dashboard/receipts/add') || p === '/dashboard/receipts', title: 'Receipt Entry' },
   { match: (p) => p.startsWith('/dashboard/receipts/edit/'), title: 'Edit Receipt' },
+  { match: (p) => p.startsWith('/dashboard/receipts/repeats'), title: 'Repeated Receipt Numbers' },
   { match: (p) => p.startsWith('/dashboard/receipts/tracking') || p.startsWith('/dashboard/receipt/tracking'), title: 'Receipt Tracking' },
   { match: (p) => p.startsWith('/dashboard/receipts/bulk-mapping') || p.startsWith('/dashboard/receipts/auto-map'), title: 'Bulk Receipt Auto-Mapping' },
   { match: (p) => p.startsWith('/dashboard/receipts/labels') || p.startsWith('/dashboard/receipts/label-list'), title: 'Address Label Printing' },

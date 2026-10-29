@@ -83,7 +83,7 @@ def test_every_page_loads_what_it_needs_with_its_own_privilege(client, admin_hea
         "masters.membership_types.read": ["/masters/membership-types?limit=5", "/masters/usage/membership-types"],
         "masters.particulars.read": ["/masters/particulars?limit=5", "/masters/usage/particulars"],
         "masters.payment_modes.read": ["/masters/payment-modes?limit=5", "/masters/banks?limit=5", "/receipts/?limit=5"],
-        "receipts.tracking.read": ["/receipts/tracking?limit=5", "/receipts/day-book?from_date=2026-10-13&to_date=2026-10-13",
+        "receipts.tracking.read": ["/receipts/tracking?limit=5", "/receipts/repeats?limit=5", "/receipts/day-book?from_date=2026-10-13&to_date=2026-10-13",
                                    "/members/?limit=5", "/masters/particulars?limit=5"],
     }
     for code, paths in pages.items():

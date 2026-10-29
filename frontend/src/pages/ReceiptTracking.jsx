@@ -31,7 +31,6 @@ import { formatMoney } from '../utils/money';
 
 import ModalFooter from '../components/ModalFooter';
 import ReceiptViewModal from '../components/ReceiptViewModal';
-import RepeatNumber from '../components/RepeatNumber';
 // Financial year (April-March) of an ISO date: 2026-10-12 -> 2026-27
 const getCurrentFY = (date = new Date()) => {
   const y = date.getFullYear();
@@ -122,7 +121,7 @@ export default function ReceiptTracking() {
   const [fyFilter, setFyFilter] = useState(() => getCurrentFY());
   const [monthFilter, setMonthFilter] = useState('ALL'); // ALL or a month number 1-12 (April to March within the period)
   const [modeFilter, setModeFilter] = useState('ALL');
-  const [numberFilter, setNumberFilter] = useState('ALL'); // ALL, KNOWN, UNKNOWN (dummy number), ZERO (no amount), REPEAT / REPEAT_2 / REPEAT_3 / REPEAT_4PLUS (a number used again: 32170/2)
+  const [numberFilter, setNumberFilter] = useState('ALL'); // ALL, KNOWN, UNKNOWN (dummy number), ZERO (no amount)
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [periodMode, setPeriodMode] = useState('FY'); // ALL, TODAY, MONTH, FY, CUSTOM
@@ -436,6 +435,14 @@ export default function ReceiptTracking() {
           <>
             <button
               type="button"
+              onClick={() => navigate('/dashboard/receipts/repeats')}
+              title="Receipt numbers the register used more than once (32170, 32170/2)"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
+            >
+              Repeated Numbers
+            </button>
+            <button
+              type="button"
               onClick={() => loadDayBook(new Date().toISOString().slice(0, 10))}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
             >
@@ -509,10 +516,10 @@ export default function ReceiptTracking() {
 
         {/* Status: whether the receipt is linked to a member, plus the old-register receipts with no real number (FY43-001 style) or no amount */}
         <FilterSelect
-          value={numberFilter === 'UNKNOWN' || numberFilter === 'ZERO' ? numberFilter : statusFilter}
+          value={numberFilter !== 'ALL' ? numberFilter : statusFilter}
           onChange={(val) => {
             if (val === 'UNKNOWN' || val === 'ZERO') { setNumberFilter(val); setStatusFilter('ALL'); }
-            else { setNumberFilter((prev) => (prev === 'UNKNOWN' || prev === 'ZERO' ? 'ALL' : prev)); setStatusFilter(val); }
+            else { setNumberFilter('ALL'); setStatusFilter(val); }
           }}
           options={[
             { value: 'ALL', label: 'All Statuses' },
@@ -534,34 +541,6 @@ export default function ReceiptTracking() {
         />
       </SearchFilterBar>
 
-      {/* Numbers the register used again (32170/2): one click shows them, the counts follow the other filters */}
-      {(summary.repeat_counts?.repeat > 0 || numberFilter.startsWith('REPEAT')) && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="font-semibold text-[#863221]">Repeated numbers:</span>
-          {[
-            ['ALL', 'All receipts', null],
-            ['REPEAT', 'All repeats', summary.repeat_counts?.repeat],
-            ['REPEAT_2', '/2', summary.repeat_counts?.repeat_2],
-            ['REPEAT_3', '/3', summary.repeat_counts?.repeat_3],
-            ['REPEAT_4PLUS', '/4 and more', summary.repeat_counts?.repeat_4plus],
-          ].map(([value, label, count]) => {
-            const on = value === 'ALL' ? !numberFilter.startsWith('REPEAT') : numberFilter === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setNumberFilter(value === 'ALL' ? 'ALL' : value)}
-                aria-pressed={on}
-                className={`px-3 py-1 rounded-full border font-semibold cursor-pointer transition-colors ${on ? 'bg-blue-50 border-blue-400 text-blue-800 ring-1 ring-blue-300' : 'bg-white border-[#E8DFD8] text-[#180200] hover:bg-[#FAF7F2]'}`}
-              >
-                {label}
-                {count != null && <span className="ml-1.5 font-mono text-[#863221]">{count}</span>}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {/* Phone layout: one card per receipt */}
       <div className="sm:hidden space-y-2.5">
         {filteredReceipts.length === 0 && (
@@ -576,7 +555,7 @@ export default function ReceiptTracking() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-mono font-bold text-xs text-[#510601]"><RepeatNumber number={receipt.receiptNumber} showWhy />{receipt.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide bg-amber-100 text-amber-800 border border-amber-200 align-middle" title="Old receipt added afterwards (dummy)">UNKNOWN</span>}</div>
+                  <div className="font-mono font-bold text-xs text-[#510601]">{receipt.receiptNumber}{receipt.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide bg-amber-100 text-amber-800 border border-amber-200 align-middle" title="Old receipt added afterwards (dummy)">UNKNOWN</span>}</div>
                   <div className="text-sm font-bold text-[#180200] truncate">{receipt.name || '—'}</div>
                   <div className="text-[11px] text-[#863221]">
                     {formatDate(receipt.receiptDate)} · {receipt.paymentMode || '—'}
@@ -657,9 +636,9 @@ export default function ReceiptTracking() {
                       key={receipt.id}
                       className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]"
                     >
-                      {/* Column 1: Receipt Number (a repeated one has a blue strip at its left edge) */}
-                      <td className={`py-3.5 px-4 font-mono font-bold text-xs ${receipt.repeat_of ? 'shadow-[inset_4px_0_0_#3B6FE0]' : ''}`}>
-                        <RepeatNumber number={receipt.receiptNumber} showWhy className="text-[#510601] tracking-wider" />
+                      {/* Column 1: Receipt Number */}
+                      <td className="py-3.5 px-4 font-mono font-bold text-xs">
+                        <span className="text-[#510601] tracking-wider">{receipt.receiptNumber}</span>
                         {(receipt.receiptStatus === 'CANCELLED' || String(receipt.status || '').toUpperCase() === 'CANCELLED') && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide bg-red-50 text-red-700 border border-red-200 align-middle">CANCELLED</span>}
                         {receipt.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide bg-amber-100 text-amber-800 border border-amber-200 align-middle" title="Old receipt added afterwards (dummy)">UNKNOWN</span>}
                       </td>

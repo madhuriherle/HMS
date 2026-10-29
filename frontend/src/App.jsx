@@ -35,6 +35,7 @@ import BulkReceiptMapping from './pages/BulkReceiptMapping';
 import KycForm from './pages/KycForm';
 import EventsManagement from './pages/EventsManagement';
 import DuplicateMembers from './pages/DuplicateMembers';
+import RepeatedReceipts from './pages/RepeatedReceipts';
 import EngagementsManagement from './pages/EngagementsManagement';
 import ReportsManagement from './pages/ReportsManagement';
 import NotificationsManagement from './pages/NotificationsManagement';
@@ -147,6 +148,7 @@ function App() {
           <Route path="receipts/add" element={<ReceiptEntry />} />
           <Route path="receipts/edit/:id" element={<ReceiptEntry />} />
           <Route path="receipts/tracking" element={<ReceiptTracking />} />
+          <Route path="receipts/repeats" element={<PermissionGate required="receipts.tracking.read" title="Access Restricted" message="You need the Receipt Tracking privilege to open this page."><RepeatedReceipts /></PermissionGate>} />
           <Route path="receipt/tracking" element={<ReceiptTracking />} />
           <Route path="receipts/bulk-mapping" element={<PermissionGate required="receipts.bulk_mapping.read" title="Access Restricted" message="You need the Bulk Receipt Mapping privilege to open this page."><BulkReceiptMapping /></PermissionGate>} />
           <Route path="receipts/auto-map" element={<PermissionGate required="receipts.bulk_mapping.read" title="Access Restricted" message="You need the Bulk Receipt Mapping privilege to open this page."><BulkReceiptMapping /></PermissionGate>} />
