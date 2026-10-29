@@ -99,8 +99,9 @@ export default function Dashboard() {
   
   const [recentActivity, setRecentActivity] = useState([]);
   const [membershipTypeData, setMembershipTypeData] = useState([]);
-  const [registrationData] = useState([]);
-  const [districtData] = useState([]);
+  const [registrationData, setRegistrationData] = useState([]);
+  const [districtData, setDistrictData] = useState([]);
+  const [registrationYear, setRegistrationYear] = useState(new Date().getFullYear());
   
   // the dashboard is privilege-gated now (dashboard.read); a role without it
   // lands on its first accessible page instead of a screen full of errors.
@@ -119,7 +120,7 @@ export default function Dashboard() {
       try {
         const [dashRes, membersRes] = await Promise.allSettled([
           api.get('/dashboard/'),
-          api.get('/members/?limit=5&sort_by=created_at&sort_desc=true')
+          api.get('/members/?limit=5&sort_by=created_at&sort_dir=desc')
         ]);
         
         // each part loads on its own: a privilege the user lacks hides that part only
@@ -134,6 +135,10 @@ export default function Dashboard() {
         setMoney(dData.receipts && dData.receipts.today_amount !== undefined ? dData.receipts : null);
         setAwaitingFinal(typeof dData.awaiting_final_approval === 'number' ? dData.awaiting_final_approval : null);
 
+        if (dData.registrations_by_month) setRegistrationData(dData.registrations_by_month);
+        if (dData.registration_year) setRegistrationYear(dData.registration_year);
+        if (dData.members_by_district) setDistrictData(dData.members_by_district);
+
         if (dData.memberships_by_type) {
           setMembershipTypeData(dData.memberships_by_type.map((item, i) => ({
             name: item.membership_type,
@@ -143,11 +148,11 @@ export default function Dashboard() {
         }
         
         const mData = membersRes.status === 'fulfilled' ? membersRes.value.data : {};
-        if (mData.items) {
-          setRecentActivity(mData.items.map(m => ({
+        if (mData.data) {
+          setRecentActivity(mData.data.map(m => ({
             id: m.id,
             name: m.full_name_en || m.name,
-            district: m.district,
+            district: m.district_name,
             type: m.membership_type,
             date: m.created_at ? m.created_at.split('T')[0] : '-',
             status: m.approval_status === 'APPROVED' ? 'Approved' : (m.approval_status === 'UNAPPROVED' ? 'Pending' : 'Inactive')
@@ -299,7 +304,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
         {/* Trend Area Chart */}
         <div className="lg:col-span-2 bg-white p-5 sm:p-6 rounded-2xl border border-[#E8DFD8] shadow-[0_4px_12px_-2px_rgba(24,2,0,0.04)]">
-          <h2 className="text-sm font-semibold text-[#180200] uppercase tracking-wider mb-6">Membership Registrations (2026)</h2>
+          <h2 className="text-sm font-semibold text-[#180200] uppercase tracking-wider mb-6">Membership Registrations ({registrationYear})</h2>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={registrationData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

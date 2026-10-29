@@ -98,7 +98,31 @@ def get_dashboard(
         )
     ]
 
+    # new registrations of this year by month (the imported old register is not a registration made this year), and
+    # the members of each district (the ten largest)
+    from models.masters import District
+    year = today.year
+    month_counts = {
+        int(m): c for m, c in db.query(func.extract("month", Member.created_at), func.count(Member.id))
+        .filter(Member.is_deleted == False, func.extract("year", Member.created_at) == year,  # noqa: E712
+                Member.registration_source.is_distinct_from("MIGRATION"))
+        .group_by(func.extract("month", Member.created_at)).all()
+    }
+    names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    registrations_by_month = [{"month": names[i], "members": month_counts.get(i + 1, 0)} for i in range(12)]
+    by_district = [
+        {"name": name, "count": count}
+        for name, count in db.query(District.name_en, func.count(Member.id))
+        .join(Member, Member.district_id == District.id)
+        .filter(Member.is_deleted == False, Member.approval_status == "APPROVED")  # noqa: E712
+        .group_by(District.id, District.name_en).order_by(func.count(Member.id).desc()).limit(10).all()
+    ]
+    can_see_members = allowed("members.read", "members.list.read", "members.unapproved.read")
+
     return {
+        "registrations_by_month": registrations_by_month if can_see_members else None,
+        "registration_year": year,
+        "members_by_district": by_district if can_see_members else None,
         "members": {
             "total": total_members,
             "approved": approved_members,

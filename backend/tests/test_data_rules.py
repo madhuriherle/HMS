@@ -113,3 +113,19 @@ def test_dashboard_carries_members_by_type_without_reports_access(client, admin_
     body = client.get(f"{API}/dashboard/", headers=admin_headers).json()
     assert isinstance(body["memberships_by_type"], list)
     assert all({"membership_type", "member_count"} <= set(row) for row in body["memberships_by_type"])
+
+
+def test_dashboard_registrations_by_month_and_districts_follow_new_members(client, admin_headers):
+    """A member registered now appears in this month's bar; the district chart lists the districts of approved members."""
+    from datetime import date
+    h = admin_headers
+    before = client.get(f"{API}/dashboard/", headers=h).json()
+    assert len(before["registrations_by_month"]) == 12 and before["registration_year"] == date.today().year
+    mine = lambda d: d["registrations_by_month"][date.today().month - 1]["members"]
+    created = client.post(f"{API}/members/", headers=h, json={
+        "first_name_en": "Dashreg", "last_name_en": "Person", "mobile": "9611000321", "gender": "MALE",
+        "address_line1": "Dash lane", "registration_source": "OFFLINE"})
+    assert created.status_code in (200, 201), created.text
+    after = client.get(f"{API}/dashboard/", headers=h).json()
+    assert mine(after) == mine(before) + 1
+    assert isinstance(after["members_by_district"], list)
