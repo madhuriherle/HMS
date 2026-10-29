@@ -63,6 +63,13 @@ export default function RegisterNewMember() {
   const lists = useLists(); // child relations, YES/NO, country codes (GET /meta/lists)
   const COUNTRY_CODES = useCountryCodes();
   const BLOOD_GROUPS = rules?.blood_groups || [];
+  // a saved blood group may be written another way ("A +VE", "o positive"): pick the list entry it means, else keep it as saved
+  const matchBloodGroup = (value, options) => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const key = (v) => String(v).toUpperCase().replace(/\s+/g, '').replace(/POSITIVE|\+VE/g, '+').replace(/NEGATIVE|-VE/g, '-');
+    return options.find((o) => key(o) === key(raw)) || raw;
+  };
   const BEHALF_OPTIONS = (rules?.applied_on_behalf_of && rules.applied_on_behalf_of.length)
     ? rules.applied_on_behalf_of
     : ['Self', 'Father', 'Mother', 'Husband', 'Wife', 'Son', 'Daughter', 'Brother', 'Sister', 'Grandson', 'Granddaughter', 'Family', 'Relative', 'Others'];
@@ -340,7 +347,7 @@ export default function RegisterNewMember() {
           age: m.date_of_birth ? calculateAge(m.date_of_birth) : '',
           gothra: m.gotra_text || '',
           gender,
-          bloodGroup: m.blood_group || '',
+          bloodGroup: matchBloodGroup(m.blood_group, BLOOD_GROUPS),
           aadharNumber: m.aadhaar_number || '',
           address: m.address_line1 || '',
           addressKn: m.address_line1_kn || '',
@@ -1572,6 +1579,9 @@ export default function RegisterNewMember() {
                       className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-xs sm:text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all cursor-pointer"
                     >
                       <option value="">Select Blood Group</option>
+                      {formData.bloodGroup && !BLOOD_GROUPS.includes(formData.bloodGroup) && (
+                        <option value={formData.bloodGroup}>{formData.bloodGroup}</option>
+                      )}
                       {BLOOD_GROUPS.map((bg) => (
                         <option key={bg} value={bg}>
                           {bg}
