@@ -631,8 +631,9 @@ export default function RegisterNewMember() {
   }, [formData.talukId]);
 
   const nameOfPlace = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '';
-  // the post office is picked from the list; the member's own Locality / Area is typed and is never overwritten by it
-  const clearPostOffice = (prev) => ({ ...prev, pincodeId: '', postalCode: '', post: '' });
+  // Locality / Area is read only: it comes from the post office picked ("Hiliyana B.O" gives "Hiliyana") and goes with it
+  const localityOf = (name) => String(name || '').replace(/\s+[BSH]\.?O\.?$/i, '').trim();
+  const clearPostOffice = (prev) => ({ ...prev, pincodeId: '', postalCode: '', post: '', locality: '' });
   const onStateChange = (id) => {
     setFormData((prev) => ({ ...clearPostOffice(prev), stateId: id, districtId: '', talukId: '', state: nameOfPlace(locations.states, id), district: '', taluk: '' }));
     if (formErrors.postalCode) setFormErrors((prev) => ({ ...prev, postalCode: '' }));
@@ -646,7 +647,7 @@ export default function RegisterNewMember() {
   const onPickPostOffice = (id) => {
     const row = pinOptions.find((x) => String(x.id) === String(id));
     if (!row) { setFormData((prev) => clearPostOffice(prev)); return; }
-    setFormData((prev) => ({ ...prev, pincodeId: String(row.id), postalCode: row.postalCode, post: row.area || '', locality: prev.locality || row.area || '' }));
+    setFormData((prev) => ({ ...prev, pincodeId: String(row.id), postalCode: row.postalCode, post: row.area || '', locality: localityOf(row.area) }));
     if (formErrors.postalCode) setFormErrors((prev) => ({ ...prev, postalCode: '' }));
   };
 
@@ -1675,17 +1676,18 @@ export default function RegisterNewMember() {
                     })()}
                   </div>
 
-                  {/* Locality / Area: the member's own area or town (the post office is the field above) */}
+                  {/* Locality / Area: read only, from the post office picked */}
                   <div>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
                       Locality / Area:
                     </label>
                     <input
                       type="text"
-                      placeholder="Area or town"
+                      readOnly
+                      tabIndex={-1}
+                      placeholder="Fills from the post office"
                       value={formData.locality}
-                      onChange={(e) => setFormData({ ...formData, locality: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                      className="w-full px-3.5 py-2.5 bg-stone-100 border border-[#E8DFD8] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none cursor-default"
                     />
                   </div>
 
