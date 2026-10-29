@@ -1,7 +1,7 @@
 import { PageTitleSlot, PageTitleProvider } from '../components/PageTitle';
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { Menu, User, LogOut, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Menu, User, LogOut, ChevronDown } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import api from '../api';
 import Swal from 'sweetalert2';
@@ -128,7 +128,7 @@ export default function MainLayout() {
                 aria-label={collapsed ? 'Expand the menu' : 'Collapse the menu'}
                 title={collapsed ? 'Expand the menu' : 'Collapse the menu'}
               >
-                {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+                <Menu className="h-5 w-5" />
               </button>
               <PageTitleSlot />
             </div>
