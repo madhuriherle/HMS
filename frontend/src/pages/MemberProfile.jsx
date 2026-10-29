@@ -200,6 +200,136 @@ function CreditBanner({ credit }) {
 
 // ── tabs ──
 
+// ── Overview: the brief view, one full-width card per section ──
+function OverviewTab({ id }) {
+  const state = useSection(id, 'overview');
+  const { hasPermission } = useAuth();
+  return (
+    <Loading state={state}>
+      {(d) => {
+        const b = d.basic;
+        const c = d.contact;
+        const m = d.membership;
+        const f = d.family;
+        const credit = m.credit;
+        const target = credit?.target_type;
+        const pct = target?.price ? Math.min(100, Math.round((credit.credit_total / target.price) * 100)) : 100;
+        const since = m.current?.member_since || d.membership?.member_since || m.current?.activated_at || m.current?.applied_at;
+        const personal = [
+          ['Gender', b.gender],
+          ['Date of birth', b.date_of_birth ? formatDate(b.date_of_birth) : ''],
+          ['Blood group', b.blood_group],
+          ['Gotra', b.gotra],
+          ['Qualification', b.qualification],
+          ['Occupation', b.occupation],
+          ['Native place', b.native_place]
+        ];
+        const contact = [
+          ['Mobile', phone(c.mobile_country_code, c.mobile)],
+          ['WhatsApp', phone(c.whatsapp_country_code, c.whatsapp_number)],
+          ['Email', c.email],
+          ['Address', c.address]
+        ];
+        const relatives = [
+          ['Father', f.father_name, f.father_membership_number],
+          ['Mother', f.mother_name, f.mother_membership_number],
+          ['Spouse', f.spouse_name, f.spouse_membership_number]
+        ].filter(([, name]) => name);
+        const hasMagazine = d.magazine.magazine_needed || d.magazine.subscriptions.length > 0 || d.magazine.services.length > 0;
+
+        return (
+          <div className="space-y-4">
+            <Panel
+              icon={CreditCard}
+              cols={4}
+              title="Membership"
+              tag={m.current ? <span className={`chip ${m.current.status === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>{m.current.status}</span> : 'Plan'}
+            >
+              {!m.current ? (
+                <Row label="Status">No membership yet</Row>
+              ) : (
+                <>
+                  <Row label="Type">{m.current.type_name_en}</Row>
+                  <Row label="Membership number">{m.current.membership_number || (m.current.old_membership_number ? 'None yet' : 'Given on approval')}</Row>
+                  {m.current.old_membership_number && <Row label="Old membership number">{m.current.old_membership_number}</Row>}
+                  <Row label="Member since">{since ? formatDate(since) : ''}</Row>
+                  <Row label="Valid till">{m.current.expires_at ? formatDate(m.current.expires_at) : ''}</Row>
+                  <Row label="Receipts">{d.receipts.total ? `${d.receipts.total} · last ${formatDate(d.receipts.latest[0]?.receipt_date)}` : 'None yet'}</Row>
+                  <div className="py-1 text-xs col-span-full">
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="text-[#7D7068] font-medium">Credit</span>
+                      <span className="font-semibold font-mono text-[#180200]">
+                        {inr(credit?.credit_total || 0)}
+                        {target && <span className="font-normal text-[#863221]"> / {inr(target.price)}</span>}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
+                      <div className="bg-[#510601] h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="block mt-1 text-[11px] text-[#863221]">{target ? `${pct}% to ${target.name_en}` : 'Highest tier reached'}</span>
+                  </div>
+                </>
+              )}
+            </Panel>
+
+            <Panel icon={User} title="Personal" tag="Core data" cols={4}>
+              {personal.map(([label, value]) => <Row key={label} label={label}>{value}</Row>)}
+            </Panel>
+
+            <Panel icon={Phone} title="Contact" tag="Reach" cols={4}>
+              {contact.filter(([label]) => label !== 'Address').map(([label, value]) => <Row key={label} label={label}>{value}</Row>)}
+            </Panel>
+
+            <Panel icon={MapPin} title="Address" tag="Location" cols={4}>
+              <Row label="Address" stack>{c.address}</Row>
+            </Panel>
+
+            <Panel icon={Users} title="Family" tag="Relations" cols={4}>
+              {relatives.length === 0 && f.children_count === 0 ? (
+                <Row label="Family">Not provided yet</Row>
+              ) : (
+                <>
+                  {relatives.map(([relation, name, number]) => (
+                    <Row key={relation} label={relation}>{[name, number].filter(Boolean).join(' · ')}</Row>
+                  ))}
+                  {f.children_count > 0 && <Row label="Children">{`${f.children_count} ${f.children_count === 1 ? 'child' : 'children'}`}</Row>}
+                </>
+              )}
+            </Panel>
+
+            {hasMagazine && (
+              <Panel icon={BookOpen} title="Magazine & services" tag="Subscriptions">
+                {d.magazine.subscriptions.map((st, i) => (
+                  <Row key={`s${i}`} label="Magazine">
+                    <span className={`chip ${String(st).toUpperCase() === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>{st}</span>
+                  </Row>
+                ))}
+                {d.magazine.services.map((sv, i) => <Row key={`v${i}`} label="Service">{sv}</Row>)}
+              </Panel>
+            )}
+
+            <Panel icon={History} title="Recent activity" tag="Latest">
+              {d.activity.length === 0 ? (
+                <Row label="Activity">No activity recorded yet</Row>
+              ) : (
+                d.activity.map((e) => (
+                  <div key={e.id} className="py-2.5 flex items-start justify-between gap-4 text-xs">
+                    <span className="font-semibold text-[#180200] min-w-0 break-words">{e.description}</span>
+                    <span className="text-[#7D7068] font-mono shrink-0 text-right">
+                      {e.acted_by_name || 'System'} · {e.created_at ? formatDateTime(e.created_at) : ''}
+                    </span>
+                  </div>
+                ))
+              )}
+            </Panel>
+          </div>
+        );
+      }}
+    </Loading>
+  );
+}
+
+
 // ── Overview: one neat card per section ──
 const initialOf = (name) => String(name || '?').trim().charAt(0).toUpperCase();
 
@@ -435,6 +565,19 @@ function AuditStrip({ core }) {
         {p.created_at && <>Processed on <span className="font-semibold">{formatDateTime(p.created_at)}</span></>}
         {p.remarks && <span className="ml-3">Remarks: {p.remarks}</span>}
       </div>
+    </div>
+  );
+}
+
+// Personal Details: the full record (read when this tab is opened)
+function PersonalTab({ id, memberCode }) {
+  const core = { personal: useSection(id, 'personal'), contact: useSection(id, 'contact'), family: useSection(id, 'family'), memberCode };
+  return (
+    <div className="space-y-4">
+      <IdentitySection core={core} />
+      <ContactFamilySection core={core} />
+      <AddressSection core={core} />
+      <AuditStrip core={core} />
     </div>
   );
 }
@@ -1213,15 +1356,14 @@ function ActivityTab({ id }) {
 }
 
 const TABS = [
-  { key: 'identity', label: 'Identity & Bio', icon: User, Component: IdentitySection, core: true },
-  { key: 'contact', label: 'Contact & Family', icon: Users, Component: ContactFamilySection, core: true },
-  { key: 'address', label: 'Address Details', icon: MapPin, Component: AddressSection, core: true },
-  { key: 'membership', label: 'Membership Info', icon: Award, Component: MembershipTab, count: 'membership' },
+  { key: 'overview', label: 'Overview', icon: User, Component: OverviewTab },
+  { key: 'personal', label: 'Personal Details', icon: Users, Component: PersonalTab },
+  { key: 'membership', label: 'Membership', icon: Award, Component: MembershipTab, count: 'membership' },
   { key: 'receipts', label: 'Receipts', icon: FileText, Component: ReceiptsTab, count: 'receipts' },
   { key: 'magazine', label: 'Magazine', icon: BookOpen, Component: MagazineTab, count: 'magazine' },
   { key: 'services', label: 'Services', icon: Briefcase, Component: ServicesTab, count: 'services' },
   { key: 'events', label: 'Events', icon: CalendarDays, Component: EventsTab, count: 'events' },
-  { key: 'activity', label: 'Audit & System Log', icon: History, Component: ActivityTab }
+  { key: 'activity', label: 'Activity & History', icon: History, Component: ActivityTab }
 ];
 
 // An application that is not approved yet opens as a read-only popup with the basic details entered.
@@ -1295,56 +1437,24 @@ export function UnapprovedPopup({ id, s, name, onClose }) {
   );
 }
 
-// One section of the profile: its tab component is mounted when the block comes near the screen (so the page does not
-// ask for every section at once) and stays mounted after.
-function LazySection({ tab, id, onOpen, core }) {
-  const ref = useRef(null);
-  const [seen, setSeen] = useState(Boolean(tab.core));
-  useEffect(() => {
-    if (seen || !ref.current || typeof IntersectionObserver === 'undefined') {
-      if (!seen) setSeen(true);
-      return undefined;
-    }
-    const io = new IntersectionObserver(([e]) => e.isIntersecting && setSeen(true), { rootMargin: '600px 0px' });
-    io.observe(ref.current);
-    return () => io.disconnect();
-  }, [seen]);
-  const Component = tab.Component;
-  return (
-    <section id={`sec-${tab.key}`} ref={ref} className="scroll-mt-4 space-y-3">
-      {!tab.core && (
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-4 bg-[#510601] rounded-full" />
-          <h2 className="text-sm font-bold uppercase tracking-wide text-[#241B16]">{tab.label}</h2>
-        </div>
-      )}
-      {seen ? <Component id={id} onOpen={onOpen} core={core} /> : <div className="min-h-[160px]"><Empty>Loading…</Empty></div>}
-    </section>
-  );
-}
-
 export default function MemberProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-  const [searchParams] = useSearchParams();
-  const [summaryCode, setSummaryCode] = useState('');
-  const core = { personal: useSection(id, 'personal'), contact: useSection(id, 'contact'), family: useSection(id, 'family'), memberCode: summaryCode };
+  const [searchParams, setSearchParams] = useSearchParams();
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState('');
 
-  const OLD_LINKS = { overview: 'identity', personal: 'identity', family: 'contact' }; // old links
+  const OLD_LINKS = { contact: 'personal', family: 'personal', identity: 'personal', address: 'personal' }; // old links
   const asked = searchParams.get('tab');
   const requestedTab = OLD_LINKS[asked] || asked;
-  const [tabKey, setTabKey] = useState(TABS.some((t) => t.key === requestedTab) ? requestedTab : 'identity');
-  const jumping = useRef(false);
-  const openTab = useCallback((key) => {
-    setTabKey(key);
-    jumping.current = true;
-    document.getElementById(`sec-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setTimeout(() => { jumping.current = false; }, 900);
-  }, []);
+  const tabKey = TABS.some((t) => t.key === requestedTab) ? requestedTab : 'overview';
+  const ActiveTab = TABS.find((t) => t.key === tabKey).Component;
+  const openTab = useCallback(
+    (key) => setSearchParams({ tab: key }, { replace: true }),
+    [setSearchParams]
+  );
 
   // the header: name, photo, status, credit and a count for each tab (one small call)
   useEffect(() => {
@@ -1353,7 +1463,7 @@ export default function MemberProfile() {
     setSummary(null);
     api
       .get(`/members/${id}/profile/summary`)
-      .then(({ data }) => { if (alive) { setSummary(data); setSummaryCode(data.member_code || ''); } })
+      .then(({ data }) => alive && setSummary(data))
       .catch((error) => notify(apiErrorMessage(error, 'Could not load this member.'), 'error'))
       .finally(() => alive && setLoading(false));
     return () => {
@@ -1378,20 +1488,6 @@ export default function MemberProfile() {
 
   const s = summary;
   const fullName = s ? memberName(s, true) : '';
-
-  // the menu highlights the section on screen; a link with ?tab= scrolls to it once the page is drawn
-  useEffect(() => {
-    if (!s || String(s.approval_status).toUpperCase() !== 'APPROVED') return undefined;
-    if (requestedTab && requestedTab !== 'identity') setTimeout(() => openTab(tabKey), 300);
-    const io = new IntersectionObserver((entries) => {
-      if (jumping.current) return;
-      const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-      if (top) setTabKey(top.target.id.replace('sec-', ''));
-    }, { rootMargin: '-10% 0px -70% 0px' });
-    TABS.forEach((t) => { const el = document.getElementById(`sec-${t.key}`); if (el) io.observe(el); });
-    return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s]);
 
   return (
     <PermissionGate required="members.list.read">
@@ -1491,9 +1587,8 @@ export default function MemberProfile() {
                 })}
               </nav>
 
-              <div className="md:col-span-9 min-w-0 space-y-4">
-                {TABS.map((t) => <LazySection key={`${id}-${t.key}`} tab={t} id={id} onOpen={openTab} core={core} />)}
-                <AuditStrip core={core} />
+              <div className="md:col-span-9 min-w-0">
+                <ActiveTab key={`${id}-${tabKey}`} id={id} onOpen={openTab} memberCode={s.member_code} />
               </div>
             </div>
           </>
