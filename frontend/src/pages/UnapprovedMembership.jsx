@@ -3,6 +3,7 @@ import useSort from '../hooks/useSort';
 import Pager from '../components/Pager';
 import SortTh from '../components/SortTh';
 import { useNavigate } from 'react-router-dom';
+import { UnapprovedPopup } from './MemberProfile';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
@@ -55,6 +56,7 @@ import { fetchReceiptRow } from '../utils/apiAdapters';
 // assignedOnly: the final-approval queue (members whose receipt is already assigned)
 export default function UnapprovedMembership({ assignedOnly = false }) {
   const navigate = useNavigate();
+  const [viewing, setViewing] = useState(null); // the applicant open in the read-only popup, right on this list
   const { hasPermission } = useAuth();
 
   // ----------------------------------------------------
@@ -866,7 +868,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                           {/* 2. View Action */}
                           <button
                             type="button"
-                            onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
+                            onClick={() => setViewing(m)}
                             className="btn-act"
                             title="View Full Application"
                           >
@@ -1160,6 +1162,14 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
         </Modal>
       )}
 
+      {viewing && (
+        <UnapprovedPopup
+          id={viewing.id}
+          s={{ approval_status: viewing.approvalStatus || 'UNAPPROVED', member_code: viewing.membershipNumber || '' }}
+          name={viewing.fullName || viewing.name}
+          onClose={() => setViewing(null)}
+        />
+      )}
       {/* View Application is rendered on dedicated full-screen page /dashboard/membership/profile/:id */}
       {false && viewingMember && (
           <div

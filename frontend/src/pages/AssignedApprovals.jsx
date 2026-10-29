@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { UnapprovedPopup } from './MemberProfile';
 import { Search, Check, Eye, Pencil } from 'lucide-react';
 import api from '../api';
 import PermissionGate from '../components/PermissionGate';
@@ -20,6 +21,7 @@ const inr = formatMoney;
 // Approving gives the permanent membership number.
 export default function AssignedApprovals() {
   const navigate = useNavigate();
+  const [viewing, setViewing] = useState(null); // the applicant open in the read-only popup, right on this list
   const [viewingReceipt, setViewingReceipt] = useState(null); // the receipt open in the shared receipt popup
   const openReceipt = async (m) => {
     try {
@@ -203,7 +205,7 @@ export default function AssignedApprovals() {
                       <td className="py-3.5 px-4 text-right whitespace-nowrap">
                         <button
                           type="button"
-                          onClick={() => navigate(`/dashboard/membership/profile/${m.id}`)}
+                          onClick={() => setViewing(m)}
                           className="btn-act"
                           title="View"
                         >
@@ -248,6 +250,14 @@ export default function AssignedApprovals() {
           )}
         </div>
       </div>
+      {viewing && (
+        <UnapprovedPopup
+          id={viewing.id}
+          s={{ approval_status: viewing.approvalStatus || 'UNAPPROVED', member_code: viewing.membershipNumber || '' }}
+          name={viewing.fullName || viewing.name}
+          onClose={() => setViewing(null)}
+        />
+      )}
       <ReceiptViewModal receipt={viewingReceipt} onClose={() => setViewingReceipt(null)} />
       <ApproveMembersModal
         isOpen={Boolean(approvingMembers)}
