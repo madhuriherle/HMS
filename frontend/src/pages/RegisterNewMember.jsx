@@ -1072,8 +1072,9 @@ export default function RegisterNewMember() {
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   {(isViewMode || isEditMode) && targetMember?.membershipNumber && targetMember.membershipNumber !== 'Not Assigned' && targetMember.approvalStatus === 'Approved' && (
-                    <span className="font-mono text-xs sm:text-sm font-bold bg-emerald-50 text-emerald-800 px-3 py-1 rounded-xl border border-emerald-200" title="Membership Number">
-                      {targetMember.membershipNumber}
+                    <span className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-800 px-3 py-1 rounded-xl border border-emerald-200" title="Membership Number">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700/80">Membership No.</span>
+                      <span className="font-mono text-xs sm:text-sm font-bold">{targetMember.membershipNumber}</span>
                     </span>
                   )}
                 </div>
@@ -1751,11 +1752,15 @@ export default function RegisterNewMember() {
 
                       className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
-                    {(formData.taluk || formData.district) && (
-                      <p className="text-xs text-stone-600 mt-1 font-medium leading-relaxed">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5 align-middle"></span>
-                        Taluk: <span className="text-[#510601] font-semibold">{formData.taluk || '—'}</span> &bull; District: <span className="text-[#510601] font-semibold">{formData.district || '—'}</span>
-                      </p>
+                    {(formData.taluk || formData.district || formData.state) && (
+                      <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                        {[['Taluk', formData.taluk], ['District', formData.district], ['State', formData.state]].map(([label, value]) => (
+                          <div key={label} className="min-w-0 rounded-lg bg-[#FAF7F2] border border-[#E8DFD8] px-2.5 py-1.5">
+                            <dt className="text-[10px] font-semibold uppercase tracking-wider text-[#A89B92]">{label}</dt>
+                            <dd className="font-semibold text-[#510601] break-words">{value || '—'}</dd>
+                          </div>
+                        ))}
+                      </dl>
                     )}
                   </div>
 
