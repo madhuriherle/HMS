@@ -297,15 +297,15 @@ function OverviewTab({ id }) {
               )}
             </Panel>
 
-            <Panel icon={User} title="Personal" tag="Core data">
+            <Panel icon={User} title="Personal" tag="Core data" cols={4} className="lg:col-span-2">
               {personal.map(([label, value]) => <Row key={label} label={label}>{value}</Row>)}
             </Panel>
 
-            <Panel icon={Phone} title="Contact" tag="Reach">
+            <Panel icon={Phone} title="Contact" tag="Reach" cols={2}>
               {contact.filter(([label]) => label !== 'Address').map(([label, value]) => <Row key={label} label={label}>{value}</Row>)}
             </Panel>
 
-            <Panel icon={MapPin} title="Address" tag="Location">
+            <Panel icon={MapPin} title="Address" tag="Location" cols={2}>
               <Row label="Address" stack>{c.address}</Row>
             </Panel>
 
@@ -354,25 +354,34 @@ function OverviewTab({ id }) {
   );
 }
 
-// a label / value row for the key-value panels; an empty value is not drawn
-const Row = ({ label, children, stack = false }) =>
-  children ? (
-    stack ? (
-      <div className="py-2.5 text-xs">
-        <dt className="text-[#7D7068] font-medium">{label}</dt>
-        <dd className="mt-1 font-semibold text-[#180200] break-words leading-snug">{children}</dd>
-      </div>
-    ) : (
-      <div className="py-2.5 flex items-start justify-between gap-4 text-xs">
-        <dt className="text-[#7D7068] font-medium shrink-0">{label}</dt>
-        <dd className="font-semibold text-[#180200] text-right min-w-0 break-words">{children}</dd>
-      </div>
-    )
-  ) : null;
+// a Panel with `cols` lays its rows out in a compact grid (label above the value); without it the rows are a list
+const GridContext = React.createContext(false);
 
-const Panel = ({ icon: Icon, title, tag, children, className = '' }) => (
+// a label / value row for the key-value panels; an empty value is not drawn
+const Row = ({ label, children, stack = false }) => {
+  const compact = React.useContext(GridContext);
+  if (!children) return null;
+  if (compact || stack) {
+    return (
+      <div className={`${compact ? 'py-1' : 'py-2.5'} text-xs min-w-0`}>
+        <dt className="text-[11px] font-semibold text-[#7D7068] uppercase tracking-wider mb-0.5">{label}</dt>
+        <dd className="font-semibold text-[#180200] break-words leading-snug">{children}</dd>
+      </div>
+    );
+  }
+  return (
+    <div className="py-2.5 flex items-start justify-between gap-4 text-xs">
+      <dt className="text-[#7D7068] font-medium shrink-0">{label}</dt>
+      <dd className="font-semibold text-[#180200] text-right min-w-0 break-words">{children}</dd>
+    </div>
+  );
+};
+
+const GRID_COLS = { 2: 'grid-cols-2', 3: 'grid-cols-2 sm:grid-cols-3', 4: 'grid-cols-2 sm:grid-cols-4' };
+
+const Panel = ({ icon: Icon, title, tag, children, className = '', cols = 0 }) => (
   <section className={`bg-white rounded-2xl border border-[#EFE6DE] shadow-xs p-5 ${className}`}>
-    <div className="flex items-center justify-between border-b border-[#EFE6DE]/70 pb-3 mb-1">
+    <div className={`flex items-center justify-between border-b border-[#EFE6DE]/70 pb-3 ${cols ? 'mb-3' : 'mb-1'}`}>
       <div className="flex items-center gap-2">
         <div className="w-7 h-7 rounded-lg bg-[#F7EDE6] text-[#8D4C32] flex items-center justify-center">
           <Icon className="w-3.5 h-3.5" />
@@ -381,7 +390,9 @@ const Panel = ({ icon: Icon, title, tag, children, className = '' }) => (
       </div>
       {tag && <span className="text-[10px] text-[#A89B92] font-medium">{tag}</span>}
     </div>
-    <dl className="divide-y divide-[#EFE6DE]/50">{children}</dl>
+    <GridContext.Provider value={cols > 0}>
+      <dl className={cols ? `grid ${GRID_COLS[cols]} gap-x-4 gap-y-3` : 'divide-y divide-[#EFE6DE]/50'}>{children}</dl>
+    </GridContext.Provider>
   </section>
 );
 
@@ -473,7 +484,7 @@ function PersonalTab({ id }) {
           )}
         </Panel>
 
-        <Panel icon={Phone} title="Contact" tag="Reach">
+        <Panel icon={Phone} title="Contact" tag="Reach" cols={2}>
           {contact.loading ? <Empty>Loading…</Empty> : !c ? <Empty>This section could not be loaded.</Empty> : (
             <>
               <Row label="Mobile">{phone(c.mobile_country_code, c.mobile)}</Row>
@@ -486,7 +497,7 @@ function PersonalTab({ id }) {
           )}
         </Panel>
 
-        <Panel icon={MapPin} title="Address" tag="Location">
+        <Panel icon={MapPin} title="Address" tag="Location" cols={2}>
           {contact.loading ? <Empty>Loading…</Empty> : !c ? null : (
             <>
               <Row label="Address" stack>{[c.address_line1, c.address_line2].filter(Boolean).join(', ')}</Row>
