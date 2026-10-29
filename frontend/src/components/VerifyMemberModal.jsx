@@ -7,6 +7,7 @@ import { confirmAction } from '../utils/actionConfirm';
 import { formatDateTime } from '../utils/dateUtils';
 import { lookupPin, loadLocations, searchPostalCodes } from '../utils/serverData';
 import { notify } from '../utils/notify';
+import useRules from '../hooks/useRules';
 
 // Helpers to extract and reconstruct full name
 const nameOf = (m) => m?.full_name_en || [m?.first_name_en, m?.middle_name_en, m?.last_name_en].filter(Boolean).join(' ') || '';
@@ -30,19 +31,26 @@ const OUTCOMES = [
 
 const inputClass = 'w-full px-3 py-1.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] font-normal normal-case';
 const headingClass = 'text-[11px] font-bold uppercase tracking-wider text-[#7D7068]';
+const cardClass = 'bg-white border border-[#E8DFD8] rounded-xl p-3.5 space-y-2.5';
+const cardTitle = 'text-xs font-bold text-[#510601] uppercase tracking-wider pb-1.5 border-b border-[#EFE6DE]';
 
 // `focus`: the box to start at (the problem the list found): name, mobile, alternate_mobile, email, date_of_birth, address or place
 export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = null }) {
+  const rules = useRules();
   const boxes = useRef({});
   const mark = (key) => (focus === key || (key === 'place' && ['state', 'district', 'taluk', 'pin'].includes(focus)) ? 'ring-2 ring-[#510601]/30 border-[#510601]' : '');
   const [member, setMember] = useState(null);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [] });
   const [form, setForm] = useState({
     name: '',
+    gender: '',
     mobile: '',
+    whatsapp_number: '',
     alternate_mobile: '',
     email: '',
     address_line1: '',
+    address_line2: '',
+    magazine: 'NONE',          // NONE | EMAIL (read online) | PHYSICAL (posted)
     date_of_birth: '',
     father_husband_name: '',
     guardian_name: '',
@@ -74,10 +82,14 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = 
 
         setForm({
           name: nameOf(d),
+          gender: (d.gender || '').toUpperCase(),
           mobile: d.mobile || '',
+          whatsapp_number: d.whatsapp_number || '',
           alternate_mobile: d.alternate_mobile || '',
           email: d.email || '',
           address_line1: d.address_line1 || '',
+          address_line2: d.address_line2 || '',
+          magazine: !d.magazine_needed ? 'NONE' : d.magazine_kind === 'EMAIL' ? 'EMAIL' : 'PHYSICAL',
           date_of_birth: d.date_of_birth ? d.date_of_birth.slice(0, 10) : '',
           father_husband_name: d.father_husband_name || d.father_name || '',
           guardian_name: d.guardian_name || '',
@@ -208,6 +220,21 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = 
     if (form.address_line1.trim() !== (member.address_line1 || '').trim()) {
       changed.address_line1 = form.address_line1.trim() || null;
     }
+    if (form.address_line2.trim() !== (member.address_line2 || '').trim()) {
+      changed.address_line2 = form.address_line2.trim() || null;
+    }
+    if (form.whatsapp_number.trim() !== (member.whatsapp_number || '').trim()) {
+      changed.whatsapp_number = form.whatsapp_number.trim() || null;
+    }
+    if (form.gender !== (member.gender || '').toUpperCase()) {
+      changed.gender = form.gender || null;
+    }
+    // how the magazine reaches them: the server tidies the rest (an e-copy keeps no postal address, a printed one needs it)
+    const wasMagazine = !member.magazine_needed ? 'NONE' : member.magazine_kind === 'EMAIL' ? 'EMAIL' : 'PHYSICAL';
+    if (form.magazine !== wasMagazine) {
+      changed.magazine_needed = form.magazine !== 'NONE';
+      if (form.magazine !== 'NONE') changed.magazine_kind = form.magazine;
+    }
 
     // 3. Date of birth
     const origDob = member.date_of_birth ? member.date_of_birth.slice(0, 10) : '';
@@ -280,7 +307,7 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = 
     <Modal
       title={`KYC call${member?.membership_number || member?.member_code ? ` · ${member.membership_number || member.member_code}` : ''}${member?.full_name_en ? ` (${member.full_name_en})` : ''}`}
       onClose={onClose}
-      maxWidthClass="max-w-3xl"
+      maxWidthClass="max-w-5xl"
       footer={
         <ModalFooter
           kind="add"
@@ -296,10 +323,10 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = 
         <div className="p-8 text-sm text-center text-[#7D7068]">Loading…</div>
       ) : (
         <div className="p-4 space-y-3.5">
-          {/* Top section: Call Result & Remark */}
-          <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-3 space-y-2.5">
+          {/* The call: its outcome and a remark, on one band */}
+          <div className="bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl p-3 grid grid-cols-1 lg:grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 items-end">
             <div>
-              <span className={headingClass}>Call Outcome *</span>
+              <span className={headingClass}>Call outcome *</span>
               <div className="flex flex-wrap gap-2 mt-1.5">
                 {OUTCOMES.map((o) => {
                   const isActive = status === o.id;
@@ -308,9 +335,7 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = 
                       key={o.id}
                       type="button"
                       onClick={() => setStatus(o.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                        isActive ? o.activeClass : o.inactiveClass
-                      }`}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${isActive ? o.activeClass : o.inactiveClass}`}
                     >
                       {isActive ? '✓ ' : ''}{o.label}
                     </button>
@@ -318,50 +343,100 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = 
                 })}
               </div>
             </div>
-
-            <label className="block">
-              <span className={headingClass}>Remark (Optional)</span>
+            <label className="block min-w-0">
+              <span className={headingClass}>Remark (optional)</span>
               <input
                 type="text"
                 value={remark}
                 maxLength={1000}
-                placeholder="e.g., Confirmed phone & address with member"
+                placeholder="e.g., Confirmed phone and address with the member"
                 onChange={(e) => setRemark(e.target.value)}
                 className={`${inputClass} mt-1`}
               />
             </label>
           </div>
 
-          {/* 2-Column Balanced Layout: Personal Details & Normal Place Flow */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Left Column: Personal Details */}
-            <div className="space-y-2.5">
-              <div className="text-xs font-bold text-[#510601] border-b border-[#E8DFD8] pb-1">
-                Personal Details
-              </div>
-
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 items-start">
+            {/* 1. Who they are */}
+            <section className={cardClass}>
+              <h3 className={cardTitle}>Identity</h3>
               <label className="block">
                 <span className={headingClass}>Name *</span>
                 <input
+                  ref={(el) => { boxes.current.name = el; }}
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className={`${inputClass} mt-1 font-semibold`}
+                  className={`${inputClass} mt-1 font-semibold ${mark('name')}`}
                 />
               </label>
-
+              <div className="grid grid-cols-2 gap-2.5">
+                <label className="block">
+                  <span className={headingClass}>Gender</span>
+                  <select value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} className={`${inputClass} mt-1`}>
+                    <option value="">Select</option>
+                    {(rules?.genders || ['MALE', 'FEMALE', 'OTHER']).map((g) => (
+                      <option key={g} value={g}>{g.charAt(0) + g.slice(1).toLowerCase()}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className={headingClass}>Date of birth</span>
+                  <input
+                    ref={(el) => { boxes.current.date_of_birth = el; }}
+                    type="date"
+                    value={form.date_of_birth}
+                    onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
+                    className={`${inputClass} mt-1 ${mark('date_of_birth')}`}
+                  />
+                </label>
+              </div>
               <label className="block">
-                <span className={headingClass}>Mobile *</span>
+                <span className={headingClass}>Father / Husband</span>
                 <input
-                  ref={(el) => { boxes.current.mobile = el; }}
-                  type="tel"
-                  maxLength={10}
-                  value={form.mobile}
-                  onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                  className={`${inputClass} mt-1 font-mono ${mark('mobile')}`}
+                  type="text"
+                  value={form.father_husband_name}
+                  onChange={(e) => setForm({ ...form, father_husband_name: e.target.value })}
+                  className={`${inputClass} mt-1`}
                 />
               </label>
+              <label className="block">
+                <span className={headingClass}>Guardian</span>
+                <input
+                  type="text"
+                  value={form.guardian_name}
+                  onChange={(e) => setForm({ ...form, guardian_name: e.target.value })}
+                  className={`${inputClass} mt-1`}
+                />
+              </label>
+            </section>
 
+            {/* 2. How to reach them, and how the magazine reaches them */}
+            <section className={cardClass}>
+              <h3 className={cardTitle}>Contact</h3>
+              <div className="grid grid-cols-2 gap-2.5">
+                <label className="block">
+                  <span className={headingClass}>Mobile *</span>
+                  <input
+                    ref={(el) => { boxes.current.mobile = el; }}
+                    type="tel"
+                    maxLength={10}
+                    value={form.mobile}
+                    onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                    className={`${inputClass} mt-1 font-mono ${mark('mobile')}`}
+                  />
+                </label>
+                <label className="block">
+                  <span className={headingClass}>WhatsApp</span>
+                  <input
+                    type="tel"
+                    maxLength={12}
+                    value={form.whatsapp_number}
+                    onChange={(e) => setForm({ ...form, whatsapp_number: e.target.value.replace(/\D/g, '').slice(0, 12) })}
+                    className={`${inputClass} mt-1 font-mono`}
+                  />
+                </label>
+              </div>
               <label className="block">
                 <span className={headingClass}>Alternate number</span>
                 <input
@@ -374,7 +449,6 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = 
                   className={`${inputClass} mt-1 font-mono ${mark('alternate_mobile')}`}
                 />
               </label>
-
               <label className="block">
                 <span className={headingClass}>Email</span>
                 <input
@@ -386,105 +460,94 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = 
                   className={`${inputClass} mt-1 ${mark('email')}`}
                 />
               </label>
-
               <label className="block">
-                <span className={headingClass}>Date of birth</span>
-                <input
-                  ref={(el) => { boxes.current.date_of_birth = el; }}
-                  type="date"
-                  value={form.date_of_birth}
-                  onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
-                  className={`${inputClass} mt-1 ${mark('date_of_birth')}`}
-                />
+                <span className={headingClass}>Magazine</span>
+                <select value={form.magazine} onChange={(e) => setForm({ ...form, magazine: e.target.value })} className={`${inputClass} mt-1`}>
+                  <option value="NONE">Not needed</option>
+                  <option value="EMAIL">Online (read on the site)</option>
+                  <option value="PHYSICAL">Printed (posted to the address)</option>
+                </select>
+                {form.magazine === 'PHYSICAL' && !form.address_line1.trim() && !member.magazine_delivery_address && (
+                  <span className="block mt-1 text-[11px] text-amber-700">A printed magazine needs an address: add it under Address.</span>
+                )}
               </label>
+            </section>
 
+            {/* 3. Where they live */}
+            <section className={`${cardClass} md:col-span-2 lg:col-span-1`}>
+              <h3 className={cardTitle}>Address</h3>
               <label className="block">
-                <span className={headingClass}>Father / Husband</span>
-                <input
-                  type="text"
-                  value={form.father_husband_name}
-                  onChange={(e) => setForm({ ...form, father_husband_name: e.target.value })}
-                  className={`${inputClass} mt-1`}
-                />
-              </label>
-
-              <label className="block">
-                <span className={headingClass}>Guardian</span>
-                <input
-                  type="text"
-                  value={form.guardian_name}
-                  onChange={(e) => setForm({ ...form, guardian_name: e.target.value })}
-                  className={`${inputClass} mt-1`}
-                />
-              </label>
-            </div>
-
-            {/* Right Column: Place (Normal Membership Flow) */}
-            <div className="space-y-2.5">
-              <div className="text-xs font-bold text-[#510601] border-b border-[#E8DFD8] pb-1">
-                Place (Normal Membership Flow)
-              </div>
-
-              <label className="block">
-                <span className={headingClass}>Address</span>
+                <span className={headingClass}>Address line 1</span>
                 <input
                   ref={(el) => { boxes.current.address = el; }}
                   type="text"
                   maxLength={255}
                   value={form.address_line1}
-                  placeholder="House / street / area"
+                  placeholder="House / street"
                   onChange={(e) => setForm({ ...form, address_line1: e.target.value })}
                   className={`${inputClass} mt-1 ${mark('address')}`}
                 />
               </label>
-
               <label className="block">
-                <span className={headingClass}>State</span>
-                <select
-                  ref={(el) => { boxes.current.state = el; }}
-                  value={form.state_id}
-                  onChange={(e) => onStateChange(e.target.value)}
+                <span className={headingClass}>Address line 2</span>
+                <input
+                  type="text"
+                  maxLength={255}
+                  value={form.address_line2}
+                  placeholder="Area / village"
+                  onChange={(e) => setForm({ ...form, address_line2: e.target.value })}
                   className={`${inputClass} mt-1`}
-                >
-                  <option value="">Select State</option>
-                  {locations.states.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
+                />
               </label>
-
-              <label className="block">
-                <span className={headingClass}>District</span>
-                <select
-                  ref={(el) => { boxes.current.district = el; }}
-                  value={form.district_id}
-                  onChange={(e) => onDistrictChange(e.target.value)}
-                  disabled={!form.state_id}
-                  className={`${inputClass} mt-1 disabled:opacity-50`}
-                >
-                  <option value="">Select District</option>
-                  {filteredDistricts.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className={headingClass}>Taluk</span>
-                <select
-                  ref={(el) => { boxes.current.taluk = el; }}
-                  value={form.taluk_id}
-                  onChange={(e) => onTalukChange(e.target.value)}
-                  disabled={!form.district_id}
-                  className={`${inputClass} mt-1 disabled:opacity-50`}
-                >
-                  <option value="">Select Taluk</option>
-                  {filteredTaluks.map((t) => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-              </label>
-
+              <div className="grid grid-cols-2 gap-2.5">
+                <label className="block">
+                  <span className={headingClass}>State</span>
+                  <select
+                    ref={(el) => { boxes.current.state = el; }}
+                    value={form.state_id}
+                    onChange={(e) => onStateChange(e.target.value)}
+                    className={`${inputClass} mt-1 ${mark('place')}`}
+                  >
+                    <option value="">Select State</option>
+                    {locations.states.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className={headingClass}>District</span>
+                  <select
+                    ref={(el) => { boxes.current.district = el; }}
+                    value={form.district_id}
+                    onChange={(e) => onDistrictChange(e.target.value)}
+                    disabled={!form.state_id}
+                    className={`${inputClass} mt-1 disabled:opacity-50 ${mark('place')}`}
+                  >
+                    <option value="">Select District</option>
+                    {filteredDistricts.map((d) => (<option key={d.id} value={d.id}>{d.name}</option>))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className={headingClass}>Taluk</span>
+                  <select
+                    ref={(el) => { boxes.current.taluk = el; }}
+                    value={form.taluk_id}
+                    onChange={(e) => onTalukChange(e.target.value)}
+                    disabled={!form.district_id}
+                    className={`${inputClass} mt-1 disabled:opacity-50 ${mark('place')}`}
+                  >
+                    <option value="">Select Taluk</option>
+                    {filteredTaluks.map((tk) => (<option key={tk.id} value={tk.id}>{tk.name}</option>))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className={headingClass}>Locality</span>
+                  <input
+                    type="text"
+                    value={form.locality}
+                    onChange={(e) => setForm({ ...form, locality: e.target.value })}
+                    className={`${inputClass} mt-1`}
+                  />
+                </label>
+              </div>
               <label className="block">
                 <span className={headingClass}>Pincode / Post office</span>
                 <select
@@ -492,18 +555,16 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = 
                   value={chosenPinId ? String(chosenPinId) : ''}
                   onChange={(e) => onPickPostOffice(e.target.value)}
                   disabled={!form.taluk_id}
-                  className={`${inputClass} mt-1 disabled:opacity-50`}
+                  className={`${inputClass} mt-1 disabled:opacity-50 ${mark('place')}`}
                 >
                   <option value="">{!form.taluk_id ? 'Select a taluk first' : pinOptions.length ? 'Select pincode / post office' : 'No pincodes for this taluk'}</option>
-                  {chosenPinId && form.pincode && !pinOptions.some((p) => p.id === chosenPinId) && (
+                  {chosenPinId && form.pincode && !pinOptions.some((po) => po.id === chosenPinId) && (
                     <option value={chosenPinId}>{form.pincode} — {form.locality || 'current'}</option>
                   )}
-                  {pinOptions.map((p) => (
-                    <option key={p.id} value={p.id}>{p.postalCode} — {p.area}</option>
-                  ))}
+                  {pinOptions.map((po) => (<option key={po.id} value={po.id}>{po.postalCode} — {po.area}</option>))}
                 </select>
               </label>
-            </div>
+            </section>
           </div>
 
           {/* Earlier KYC Call history (compact) */}
