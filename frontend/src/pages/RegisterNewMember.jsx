@@ -1631,6 +1631,8 @@ export default function RegisterNewMember() {
                               options={locations.states.map((x) => ({ value: String(x.id), label: x.name }))}
                               placeholder="Select State"
                               searchPlaceholder="Search state…"
+                              menuWidthClass="w-[20rem] max-w-[85vw]"
+                              maxHeightClass="max-h-80"
                             />
                           </div>
                           <div>
@@ -1642,6 +1644,8 @@ export default function RegisterNewMember() {
                               options={districts.map((x) => ({ value: String(x.id), label: x.name }))}
                               placeholder="Select District"
                               searchPlaceholder="Search district…"
+                              menuWidthClass="w-[20rem] max-w-[85vw]"
+                              maxHeightClass="max-h-80"
                             />
                           </div>
                           <div>
@@ -1653,6 +1657,8 @@ export default function RegisterNewMember() {
                               options={taluks.map((x) => ({ value: String(x.id), label: x.name }))}
                               placeholder="Select Taluk"
                               searchPlaceholder="Search taluk…"
+                              menuWidthClass="w-[20rem] max-w-[85vw]"
+                              maxHeightClass="max-h-80"
                             />
                           </div>
                           <div>
