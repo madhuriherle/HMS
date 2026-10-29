@@ -24,6 +24,7 @@ const TABS = [
   { id: 'no_place', label: 'No pincode or district', hint: 'The member has no pincode or no district, so the state, district and taluk cannot be filled.',
     extra: [{ head: 'Missing', cell: (m) => (m.missing || []).join(', ') || '—' }] },
   { id: 'print_no_address', label: 'Printed magazine, no address', hint: 'The member gets the printed magazine but has no address (and no separate magazine address) to post it to.', extra: [] },
+  { id: 'no_dob', label: 'No date of birth', hint: 'The member has no date of birth.', extra: [] },
   { id: 'no_mobile', label: 'No mobile number', hint: 'The member has no mobile number.',
     extra: [{ head: 'Alternate number', cell: (m) => m.alternate_mobile || '—', nowrap: true, mono: true }] },
   { id: 'no_address', label: 'No address', hint: 'The member has no address.',

@@ -84,6 +84,8 @@ def test_data_check_more_problems(client, admin_headers):
     assert client.get("/api/v1/data-check/members", headers=admin_headers, params={"kind": "short_name"}).status_code == 400   # a short name such as UMA is a valid name
     assert ids("print_no_address") == {post_no_addr}, "a printed magazine with an address, and an online one, are not listed"
     assert post_ok not in ids("print_no_address") and email_mag not in ids("print_no_address")
+    nodob = client.get("/api/v1/data-check/members", headers=admin_headers, params={"kind": "no_dob", "limit": 5})
+    assert nodob.status_code == 200 and all(r["dob"] is None for r in nodob.json()["rows"]) and nodob.json()["total"] >= 1
     nomob = client.get("/api/v1/data-check/members", headers=admin_headers, params={"kind": "no_mobile", "limit": 5})
     assert nomob.status_code == 200 and all(not (r["mobile"] or "").strip() for r in nomob.json()["rows"])
     noaddr = client.get("/api/v1/data-check/members", headers=admin_headers, params={"kind": "no_address", "search": tag, "limit": 50}).json()["rows"]

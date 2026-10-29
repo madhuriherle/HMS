@@ -21,6 +21,7 @@ KINDS = {
     "odd_name": "Odd characters in the name",
     "no_mobile": "No mobile number",
     "no_address": "No address",
+    "no_dob": "No date of birth",
 }
 
 
@@ -55,6 +56,8 @@ def _filter(kind: str, db: Session):
     if kind == "print_no_address":
         blank = lambda col: or_(col.is_(None), func.trim(col) == "")  # noqa: E731
         return and_(Member.magazine_needed == True, Member.magazine_kind == "PHYSICAL", blank(Member.address_line1), blank(Member.magazine_delivery_address))  # noqa: E712
+    if kind == "no_dob":
+        return Member.date_of_birth.is_(None)
     if kind == "no_mobile":
         return or_(Member.mobile.is_(None), func.trim(Member.mobile) == "")
     if kind == "no_address":
