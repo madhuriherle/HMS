@@ -19,7 +19,6 @@ KINDS = {
     "no_place": "No pincode or no district",
     "print_no_address": "Printed magazine but no address",
     "odd_name": "Odd characters in the name",
-    "short_name": "Name shorter than 4 letters",
 }
 
 
@@ -57,8 +56,6 @@ def _filter(kind: str, db: Session):
     if kind == "odd_name":
         # anything but letters, spaces, dots, apostrophes and hyphens
         return Member.full_name_en.op("~")(r"[^A-Za-z .'-]") if pg else Member.full_name_en.op("GLOB")("*[^A-Za-z .'-]*")
-    if kind == "short_name":
-        return func.length(func.trim(func.coalesce(Member.full_name_en, ""))) < 4
     raise ValueError("kind must be one of: " + ", ".join(KINDS))
 
 

@@ -69,7 +69,6 @@ def test_data_check_more_problems(client, admin_headers):
     good_mail = make(tag + "GoodMail", email="ok.person@example.com")
     odd = make(tag + "Odd9", full_name_en=tag + " Name 9/x")
     fine = make(tag + "Fine", full_name_en=tag + " Fine Name")
-    short = make("Ab", full_name_en="Ab")
     post_no_addr = make(tag + "Post", magazine_needed=True, magazine_kind="PHYSICAL", address_line1=None, magazine_delivery_address=None)
     post_ok = make(tag + "PostOk", magazine_needed=True, magazine_kind="PHYSICAL", address_line1="1 Temple Road")
     email_mag = make(tag + "Online", magazine_needed=True, magazine_kind="EMAIL", address_line1=None)
@@ -82,7 +81,7 @@ def test_data_check_more_problems(client, admin_headers):
     assert ids("bad_email") == {bad_mail}
     assert good_mail not in ids("bad_email")
     assert ids("odd_name") == {odd} and fine not in ids("odd_name")
-    assert short in ids("short_name", "Ab") and fine not in ids("short_name")
+    assert client.get("/api/v1/data-check/members", headers=admin_headers, params={"kind": "short_name"}).status_code == 400   # a short name such as UMA is a valid name
     assert ids("print_no_address") == {post_no_addr}, "a printed magazine with an address, and an online one, are not listed"
     assert post_ok not in ids("print_no_address") and email_mag not in ids("print_no_address")
     place = client.get("/api/v1/data-check/members", headers=admin_headers, params={"kind": "no_place", "search": tag, "limit": 50}).json()["rows"]

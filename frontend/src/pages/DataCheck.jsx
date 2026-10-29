@@ -24,8 +24,7 @@ const TABS = [
   { id: 'no_place', label: 'No pincode or district', hint: 'The member has no pincode or no district, so the state, district and taluk cannot be filled.',
     extra: [{ head: 'Missing', cell: (m) => (m.missing || []).join(', ') || '—' }] },
   { id: 'print_no_address', label: 'Printed magazine, no address', hint: 'The member gets the printed magazine but has no address (and no separate magazine address) to post it to.', extra: [] },
-  { id: 'odd_name', label: 'Odd characters in name', hint: 'The name has something other than letters, spaces, dots, apostrophes or hyphens (a digit, a slash, a stray symbol).', extra: [] },
-  { id: 'short_name', label: 'Name too short', hint: 'The name has fewer than 4 letters: probably only initials or a half-typed name.', extra: [] }
+  { id: 'odd_name', label: 'Odd characters in name', hint: 'The name has something other than letters, spaces, dots, apostrophes or hyphens (a digit, a slash, a stray symbol).', extra: [] }
 ];
 
 export default function DataCheck() {
