@@ -3,7 +3,7 @@ from api.deps import read_guard
 from api.v1.endpoints import (
     auth, masters, users, members, receipts,
     magazines, events, engagements, notifications,
-    system, system_admin, activity, reports, approvals, imports, dashboard, kyc, meta
+    system, system_admin, activity, reports, approvals, imports, dashboard, kyc, meta, data_check
 )
 
 api_router = APIRouter()
@@ -28,6 +28,9 @@ api_router.include_router(notifications.router, prefix="/notifications", tags=["
 api_router.include_router(approvals.router, prefix="/approvals", tags=["approvals"], dependencies=[Depends(read_guard("approvals"))])
 api_router.include_router(imports.router, prefix="/imports", tags=["imports"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+
+# Members whose stored data looks wrong (for the office to correct)
+api_router.include_router(data_check.router, prefix="/data-check", tags=["data-check"])
 
 # Data rules the screens use (formats, limits, fixed lists)
 api_router.include_router(meta.router, prefix="/meta", tags=["meta"])

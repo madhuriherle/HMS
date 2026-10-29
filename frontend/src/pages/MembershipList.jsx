@@ -398,6 +398,15 @@ export default function MembershipList() {
                 <span>Duplicates</span>
               </Link>
             )}
+            {hasPermission('members.list.read') && (
+              <Link
+                to="/dashboard/membership/data-check"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-white border border-[#510601] text-[#510601] hover:bg-[#510601]/5 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs cursor-pointer shrink-0"
+                title="Members whose stored data looks wrong: a date of birth in the future, under 18, over 110, or an odd alternate number"
+              >
+                <span>Data Check</span>
+              </Link>
+            )}
             {hasPermission('members.list.write') && (
               <button
                 type="button"

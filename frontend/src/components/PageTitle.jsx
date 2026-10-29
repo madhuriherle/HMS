@@ -48,6 +48,7 @@ export const ROUTE_TITLE_MAP = [
   { match: (p) => p.startsWith('/dashboard/membership/view/') || p.startsWith('/dashboard/membership/profile/'), title: 'Member Profile' },
   { match: (p) => p.startsWith('/dashboard/membership/import'), title: 'Bulk Member Import (Live Register)' },
   { match: (p) => p.startsWith('/dashboard/membership/duplicates'), title: 'Duplicate Members' },
+  { match: (p) => p.startsWith('/dashboard/membership/data-check'), title: 'Data Check' },
   { match: (p) => p.startsWith('/dashboard/membership/unapproved'), title: 'Unapproved Membership' },
   { match: (p) => p.startsWith('/dashboard/membership/assigned'), title: 'Assigned for Approval' },
   { match: (p) => p.startsWith('/dashboard/receipts/entry') || p.startsWith('/dashboard/receipts/add') || p === '/dashboard/receipts', title: 'Receipt Entry' },

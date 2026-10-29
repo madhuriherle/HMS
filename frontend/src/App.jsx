@@ -35,6 +35,7 @@ import BulkReceiptMapping from './pages/BulkReceiptMapping';
 import KycForm from './pages/KycForm';
 import EventsManagement from './pages/EventsManagement';
 import DuplicateMembers from './pages/DuplicateMembers';
+import DataCheck from './pages/DataCheck';
 import RepeatedReceipts from './pages/RepeatedReceipts';
 import EngagementsManagement from './pages/EngagementsManagement';
 import ReportsManagement from './pages/ReportsManagement';
@@ -80,6 +81,7 @@ function App() {
           {/* Membership Module Routes */}
           <Route path="membership/list" element={<MembershipList />} />
           <Route path="membership/import" element={<PermissionGate required={['members.import.read', 'members.import.write']} title="Access Restricted" message="You need permission to register or import members."><MemberImport /></PermissionGate>} />
+          <Route path="membership/data-check" element={<PermissionGate required="members.list.read" title="Access Restricted" message="You need permission to view the member list."><DataCheck /></PermissionGate>} />
           <Route path="membership/duplicates" element={<PermissionGate required="members.list.read" title="Access Restricted" message="You need permission to view the member list."><DuplicateMembers /></PermissionGate>} />
           <Route path="membership/unapproved" element={<UnapprovedMembership />} />
           <Route path="membership/assigned" element={<AssignedApprovals />} />
