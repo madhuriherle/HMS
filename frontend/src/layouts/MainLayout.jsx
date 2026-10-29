@@ -1,13 +1,27 @@
 import { PageTitleSlot, PageTitleProvider } from '../components/PageTitle';
 import React, { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { Menu, User, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, User, LogOut, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import Sidebar from '../components/Sidebar';
 import api from '../api';
 import Swal from 'sweetalert2';
 
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // desktop: the menu can shrink to an icon strip; the choice is a per-browser convenience
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('hms_sidebar_collapsed') === '1';
+    } catch (_) {
+      return false;
+    }
+  });
+  const setCollapsedSaved = (value) => {
+    setCollapsed(value);
+    try {
+      localStorage.setItem('hms_sidebar_collapsed', value ? '1' : '0');
+    } catch (_) {}
+  };
   const navigate = useNavigate();
 
   const [currentUser, setCurrentUser] = useState(() => {
@@ -93,7 +107,7 @@ export default function MainLayout() {
           />
         )}
         
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} collapsed={collapsed} onExpand={() => setCollapsedSaved(false)} />
 
         <div className="flex flex-col flex-1 w-full overflow-hidden relative min-w-0">
           {/* Main Application Top Header with Logged-in User Profile */}
@@ -106,6 +120,15 @@ export default function MainLayout() {
                 aria-label="Open navigation menu"
               >
                 <Menu className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setCollapsedSaved(!collapsed)}
+                className="hidden lg:inline-flex p-2 rounded-lg bg-stone-50 border border-[#E8DFD8] shadow-2xs text-[#180200] hover:text-[#510601] hover:bg-stone-100 focus:outline-none cursor-pointer"
+                aria-label={collapsed ? 'Expand the menu' : 'Collapse the menu'}
+                title={collapsed ? 'Expand the menu' : 'Collapse the menu'}
+              >
+                {collapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
               </button>
               <PageTitleSlot />
             </div>

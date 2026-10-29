@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { NavLink, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronRight, Circle, List, X } from 'lucide-react';
 import { MENU_ICONS } from '../utils/menuIcons';
@@ -53,8 +54,33 @@ const isPathActive = (pathname, path) => {
   return pathname === path || pathname.startsWith(`${path}/`);
 };
 
-export default function Sidebar({ isOpen, onClose }) {
+// The name of a menu item next to its icon while the menu is collapsed. Drawn on the page body (position: fixed) so
+// the scrolling menu cannot clip it.
+function CollapsedTip({ tip }) {
+  if (!tip) return null;
+  return createPortal(
+    <div
+      className="fixed z-50 -translate-y-1/2 whitespace-nowrap rounded-md bg-[#180200] px-2.5 py-1 text-xs font-medium text-white shadow-lg pointer-events-none"
+      style={{ top: tip.top, left: tip.left }}
+    >
+      {tip.name}
+    </div>,
+    document.body
+  );
+}
+
+export default function Sidebar({ isOpen, onClose, collapsed = false, onExpand }) {
   const location = useLocation();
+  const [tip, setTip] = useState(null);
+  const showTip = (name) => (e) => {
+    if (!collapsed) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ name, top: r.top + r.height / 2, left: r.right + 10 });
+  };
+  const hideTip = () => setTip(null);
+  // on a phone the menu is the full drawer: "collapsed" only applies from the desktop width up
+  const hideWhenCollapsed = collapsed ? 'lg:hidden' : '';
+  const centreWhenCollapsed = collapsed ? 'lg:justify-center lg:px-0' : '';
 
   const [visibleMenuItems, setVisibleMenuItems] = useState([]);
   const [menuState, setMenuState] = useState('loading'); // 'loading' | 'ready' | 'error'
@@ -101,6 +127,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
   // Accordion behavior: clicking one closes previous and opens current
   const toggleSubmenu = (menuName) => {
+    if (collapsed && onExpand) onExpand(); // a group opens its pages, so the menu opens first
     setExpandedMenus((prev) => (prev[menuName] ? {} : { [menuName]: true }));
   };
 
@@ -114,7 +141,8 @@ export default function Sidebar({ isOpen, onClose }) {
   return (
     <aside
       className={clsx(
-        'w-72 shrink-0 flex flex-col bg-[#200200] text-[#FAF7F2] select-none z-30 transition-transform duration-300 ease-in-out',
+        'w-72 shrink-0 flex flex-col bg-[#200200] text-[#FAF7F2] select-none z-30 transition-[transform,width] duration-300 ease-in-out',
+        collapsed ? 'lg:w-16' : 'lg:w-72',
         // Desktop: Fixed/static expanded sidebar
         'lg:static lg:inset-auto lg:translate-x-0 lg:h-screen lg:shadow-none',
         // Mobile: Off-canvas slide-over drawer
@@ -123,17 +151,18 @@ export default function Sidebar({ isOpen, onClose }) {
       )}
     >
       {/* Brand Header */}
-      <div className="flex h-16 shrink-0 items-center justify-between border-b border-[#8C1801] bg-[#200200] px-4 py-1.5">
+      <div className={clsx('flex h-16 shrink-0 items-center justify-between border-b border-[#8C1801] bg-[#200200] px-4 py-1.5', collapsed && 'lg:px-2')}>
         <NavLink
           to="/dashboard"
           onClick={handleNavClick}
-          className="flex items-center justify-start flex-1 h-full min-w-0"
+          className={clsx('flex items-center justify-start flex-1 h-full min-w-0', collapsed && 'lg:overflow-hidden')}
           title="Shri Akhila Havyaka Mahasabha"
         >
+          {/* collapsed: only the flame at the left of the logo shows */}
           <img
             src={fullLogo}
             alt="Shri Akhila Havyaka Mahasabha (R.)"
-            className="w-full max-h-11 object-contain filter drop-shadow-sm"
+            className={clsx('filter drop-shadow-sm', collapsed ? 'lg:h-10 lg:w-12 lg:max-w-none lg:object-cover lg:object-left' : 'w-full max-h-11 object-contain')}
           />
         </NavLink>
 
@@ -149,7 +178,7 @@ export default function Sidebar({ isOpen, onClose }) {
       </div>
 
       {/* Navigation List */}
-      <nav className="flex-1 space-y-1.5 p-3 overflow-y-auto overflow-x-hidden">
+      <nav className={clsx('flex-1 space-y-1.5 p-3 overflow-y-auto overflow-x-hidden', collapsed && 'lg:px-2')}>
         {menuState === 'loading' && (
           <p className="px-3.5 py-2 text-xs text-[#FAF7F2]/60">Loading menu…</p>
         )}
@@ -176,9 +205,12 @@ export default function Sidebar({ isOpen, onClose }) {
                   <button
                     type="button"
                     onClick={() => toggleSubmenu(item.name)}
+                    onMouseEnter={showTip(item.name)}
+                    onMouseLeave={hideTip}
                     aria-expanded={isItemExpanded}
                     className={clsx(
                       'relative w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer group',
+                      centreWhenCollapsed,
                       isParentActive
                         ? 'bg-[#8C1801] text-[#FFC107] font-semibold shadow-sm ring-1 ring-[#FFC107]/40'
                         : 'text-[#FAF7F2] hover:bg-[#8C1801]/60 hover:text-white'
@@ -188,16 +220,17 @@ export default function Sidebar({ isOpen, onClose }) {
                       <Icon
                         className={clsx(
                           'h-5 w-5 shrink-0 mr-3 transition-colors',
+                          collapsed && 'lg:mr-0',
                           isParentActive
                             ? 'text-[#FFC107]'
                             : 'text-[#FFC107]/80 group-hover:text-[#FFC107]'
                         )}
                       />
-                      <span className="truncate text-left">{item.name}</span>
+                      <span className={clsx('truncate text-left', hideWhenCollapsed)}>{item.name}</span>
                     </div>
 
                     {/* Submenu Dropdown Chevron */}
-                    <div className="shrink-0 transition-transform duration-200">
+                    <div className={clsx('shrink-0 transition-transform duration-200', hideWhenCollapsed)}>
                       {isItemExpanded ? (
                         <ChevronDown className="h-4 w-4 text-[#FFC107]/90" />
                       ) : (
@@ -208,7 +241,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
                   {/* Submenu Items List */}
                   {isItemExpanded && (
-                    <div className="space-y-1 py-1 pl-6 pr-1 animate-in fade-in-50 duration-200">
+                    <div className={clsx('space-y-1 py-1 pl-6 pr-1 animate-in fade-in-50 duration-200', hideWhenCollapsed)}>
                       {item.submenus.map((sub) => {
                         // the page itself is only "active" when none of its own pages below it is the open one
                         const childActive = (sub.children || []).some((c) => isPathActive(location.pathname, c.path));
@@ -246,8 +279,11 @@ export default function Sidebar({ isOpen, onClose }) {
                   to={item.path}
                   end={item.path === '/dashboard'}
                   onClick={handleNavClick}
+                  onMouseEnter={showTip(item.name)}
+                  onMouseLeave={hideTip}
                   className={clsx(
                     'relative w-full flex items-center px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer group',
+                    centreWhenCollapsed,
                     isSingleActive
                       ? 'bg-[#8C1801] text-[#FFC107] font-semibold shadow-sm ring-1 ring-[#FFC107]/40'
                       : 'text-[#FAF7F2] hover:bg-[#8C1801]/60 hover:text-white'
@@ -256,18 +292,20 @@ export default function Sidebar({ isOpen, onClose }) {
                   <Icon
                     className={clsx(
                       'h-5 w-5 shrink-0 mr-3 transition-colors',
+                      collapsed && 'lg:mr-0',
                       isSingleActive
                         ? 'text-[#FFC107]'
                         : 'text-[#FFC107]/80 group-hover:text-[#FFC107]'
                     )}
                   />
-                  <span className="truncate text-left">{item.name}</span>
+                  <span className={clsx('truncate text-left', hideWhenCollapsed)}>{item.name}</span>
                 </NavLink>
               )}
             </div>
           );
         })}
       </nav>
+      <CollapsedTip tip={tip} />
     </aside>
   );
 }
