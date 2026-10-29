@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Upload, Download, Loader2, FileSpreadsheet } from 'lucide-react';
 import api from '../api';
 import { notify } from '../utils/notify';
+import ImportFormat from './ImportFormat';
 
 // What each count means, in the order the office reads them.
 const LABELS = [
@@ -97,6 +98,11 @@ export default function LegacyDryRun() {
           </button>
         </div>
       </div>
+
+      <ImportFormat formatUrl="/members/legacy-import/format" templateUrl="/members/legacy-import/template" templateFile="MstMember_format.xlsx">
+        An Excel file (.xlsx), first sheet, headings in row 1, one member per row. <b>CusNo</b> and <b>CusName</b> are required; any other column in the
+        register is ignored. If the register says the magazine is <b>No</b>, the member has no magazine, whatever else is in the row.
+      </ImportFormat>
 
       {state?.status === 'FAILED' && <p className="text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{state.error}</p>}
 

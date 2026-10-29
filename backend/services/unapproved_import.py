@@ -139,19 +139,20 @@ FORMAT_GROUPS = [
 ]
 
 
-def template_xlsx() -> bytes:
+def template_xlsx(groups=None, example=None, sheet: str = "MstApplication") -> bytes:
     """A blank file with the headings the import reads (nothing in it would be imported), and a second sheet that explains each
-    column with one example applicant."""
+    column with one example row. The member register uses the same builder with its own columns."""
     from openpyxl import Workbook
 
+    groups = groups or FORMAT_GROUPS
     heads = []
-    for _, cols in FORMAT_GROUPS:
+    for _, cols in groups:
         for name, _m, _r in cols:
             if name.endswith("1"):
                 heads.extend(name[:-1] + str(n) for n in range(1, 7))
             else:
                 heads.append(name)
-    example = {
+    example = example or {
         "CusNo": 16892, "CusTitle": "SRI.", "CusName": "SUDHINDRA NADIGAR .R", "CusDoB": "1983-08-29", "CusBloodGroup": "O+VE", "CusGotra": "VASHISHTA",
         "CusRelation": "G", "CusNameFather": "Ramakrishna Nadigar", "CusMobile": "9980899909", "CusAddress": "534, 9TH CROSS, NAGASANDRA", "CusPinCode": "560073",
         "CusPost": "NAGASANDRA", "CusCity": "BANGALORE", "CusMemberType": "POSHAKA", "CusMagazine": "No", "CusOnline": "Online",
@@ -159,16 +160,16 @@ def template_xlsx() -> bytes:
     }
     wb = Workbook()
     ws = wb.active
-    ws.title = "MstApplication"
+    ws.title = sheet
     ws.append(heads)                    # the sheet the import reads: headings only
     notes = wb.create_sheet("Format")
     notes.append(["Heading", "Required", "What it holds", "Example"])
-    for group, cols in FORMAT_GROUPS:
+    for group, cols in groups:
         notes.append([group])
         for name, meaning, required in cols:
             notes.append([name, "Yes" if required else "", meaning, example.get(name, "")])
     notes.append([])
-    notes.append(["Fill the first sheet (MstApplication) from row 2, one applicant per row. This sheet is only an explanation."])
+    notes.append([f"Fill the first sheet ({sheet}) from row 2, one row per person. This sheet is only an explanation."])
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()

@@ -21,6 +21,7 @@ import { formatDateTime } from '../utils/dateUtils';
 import { confirmAction } from '../utils/actionConfirm';
 import { memberName } from '../utils/memberName';
 import LegacyDryRun from '../components/LegacyDryRun';
+import ImportFormat from '../components/ImportFormat';
 
 export default function MemberImport() {
   const navigate = useNavigate();
@@ -347,6 +348,9 @@ export default function MemberImport() {
         <div className="bg-white border border-[#E8DFD8] rounded-2xl shadow-sm p-6 space-y-6">
           {!importCompleted && (
             <div className="space-y-4">
+              <ImportFormat formatUrl="/meta/import-format/members">
+                A CSV or Excel file, headings in row 1, one member per row. The Download Template CSV button above gives a blank file with these headings.
+              </ImportFormat>
               <label className="block text-xs font-bold text-[#180200] uppercase tracking-wider">
                 Select Member Data File (.CSV or .XLSX)
               </label>

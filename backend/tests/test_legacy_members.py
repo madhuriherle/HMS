@@ -363,3 +363,32 @@ def test_patrika_nidhi_receipts(client, admin_headers):
         assert legacy_import.retag_patrika_receipts(db, rows, 1)["receipts_changed"] == 0     # a second run changes nothing
     finally:
         db.close()
+
+
+def test_magazine_no_stays_no_whatever_else_the_row_says(client, admin_headers):
+    """CusMagazine = No means no magazine, even when the row is marked Online, has an email, is a Poshaka, or has receipts."""
+    from db.session import SessionLocal
+    from models.magazines import MagazineSubscription
+    from models.members import Member
+    from services import legacy_import
+
+    s = _sfx()
+    _create_membership_type(client, admin_headers, "MN" + s[-5:], "Ajeeva")
+    rows = legacy_import.read_register(_register([
+        _row(990001, "MAG NO ONLINE", CusMagazine="No", CusOnline="Online", CusEmail="no@example.com", CusReceiptNo1=77001, CusReceiptDate1=datetime(2025, 5, 1), CusMemAmt1=1000),
+        _row(990002, "MAG NO PRINT", CusMagazine="No", CusOnline="Print"),
+        _row(990003, "MAG YES ONLINE", CusMagazine="Yes", CusOnline="Online", CusEmail="yes@example.com"),
+        _row(990004, "MAG YES PRINT", CusMagazine="Yes", CusOnline="Print"),
+    ]))
+    db = SessionLocal()
+    try:
+        assert legacy_import.import_members(db, rows, 1, run_id="m" + s[-8:], file_name="MstMember.xlsx")["created"] == 4
+        got = {m.membership_number: m for m in db.query(Member).filter(Member.membership_number.in_(["990001", "990002", "990003", "990004"]))}
+        for no in ("990001", "990002"):
+            m = got[no]
+            assert (m.magazine_needed, m.magazine_kind, m.magazine_email) == (False, None, None), no
+            assert db.query(MagazineSubscription).filter(MagazineSubscription.member_id == m.id).count() == 0, no
+        assert (got["990003"].magazine_needed, got["990003"].magazine_kind) == (True, "EMAIL")
+        assert (got["990004"].magazine_needed, got["990004"].magazine_kind) == (True, "PHYSICAL")
+    finally:
+        db.close()

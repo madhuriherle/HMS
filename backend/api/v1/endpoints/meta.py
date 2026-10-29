@@ -107,6 +107,35 @@ IMPORT_TEMPLATES = {
 }
 
 
+# What each column of the members CSV holds (shown on the import screen). (heading, meaning, required)
+IMPORT_FORMATS = {
+    "members": [
+        ("membership_number", "The member's membership number. A number already in the system is skipped (or stops the import, as chosen)", True),
+        ("member_name", "Full name, kept whole", True),
+        ("gotra", "Gotra", False),
+        ("mobile", "10-digit mobile. +91 and spaces are dropped; a landline or any other length is left blank with a warning", False),
+        ("gender", "MALE, FEMALE or OTHER", False),
+        ("date_of_birth", "Date of birth (YYYY-MM-DD or DD-MM-YYYY)", False),
+        ("email", "Email address", False),
+        ("address_line1", "First address line", False),
+        ("address_line2", "Second address line", False),
+        ("locality", "Locality / area", False),
+        ("city", "City or town", False),
+        ("pincode", "6-digit pincode; the state, district and taluk come from our pincode data", False),
+        ("membership_type", "The membership type, as named in Membership Types", False),
+        ("remarks", "Any note", False),
+    ],
+}
+
+
+@router.get("/import-format/{kind}")
+def import_format(kind: str, current_user: User = Depends(deps.get_current_user)) -> Any:
+    """The columns an upload screen reads and what each holds (the screen shows them beside its template)."""
+    if kind not in IMPORT_FORMATS:
+        raise HTTPException(status_code=404, detail="Unknown format")
+    return {"groups": [{"group": "Columns", "columns": [{"name": n, "meaning": m, "required": r} for n, m, r in IMPORT_FORMATS[kind]]}]}
+
+
 @router.get("/import-template/{kind}")
 def import_template(kind: str, current_user: User = Depends(deps.get_current_user)) -> Any:
     """Header-only CSV template for an upload screen (members, postal-codes)."""

@@ -1266,3 +1266,47 @@ def backfill_applicant_kannada(db, app_rows: list, words: dict) -> dict:
             left.append({"application_no": ref, "name": _s(r.get("CusName")), "unknown_words": [w for w in ws if w not in words]})
     db.commit()
     return {"converted": done, "left_blank": len(left), "left": left}
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# The file format, for the import screen: the member register (MstMember) has the columns of the applications register,
+# with the membership number in CusNo, and a few more for the status, the expiry and the magazine.
+# ---------------------------------------------------------------------------------------------------------------------
+def member_format_groups() -> list:
+    from services.unapproved_import import FORMAT_GROUPS
+
+    groups = []
+    for name, cols in FORMAT_GROUPS:
+        out = []
+        for col, meaning, required in cols:
+            if col == "CusNo":
+                meaning = "Membership number (the number the member is known by). 0 means it has no number: CusNoOld is used"
+            elif col == "CusNoOld":
+                meaning = "The old membership number, kept as the old number; used as the number when CusNo is 0"
+            elif col == "CusMagazine":
+                meaning = "Yes / No. No means no magazine, whatever else the row says (Online / Print, the type and the receipts are ignored for it)"
+            out.append((col, meaning, required))
+        if name == "Membership":
+            out += [
+                ("CusStatus", "Normal or Expired. Expired members are imported inactive", False),
+                ("CusExpDt", "Expiry date of the membership", False),
+                ("CusEnrolled", "Date the member enrolled", False),
+                ("DeleteMark", "* marks a member deleted in the old register (imported inactive, not dropped)", False),
+                ("CusNoteMagazine", "A note about the magazine, kept on the subscription", False),
+                ("CusNoRef", "Number of the member who referred this one", False),
+                ("CusNameRef", "Name of the member who referred this one", False),
+            ]
+        groups.append((name, out))
+    return groups
+
+
+def template_xlsx() -> bytes:
+    from services import unapproved_import
+
+    example = {
+        "CusNo": 20692, "CusTitle": "SRI.", "CusName": "SHRIDHARA S.GAONKAR", "CusDoB": "1975-05-12", "CusRelation": "G", "CusNameFather": "Shivaram Gaonkar",
+        "CusMobile": "9980899909", "CusAddress": "12, TEMPLE ROAD, ANKOLA", "CusPinCode": "581314", "CusPost": "ANKOLA", "CusMemberType": "POSHAKA",
+        "CusMagazine": "Yes", "CusOnline": "Print", "CusStatus": "Normal", "CusExpDt": "2030-03-31", "CusEnrolled": "2005-04-10",
+        "CusReceiptNo1": 4104, "CusReceiptDate1": "2025-04-01", "CusMemAmt1": 1000, "CusMemUpAmt1": 0, "CusScholarAmt1": 0,
+    }
+    return unapproved_import.template_xlsx(member_format_groups(), example, sheet="MstMember")

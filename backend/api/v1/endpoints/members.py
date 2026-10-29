@@ -974,6 +974,30 @@ def _run_legacy_dry_run(job_id: str, user_id: int, file_name: str, content: byte
         db.close()
 
 
+@router.get("/legacy-import/format")
+def legacy_import_format(
+    current_user: User = Depends(deps.require_permission("members.import.write")),
+) -> Any:
+    """The columns the old member register (MstMember) import reads and what each holds (shown on the import screen)."""
+    from services import legacy_import
+
+    return {"groups": [{"group": g, "columns": [{"name": n, "meaning": m, "required": r} for n, m, r in cols]} for g, cols in legacy_import.member_format_groups()]}
+
+
+@router.get("/legacy-import/template")
+def legacy_import_template(
+    current_user: User = Depends(deps.require_permission("members.import.write")),
+) -> Any:
+    """The blank file the old member register import reads: the MstMember headings and a sheet explaining each column."""
+    from services import legacy_import
+
+    return Response(
+        content=legacy_import.template_xlsx(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=MstMember_format.xlsx"},
+    )
+
+
 @router.post("/legacy-import/dry-run")
 async def start_legacy_dry_run(
     file: UploadFile = File(...),
