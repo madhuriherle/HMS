@@ -16,6 +16,7 @@ puts them in one Excel file. The rules (agreed with the office):
 import io
 import re
 from collections import Counter, defaultdict
+from core.blood_group import normalize_blood_group
 from datetime import date, datetime
 from typing import Any, Optional
 
@@ -532,7 +533,7 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
             membership_number=number, old_membership_number=old_no, legacy_ref_number=(cus_no if applicants else None),
             name_title=title, full_name_en=name, first_name_en=name[:100], middle_name_en=None, last_name_en=None,
             full_name_kn=_s(r.get("CusNameKannada")) or None, gender=gender, date_of_birth=_as_date(r.get("CusDoB")),
-            blood_group=_s(r.get("CusBloodGroup"))[:10] or None, father_husband_name=father[:150] if father else None,
+            blood_group=(normalize_blood_group(_s(r.get("CusBloodGroup"))) or "")[:10] or None, father_husband_name=father[:150] if father else None,
             guardian_name=guardian[:150] if guardian else None,
             gotra_id=gotra_id, gotra_text=gotra_text, email=email[:191] if email else None,
             mobile=mobile, mobile_raw=mobile_raw, alternate_mobile=alt,

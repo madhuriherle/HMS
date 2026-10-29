@@ -35,6 +35,9 @@ VALID_SERVICE_OPTIN_STATUSES = {"ACTIVE", "CANCELLED"}
 VALID_SERVICE_OPTIN_SOURCES = {"ADMIN", "MOBILE_APP", "WEBSITE"}
 
 
+from core.blood_group import normalize_blood_group  # noqa: E402
+
+
 def _clean_alternate(v: Optional[str]) -> Optional[str]:
     """The alternate number is a second mobile or a landline: digits, with a space or a dash allowed (an STD code), 6 to 15 digits."""
     if v is None or str(v).strip() == "":
@@ -139,6 +142,11 @@ class MemberBase(MemberFields):
     @classmethod
     def _validate_alternate(cls, v: Optional[str]) -> Optional[str]:
         return _clean_alternate(v)
+
+    @field_validator("blood_group")
+    @classmethod
+    def _validate_blood_group(cls, v: Optional[str]) -> Optional[str]:
+        return normalize_blood_group(v)
 
     @field_validator("whatsapp_number")
     @classmethod
@@ -345,6 +353,11 @@ class MemberUpdate(BaseModel):
     @classmethod
     def _validate_alternate(cls, v: Optional[str]) -> Optional[str]:
         return _clean_alternate(v)
+
+    @field_validator("blood_group")
+    @classmethod
+    def _validate_blood_group(cls, v: Optional[str]) -> Optional[str]:
+        return normalize_blood_group(v)
 
 
 class MemberInDBBase(MemberFields):
