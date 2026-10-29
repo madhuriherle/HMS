@@ -18,7 +18,7 @@ import { notify } from '../utils/notify';
 import { apiErrorMessage } from '../utils/apiError';
 import {
   searchPostalCodes,
-  lookupPin,
+  loadLocations,
   loadMembershipTypes,
   loadGothras,
   loadQualifications,
@@ -126,20 +126,6 @@ export default function RegisterNewMember() {
     };
   }, []);
 
-  // The PIN autocomplete asks the server (the PINs that begin with what is typed); the 15,000-row table is never downloaded
-  const pinSearchSeq = useRef(0);
-  const searchPostalLocations = async (query, limit = 20) => {
-    const q = String(query || '').trim();
-    if (!q) return [];
-    const seq = (pinSearchSeq.current += 1);
-    try {
-      const found = await searchPostalCodes({ pincode_starts: q }, limit);
-      return seq === pinSearchSeq.current ? found : null; // null: a newer keystroke is already being answered
-    } catch {
-      return [];
-    }
-  };
-
   // The member being viewed / edited (read from the server)
   const [targetMember, setTargetMember] = useState(null);
   const [, setLoadingMember] = useState(Boolean(params.id));
@@ -148,7 +134,6 @@ export default function RegisterNewMember() {
   // Form tab: 'membershipDetails' | 'paymentInfo'
   const [] = useState('membershipDetails');
   const fileInputRef = useRef(null);
-  const pinWrapperRef = useRef(null);
   const [saving, setSaving] = useState(false);
 
   // Active membership types available for new registrations
@@ -195,6 +180,10 @@ export default function RegisterNewMember() {
     nativeSame: false,
     designation: '',
     postalCode: '',
+    stateId: '',
+    districtId: '',
+    talukId: '',
+    pincodeId: '',
     locality: '',
     localityKn: '',
     taluk: '',
@@ -232,22 +221,8 @@ export default function RegisterNewMember() {
   const [formErrors, setFormErrors] = useState({});
   const [isWhatsAppSameAsMobile, setIsWhatsAppSameAsMobile] = useState(true); // a new member: WhatsApp follows the mobile until changed
 
-  // PIN code autocomplete suggestions
-  const [pinSuggestions, setPinSuggestions] = useState([]);
-  // the locality last filled in from a PIN code, so it can be cleared again when the PIN changes (a typed one is kept)
+  // the locality last filled in from a post office, so it can be cleared again when the place changes (a typed one is kept)
   const autoLocality = useRef('');
-  const [isPinSuggestionsOpen, setIsPinSuggestionsOpen] = useState(false);
-
-  // Click outside listener for PIN suggestion dropdown
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (pinWrapperRef.current && !pinWrapperRef.current.contains(e.target)) {
-        setIsPinSuggestionsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // New registration: default to the first active membership type and its price
   useEffect(() => {
@@ -355,6 +330,10 @@ export default function RegisterNewMember() {
           nativeSame: !!m.native_same_as_current,
           designation: m.designation || '',
           postalCode: pin?.postalCode || '',
+          stateId: m.state_id ? String(m.state_id) : '',
+          districtId: m.district_id ? String(m.district_id) : '',
+          talukId: m.taluk_id ? String(m.taluk_id) : '',
+          pincodeId: m.pincode_id ? String(m.pincode_id) : '',
           locality: m.locality || m.post || pin?.area || '',
           localityKn: m.locality_kn || '',
           taluk: m.taluk_name || '',
@@ -639,88 +618,44 @@ export default function RegisterNewMember() {
     }
   };
 
-  // the PIN of the different postal address fills its own place, taluk, district and state
+  // Place, top down: State -> District -> Taluk -> Pincode / post office. Each list holds only what is under the one above it.
+  const [locations, setLocations] = useState({ states: [], districts: [], taluks: [] });
+  const [pinOptions, setPinOptions] = useState([]);
+  useEffect(() => {
+    loadLocations().then((l) => setLocations(l || { states: [], districts: [], taluks: [] })).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!formData.talukId) { setPinOptions([]); return undefined; }
+    let current = true;
+    searchPostalCodes({ taluk_id: Number(formData.talukId) }, 200)
+      .then((rows) => { if (current) setPinOptions(rows); })
+      .catch(() => { if (current) setPinOptions([]); });
+    return () => { current = false; };
+  }, [formData.talukId]);
 
-  const handlePinChange = async (val) => {
-    const cleanVal = val.replace(/\D/g, '').slice(0, 6);
-    // a PIN that is being changed or cleared no longer describes the places filled in from the old one
-    setFormData((prev) => {
-      if (cleanVal.length === 6 || prev.postalCode === cleanVal) return { ...prev, postalCode: cleanVal };
-      const keepLocality = prev.locality && prev.locality !== autoLocality.current;
-      return {
-        ...prev,
-        postalCode: cleanVal,
-        locality: keepLocality ? prev.locality : '',
-        taluk: '',
-        district: '',
-        state: ''
-      };
-    });
+  const nameOfPlace = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '';
+  const clearPostOffice = (prev) => ({ ...prev, pincodeId: '', postalCode: '', locality: prev.locality && prev.locality !== autoLocality.current ? prev.locality : '' });
+  const onStateChange = (id) => {
+    setFormData((prev) => ({ ...clearPostOffice(prev), stateId: id, districtId: '', talukId: '', state: nameOfPlace(locations.states, id), district: '', taluk: '' }));
     if (formErrors.postalCode) setFormErrors((prev) => ({ ...prev, postalCode: '' }));
-
-    if (cleanVal.length >= 2) {
-      const results = await searchPostalLocations(cleanVal, 20);
-      if (results) {
-        setPinSuggestions(results);
-        setIsPinSuggestionsOpen(results.length > 0);
-      }
-    } else {
-      setPinSuggestions([]);
-      setIsPinSuggestionsOpen(false);
-    }
-
-    if (cleanVal.length === 6) {
-      // 1. Try local data first
-      const matchInfo = await lookupPin(cleanVal).catch(() => ({ found: false }));
-      if (matchInfo.found) {
-        const wasAuto = autoLocality.current;
-        autoLocality.current = matchInfo.area || '';
-        setFormData((prev) => ({
-          ...prev,
-          locality: prev.locality && prev.locality !== wasAuto ? prev.locality : matchInfo.area || '',
-          taluk: matchInfo.talukName || '',
-          district: matchInfo.districtName || '',
-          state: matchInfo.stateName || ''
-        }));
-      } else {
-        // 2. If not found locally, use free public API
-        try {
-          // looked up by the server, so the browser does not depend on the public postal service
-          const res = await api.get(`/meta/pincode/${cleanVal}`);
-          if (res.data) {
-            const data = res.data;
-            if (data.found) {
-              const postOffice = { Name: data.area, Block: data.taluk, District: data.district, State: data.state };
-              const wasAuto = autoLocality.current;
-              autoLocality.current = postOffice.Name || '';
-              setFormData((prev) => ({
-                ...prev,
-                locality: prev.locality && prev.locality !== wasAuto ? prev.locality : postOffice.Name || '',
-                taluk: postOffice.Block || '',
-                district: postOffice.District || '',
-                state: postOffice.State || ''
-              }));
-            }
-          }
-        } catch (err) {
-          console.error("Failed to fetch pin code details from API", err);
-        }
-      }
-    }
   };
-
-  const handleSelectPostalSuggestion = (item) => {
-    autoLocality.current = item.area || '';
+  const onDistrictChange = (id) => {
+    setFormData((prev) => ({ ...clearPostOffice(prev), districtId: id, talukId: '', district: nameOfPlace(locations.districts, id), taluk: '' }));
+  };
+  const onTalukChange = (id) => {
+    setFormData((prev) => ({ ...clearPostOffice(prev), talukId: id, taluk: nameOfPlace(locations.taluks, id) }));
+  };
+  const onPickPostOffice = (id) => {
+    const row = pinOptions.find((x) => String(x.id) === String(id));
+    if (!row) { setFormData((prev) => clearPostOffice(prev)); return; }
+    const wasAuto = autoLocality.current;
+    autoLocality.current = row.area || '';
     setFormData((prev) => ({
       ...prev,
-      postalCode: item.postalCode,
-      locality: item.area || '',
-      taluk: item.talukName || '',
-      district: item.districtName || '',
-      state: item.stateName || ''
+      pincodeId: String(row.id),
+      postalCode: row.postalCode,
+      locality: prev.locality && prev.locality !== wasAuto ? prev.locality : row.area || ''
     }));
-    setPinSuggestions([]);
-    setIsPinSuggestionsOpen(false);
     if (formErrors.postalCode) setFormErrors((prev) => ({ ...prev, postalCode: '' }));
   };
 
@@ -880,11 +815,8 @@ export default function RegisterNewMember() {
   // ----------------------------------------------------
   // SAVE (server calls)
   // ----------------------------------------------------
-  const buildPayload = (pinRows = []) => {
+  const buildPayload = () => {
     const parts = formData.name.trim().split(/\s+/);
-    const pinRow = pinRows.find(
-      (p) => p.postalCode === formData.postalCode && (!formData.locality || p.area === formData.locality)
-    ) || pinRows.find((p) => p.postalCode === formData.postalCode);
     return {
       name_title: formData.nameTitle || null,
       full_name_en: formData.name.trim().split(/\s+/).join(' '),
@@ -934,10 +866,10 @@ export default function RegisterNewMember() {
       locality: (formData.locality || '').trim() || null,
       locality_kn: (formData.localityKn || '').trim() || null,
       post: (formData.locality || '').trim() || null,
-      state_id: pinRow?.stateId || null,
-      district_id: pinRow?.districtId || null,
-      taluk_id: pinRow?.talukId || null,
-      pincode_id: pinRow?.id || null,
+      state_id: formData.stateId ? Number(formData.stateId) : null,
+      district_id: formData.districtId ? Number(formData.districtId) : null,
+      taluk_id: formData.talukId ? Number(formData.talukId) : null,
+      pincode_id: formData.pincodeId ? Number(formData.pincodeId) : null,
       applied_on_behalf_of: formData.appliedOnBehalfOf === 'Others' ? (formData.behalfOtherText || '').trim() || 'Others' : formData.appliedOnBehalfOf || null,
       mobile_owner_name: formData.appliedOnBehalfOf !== 'Self' ? (formData.mobileOwnerName || '').trim() || null : null,
       whatsapp_owner_relation: otherWhatsApp ? formData.whatsappOwnerRelation || null : null,
@@ -969,8 +901,7 @@ export default function RegisterNewMember() {
     setSaving(true);
     try {
       // the rows for this PIN come from the server, to find the post office's id
-      const pinRows = formData.postalCode ? await searchPostalCodes({ pincode_starts: formData.postalCode }, 100) : [];
-      const payload = buildPayload(pinRows);
+      const payload = buildPayload();
       if (isEditMode && params.id) {
         const { data } = await api.put(`/members/${params.id}`, payload);
         if (photoFile) {
@@ -1683,67 +1614,61 @@ export default function RegisterNewMember() {
                     />
                   </div>
 
-                  {/* Pin Code with Autocomplete */}
-                  <div className="relative" ref={pinWrapperRef}>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Pin Code:
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        maxLength={6}
-                        value={formData.postalCode}
-                        onChange={(e) => handlePinChange(e.target.value)}
-                        onFocus={() => {
-                          if (formData.postalCode && formData.postalCode.length >= 2) {
-                            searchPostalLocations(formData.postalCode, 20).then((results) => {
-                              if (!results) return;
-                              setPinSuggestions(results);
-                              setIsPinSuggestionsOpen(results.length > 0);
-                            });
-                          }
-                        }}
-
-                        className={`w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border rounded-lg text-sm font-mono text-[#180200] placeholder:text-[#9E8B7F] placeholder:font-sans focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all ${
-                          formErrors.postalCode ? 'border-red-500 ring-2 ring-red-500/20' : 'border-[#E8DFD8] hover:border-[#8C1801]/60'
-                        }`}
-                      />
-                    </div>
-                    {formErrors.postalCode && (
-                      <p className="text-[11px] text-red-600 mt-1">{formErrors.postalCode}</p>
-                    )}
-
-                    {/* Autocomplete Suggestions Dropdown */}
-                    {isPinSuggestionsOpen && pinSuggestions.length > 0 && (
-                      <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#E8DFD8] rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto divide-y divide-stone-100">
-                        {pinSuggestions.map((item, idx) => (
-                          <button
-                            key={`${item.postalCode}-${item.area}-${idx}`}
-                            type="button"
-                            onClick={() => handleSelectPostalSuggestion(item)}
-                            className="w-full px-3.5 py-2.5 text-left hover:bg-[#FAF7F2] transition-colors flex items-center justify-between group cursor-pointer"
-                          >
-                            <div className="min-w-0 pr-2">
-                              <span className="font-semibold text-sm text-[#180200] group-hover:text-[#510601]">
-                                {item.area} — {item.postalCode}
-                              </span>
-                              <div className="text-xs text-stone-500 truncate">
-                                Taluk: <span className="font-medium text-stone-700">{item.talukName || '—'}</span> &bull; District: <span className="font-medium text-stone-700">{item.districtName || '—'}</span>
-                              </div>
-                            </div>
-                            <span className="shrink-0 text-xs font-mono font-bold text-[#8C1801] bg-[#FAF7F2] px-2 py-0.5 rounded border border-[#E8DFD8]">
-                              {item.postalCode}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                  {/* Place, top down: State, District, Taluk, Pincode / post office */}
+                  <div className="col-span-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {(() => {
+                      const selectClass = 'w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all disabled:opacity-50 cursor-pointer';
+                      const labelClass = 'block text-sm text-[#3D140C] mb-1.5 font-semibold';
+                      const districts = locations.districts.filter((d) => !formData.stateId || String(d.stateId) === String(formData.stateId));
+                      const taluks = locations.taluks.filter((x) => !formData.districtId || String(x.districtId) === String(formData.districtId));
+                      return (
+                        <>
+                          <div>
+                            <label className={labelClass}>State:</label>
+                            <select value={formData.stateId} onChange={(e) => onStateChange(e.target.value)} className={selectClass}>
+                              <option value="">Select State</option>
+                              {locations.states.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className={labelClass}>District:</label>
+                            <select value={formData.districtId} onChange={(e) => onDistrictChange(e.target.value)} disabled={!formData.stateId} className={selectClass}>
+                              <option value="">Select District</option>
+                              {districts.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className={labelClass}>Taluk:</label>
+                            <select value={formData.talukId} onChange={(e) => onTalukChange(e.target.value)} disabled={!formData.districtId} className={selectClass}>
+                              <option value="">Select Taluk</option>
+                              {taluks.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className={labelClass}>Pincode / Post Office:</label>
+                            <select
+                              value={formData.pincodeId}
+                              onChange={(e) => onPickPostOffice(e.target.value)}
+                              disabled={!formData.talukId}
+                              className={`${selectClass} ${formErrors.postalCode ? 'border-red-500 ring-2 ring-red-500/20' : ''}`}
+                            >
+                              <option value="">{!formData.talukId ? 'Select a taluk first' : pinOptions.length ? 'Select pincode / post office' : 'No pincodes for this taluk'}</option>
+                              {formData.pincodeId && !pinOptions.some((x) => String(x.id) === String(formData.pincodeId)) && (
+                                <option value={formData.pincodeId}>{formData.postalCode} — {formData.locality || 'current'}</option>
+                              )}
+                              {pinOptions.map((x) => <option key={x.id} value={x.id}>{x.postalCode} — {x.area}</option>)}
+                            </select>
+                            {formErrors.postalCode && <p className="text-[11px] text-red-600 mt-1">{formErrors.postalCode}</p>}
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
 
-                  {/* Post Office / Locality */}
+                  {/* Locality (the post office fills it; it can be changed) */}
                   <div>
                     <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Post Office / Locality:
+                      Locality:
                     </label>
                     <input
                       type="text"
@@ -1752,16 +1677,6 @@ export default function RegisterNewMember() {
 
                       className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
-                    {(formData.taluk || formData.district || formData.state) && (
-                      <dl className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                        {[['Taluk', formData.taluk], ['District', formData.district], ['State', formData.state]].map(([label, value]) => (
-                          <div key={label} className="min-w-0 rounded-lg bg-[#FAF7F2] border border-[#E8DFD8] px-2.5 py-1.5">
-                            <dt className="text-[10px] font-semibold uppercase tracking-wider text-[#A89B92]">{label}</dt>
-                            <dd className="font-semibold text-[#510601] break-words">{value || '—'}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    )}
                   </div>
 
                   {/* Native Place */}
