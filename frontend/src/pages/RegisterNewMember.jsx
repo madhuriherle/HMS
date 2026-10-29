@@ -173,7 +173,7 @@ export default function RegisterNewMember() {
     birthDate: '',
     age: '',
     gothra: '',
-    gender: 'Male',
+    gender: '', // never guessed: the office picks it (or the title does)
     bloodGroup: '',
     aadharNumber: '',
     address: '',
@@ -307,7 +307,7 @@ export default function RegisterNewMember() {
           children: Array.isArray(m.children_details)
             ? m.children_details.map((c) => ({
                 name: c.name || '',
-                gender: c.gender || 'Male',
+                gender: c.gender || '',
                 membershipNo: c.membership_number || '',
                 dob: c.dob || ''
               }))
@@ -780,7 +780,7 @@ export default function RegisterNewMember() {
     setFormData((prev) => ({
       ...prev,
       hasChildren: 'YES',
-      children: [...(prev.children || []), { name: '', gender: 'Male', membershipNo: '', dob: '' }]
+      children: [...(prev.children || []), { name: '', gender: '', membershipNo: '', dob: '' }]
     }));
   };
 
@@ -834,7 +834,7 @@ export default function RegisterNewMember() {
             .filter((c) => c && c.name && c.name.trim())
             .map((c) => ({
               name: c.name.trim(),
-              gender: c.gender || 'Male',
+              gender: c.gender || null,
               membership_number: (c.membershipNo || '').trim() || null,
               dob: toISODate(c.dob) || null
             }))
@@ -2152,7 +2152,7 @@ export default function RegisterNewMember() {
                                 hasChildren: 'YES',
                                 children: prev.children && prev.children.length > 0
                                   ? prev.children
-                                  : [{ name: '', gender: 'Male', membershipNo: '', dob: '' }]
+                                  : [{ name: '', gender: '', membershipNo: '', dob: '' }]
                               }));
                             }}
                             className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all cursor-pointer ${
@@ -2189,10 +2189,11 @@ export default function RegisterNewMember() {
                                   </div>
                                   <div className="sm:col-span-3">
                                     <select
-                                      value={child.gender || 'Male'}
+                                      value={child.gender || ''}
                                       onChange={(e) => handleChildChange(index, 'gender', e.target.value)}
                                       className="w-full px-3 py-1.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-xs text-[#180200] focus:outline-none focus:border-[#510601] cursor-pointer"
                                     >
+                                      <option value="">Select</option>
                                       {(lists?.child_relations || []).map((o) => <option key={o.code} value={o.code}>{o.label}</option>)}
                                     </select>
                                   </div>

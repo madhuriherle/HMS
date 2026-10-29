@@ -126,6 +126,26 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   };
   const reloadData = loadPage; // after an action the same page is read again
 
+  // the format of the file, loaded when the import popup opens
+  useEffect(() => {
+    if (!appImportOpen || appFormat) return;
+    api.get('/members/unapproved-applications/import/format').then(({ data }) => setAppFormat(data)).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appImportOpen]);
+
+  const downloadAppTemplate = async () => {
+    try {
+      const { data } = await api.get('/members/unapproved-applications/import/template', { responseType: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(data);
+      a.download = 'MstApplication_format.xlsx';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Could not download the format file', 'error');
+    }
+  };
+
   // Unapproved applications import (MstApplication): read the file, show what it would create, then import it
   const handleAppFile = async (event) => {
     const file = event.target.files?.[0];
@@ -270,6 +290,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [appPlan, setAppPlan] = useState(null);
   const [appImporting, setAppImporting] = useState(false);
   const [appPreviewing, setAppPreviewing] = useState(false);
+  const [appFormat, setAppFormat] = useState(null); // the columns the import reads, from the server
   useEffect(() => { if (!assigningMember) setReplacingReceipt(null); }, [assigningMember]);
   // the API behind Map enforces receipts.write; the sibling Bulk Mapping screen uses the page privilege,
   // so either one is enough to press it
@@ -636,7 +657,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
         rightSlot={
           (
             <div className="flex items-center gap-2 flex-wrap">
-              {hasPermission('members.unapproved.write') && (<button type="button" onClick={() => { setAppImportOpen(true); setAppFile(null); setAppPlan(null); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#510601] text-xs font-bold rounded-xl transition-all cursor-pointer"><Upload className="w-3.5 h-3.5" /> Import Unapproved Applications</button>)}
+              {hasPermission('members.unapproved.write') && (<button type="button" onClick={() => { setAppImportOpen(true); setAppFile(null); setAppPlan(null); }} title="Import unapproved applications from the MstApplication Excel file" className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#510601] text-xs font-bold rounded-xl transition-all cursor-pointer"><Upload className="w-3.5 h-3.5" /> Import</button>)}
               {statusFilter === 'UNAPPROVED' && (
                 <button
                   type="button"
@@ -646,7 +667,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                   title="Download the listed applicants as a PDF for the meeting; they are marked as exported today"
                 >
                   {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                  <span>Export PDF</span>
+                  <span>Export</span>
                 </button>
               )}
               <span className="text-xs font-bold text-[#510601] bg-[#FAF7F2] px-2.5 py-1.5 rounded-lg border border-[#E8DFD8]">
@@ -1419,6 +1440,38 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
             Upload MstApplication (.xlsx). CusNo is kept as the application reference; the membership number stays blank
             until approval. Receipts are imported and attached.
           </p>
+          {/* the format: one applicant per row, headings in row 1, and what each column holds */}
+          <div className="rounded-lg border border-[#E8DFD8] bg-[#FAF7F2] p-3 text-xs space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-bold text-[#510601]">File format</span>
+              <button type="button" onClick={downloadAppTemplate} className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#510601] text-[#510601] hover:bg-[#510601]/5 text-xs font-bold rounded-lg cursor-pointer">
+                <Download className="w-3.5 h-3.5" /> Download format file
+              </button>
+            </div>
+            <p className="text-gray-600">
+              An Excel file (.xlsx), first sheet, headings in row 1, one applicant per row. <b>CusNo</b> and <b>CusName</b> are required; any other column in the
+              register is ignored. The format file has the headings and a second sheet that explains each column.
+            </p>
+            <details>
+              <summary className="cursor-pointer font-semibold text-[#863221]">See every column</summary>
+              <div className="mt-2 max-h-56 overflow-y-auto space-y-2.5 pr-1">
+                {(appFormat?.groups || []).map((g) => (
+                  <div key={g.group}>
+                    <div className="font-bold text-[#510601]">{g.group}</div>
+                    <ul className="mt-0.5 space-y-0.5">
+                      {g.columns.map((c) => (
+                        <li key={c.name} className="flex gap-2">
+                          <span className="font-mono font-semibold text-[#180200] shrink-0">{c.name}{c.required ? ' *' : ''}</span>
+                          <span className="text-gray-600">{c.meaning}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+                {!appFormat && <p className="text-gray-500">Loading…</p>}
+              </div>
+            </details>
+          </div>
           <input
             type="file"
             accept=".xlsx,.xls"

@@ -132,3 +132,26 @@ def test_applicants_payment_status_filter_and_shortfall(client, admin_headers):
     none = none["data"] if isinstance(none, dict) else none
     assert [m for m in none if str(m.get("legacy_ref_number")) == "970003"]
 
+
+
+def test_applications_import_format_file(client, admin_headers):
+    """The format file: the headings the import reads, a sheet that explains them, and nothing in it that would be imported."""
+    import io
+    import openpyxl
+
+    r = client.get("/api/v1/members/unapproved-applications/import/template", headers=admin_headers)
+    assert r.status_code == 200, r.text
+    wb = openpyxl.load_workbook(io.BytesIO(r.content))
+    assert wb.sheetnames == ["MstApplication", "Format"]
+    heads = [c.value for c in wb["MstApplication"][1]]
+    assert {"CusNo", "CusName", "CusPinCode", "CusReceiptNo1", "CusReceiptNo6", "CusMemUpAmt6"} <= set(heads)
+    assert wb["MstApplication"].max_row == 1, "the sheet the import reads holds headings only"
+    assert any(row[0].value == "CusName" and row[1].value == "Yes" for row in wb["Format"].iter_rows())
+    pre = client.post("/api/v1/members/unapproved-applications/import/preview", headers=admin_headers,
+                      files={"file": ("MstApplication_format.xlsx", r.content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert pre.status_code == 200, pre.text
+    assert pre.json()["counts"].get("members", 0) == 0
+    fmt = client.get("/api/v1/members/unapproved-applications/import/format", headers=admin_headers)
+    assert fmt.status_code == 200, fmt.text
+    names = [c["name"] for g in fmt.json()["groups"] for c in g["columns"]]
+    assert "CusName" in names and "CusNo" in names

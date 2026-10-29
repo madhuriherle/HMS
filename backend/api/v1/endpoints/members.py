@@ -1018,6 +1018,26 @@ def download_legacy_dry_run(
                         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
+@router.get("/unapproved-applications/import/format")
+def unapproved_applications_format(
+    current_user: User = Depends(deps.require_permission("members.unapproved.write")),
+) -> Any:
+    """The columns the applications import reads, grouped, with what each holds (shown in the import popup)."""
+    return {"groups": [{"group": g, "columns": [{"name": n, "meaning": m, "required": r} for n, m, r in cols]} for g, cols in unapproved_import.FORMAT_GROUPS]}
+
+
+@router.get("/unapproved-applications/import/template")
+def unapproved_applications_template(
+    current_user: User = Depends(deps.require_permission("members.unapproved.write")),
+) -> Any:
+    """The blank file the applications import reads: the MstApplication headings, and a sheet explaining each column."""
+    return Response(
+        content=unapproved_import.template_xlsx(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=MstApplication_format.xlsx"},
+    )
+
+
 @router.post("/unapproved-applications/import/preview")
 async def preview_unapproved_applications(
     file: UploadFile = File(...),

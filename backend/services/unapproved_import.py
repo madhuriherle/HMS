@@ -90,3 +90,85 @@ def run(db, content: bytes, user_id: int, file_name: str = "") -> dict:
         "receipts": {"created": receipts["created"], "skipped": receipts["skipped"]},
         "skipped_list": members["skipped_list"],
     }
+
+# The file the import reads: the MstApplication register, one applicant per row, headings in row 1. Only these columns are used
+# (any others in the register are ignored). (heading, meaning, required)
+FORMAT_GROUPS = [
+    ("Applicant", [
+        ("CusNo", "Application number. Kept as the application reference; the membership number stays blank until approval", True),
+        ("CusNoOld", "Used as the application number when CusNo is 0", False),
+        ("CusTitle", "SRI. / SMT. / KUM. / DR. ... The gender is taken from this (SRI male, SMT. and KUM. female, others blank)", False),
+        ("CusName", "Full name, kept whole", True),
+        ("CusNameKannada", "Name in Kannada", False),
+        ("CusDoB", "Date of birth", False),
+        ("CusBloodGroup", "Blood group, for example O+VE", False),
+        ("CusGotra", "Gotra", False),
+        ("CusRelation", "S (son of), W (wife of), D (daughter of) or G (guardian)", False),
+        ("CusNameFather", "Name of the father, husband or guardian (the relation above says which)", False),
+        ("CusDesignation", "Occupation / designation", False),
+    ]),
+    ("Contact", [
+        ("CusMobile", "Mobile number", False),
+        ("CusPhone", "Alternate or landline number", False),
+        ("CusEmail", "Email address", False),
+    ]),
+    ("Address", [
+        ("CusAddress", "Address lines", False),
+        ("CusPinCode", "6-digit pincode. The state, district and taluk come from our pincode data, not from the file", False),
+        ("CusPost", "Post office", False),
+        ("CusCity", "City or town", False),
+        ("CusArea", "Area", False),
+        ("CusPlace", "Place or village", False),
+        ("CusState", "State (only used when the pincode is not found)", False),
+        ("CusLabelPoint", "Label point for the magazine", False),
+        ("CusAddressNative", "Native address", False),
+    ]),
+    ("Membership", [
+        ("CusMemberType", "POSHAKA, AJEEVA, MAHAPOSHAKA or MAHAPALAKA", False),
+        ("CusMagazine", "Yes / No", False),
+        ("CusOnline", "Online / Print", False),
+    ]),
+    ("Receipts (up to 6 per applicant; repeat for 1 to 6)", [
+        ("CusReceiptNo1", "Receipt number; a number already used is saved with /2, /3 ...", False),
+        ("CusReceiptDate1", "Receipt date", False),
+        ("CusMemAmt1", "Membership amount", False),
+        ("CusMemUpAmt1", "Upgrade amount (Patrika Nidhi)", False),
+        ("CusScholarAmt1", "Scholarship amount", False),
+        ("CusReceiptNote1", "Note on the receipt", False),
+    ]),
+]
+
+
+def template_xlsx() -> bytes:
+    """A blank file with the headings the import reads (nothing in it would be imported), and a second sheet that explains each
+    column with one example applicant."""
+    from openpyxl import Workbook
+
+    heads = []
+    for _, cols in FORMAT_GROUPS:
+        for name, _m, _r in cols:
+            if name.endswith("1"):
+                heads.extend(name[:-1] + str(n) for n in range(1, 7))
+            else:
+                heads.append(name)
+    example = {
+        "CusNo": 16892, "CusTitle": "SRI.", "CusName": "SUDHINDRA NADIGAR .R", "CusDoB": "1983-08-29", "CusBloodGroup": "O+VE", "CusGotra": "VASHISHTA",
+        "CusRelation": "G", "CusNameFather": "Ramakrishna Nadigar", "CusMobile": "9980899909", "CusAddress": "534, 9TH CROSS, NAGASANDRA", "CusPinCode": "560073",
+        "CusPost": "NAGASANDRA", "CusCity": "BANGALORE", "CusMemberType": "POSHAKA", "CusMagazine": "No", "CusOnline": "Online",
+        "CusReceiptNo1": 1045, "CusReceiptDate1": "2026-03-20", "CusMemAmt1": 1000, "CusMemUpAmt1": 0, "CusScholarAmt1": 0,
+    }
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "MstApplication"
+    ws.append(heads)                    # the sheet the import reads: headings only
+    notes = wb.create_sheet("Format")
+    notes.append(["Heading", "Required", "What it holds", "Example"])
+    for group, cols in FORMAT_GROUPS:
+        notes.append([group])
+        for name, meaning, required in cols:
+            notes.append([name, "Yes" if required else "", meaning, example.get(name, "")])
+    notes.append([])
+    notes.append(["Fill the first sheet (MstApplication) from row 2, one applicant per row. This sheet is only an explanation."])
+    out = io.BytesIO()
+    wb.save(out)
+    return out.getvalue()
