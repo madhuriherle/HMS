@@ -677,7 +677,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           widthClass="w-full sm:w-44"
         />
 
-        {/* 4. Exported for approval: only the applicants that were on an exported PDF (or on the one exported on a given day), or not yet */}
+        {/* 4. Exported for approval: only the applicants that were on an exported PDF, or the ones not exported yet */}
         <FilterSelect
           value={exportFilter}
           onChange={(val) => {
@@ -692,14 +692,6 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           ]}
           widthClass="w-full sm:w-52"
         />
-        {exportFilter === 'EXPORTED' && (
-          <DateInput
-            value={exportedOn}
-            onChange={(e) => { setExportedOn(e.target.value); setCurrentPage(1); }}
-            placeholder="Exported on"
-            className="h-9 px-3 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601] w-full sm:w-40"
-          />
-        )}
       </SearchFilterBar>
 
       {/* ---------------------------------------------------- */}
