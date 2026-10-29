@@ -7,7 +7,6 @@ import { UnapprovedPopup } from './MemberProfile';
 import Modal from '../components/Modal';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
-import FilterMore from '../components/FilterMore';
 import DateInput from '../components/DateInput';
 import {
   User,
@@ -664,61 +663,43 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           widthClass="w-full sm:w-44"
         />
 
-        {/* The rarer filters behind one button, so the card stays in one line: the district, and the meeting PDF (only the applicants that
-            were on an exported PDF, or on the one exported on a given day) */}
-        <FilterMore count={(statusFilter !== 'UNAPPROVED' ? 1 : 0) + (districtFilter !== 'ALL' ? 1 : 0) + (statusFilter === 'UNAPPROVED' && exportFilter !== 'ALL' ? 1 : 0)}>
-          {/* Awaiting decision is the normal list; the rejected applicants (who can be re-opened) are one choice away */}
-          {!assignedOnly && (
-            <FilterSelect
-              value={statusFilter}
-              onChange={(val) => {
-                setStatusFilter(val);
-                setSelectedIds(new Set());
-                setCurrentPage(1);
-              }}
-              options={[
-                { value: 'UNAPPROVED', label: 'Awaiting decision' },
-                { value: 'REJECTED', label: 'Rejected' }
-              ]}
-            />
-          )}
-          <FilterSelect
-            value={districtFilter}
-            onChange={(val) => {
-              setDistrictFilter(val);
-              setCurrentPage(1);
-            }}
-            options={[
-              { value: 'ALL', label: 'All Districts' },
-              ...filterDistricts.map((d) => ({ value: d.name, label: d.name }))
-            ]}
+        {/* 3. District */}
+        <FilterSelect
+          value={districtFilter}
+          onChange={(val) => {
+            setDistrictFilter(val);
+            setCurrentPage(1);
+          }}
+          options={[
+            { value: 'ALL', label: 'All Districts' },
+            ...filterDistricts.map((d) => ({ value: d.name, label: d.name }))
+          ]}
+          widthClass="w-full sm:w-44"
+        />
+
+        {/* 4. Exported for approval: only the applicants that were on an exported PDF (or on the one exported on a given day), or not yet */}
+        <FilterSelect
+          value={exportFilter}
+          onChange={(val) => {
+            setExportFilter(val);
+            if (val !== 'EXPORTED') setExportedOn('');
+            setCurrentPage(1);
+          }}
+          options={[
+            { value: 'ALL', label: 'All (exported or not)', display: 'Exported for approval' },
+            { value: 'EXPORTED', label: 'Exported for approval' },
+            { value: 'NOT_EXPORTED', label: 'Not exported yet' }
+          ]}
+          widthClass="w-full sm:w-52"
+        />
+        {exportFilter === 'EXPORTED' && (
+          <DateInput
+            value={exportedOn}
+            onChange={(e) => { setExportedOn(e.target.value); setCurrentPage(1); }}
+            placeholder="Exported on"
+            className="h-9 px-3 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601] w-full sm:w-40"
           />
-          {statusFilter === 'UNAPPROVED' && (
-            <>
-              <FilterSelect
-                value={exportFilter}
-                onChange={(val) => {
-                  setExportFilter(val);
-                  if (val !== 'EXPORTED') setExportedOn('');
-                  setCurrentPage(1);
-                }}
-                options={[
-                  { value: 'ALL', label: 'Exported for approval: all' },
-                  { value: 'EXPORTED', label: 'Exported for approval: yes' },
-                  { value: 'NOT_EXPORTED', label: 'Exported for approval: not yet' }
-                ]}
-              />
-              {exportFilter === 'EXPORTED' && (
-                <DateInput
-                  value={exportedOn}
-                  onChange={(e) => { setExportedOn(e.target.value); setCurrentPage(1); }}
-                  placeholder="Exported on"
-                  className="w-full h-9 px-3 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]"
-                />
-              )}
-            </>
-          )}
-        </FilterMore>
+        )}
       </SearchFilterBar>
 
       {/* ---------------------------------------------------- */}
