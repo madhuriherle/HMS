@@ -101,6 +101,7 @@ const toEntryMember = (m, loc) => {
     birthDate: m.date_of_birth || '',
     age: ageFrom(m.date_of_birth),
     fatherHusbandName: m.father_husband_name || '',
+    guardianName: m.guardian_name || '',
     aadharNumber: m.aadhaar_number || '',
     qualification: m.qualification_text || '',
     employment: m.occupation || '',
@@ -1573,7 +1574,7 @@ export default function ReceiptEntry() {
                     </div>
 
                     <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-[#863221] shrink-0">Father Name:</span>
+                      <span className="font-bold text-[#863221] shrink-0">{viewingMember.fatherHusbandName || viewingMember.fatherName ? 'Father Name:' : 'Guardian:'}</span>
                       <span className="text-[#180200]">{viewingMember.fatherHusbandName || viewingMember.fatherName || viewingMember.guardianName || '—'}</span>
                     </div>
 
@@ -2446,6 +2447,12 @@ export default function ReceiptEntry() {
                         <span className="text-[#863221] font-semibold block">Father / Husband Name:</span>
                         <strong className="text-[#180200]">{selectedMember.fatherHusbandName || '—'}</strong>
                       </div>
+                      {selectedMember.guardianName && (
+                        <div>
+                          <span className="text-[#863221] font-semibold block">Guardian Name:</span>
+                          <strong className="text-[#180200]">{selectedMember.guardianName}</strong>
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pb-2.5 border-b border-[#E8DFD8]">

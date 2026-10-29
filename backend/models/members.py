@@ -39,6 +39,7 @@ class Member(AuditMixin, Base):
     # Horoscope fields (gotra/nakshatra/rashi/masa/mithi/samvathsara) were
     # removed in migration 0014 — Mangalya/matrimony owns those.
     father_husband_name: Mapped[str] = mapped_column(String(150), nullable=True)
+    guardian_name: Mapped[str] = mapped_column(String(150), nullable=True)
     blood_group: Mapped[str] = mapped_column(String(10), nullable=True)
     native_place_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("native_places.id"), nullable=True)
     native_place_text: Mapped[str] = mapped_column(String(150), nullable=True)

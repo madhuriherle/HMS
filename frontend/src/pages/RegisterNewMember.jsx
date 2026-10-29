@@ -155,6 +155,7 @@ export default function RegisterNewMember() {
     existingNumber: '',
     fatherHusbandName: '',
     fatherName: '',
+    guardianName: '',
     fatherMembershipNo: '',
     motherName: '',
     motherMembershipNo: '',
@@ -260,7 +261,7 @@ export default function RegisterNewMember() {
         const reg = m.registration_payment || {};
         const dial = m.mobile_country_code || '+91';
         const waDial = m.whatsapp_country_code || dial;
-        const gender = titleCase(m.gender) || 'Male';
+        const gender = titleCase(m.gender) || ''; // never guess: an imported applicant may have no gender
 
         // the photo is a protected file: fetch it as an image
         let photoUrl = '';
@@ -295,6 +296,7 @@ export default function RegisterNewMember() {
           email: m.email || '',
           fatherHusbandName: m.father_name || m.father_husband_name || '',
           fatherName: m.father_name || m.father_husband_name || '',
+          guardianName: m.guardian_name || '',
           fatherMembershipNo: m.father_membership_number || '',
           motherName: m.mother_name || '',
           motherMembershipNo: m.mother_membership_number || '',
@@ -808,17 +810,18 @@ export default function RegisterNewMember() {
   // SAVE (server calls)
   // ----------------------------------------------------
   const buildPayload = () => {
-    const parts = formData.name.trim().split(/\s+/);
+    const fullName = formData.name.trim().split(/\s+/).join(' ');
     return {
       name_title: formData.nameTitle || null,
-      full_name_en: formData.name.trim().split(/\s+/).join(' '),
-      first_name_en: parts[0],
-      middle_name_en: parts.length > 2 ? parts.slice(1, -1).join(' ') : null,
-      last_name_en: parts.length > 1 ? parts[parts.length - 1] : null,
+      full_name_en: fullName,
+      first_name_en: fullName,
+      middle_name_en: null,
+      last_name_en: null,
       full_name_kn: (formData.nameKn || '').trim() || null,
       email: (formData.email || '').trim() || null,
       father_husband_name: (formData.fatherName || formData.spouseName || formData.fatherHusbandName || '').trim() || null,
       father_name: (formData.fatherName || formData.fatherHusbandName || '').trim() || null,
+      guardian_name: (formData.guardianName || '').trim() || null,
       father_membership_number: (formData.fatherMembershipNo || '').trim() || null,
       mother_name: (formData.motherName || '').trim() || null,
       mother_membership_number: (formData.motherMembershipNo || '').trim() || null,
@@ -1921,6 +1924,19 @@ export default function RegisterNewMember() {
                           {(formErrors.fatherName || formErrors.fatherHusbandName) && (
                             <p className="text-[11px] text-red-600 mt-1">{formErrors.fatherName || formErrors.fatherHusbandName}</p>
                           )}
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-[#3D140C] mb-1 font-semibold">
+                            Guardian's Name (if any):
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Guardian's Full Name"
+                            value={formData.guardianName}
+                            onChange={(e) => setFormData({ ...formData, guardianName: e.target.value })}
+                            className="w-full px-3 py-2 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                          />
                         </div>
 
                         <div>

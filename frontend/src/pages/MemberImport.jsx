@@ -637,7 +637,7 @@ export default function MemberImport() {
                           {r.full_name_kn ? <span className="block text-[11px] text-[#863221]/70">{r.full_name_kn}</span> : null}
                         </td>
                         <td className="py-2 px-3 font-mono">{r.mobile || '—'}</td>
-                        <td className="py-2 px-3">{r.gender || 'MALE'}</td>
+                        <td className="py-2 px-3">{r.gender || '—'}</td>
                         <td className="py-2 px-3">{r.city || r.locality || '—'}</td>
                         <td className="py-2 px-3">
                           <span className="px-2 py-0.5 rounded bg-[#FAF7F2] border border-[#E8DFD8] text-[10px] font-bold text-[#863221]">

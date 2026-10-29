@@ -28,11 +28,19 @@ def test_members_import(client, admin_headers):
         a = db.query(Member).filter(Member.membership_number == "910001").one()
         assert a.old_membership_number == "5" and a.legacy_ref_number is None and a.approval_status == "APPROVED" and a.registration_source == "MIGRATION"
         assert a.mobile == "9876543299"
+        # the register has only a full name: keep it whole, do not split into first / middle / last
+        assert (a.full_name_en, a.first_name_en, a.middle_name_en, a.last_name_en) == ("RAMA BHAT", "RAMA BHAT", None, None)
         b = db.query(Member).filter(Member.membership_number == "910002").one()
         assert b.old_membership_number is None and b.member_status == "INACTIVE" and "Expired" in (b.remarks or "")
         c = db.query(Member).filter(Member.membership_number == "910003").one()
         assert c.is_deleted is False and c.member_status == "INACTIVE" and "Marked deleted" in (c.remarks or "")   # kept as an inactive member
         assert db.query(MemberMembership).filter(MemberMembership.member_id == a.id).one().membership_type_id == mt["id"]
+        # rows imported by an older run were split: the backfill puts the whole name back
+        a.first_name_en, a.middle_name_en, a.last_name_en = "RAMA", None, "BHAT"
+        db.commit()
+        assert legacy_import.backfill_full_name(db)["updated"] >= 1
+        db.refresh(a)
+        assert (a.full_name_en, a.first_name_en, a.middle_name_en, a.last_name_en) == ("RAMA BHAT", "RAMA BHAT", None, None)
         # a second run adds nothing
         again = legacy_import.import_members(db, rows, 1, run_id="u" + s[-8:])
         assert again["created"] == 0
@@ -40,6 +48,86 @@ def test_members_import(client, admin_headers):
         db.close()
     found = client.get(f"{API}/members/", headers=admin_headers, params={"search": "910001"})
     assert found.status_code == 200 and any((m.get("membership_number") or m.get("member_code")) == "910001" for m in found.json()["data"])
+
+
+def test_guardian_relation_goes_to_guardian_name(client, admin_headers):
+    from db.session import SessionLocal
+    from models.members import Member
+    from services import legacy_import
+
+    s = _sfx()
+    _create_membership_type(client, admin_headers, "LG" + s[-5:], "Ajeeva")
+    rows = legacy_import.read_register(_register([
+        _row(980001, "GUARDIAN G", CusRelation="G", CusNameFather="MANJUNATHA HEGDE"),
+        _row(980002, "FATHER F", CusRelation="S/O", CusNameFather="RAMA BHAT"),
+        _row(980003, "WIFE W", CusRelation="W/O", CusNameFather="GOPAL RAO"),
+        _row(980004, "GUARDIAN BLANK", CusRelation="G"),
+    ]))
+    db = SessionLocal()
+    try:
+        out = legacy_import.import_members(db, rows, 1, run_id="g" + s[-8:], file_name="MstMember.xlsx")
+        assert out["created"] == 4, out
+        g = db.query(Member).filter(Member.membership_number == "980001").one()
+        assert (g.guardian_name, g.father_husband_name) == ("MANJUNATHA HEGDE", None)
+        f = db.query(Member).filter(Member.membership_number == "980002").one()
+        assert (f.guardian_name, f.father_husband_name) == (None, "S/O RAMA BHAT")
+        w = db.query(Member).filter(Member.membership_number == "980003").one()
+        assert (w.guardian_name, w.father_husband_name) == (None, "W/O GOPAL RAO")
+        blank = db.query(Member).filter(Member.membership_number == "980004").one()
+        assert (blank.guardian_name, blank.father_husband_name) == (None, None)
+        # rows imported before the guardian field existed carry the name in father_husband_name
+        g.guardian_name, g.father_husband_name = None, "MANJUNATHA HEGDE"
+        db.commit()
+        moved = legacy_import.backfill_guardian_names(db, rows)
+        assert moved["moved"] >= 1, moved
+        db.refresh(g)
+        assert (g.guardian_name, g.father_husband_name) == ("MANJUNATHA HEGDE", None)
+        assert legacy_import.backfill_guardian_names(db, rows)["moved"] == 0
+    finally:
+        db.close()
+
+
+def test_import_fetches_state_district_taluk_from_the_pincode(client, admin_headers):
+    from db.session import SessionLocal
+    from models.masters import District, PostalCode, State, Taluk
+    from models.members import Member
+    from services import legacy_import
+
+    s = _sfx()
+    _create_membership_type(client, admin_headers, "LP" + s[-5:], "Ajeeva")
+    db = SessionLocal()
+    try:
+        st = State(name_en="State " + s, status=True)
+        db.add(st)
+        db.flush()
+        d_pin = District(state_id=st.id, name_en="Pin District " + s, status=True)
+        d_file = District(state_id=st.id, name_en="File District " + s, status=True)
+        db.add_all([d_pin, d_file])
+        db.flush()
+        t_pin = Taluk(district_id=d_pin.id, name_en="Pin Taluk " + s, status=True)
+        t_file = Taluk(district_id=d_file.id, name_en="File Taluk " + s, status=True)
+        db.add_all([t_pin, t_file])
+        db.commit()
+        pc = PostalCode(pincode="6" + s[-5:], post_office_name="PO " + s, state_id=st.id, district_id=d_pin.id, taluk_id=t_pin.id, status=True)
+        db.add(pc)
+        db.commit()
+        rows = legacy_import.read_register(_register([
+            _row(930001, "PLACE CHECK", CusPinCode=pc.pincode, CusPost=pc.post_office_name, CusState=st.name_en,
+                 CusDistrict=d_file.name_en, CusTaluk=t_file.name_en),
+            _row(930002, "PIN IN POST", CusPinCode="0", CusPost=pc.pincode, CusState=st.name_en),
+        ]))
+        out = legacy_import.import_members(db, rows, 1, run_id="p" + s[-8:], file_name="MstMember.xlsx")
+        assert out["created"] == 2, out
+        m = db.query(Member).filter(Member.membership_number == "930001").one()
+        # the pincode row says Pin District / Pin Taluk, the register says File District / File Taluk:
+        # the database's pincode row wins
+        assert (m.state_id, m.district_id, m.taluk_id) == (st.id, d_pin.id, t_pin.id)
+        # a row whose pin and post are swapped (0 in the pin column) still finds the pincode from the post field
+        swapped = db.query(Member).filter(Member.membership_number == "930002").one()
+        assert (swapped.pincode_id, swapped.state_id, swapped.district_id, swapped.taluk_id) == (pc.id, st.id, d_pin.id, t_pin.id)
+        assert swapped.post == pc.post_office_name and any("Pincode '0'" in w["warning"] for w in out["warning_list"])
+    finally:
+        db.close()
 
 
 def test_receipts_import(client, admin_headers):

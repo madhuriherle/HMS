@@ -52,7 +52,7 @@ def _load(db) -> list:
     from models.members import Member
 
     q = (db.query(Member.id, Member.full_name_en, Member.first_name_en, Member.middle_name_en, Member.last_name_en, Member.mobile,
-                  Member.membership_number, Member.old_membership_number, Member.date_of_birth, Member.father_husband_name,
+                  Member.membership_number, Member.old_membership_number, Member.date_of_birth, Member.father_husband_name, Member.guardian_name,
                   Member.locality, Member.village, Member.city, Member.approval_status, Member.member_status, Member.gender,
                   Member.verification_status, Member.verified_at, Member.verification_remark,
                   PostalCode.pincode, District.name_en, PostalCode.post_office_name, Taluk.name_en)
@@ -60,10 +60,10 @@ def _load(db) -> list:
          .outerjoin(Taluk, Taluk.id == Member.taluk_id)
          .filter(Member.is_deleted == False))  # noqa: E712
     out = []
-    for (mid, full, f, mi, la, mobile, mno, old, dob, father, loc, vil, city, appr, status, gender, vstatus, vat, vremark, pin, district, post_office, taluk) in q.all():
+    for (mid, full, f, mi, la, mobile, mno, old, dob, father, guardian, loc, vil, city, appr, status, gender, vstatus, vat, vremark, pin, district, post_office, taluk) in q.all():
         name = " ".join((full or " ".join(p for p in (f, mi, la) if p)).split())
         out.append({"id": mid, "name": name, "mobile": mobile or "", "membership_no": mno or "", "old_no": old or "",
-                    "dob": dob.isoformat() if dob else "", "father": father or "", "place": loc or vil or city or "", "post_office": post_office or "", "taluk": taluk or "",
+                    "dob": dob.isoformat() if dob else "", "father": father or guardian or "", "place": loc or vil or city or "", "post_office": post_office or "", "taluk": taluk or "",
                     "pincode": pin or "", "district": district or "", "approval": appr or "", "status": status or "", "gender": gender or "",
                     "verification": vstatus or "NOT_VERIFIED", "verified_at": vat.date().isoformat() if vat else "", "verification_remark": vremark or ""})
     return out
@@ -163,7 +163,7 @@ def groups_xlsx(groups: list) -> bytes:
 
     wb = Workbook(write_only=True)
     ws = wb.create_sheet("Duplicates")
-    ws.append(["Group", "Why", "Name", "Membership no", "Old no", "Mobile", "Date of birth", "Father / husband", "Village / area", "Post office", "Taluk", "Pincode", "District", "Gender", "Approval", "Status", "KYC", "KYC on", "KYC remark", "Members with this exact name"])
+    ws.append(["Group", "Why", "Name", "Membership no", "Old no", "Mobile", "Date of birth", "Father / husband / guardian", "Village / area", "Post office", "Taluk", "Pincode", "District", "Gender", "Approval", "Status", "KYC", "KYC on", "KYC remark", "Members with this exact name"])
     for n, g in enumerate(groups, 1):
         for m in g["members"]:
             ws.append([n, g["reason"], m["name"], m["membership_no"], m["old_no"], m["mobile"], m["dob"], m["father"], m["place"], m["post_office"], m["taluk"], m["pincode"], m["district"],

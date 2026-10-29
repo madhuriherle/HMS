@@ -39,6 +39,7 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
     mobile: '',
     date_of_birth: '',
     father_husband_name: '',
+    guardian_name: '',
     state_id: '',
     district_id: '',
     taluk_id: '',
@@ -70,6 +71,7 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
           mobile: d.mobile || '',
           date_of_birth: d.date_of_birth ? d.date_of_birth.slice(0, 10) : '',
           father_husband_name: d.father_husband_name || d.father_name || '',
+          guardian_name: d.guardian_name || '',
           state_id: d.state_id ? String(d.state_id) : '',
           district_id: d.district_id ? String(d.district_id) : '',
           taluk_id: d.taluk_id ? String(d.taluk_id) : '',
@@ -188,6 +190,11 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
     if (form.father_husband_name.trim() !== origFather.trim()) {
       changed.father_husband_name = form.father_husband_name.trim() || null;
       changed.father_name = form.father_husband_name.trim() || null;
+    }
+
+    // 4b. Guardian
+    if (form.guardian_name.trim() !== (member.guardian_name || '').trim()) {
+      changed.guardian_name = form.guardian_name.trim() || null;
     }
 
     // 5. Normal Flow Place: State, District, Taluk
@@ -340,6 +347,16 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
                   type="text"
                   value={form.father_husband_name}
                   onChange={(e) => setForm({ ...form, father_husband_name: e.target.value })}
+                  className={`${inputClass} mt-1`}
+                />
+              </label>
+
+              <label className="block">
+                <span className={headingClass}>Guardian</span>
+                <input
+                  type="text"
+                  value={form.guardian_name}
+                  onChange={(e) => setForm({ ...form, guardian_name: e.target.value })}
                   className={`${inputClass} mt-1`}
                 />
               </label>

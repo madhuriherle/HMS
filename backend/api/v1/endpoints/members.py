@@ -19,7 +19,7 @@ from core.pagination import paginate
 from services.sequences import generate_next_number
 from services.pricing import active_price
 from services.file_upload import IMAGE_TYPES, save_upload
-from services import approval_gate
+from services import approval_gate, unapproved_import
 from datetime import date, datetime, timezone
 
 router = APIRouter()
@@ -1016,6 +1016,39 @@ def download_legacy_dry_run(
         raise HTTPException(409, "The reports are not ready yet")
     return FileResponse(path, filename="old_register_dry_run.xlsx",
                         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@router.post("/unapproved-applications/import/preview")
+async def preview_unapproved_applications(
+    file: UploadFile = File(...),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.unapproved.write")),
+) -> Any:
+    """Read the applications register (MstApplication) and report what its import would create. Saves nothing."""
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "The file is empty")
+    try:
+        return unapproved_import.preview(db, content)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+
+
+@router.post("/unapproved-applications/import")
+async def import_unapproved_applications(
+    file: UploadFile = File(...),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("members.unapproved.write")),
+) -> Any:
+    """Import the applications register: UNAPPROVED members with no membership number, CusNo kept as the application
+    number, their receipts created and attached. Safe to repeat: an applicant already in is skipped."""
+    content = await file.read()
+    if not content:
+        raise HTTPException(400, "The file is empty")
+    try:
+        return unapproved_import.run(db, content, current_user.id, (file.filename or "")[:255])
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 
 
 @router.get("/import-history")
@@ -2704,6 +2737,7 @@ def _profile_family(db: Session, member: Member) -> dict:
     masters = _member_master_details(db, member)
     return {
         "father_name": member.father_name or member.father_husband_name,
+        "guardian_name": member.guardian_name,
         "father_membership_number": member.father_membership_number,
         "mother_name": member.mother_name,
         "mother_membership_number": member.mother_membership_number,
@@ -3186,7 +3220,8 @@ def _profile_overview(db: Session, member: Member, current_user: User) -> dict:
             "member_since": membership.get("member_since"),
         },
         "family": {
-            "father_name": family["father_name"], "father_membership_number": family["father_membership_number"],
+            "father_name": family["father_name"], "guardian_name": family["guardian_name"],
+            "father_membership_number": family["father_membership_number"],
             "mother_name": family["mother_name"], "mother_membership_number": family["mother_membership_number"],
             "spouse_name": family["spouse_name"], "spouse_membership_number": family["spouse_membership_number"],
             "children_count": len(family["children"]),

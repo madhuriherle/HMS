@@ -56,6 +56,48 @@ def test_applicants_import_and_check(client, admin_headers):
         db.close()
 
 
+def test_applicants_import_endpoints(client, admin_headers):
+    """The Unapproved screen's Import: preview the register, then import it in one call."""
+    from db.session import SessionLocal
+    from models.masters import Particular
+    from models.members import Member
+
+    s = _sfx()
+    _create_membership_type(client, admin_headers, "AX" + s[-5:], "Ajeeva")
+    db = SessionLocal()
+    try:
+        if not db.query(Particular).filter(Particular.name_en == "Membership", Particular.parent_id.is_(None), Particular.is_deleted == False).first():  # noqa: E712
+            db.add(Particular(code="RT-" + s[-6:], name_en="Membership", status=True, pays_for_membership=True))
+            db.commit()
+    finally:
+        db.close()
+    content = _register([
+        _row(960001, "API APPLICANT", [(6101, datetime(2026, 3, 1), 1000)], CusTitle="SRI."),
+        _row(960002, "API APPLICANT TWO", CusTitle="SMT."),
+        _row(960003, "API APPLICANT THREE", CusTitle="DR."),
+    ])
+    name = "MstApplication.xlsx"
+    pre = client.post("/api/v1/members/unapproved-applications/import/preview", headers=admin_headers,
+                      files={"file": (name, content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert pre.status_code == 200, pre.text
+    counts = pre.json()["counts"]
+    assert counts["members"] == 3 and counts["receipts_to_import"] == 1
+    got = client.post("/api/v1/members/unapproved-applications/import", headers=admin_headers,
+                      files={"file": (name, content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert got.status_code == 200, got.text
+    body = got.json()
+    assert body["created"] == 3 and body["receipts"]["created"] == 1, body
+    db = SessionLocal()
+    try:
+        one = db.query(Member).filter(Member.legacy_ref_number == "960001").one()
+        assert one.approval_status == "UNAPPROVED" and one.membership_number is None
+        assert one.gender == "MALE"                                  # SRI.
+        assert db.query(Member).filter(Member.legacy_ref_number == "960002").one().gender == "FEMALE"   # SMT.
+        assert db.query(Member).filter(Member.legacy_ref_number == "960003").one().gender is None       # DR.: not guessed
+    finally:
+        db.close()
+
+
 def test_applicants_payment_status_filter_and_shortfall(client, admin_headers):
     """The Unapproved list can be filtered by payment status, and its rows carry the shortfall (an applicant paying less than the price of the type they chose)."""
     from db.session import SessionLocal

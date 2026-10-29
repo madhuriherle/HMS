@@ -12,7 +12,7 @@ EDITABLE_MEMBER_FIELDS: Set[str] = {
     "address_line1", "address_line2", "locality",
     "address_line1_kn", "address_line2_kn", "locality_kn",
     "full_name_kn", "gender", "date_of_birth",
-    "father_husband_name", "blood_group", "native_place_id",
+    "father_husband_name", "guardian_name", "blood_group", "native_place_id",
     "native_place_text", "qualification_id", "qualification_text", "occupation", "designation", "native_address", "native_same_as_current",
     "gotra_id", "gotra_text",
     "father_name", "father_membership_number", "mother_name", "mother_membership_number",
@@ -45,6 +45,7 @@ class MemberFields(BaseModel):
     date_of_birth: Optional[date] = None
     # Mangalya-parity personal fields.
     father_husband_name: Optional[str] = None
+    guardian_name: Optional[str] = None
     blood_group: Optional[str] = None
     native_place_id: Optional[int] = None
     native_place_text: Optional[str] = None
@@ -202,6 +203,7 @@ class MemberUpdate(BaseModel):
     date_of_birth: Optional[date] = None
     # Mangalya-parity personal fields.
     father_husband_name: Optional[str] = None
+    guardian_name: Optional[str] = None
     blood_group: Optional[str] = None
     native_place_id: Optional[int] = None
     native_place_text: Optional[str] = None

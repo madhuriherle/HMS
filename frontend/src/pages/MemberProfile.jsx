@@ -232,6 +232,7 @@ function OverviewTab({ id }) {
         ];
         const relatives = [
           ['Father', f.father_name, f.father_membership_number],
+          ['Guardian', f.guardian_name, null],
           ['Mother', f.mother_name, f.mother_membership_number],
           ['Spouse', f.spouse_name, f.spouse_membership_number]
         ].filter(([, name]) => name);
@@ -485,7 +486,7 @@ function ContactFamilySection({ core }) {
   }, [fam]);
 
   const relatives = fam
-    ? [['Father', fam.father_name, fam.father_membership_number], ['Mother', fam.mother_name, fam.mother_membership_number], ['Spouse', fam.spouse_name, fam.spouse_membership_number]].filter(([, name]) => name)
+    ? [['Father', fam.father_name, fam.father_membership_number], ['Guardian', fam.guardian_name, null], ['Mother', fam.mother_name, fam.mother_membership_number], ['Spouse', fam.spouse_name, fam.spouse_membership_number]].filter(([, name]) => name)
     : [];
   return (
     <Panel icon={Users} title="Contact & Family" tag={<SectionTag n={2} />} cols={3}>

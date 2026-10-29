@@ -152,7 +152,7 @@ export default function DuplicateMembers() {
                       <th className="px-3 py-2">Old no</th>
                       <th className="px-3 py-2">Mobile</th>
                       <th className="px-3 py-2">Date of birth</th>
-                      <th className="px-3 py-2">Father / husband</th>
+                      <th className="px-3 py-2">Father / husband / guardian</th>
                       <th className="px-3 py-2">Post office · Taluk</th>
                       <th className="px-3 py-2">Pincode</th>
                       <th className="px-3 py-2">District</th>

@@ -25,11 +25,22 @@ _KANNADA = re.compile("[\u0C80-\u0CFF]")
 FIRST_YEAR = 1943          # the Sabha began in 1943: no receipt can be older
 SLOTS = range(1, 7)
 TYPE_FIXES = {"POSHAK": "POSHAKA", "AJEEV": "AJEEVA", "A": "AJEEVA"}   # typos in the old register ("A" is a guess)
+# The old register has no gender column. Only these titles say it; anything else (DR., PROF., ...) stays blank.
+_GENDER_BY_TITLE = {"SRI": "MALE", "SMT": "FEMALE", "KUM": "FEMALE"}
 SAMPLE = 25
 
 
 def _s(v) -> str:
     return re.sub(r"\s+", " ", str(v)).strip() if v is not None else ""
+
+
+def _pin_and_post(row: dict) -> tuple:
+    """The register has a pincode column and a post-office column. A row can have them swapped (the pin in the
+    post column and 0 in the pincode column): take the 6-digit value as the pin. Returns (pin, post, swapped)."""
+    pin, post = _s(row.get("CusPinCode")), _s(row.get("CusPost"))
+    if not re.fullmatch(r"\d{6}", pin) and re.fullmatch(r"\d{6}", post):
+        return post, "", True
+    return pin, post, False
 
 
 def _num(v) -> float:
@@ -134,7 +145,7 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
             "cus_no": cus_no, "old_no": old_no,
             "name": _clean_import_name(r.get("CusName")), "title": _s(r.get("CusTitle")),
             "type": types.get(type_key), "type_text": raw_type, "mobile": mobile,
-            "mobile_text": _s(r.get("CusMobile")), "pin": _s(r.get("CusPinCode")),
+            "mobile_text": _s(r.get("CusMobile")), "pin": _pin_and_post(r)[0],
             "deleted": _s(r.get("DeleteMark")) == "*", "expired": _s(r.get("CusStatus")).lower() == "expired",
             "magazine": _s(r.get("CusMagazine")), "online": _s(r.get("CusOnline")),
             "returned": sum(1 for j in range(1, 13) if _s(r.get(f"CusMagazineReturned{j}"))),
@@ -394,7 +405,7 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
         gotras.setdefault(_gotra_key(g.name_en), g)
     titles = {re.sub(r"[^A-Z]", "", t.upper()): t for (t,) in db.query(NameTitle.name_en).filter(NameTitle.is_deleted == False).all()}  # noqa: E712
     states = {re.sub(r"[^A-Z]", "", s.name_en.upper()): s for s in db.query(State).filter(State.is_deleted == False).all()}  # noqa: E712
-    wanted_pins = {_s(r.get("CusPinCode")) for r in rows}
+    wanted_pins = {_pin_and_post(r)[0] for r in rows}
     from services.pincode_map import post_office_key
     pins = defaultdict(list)       # a pincode has many post offices: the member's own post office (CusPost) picks the row
     for pc in db.query(PostalCode).filter(PostalCode.pincode.in_(wanted_pins), PostalCode.is_deleted == False).order_by(PostalCode.id).all():  # noqa: E712
@@ -465,10 +476,11 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
             mobile, alt = alt, None
         if not alt and _s(r.get("CusPhone")):
             alt = _s(r.get("CusPhone"))[:20]
-        parts = name.split(" ")
-        first, middle, last = (parts[0], (" ".join(parts[1:-1]) or None), parts[-1]) if len(parts) > 1 else (name, None, None)
         title_raw = _s(r.get("CusTitle"))
         title = titles.get(re.sub(r"[^A-Z]", "", title_raw.upper()), title_raw)[:10] or None
+        # the register has no gender column: only the title says it (SRI = male, SMT./KUM. = female); DR. and the
+        # rest are left blank rather than guessed
+        gender = _GENDER_BY_TITLE.get(re.sub(r"[^A-Z]", "", title_raw.upper()))
         gotra_id = gotra_text = None
         g = _clean_import_name(r.get("CusGotra"))
         if g.upper() not in _NO_GOTRA:
@@ -482,7 +494,10 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
                 warn.append(f"Gotra '{g}' is not in the Gotra master: set to GENERAL")
             else:
                 warn.append(f"Gotra '{g}' is not in the Gotra master: left blank")
-        pc = pick_pincode(_s(r.get("CusPinCode")), _s(r.get("CusPost")))
+        pin, post, pin_from_post = _pin_and_post(r)
+        if pin_from_post:
+            warn.append(f"Pincode '{_s(r.get('CusPinCode'))}' is not valid: used '{pin}' from the post field")
+        pc = pick_pincode(pin, post)
         state = states.get(re.sub(r"[^A-Z]", "", _s(r.get("CusState")).upper()))
         addr = _lines(r.get("CusAddress"))
         status_text = _s(r.get("CusStatus")).lower()
@@ -495,22 +510,29 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
         if status_text == "expired":
             exp_date = _as_date(r.get("CusExpDt"))
             notes.append("Expired in the old register" + (f" ({exp_date:%d-%m-%Y})" if exp_date else ""))
-        relation, father_name = _s(r.get("CusRelation")), _s(r.get("CusNameFather"))
-        father = f"{relation} {father_name}" if relation in ("S/O", "W/O", "D/O") and father_name else (father_name or None)
+        relation, parent_name = _s(r.get("CusRelation")), _s(r.get("CusNameFather"))
+        if parent_name and relation in ("S/O", "W/O", "D/O"):
+            father, guardian = f"{relation} {parent_name}", None
+        elif parent_name and relation == "G":
+            father, guardian = None, parent_name
+        else:
+            father, guardian = (parent_name or None), None
         online = _s(r.get("CusOnline")).lower() == "online"
         wants = _s(r.get("CusMagazine")).lower() == "yes"
         ref_no = int(_num(r.get("CusNoRef"))) or None
         email = _s(r.get("CusEmail")) or None
+        post_text = (pc.post_office_name[:150] if pc and pc.post_office_name else None) if pin_from_post else (_s(r.get("CusPost"))[:150] or None)
         member = Member(
             membership_number=number, old_membership_number=old_no, legacy_ref_number=(cus_no if applicants else None),
-            name_title=title, full_name_en=name, first_name_en=first[:100], middle_name_en=(middle or None), last_name_en=(last or None),
-            full_name_kn=_s(r.get("CusNameKannada")) or None, date_of_birth=_as_date(r.get("CusDoB")),
+            name_title=title, full_name_en=name, first_name_en=name[:100], middle_name_en=None, last_name_en=None,
+            full_name_kn=_s(r.get("CusNameKannada")) or None, gender=gender, date_of_birth=_as_date(r.get("CusDoB")),
             blood_group=_s(r.get("CusBloodGroup"))[:10] or None, father_husband_name=father[:150] if father else None,
+            guardian_name=guardian[:150] if guardian else None,
             gotra_id=gotra_id, gotra_text=gotra_text, email=email[:191] if email else None,
             mobile=mobile, mobile_raw=mobile_raw, alternate_mobile=alt,
             address_line1=(addr[0][:255] if addr else None), address_line2=(", ".join(addr[1:])[:255] if len(addr) > 1 else None),
             city=_s(r.get("CusCity"))[:150] or None, area=_s(r.get("CusArea"))[:150] or None, place=_s(r.get("CusPlace"))[:150] or None,
-            grama=_s(r.get("CusGrama"))[:150] or None, village=_s(r.get("CusVillage"))[:150] or None, post=_s(r.get("CusPost"))[:150] or None,
+            grama=_s(r.get("CusGrama"))[:150] or None, village=_s(r.get("CusVillage"))[:150] or None, post=post_text,
             locality=(_s(r.get("CusPlace")) or _s(r.get("CusArea")) or _s(r.get("CusCity")))[:150] or None,
             label_point=_s(r.get("CusLabelPoint"))[:100] or None, address_remarks=" ".join(_lines(r.get("CusAddressRemarks"))) or None,
             country=("India" if _s(r.get("CusCountry")).upper() in ("", "INDIA") else _s(r.get("CusCountry")).title()),
@@ -731,6 +753,74 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
     return {"created": created, "shared": shared, "dummy": dummy, "zero_amount": zero, "skipped": len(skipped), "skipped_list": skipped[:200],
             "ignored_undated": len(ignored), "not_imported_other": len(not_imported), "plan": plan,
             "ignored_list": ignored, "not_imported_list": not_imported}
+
+
+def backfill_gender_from_title(db, *, batch: int = 1000) -> dict:
+    """Fill the gender of already-imported members from their title (SRI = male, SMT./KUM. = female). A member whose
+    gender is already set is left alone, and an ambiguous title (DR., PROF., ...) stays blank. Safe to repeat."""
+    from models.members import Member
+
+    done = 0
+    q = db.query(Member).filter(Member.registration_source == "MIGRATION", Member.gender.is_(None), Member.name_title.isnot(None))
+    for m in q.yield_per(batch):
+        gender = _GENDER_BY_TITLE.get(re.sub(r"[^A-Z]", "", (m.name_title or "").upper()))
+        if gender:
+            m.gender = gender
+            done += 1
+    db.commit()
+    return {"updated": done}
+
+
+def backfill_full_name(db, *, batch: int = 1000) -> dict:
+    """Put the whole name back into first_name_en for members imported before the register stopped splitting names.
+    The register has one full name, so the earlier first / middle / last split is dropped. Safe to repeat."""
+    from models.members import Member
+
+    done = 0
+    q = db.query(Member).filter(Member.registration_source == "MIGRATION", Member.full_name_en.isnot(None))
+    for m in q.yield_per(batch):
+        full = (m.full_name_en or "")[:100]
+        if m.first_name_en != full or m.middle_name_en or m.last_name_en:
+            m.first_name_en, m.middle_name_en, m.last_name_en = full, None, None
+            done += 1
+    db.commit()
+    return {"updated": done}
+
+
+def backfill_guardian_names(db, rows: list, *, batch: int = 1000) -> dict:
+    """Move the name of a 'G' (guardian) record from father_husband_name to guardian_name for members imported
+    before the guardian had its own field. Only a name equal to the register's is moved; anything the office has
+    typed since is left alone. Safe to repeat."""
+    from models.members import Member
+
+    by_no = {o: i for o, i in db.query(Member.membership_number, Member.id).filter(
+        Member.registration_source == "MIGRATION", Member.membership_number != None).all()}  # noqa: E711
+    by_ref = {o: i for o, i in db.query(Member.legacy_ref_number, Member.id).filter(
+        Member.registration_source == "MIGRATION", Member.legacy_ref_number != None).all()}  # noqa: E711
+    moved = same = missing = 0
+    for n, r in enumerate(rows, 1):
+        if _s(r.get("CusRelation")).upper() != "G":
+            continue
+        name = _s(r.get("CusNameFather"))[:150]
+        if not name:
+            continue
+        no_raw, old_raw = _num(r.get("CusNo")), _num(r.get("CusNoOld"))
+        no = str(int(old_raw)) if no_raw == 0 and old_raw != 0 else str(int(no_raw))
+        mid = by_no.get(no) or by_ref.get(no)
+        if mid is None:
+            missing += 1
+            continue
+        m = db.get(Member, mid)
+        if m.guardian_name == name:
+            same += 1
+        elif (m.father_husband_name or "") == name:
+            m.guardian_name = name
+            m.father_husband_name = None
+            moved += 1
+        if n % batch == 0:
+            db.commit()
+    db.commit()
+    return {"moved": moved, "already_right": same, "not_found": missing}
 
 
 def backfill_native(db, rows: list, *, batch: int = 1000) -> dict:

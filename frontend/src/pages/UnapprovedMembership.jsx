@@ -28,6 +28,7 @@ import {
   List,
   Download,
   RotateCcw,
+  Upload,
 } from 'lucide-react';
 import api from '../api';
 import { formatDate } from '../utils/dateUtils';
@@ -124,6 +125,45 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     }
   };
   const reloadData = loadPage; // after an action the same page is read again
+
+  // Unapproved applications import (MstApplication): read the file, show what it would create, then import it
+  const handleAppFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setAppFile(file);
+    setAppPlan(null);
+    setAppPreviewing(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await api.post('/members/unapproved-applications/import/preview', form);
+      setAppPlan(data.counts || {});
+      notify(`Loaded ${data.counts?.members || 0} applicants`, 'success');
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Preview failed', 'error');
+    } finally {
+      setAppPreviewing(false);
+    }
+  };
+
+  const handleAppImport = async () => {
+    if (!appFile) return;
+    setAppImporting(true);
+    try {
+      const form = new FormData();
+      form.append('file', appFile);
+      const { data } = await api.post('/members/unapproved-applications/import', form);
+      notify(`Created ${data.created || 0} unapproved applicants. Receipts: ${data.receipts?.created || 0}`, 'success');
+      setAppImportOpen(false);
+      setAppFile(null);
+      setAppPlan(null);
+      await loadPage();
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Import failed', 'error');
+    } finally {
+      setAppImporting(false);
+    }
+  };
 
   const loadMasters = async () => {
     const fail = (what) => (error) => {
@@ -222,7 +262,14 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
     }
     setReceiptView({ member: m, receipt: full || m.receipt });
   };
-  const [replacingReceipt, setReplacingReceipt] = useState(null); // the assigned receipt the picked one will replace
+  const [replacingReceipt, setReplacingReceipt] = useState(null);
+
+  // Unapproved applications import (MstApplication)
+  const [appImportOpen, setAppImportOpen] = useState(false);
+  const [appFile, setAppFile] = useState(null);
+  const [appPlan, setAppPlan] = useState(null);
+  const [appImporting, setAppImporting] = useState(false);
+  const [appPreviewing, setAppPreviewing] = useState(false);
   useEffect(() => { if (!assigningMember) setReplacingReceipt(null); }, [assigningMember]);
   // the API behind Map enforces receipts.write; the sibling Bulk Mapping screen uses the page privilege,
   // so either one is enough to press it
@@ -589,6 +636,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
         rightSlot={
           (
             <div className="flex items-center gap-2 flex-wrap">
+              {hasPermission('members.unapproved.write') && (<button type="button" onClick={() => { setAppImportOpen(true); setAppFile(null); setAppPlan(null); }} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E8DFD8] hover:border-[#510601] text-[#510601] text-xs font-bold rounded-xl transition-all cursor-pointer"><Upload className="w-3.5 h-3.5" /> Import Unapproved Applications</button>)}
               {statusFilter === 'UNAPPROVED' && (
                 <button
                   type="button"
@@ -1363,7 +1411,54 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           </div>
         </div>
       )}
+
+      {/* UNAPPROVED APPLICATIONS IMPORT (MstApplication.xlsx) */}
+      <Modal isOpen={appImportOpen} onClose={() => !appImporting && setAppImportOpen(false)} title="Import Unapproved Applications" size="xl">
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-gray-600">
+            Upload MstApplication (.xlsx). CusNo is kept as the application reference; the membership number stays blank
+            until approval. Receipts are imported and attached.
+          </p>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            disabled={appImporting}
+            onChange={handleAppFile}
+            className="block text-sm"
+          />
+          {appPreviewing && <p className="text-sm text-gray-500">Reading the register...</p>}
+          {appPlan && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              {[
+                ['Applicants', appPlan.members],
+                ['Receipts importable', appPlan.receipts_to_import],
+                ['No receipt', appPlan.members_no_receipt],
+                ['Problems', appPlan.members_with_problems],
+              ].map(([label, value]) => (
+                <div key={label} className="border rounded p-2">
+                  <div className="text-gray-500">{label}</div>
+                  <div className="font-semibold">{value ?? 0}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setAppImportOpen(false)} className="px-3 py-2 text-sm border rounded" disabled={appImporting}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!appFile || !appPlan || appImporting || appPreviewing}
+              onClick={handleAppImport}
+              className="px-3 py-2 text-sm bg-[#510601] text-white rounded disabled:opacity-50"
+            >
+              {appImporting ? 'Importing...' : 'Import'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
     </PermissionGate>
   );
 }
+
