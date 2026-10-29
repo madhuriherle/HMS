@@ -192,7 +192,7 @@ export const loadUnapprovedPage = async (params = {}) => {
       receiptStatus: receipt ? 'Assigned' : 'Pending',
       assignedReceiptNumber: receipt ? receipt.receiptNumber : '',
       receipt,
-      registrationDate: m.created_at ? String(m.created_at).slice(0, 10) : '',
+      registrationDate: m.registered_on ? String(m.registered_on).slice(0, 10) : '',   // the day of the form, or the first receipt of an imported member (never the import day)
     };
   });
   return { ...page, rows };

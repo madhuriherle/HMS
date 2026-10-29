@@ -67,7 +67,6 @@ export default function MemberLookupCard({ lookup, onUse }) {
             <div className="grid grid-cols-2 gap-x-3 gap-y-2">
               <Field label="Membership No." value={m.membership_number || m.member_code} />
               <Field label="Mobile" value={m.mobile} />
-              <Field label="Valid till" value={m.valid_till ? formatDate(m.valid_till) : ''} />
               <div className="col-span-2 min-w-0">
                 <span className="block text-[10px] font-semibold uppercase tracking-wide text-[#863221]/70">Last receipt</span>
                 <span className="block text-[#180200] font-medium truncate">

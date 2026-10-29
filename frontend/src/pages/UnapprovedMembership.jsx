@@ -1225,9 +1225,11 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                       {viewingMember.registrationSource || '—'}
                     </span>
                   </div>
-                  <p className="text-xs text-[#863221]">
-                    Registered on {formatDate(viewingMember.registrationDate)}
-                  </p>
+                  {viewingMember.registrationDate && (
+                    <p className="text-xs text-[#863221]">
+                      Registered on {formatDate(viewingMember.registrationDate)}
+                    </p>
+                  )}
                 </div>
               </div>
               <button

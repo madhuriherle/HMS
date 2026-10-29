@@ -214,7 +214,7 @@ function OverviewTab({ id }) {
         const credit = m.credit;
         const target = credit?.target_type;
         const pct = target?.price ? Math.min(100, Math.round((credit.credit_total / target.price) * 100)) : 100;
-        const since = m.current?.member_since || d.membership?.member_since || m.current?.activated_at || m.current?.applied_at;
+        const since = m.current?.member_since || d.membership?.member_since;   // the first receipt for an imported member, the approval day for the others
         const personal = [
           ['Gender', b.gender],
           ['Date of birth', b.date_of_birth ? formatDate(b.date_of_birth) : ''],
@@ -254,7 +254,6 @@ function OverviewTab({ id }) {
                   <Row label="Membership number">{m.current.membership_number || (m.current.old_membership_number ? 'None yet' : 'Given on approval')}</Row>
                   {m.current.old_membership_number && <Row label="Old membership number">{m.current.old_membership_number}</Row>}
                   <Row label="Member since">{since ? formatDate(since) : ''}</Row>
-                  <Row label="Valid till">{m.current.expires_at ? formatDate(m.current.expires_at) : ''}</Row>
                   <Row label="Receipts">{d.receipts.total ? `${d.receipts.total} · last ${formatDate(d.receipts.latest[0]?.receipt_date)}` : 'None yet'}</Row>
                   <div className="py-1 text-xs col-span-full">
                     <div className="flex items-start justify-between gap-4">
@@ -444,8 +443,10 @@ function IdentitySection({ core }) {
           <Row label="Verification remark">{p.verification_remark}</Row>
           <Row label="KYC by">{p.verified_by_name}</Row>
           <Row label="Registered through">{shownSource(p.registration_source)}</Row>
-          <Row label="Registered on">{p.created_at ? formatDateTime(p.created_at) : ''}</Row>
-          <Row label="Approved on">{p.approved_at ? formatDateTime(p.approved_at) : ''}</Row>
+          <Row label="Registered on">{p.registered_on ? formatDate(p.registered_on) : ''}</Row>
+          <Row label="Member since">{p.member_since ? formatDate(p.member_since) : ''}</Row>
+          <Row label="Approved on">{p.approved_on ? formatDate(p.approved_on) : ''}</Row>
+          <Row label="Imported on">{p.imported_on ? formatDate(p.imported_on) : ''}</Row>
           <Row label="Approved by">{p.approved_by_name}</Row>
           <Row label="Membership category">{p.membership_type_category}</Row>
           <Row label="Payment at registration">
@@ -611,7 +612,7 @@ function AuditStrip({ core }) {
         <span>Registration type: <strong className="uppercase font-bold">{source || '—'}</strong></span>
       </div>
       <div className="text-emerald-700 text-[11px]">
-        {p.created_at && <>Processed on <span className="font-semibold">{formatDateTime(p.created_at)}</span></>}
+        {p.registered_on && <>Registered on <span className="font-semibold">{formatDate(p.registered_on)}</span></>}
         {p.remarks && <span className="ml-3">Remarks: {p.remarks}</span>}
       </div>
     </div>
@@ -664,9 +665,10 @@ function MembershipTab({ id }) {
             <Card icon={User} title="Registration & approval">
               <dl className="divide-y divide-[#EFE6DE]/50 text-xs">
                 <Row label="Status">{d.approval.status}</Row>
-                <Row label="Registered on">{d.approval.registered_at ? formatDateTime(d.approval.registered_at) : '—'}</Row>
+                <Row label="Registered on">{d.approval.registered_at ? formatDate(d.approval.registered_at) : '—'}</Row>
                 <Row label="Registered by">{d.approval.registered_by || '—'}</Row>
-                <Row label="Approved on">{d.approval.approved_at ? formatDateTime(d.approval.approved_at) : '—'}</Row>
+                <Row label="Approved on">{d.approval.approved_at ? formatDate(d.approval.approved_at) : '—'}</Row>
+                {d.approval.imported_on && <Row label="Imported on">{formatDate(d.approval.imported_on)}</Row>}
                 <Row label="Approved by">{d.approval.approved_by || '—'}</Row>
               </dl>
             </Card>
@@ -682,13 +684,12 @@ function MembershipTab({ id }) {
                     <div className="text-xs text-[#863221] font-mono">{m.membership_number || 'No number yet'}</div>
                     {m.family_membership_number && <div className="text-[11px] text-[#863221]">Family no. {m.family_membership_number}</div>}
                     <div className="text-[11px] text-[#863221]">
-                      {m.member_since ? `Member since ${formatDate(m.member_since)}` : m.activated_at ? `Active from ${formatDate(m.activated_at)}` : m.applied_at ? `Applied ${formatDate(m.applied_at)}` : ''}
+                      {m.member_since ? `Member since ${formatDate(m.member_since)}` : ''}
                     </div>
                   </div>
                   <div className="text-right text-xs text-[#863221]">
                     <div className="font-semibold">{m.status}</div>
                     {m.current_price != null && <div>Price {inr(m.current_price)}</div>}
-                    {m.expires_at && <div>Valid till {formatDate(m.expires_at)}</div>}
                   </div>
                 </div>
               ))
@@ -1473,7 +1474,7 @@ export function UnapprovedPopup({ id, s, name, onClose }) {
               <Row label="Qualification">{p.qualification}</Row>
               <Row label="Occupation">{p.occupation}</Row>
               <Row label="Registered through">{shownSource(p.registration_source)}</Row>
-              <Row label="Registered on">{p.created_at ? formatDateTime(p.created_at) : ''}</Row>
+              <Row label="Registered on">{p.registered_on ? formatDate(p.registered_on) : ''}</Row>
             </>
           )}
         </Panel>
@@ -1609,7 +1610,6 @@ export default function MemberProfile() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
                 ['Member since', s.member_since ? formatDate(s.member_since) : '—', ''],
-                ['Valid till', s.valid_till ? formatDate(s.valid_till) : '—', ''],
                 ['Last receipt', s.last_receipt_date ? formatDate(s.last_receipt_date) : '—', ''],
                 ['Payment',
                   !s.payment?.judged ? '—' : s.payment?.no_receipt ? 'No receipt on record' : s.payment?.mismatch ? `Short by ${inr(s.payment.shortfall)}` : 'Paid in full',

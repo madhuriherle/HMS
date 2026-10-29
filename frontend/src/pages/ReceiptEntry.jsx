@@ -71,7 +71,7 @@ const toEntryMember = (m, loc) => {
   const districtName = m.district_name || '';
   const stateName = m.state_name || '';
   const talukName = m.taluk_name || '';
-  const created = m.created_at ? String(m.created_at) : '';
+  const created = m.registered_on ? String(m.registered_on) : '';   // never the day of an import
   return {
     id: m.id,
     registrationNumber: String(m.id),
@@ -113,7 +113,7 @@ const toEntryMember = (m, loc) => {
     registrationType: m.registration_source || '',
     registrationDate: created,
     createdDate: created,
-    memberSince: m.member_since || m.approved_at || null,
+    memberSince: m.member_since || null,
     // what was typed on the application's payment tab
     paymentMode: reg.payment_mode || '',
     bankAccount: reg.bank_account || '',
@@ -1487,8 +1487,6 @@ export default function ReceiptEntry() {
           const formattedRegDate = regDateStr ? (formatDateTime(regDateStr) || formatDate(regDateStr)) : '—';
           const dobStr = viewingMember.birthDate || viewingMember.dob || viewingMember.dateOfBirth;
           const formattedDob = dobStr ? formatDate(dobStr) : '—';
-          const expDateStr = viewingMember.expiryDate;
-          const formattedExpDate = expDateStr ? formatDate(expDateStr) : '—';
 
           return (
             <div
@@ -1593,10 +1591,6 @@ export default function ReceiptEntry() {
                       <span className="text-[#180200]">{viewingMember.height || '—'}</span>
                     </div>
 
-                    <div className="flex items-baseline gap-1.5 leading-snug">
-                      <span className="font-bold text-[#863221] shrink-0">Expiry Date:</span>
-                      <span className="text-[#180200] font-mono">{formattedExpDate}</span>
-                    </div>
                   </div>
 
                   {/* Column 3: PAYMENT INFORMATION & RECIEPT INFORMATION */}

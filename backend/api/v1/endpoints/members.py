@@ -339,6 +339,8 @@ def _attach_membership_types(db: Session, rows: list) -> None:
     ):
         latest[ms.member_id] = (t.id, t.name_en, ms.membership_number)
     _attach_places(db, rows)
+    from services import member_dates
+    member_dates.attach_dates(db, rows)
     from services import membership_credit
     checks = membership_credit.payment_check_rows(db, ids)   # who paid less than the price of their joining era
     checks.update(membership_credit.payment_check_rows(db, ids, applicants=True))   # and the applicants: less than the price of the type they chose
@@ -1170,7 +1172,8 @@ def read_member(
         raise HTTPException(status_code=404, detail="Member not found")
     data = schemas_members.Member.model_validate(member).model_dump(mode="json")
     _attach_places(db, [data])  # the popup gets state / district / taluk names with the member, in the same call
-    data["member_since"] = calculate_member_since(db, member)
+    from services import member_dates
+    data.update({k: v for k, v in member_dates.dates_for_one(db, member).items() if k != "imported_on"})   # registered_on, approved_on, member_since
     data["photo_path"] = member.photo_path       # the Edit page shows the photo from this
     return data
 
@@ -2352,7 +2355,7 @@ def read_member_profile(
             "applied_at": m.applied_at,
             "activated_at": m.activated_at,
             "expires_at": m.expires_at,
-            "member_since": since_dt or m.activated_at or m.applied_at,
+            "member_since": since_dt,
             "current_price": float(price.amount) if price else None,
         })
 
@@ -2736,7 +2739,14 @@ def _profile_personal(db: Session, member: Member) -> dict:
         "approved_by_name": _user_name(db, member.approved_by),
         "verified_by_name": _user_name(db, member.verified_by),
         "login_count": member.login_count or 0,
+        **_dates_view(db, member),
     }
+
+
+def _dates_view(db: Session, member: Member) -> dict:
+    """registered_on / approved_on / member_since / imported_on for the profile (see services/member_dates.py)."""
+    from services import member_dates
+    return member_dates.dates_for_one(db, member)
 
 
 def _user_name(db: Session, user_id) -> Optional[str]:
@@ -2845,38 +2855,10 @@ def _payment_check_view(db: Session, member_id: int):
 
 
 def calculate_member_since(db: Session, member: Member, current_membership: Optional[Any] = None) -> Optional[Any]:
-    """Calculate the 'Member since' date:
-    - For imported members (registration_source in ('MIGRATION', 'IMPORT') or is_imported):
-      The receipt date of their earliest (first) receipt.
-    - For normal members:
-      The date selected while approving (member.approved_at or current_membership.activated_at).
-    """
-    from models.receipts import Receipt, ReceiptAllocation
-    is_imported = (member.registration_source in ("MIGRATION", "IMPORT") or getattr(member, "is_imported", False))
-    if is_imported:
-        first_receipt = (
-            db.query(Receipt.receipt_date)
-            .join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id)
-            .filter(
-                ReceiptAllocation.member_id == member.id,
-                ReceiptAllocation.is_deleted == False,
-                Receipt.is_deleted == False,
-                Receipt.receipt_status != "CANCELLED",
-            )
-            .order_by(Receipt.receipt_date.asc(), Receipt.id.asc())
-            .first()
-        )
-        if first_receipt and first_receipt[0]:
-            return first_receipt[0]
-
-    # For normal ones (or imported members without receipts), the approval date:
-    if member.approved_at:
-        return member.approved_at
-    if current_membership and getattr(current_membership, "activated_at", None):
-        return current_membership.activated_at
-    if current_membership and getattr(current_membership, "applied_at", None):
-        return current_membership.applied_at
-    return member.created_at
+    """The 'Member since' date (see services/member_dates.py): the first receipt for an imported member, the approval date for the others,
+    and nothing for someone not approved yet."""
+    from services import member_dates
+    return member_dates.dates_for_one(db, member)["member_since"]
 
 
 def _profile_membership(db: Session, member: Member, actor=None) -> dict:
@@ -2901,7 +2883,7 @@ def _profile_membership(db: Session, member: Member, actor=None) -> dict:
             "id": m.id, "membership_type_id": t.id, "type_code": t.code, "type_name_en": t.name_en,
             "type_name_kn": t.name_kn, "membership_number": m.membership_number, "old_membership_number": member.old_membership_number, "status": m.status,
             "applied_at": m.applied_at, "activated_at": m.activated_at, "expires_at": m.expires_at,
-            "member_since": since_dt or m.activated_at or m.applied_at,
+            "member_since": since_dt,
             "family_membership_number": m.family_membership_number,
             "current_price": float(price.amount) if price else None,
         })
@@ -2925,8 +2907,9 @@ def _profile_membership(db: Session, member: Member, actor=None) -> dict:
         "payments": membership_credit.payment_table(db, mid),
         "approval": {
             "status": member.approval_status,
-            "registered_at": member.created_at, "registered_by": actor(member.created_by),
-            "approved_at": member.approved_at, "approved_by": actor(member.approved_by),
+            "registered_at": _dates_view(db, member)["registered_on"], "registered_by": actor(member.created_by),
+            "approved_at": _dates_view(db, member)["approved_on"], "approved_by": actor(member.approved_by),
+            "imported_on": _dates_view(db, member)["imported_on"],
         },
         "membership_credit": membership_credit.summary(db, mid),
         "type_changes": [
