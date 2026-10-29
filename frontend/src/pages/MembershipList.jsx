@@ -15,7 +15,6 @@ import {
   CheckCircle2,
   X,
   AlertCircle,
-  MapPin,
   Filter,
   CheckSquare,
 } from 'lucide-react';
@@ -200,17 +199,6 @@ export default function MembershipList() {
     (stateFilter !== 'ALL' ? 1 : 0) +
     (districtFilter !== 'ALL' ? 1 : 0) +
     (paymentFilter !== 'ALL' ? 1 : 0);
-  const singleMatchMember =
-    !loadingPage && total === 1 && paginatedMembers.length === 1 && (debouncedSearch.trim() || activeFilterCount > 0)
-      ? paginatedMembers[0]
-      : null;
-  const singleMatchPlace = singleMatchMember
-    ? (singleMatchMember.city ||
-        singleMatchMember.place ||
-        districts.find((d) => d.id === singleMatchMember.districtId)?.name ||
-        '')
-    : '';
-
   // Checkbox selection helpers
   const isAllPaginatedSelected = useMemo(() => {
     if (paginatedMembers.length === 0) return false;
@@ -487,51 +475,9 @@ export default function MembershipList() {
       </SearchFilterBar>
 
       {/* ---------------------------------------------------- */}
-      {/* SINGLE MATCH (LEFT, GREEN) + MEMBERSHIP TABLE        */}
+      {/* MEMBERSHIP TABLE                                     */}
       {/* ---------------------------------------------------- */}
       <div className="flex flex-col lg:flex-row gap-6 items-start">
-        {singleMatchMember && (
-          <aside className="w-full lg:w-80 shrink-0 bg-white rounded-2xl border-2 border-green-300 shadow-md overflow-hidden">
-            <div className="bg-green-600 px-4 py-3 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-white" />
-              <span className="text-xs font-bold uppercase tracking-wider text-white">Exactly 1 Member Found</span>
-            </div>
-            <div className="p-4 space-y-3 bg-green-50">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-green-600">Membership No.</p>
-                <p className="font-mono font-bold text-lg text-green-800">
-                  {singleMatchMember.membershipNumber || '—'}
-                </p>
-              </div>
-              <div className="border-t border-green-200 pt-3">
-                <p className="text-sm font-bold text-green-900">
-                  {singleMatchMember.nameTitle ? `${singleMatchMember.nameTitle} ` : ''}
-                  {singleMatchMember.fullName || singleMatchMember.name}
-                </p>
-                <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-green-700">
-                  <MapPin className="w-3.5 h-3.5 shrink-0" />
-                  {singleMatchPlace || '—'}
-                  {singleMatchMember.mobile || singleMatchMember.mobileNumber ? (
-                    <>
-                      <span className="text-green-400">·</span>
-                      <span className="font-mono">{singleMatchMember.mobile || singleMatchMember.mobileNumber}</span>
-                    </>
-                  ) : null}
-                </p>
-              </div>
-              <Link
-                to={`/dashboard/membership/profile/${singleMatchMember.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center justify-center gap-1.5 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span>View Profile</span>
-              </Link>
-            </div>
-          </aside>
-        )}
-
         <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm overflow-hidden flex-1 min-w-0 w-full">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
