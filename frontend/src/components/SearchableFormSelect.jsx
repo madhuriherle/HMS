@@ -11,7 +11,9 @@ export default function SearchableFormSelect({
   className = '',
   disabled = false,
   showSearch = true,
-  maxHeightClass = 'max-h-52'
+  maxHeightClass = 'max-h-52',
+  menuWidthClass = '',   // a wider list than the box, e.g. 'w-[26rem] max-w-[85vw]' (otherwise as wide as the box)
+  menuAlign = 'left'     // with a wider list: 'right' lets it grow to the left
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -96,7 +98,9 @@ export default function SearchableFormSelect({
       {isOpen && (
         <div
           role="listbox"
-          className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-[#E8DFD8] rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+          className={`absolute top-full mt-1.5 z-50 bg-white border border-[#E8DFD8] rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
+            menuWidthClass ? `${menuAlign === 'right' ? 'right-0' : 'left-0'} ${menuWidthClass}` : 'left-0 right-0'
+          }`}
           style={{ minWidth: '100%' }}
         >
           {/* Optional Search bar inside dropdown */}

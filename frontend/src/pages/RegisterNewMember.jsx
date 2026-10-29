@@ -1670,6 +1670,9 @@ export default function RegisterNewMember() {
                               ]}
                               placeholder={!formData.talukId ? 'Select a taluk first' : pinOptions.length ? 'Select pincode / post office' : 'No pincodes for this taluk'}
                               searchPlaceholder="Search pincode or post office…"
+                              menuWidthClass="w-[26rem] max-w-[85vw]"
+                              menuAlign="right"
+                              maxHeightClass="max-h-80"
                             />
                             {formErrors.postalCode && <p className="text-[11px] text-red-600 mt-1">{formErrors.postalCode}</p>}
                           </div>
