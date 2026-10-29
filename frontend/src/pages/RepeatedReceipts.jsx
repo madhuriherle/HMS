@@ -92,7 +92,7 @@ export default function RepeatedReceipts() {
                 kind === k.id ? 'bg-[#510601] text-white border-[#510601]' : 'bg-white text-[#510601] border-[#E8DFD8] hover:border-[#510601]'
               }`}
             >
-              {k.label}{data.counts?.[k.id] != null && <span className="ml-1.5 font-mono opacity-80">{data.counts[k.id]}</span>}
+              {k.label}
             </button>
           ))}
         </div>
