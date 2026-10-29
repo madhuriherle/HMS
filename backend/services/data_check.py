@@ -19,6 +19,8 @@ KINDS = {
     "no_place": "No pincode or no district",
     "print_no_address": "Printed magazine but no address",
     "odd_name": "Odd characters in the name",
+    "no_mobile": "No mobile number",
+    "no_address": "No address",
 }
 
 
@@ -53,6 +55,10 @@ def _filter(kind: str, db: Session):
     if kind == "print_no_address":
         blank = lambda col: or_(col.is_(None), func.trim(col) == "")  # noqa: E731
         return and_(Member.magazine_needed == True, Member.magazine_kind == "PHYSICAL", blank(Member.address_line1), blank(Member.magazine_delivery_address))  # noqa: E712
+    if kind == "no_mobile":
+        return or_(Member.mobile.is_(None), func.trim(Member.mobile) == "")
+    if kind == "no_address":
+        return or_(Member.address_line1.is_(None), func.trim(Member.address_line1) == "")
     if kind == "odd_name":
         # anything but letters, spaces, dots, apostrophes and hyphens
         return Member.full_name_en.op("~")(r"[^A-Za-z .'-]") if pg else Member.full_name_en.op("GLOB")("*[^A-Za-z .'-]*")
