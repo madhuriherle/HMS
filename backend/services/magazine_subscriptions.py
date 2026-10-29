@@ -47,6 +47,8 @@ def sync_member_magazine_subscription(
     if effective_needed:
         if member.approval_status != "APPROVED":
             return sub  # the subscription starts at final approval, not at registration
+        if member.member_status != "ACTIVE":
+            return sub  # an expired or deleted (inactive) member never gets a subscription started, whoever asks
         if not sub:
             sub = MagazineSubscription(
                 member_id=member.id,
@@ -96,6 +98,7 @@ def ensure_subscription_on_receipt_assigned(
             Member.is_deleted == False,
             Member.magazine_needed == True,  # noqa: E712
             Member.approval_status == "APPROVED",  # an applicant waiting for approval gets none yet
+            Member.member_status == "ACTIVE",      # an expired or deleted member never gets one, not even by the backfill
         )
         .all()
     )

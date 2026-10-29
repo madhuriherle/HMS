@@ -473,3 +473,26 @@ def test_recipients_are_paged_with_their_subscription_pause_and_returns(client, 
     # the lists the screen reads next are capped as well
     for path in ("subscriptions", "pauses", "returns", "label-batches", "delivery-batches"):  # the old delivery batches stay readable
         assert client.get(f"{API}/magazines/{path}", headers=h, params={"limit": 5000}).json()["limit"] == 200, path
+
+
+def test_inactive_member_is_never_listed_or_started(client, admin_headers):
+    """An expired or deleted (inactive) member never gets a subscription started: not listed to be started, and not started by the backfill either."""
+    h, s = admin_headers, _sfx()
+    m = client.post(f"{API}/members/", headers=h, json={
+        "first_name_en": f"Inactive{s}", "mobile": "93" + s.zfill(8), "magazine_needed": True, "magazine_delivery_address": f"Inactive Addr {s}",
+    }).json()
+    _approve_member(client, h, m["id"])
+    body = _entry_payload(f"IN-{s}", "IN Payer", payment_mode="CASH", allocations=[{"member_id": m["id"], "allocated_amount": 600}])
+    client.post(f"{API}/receipts/", headers=h, json=body)
+    from db.session import SessionLocal
+    from models.magazines import MagazineSubscription
+    from models.members import Member
+    with SessionLocal() as db:       # the member expires in the old register; their subscription row is gone
+        db.query(Member).filter(Member.id == m["id"]).update({"member_status": "INACTIVE"})
+        db.query(MagazineSubscription).filter(MagazineSubscription.member_id == m["id"]).update({"is_deleted": True})
+        db.commit()
+    unsub = client.get(f"{API}/magazines/unsubscribed-paid-members", headers=h, params={"limit": 200}).json()
+    assert m["id"] not in [u["member_id"] for u in unsub["data"]]
+    bf = client.post(f"{API}/magazines/backfill-subscriptions", headers=h, json={"member_ids": [m["id"]]})
+    assert bf.status_code == 200 and bf.json()["created_count"] == 0
+    assert client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": m["id"]}).json()["data"] == []

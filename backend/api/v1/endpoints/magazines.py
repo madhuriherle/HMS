@@ -1304,6 +1304,7 @@ def read_unsubscribed_paid_members(
             Member.is_deleted == False,  # noqa: E712
             Member.magazine_needed == True,  # noqa: E712
             Member.approval_status == "APPROVED",  # an applicant gets the subscription at approval
+            Member.member_status == "ACTIVE",      # an expired or deleted member never gets the magazine, so is never listed to be started
             ReceiptAllocation.is_deleted == False,  # noqa: E712
             ~Member.id.in_(subscribed),
         )
