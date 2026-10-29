@@ -392,3 +392,47 @@ def test_magazine_no_stays_no_whatever_else_the_row_says(client, admin_headers):
         assert (got["990004"].magazine_needed, got["990004"].magazine_kind) == (True, "PHYSICAL")
     finally:
         db.close()
+
+
+def test_upgrade_with_an_amrutha_mahotsava_note_goes_to_that_campaign(client, admin_headers):
+    """The upgrade column is Patrika Nidhi, except an amount whose note names the 75-year Amrutha Mahotsava campaign (Donation > Amrutha Mahotsava Abhiyana)."""
+    from db.session import SessionLocal
+    from models.members import Member
+    from models.receipts import Receipt, ReceiptItem
+    from services import legacy_import
+
+    s = _sfx()
+    _create_membership_type(client, admin_headers, "AM" + s[-5:], "Ajeeva")
+    day = datetime(2025, 6, 2)
+    rows = legacy_import.read_register(_register([
+        _row(995001, "CAMPAIGN ONE", CusReceiptNo1=88001, CusReceiptDate1=day, CusMemAmt1=1000, CusMemUpAmt1=100, CusReceiptNote1="Amruthamahosthava Abhiyana"),
+        _row(995002, "CAMPAIGN TWO", CusReceiptNo1=88002, CusReceiptDate1=day, CusMemUpAmt1=100, CusReceiptNote1="A.M Office"),
+        _row(995003, "PLAIN UPGRADE", CusReceiptNo1=88003, CusReceiptDate1=day, CusMemUpAmt1=100),
+        _row(995004, "PATRIKA NOTE", CusReceiptNo1=88004, CusReceiptDate1=day, CusMemUpAmt1=100, CusReceiptNote1="PATRIKA FUND"),
+        _row(995005, "LOCAL DRIVE", CusReceiptNo1=88005, CusReceiptDate1=day, CusMemUpAmt1=100, CusReceiptNote1="YELLAPURA ABHIYANA"),
+    ]))
+    db = SessionLocal()
+
+    def lines(number):
+        rec = db.query(Receipt).filter(Receipt.receipt_number == number).one()
+        return sorted(((i.sub_particular_name, float(i.amount)) for i in db.query(ReceiptItem).filter(ReceiptItem.receipt_id == rec.id, ReceiptItem.is_deleted == False)), key=lambda x: str(x[0])), float(rec.net_amount)  # noqa: E712
+    try:
+        legacy_import.import_members(db, rows, 1, run_id="a" + s[-8:], file_name="MstMember.xlsx")
+        legacy_import.import_receipts(db, rows, 1)
+        assert lines("88001") == ([("Amrutha Mahotsava Abhiyana", 100.0), (None, 1000.0)], 1100.0)
+        assert lines("88002") == ([("Amrutha Mahotsava Abhiyana", 100.0)], 100.0)
+        assert lines("88003")[0] == [("Patrika Nidhi", 100.0)] and lines("88004")[0] == [("Patrika Nidhi", 100.0)]
+        assert lines("88005")[0] == [("Patrika Nidhi", 100.0)]       # a local drive keeps the Patrika Nidhi heading until the office says otherwise
+        # receipts imported before the rule: the helper moves the campaign amounts, once, and the totals stay
+        for number in ("88001", "88002"):
+            rec = db.query(Receipt).filter(Receipt.receipt_number == number).one()
+            pat = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == rec.id, ReceiptItem.sub_particular_name == "Amrutha Mahotsava Abhiyana").one()
+            sub_pat = db.query(ReceiptItem.sub_particular_id).filter(ReceiptItem.sub_particular_name == "Patrika Nidhi").first()[0]
+            pat.sub_particular_id, pat.sub_particular_name = sub_pat, "Patrika Nidhi"
+        db.commit()
+        out = legacy_import.retag_amrutha_receipts(db, rows, 1)
+        assert out["receipts_changed"] == 2 and out["amount_moved_to_amrutha_mahotsava"] == 200.0, out
+        assert lines("88001") == ([("Amrutha Mahotsava Abhiyana", 100.0), (None, 1000.0)], 1100.0)
+        assert legacy_import.retag_amrutha_receipts(db, rows, 1)["receipts_changed"] == 0
+    finally:
+        db.close()

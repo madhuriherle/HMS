@@ -21,6 +21,10 @@ from typing import Any, Optional
 
 # the old register wrote Patrika Nidhi (the magazine fund) payments in the upgrade or the donation column with this note
 _PATRIKA = re.compile(r"patrika|\bp\.?\s*nidhi\b", re.I)
+# ... and the 75-year Amrutha Mahotsava campaign ("Amruthamahosthava Abhiyana" and its many spellings, "A.M Office"): an upgrade amount with
+# such a note is a donation to that campaign, not Patrika Nidhi
+_AMRUTHA = re.compile(r"amr[iuy]|amrt|mritam|mahos|a\.?\s?m\.?\s*office", re.I)
+AMRUTHA_SUB = "Amrutha Mahotsava Abhiyana"
 _KANNADA = re.compile("[\u0C80-\u0CFF]")
 FIRST_YEAR = 1943          # the Sabha began in 1943: no receipt can be older
 SLOTS = range(1, 7)
@@ -189,8 +193,10 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
             line = {"cus_no": cus_no, "name": m["name"], "slot": j, "number": number, "date": d, "raw_date": _s(dt),
                     "membership": mem, "upgrade": up, "other": extra, "note": _s(r.get(f"CusReceiptNote{j}")), "kind": "OK",
                     "scholarship": _num(r.get(f"CusScholarAmt{j}")),
-                    "donation": sum(_num(r.get(f"CusDon{k}Amt{j}")) for k in (1, 2, 3)), "patrika": 0.0}
-            line["patrika"], line["upgrade"] = line["upgrade"], 0.0       # the upgrade column is Patrika Nidhi
+                    "donation": sum(_num(r.get(f"CusDon{k}Amt{j}")) for k in (1, 2, 3)), "patrika": 0.0, "amrutha": 0.0}
+            line["patrika"], line["upgrade"] = line["upgrade"], 0.0       # the upgrade column is Patrika Nidhi ...
+            if line["patrika"] and _AMRUTHA.search(line["note"]):         # ... unless the note says it was for the Amrutha Mahotsava campaign
+                line["amrutha"], line["patrika"] = line["patrika"], 0.0
             if _PATRIKA.search(line["note"]):
                 line["patrika"], line["donation"] = line["patrika"] + line["donation"], 0.0
             m["lines"].append(line)
@@ -239,7 +245,7 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
             ln["dummy"] = f"FY{code}-{seq[code]:03d}"
             dummies.append({**ln, "reason": ("number already used on another date" if ln["kind"] == "NUMBER_TAKEN"
                                              else "no receipt number" + (", no amount" if not (ln["membership"] or ln["upgrade"] or ln["other"]) else ""))})
-        elif not (ln["membership"] or ln["upgrade"] or ln["other"] or ln["patrika"]):
+        elif not (ln["membership"] or ln["upgrade"] or ln["other"] or ln["patrika"] or ln["amrutha"]):
             ln["kind"] = "NO_AMOUNT"
 
     zero_amount = [ln for _m, ln in importable if ln["kind"] == "NO_AMOUNT"]
@@ -615,9 +621,10 @@ def _particulars(db, user_id: int) -> dict:
     donation = find("Donation") or make("Donation")
     general_donation = find("General Donation", donation.id) or make("General Donation", donation.id)
     patrika_nidhi = find("Patrika Nidhi", donation.id) or make("Patrika Nidhi", donation.id)
+    amrutha = find(AMRUTHA_SUB, donation.id) or make(AMRUTHA_SUB, donation.id)
     scholarship = find("Scholarship") or make("Scholarship")
     general_scholarship = find("General", scholarship.id) or make("General", scholarship.id)
-    return {"membership": membership, "donation": donation, "general_donation": general_donation, "patrika_nidhi": patrika_nidhi,
+    return {"membership": membership, "donation": donation, "general_donation": general_donation, "patrika_nidhi": patrika_nidhi, "amrutha": amrutha,
             "scholarship": scholarship, "general_scholarship": general_scholarship}
 
 
@@ -687,11 +694,12 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
         sch = sum(l["scholarship"] for _m, l in members)
         don = sum(l["donation"] for _m, l in members)
         pat = sum(l["patrika"] for _m, l in members)
-        total = mem + up + sch + don + pat
+        amr = sum(l["amrutha"] for _m, l in members)
+        total = mem + up + sch + don + pat + amr
         if mem > 0 or total == 0:
             rtype = "MEMBERSHIP"
         else:
-            rtype = "SCHOLARSHIP" if sch > 0 and don == 0 and pat == 0 else "GENERAL_DONATION"
+            rtype = "SCHOLARSHIP" if sch > 0 and don == 0 and pat == 0 and amr == 0 else "GENERAL_DONATION"
         notes = " | ".join(dict.fromkeys(x for x in [l["note"] for _m, l in members] if x))
         fy = receipt_numbers.financial_year_for(first["date"])
         dummy_now = key[0] == "dummy"
@@ -733,8 +741,10 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
                     item("DONATION", p["donation"], p["general_donation"], don, notes or None)
                 if pat > 0:
                     item("DONATION", p["donation"], p["patrika_nidhi"], pat, notes or "Old register: upgrade column (Patrika Nidhi)")
+                if amr > 0:
+                    item("DONATION", p["donation"], p["amrutha"], amr, notes or "Old register: upgrade column (Amrutha Mahotsava Abhiyana)")
                 for (mid, mno, _name), ln in members:
-                    own = ln["membership"] + ln["upgrade"] + ln["scholarship"] + ln["donation"] + ln["patrika"]
+                    own = ln["membership"] + ln["upgrade"] + ln["scholarship"] + ln["donation"] + ln["patrika"] + ln["amrutha"]
                     # on a receipt shared by several members each one is given the membership money of their own line
                     share = own if len(members) == 1 else (ln["membership"] + ln["upgrade"] or own)
                     db.add(ReceiptAllocation(receipt_id=r.id, member_id=mid, allocated_amount=share, created_by=user_id))
@@ -1199,7 +1209,7 @@ def reconcile_applicants(db, rows: list) -> dict:
         mine = list(got.get(hit[0], [])) if hit else []
         done = 0
         for ln in lines:
-            want = round(ln["membership"] + ln["patrika"] + ln["scholarship"] + ln["donation"] + ln["upgrade"], 2)
+            want = round(ln["membership"] + ln["patrika"] + ln["amrutha"] + ln["scholarship"] + ln["donation"] + ln["upgrade"], 2)
             pick = next((g for g in mine if g[0] == ln["date"] and abs(g[2] - want) < 0.01), None) or next((g for g in mine if g[0] == ln["date"]), None)
             if pick is None:
                 status, shown = "MISSED", ""
@@ -1310,3 +1320,76 @@ def template_xlsx() -> bytes:
         "CusReceiptNo1": 4104, "CusReceiptDate1": "2025-04-01", "CusMemAmt1": 1000, "CusMemUpAmt1": 0, "CusScholarAmt1": 0,
     }
     return unapproved_import.template_xlsx(member_format_groups(), example, sheet="MstMember")
+
+
+def retag_amrutha_receipts(db, rows: list, user_id: int) -> dict:
+    """Receipts already imported whose register upgrade amount carries an Amrutha Mahotsava note: that amount moves from
+    Donation > Patrika Nidhi to Donation > Amrutha Mahotsava Abhiyana (the sub type is made when it is not there). Receipt totals do
+    not change. A slot is matched to its receipt by member and date (and number when several). Safe to repeat: money already under
+    the campaign is not moved again."""
+    from datetime import timezone
+    from models.members import Member
+    from models.receipts import Receipt, ReceiptAllocation, ReceiptItem
+
+    p = _particulars(db, user_id)
+    pat, amr = p["patrika_nidhi"], p["amrutha"]
+    now = datetime.now(timezone.utc)
+    by_no = {}
+    for no, old, i in db.query(Member.membership_number, Member.old_membership_number, Member.id).filter(Member.registration_source == "MIGRATION").all():
+        if no:
+            by_no[no] = i
+        if old:
+            by_no.setdefault(old, i)
+    # what each receipt should hold under the campaign
+    wanted, notes, missing = defaultdict(float), {}, 0
+    for r in rows:
+        no_raw, old_raw = _num(r.get("CusNo")), _num(r.get("CusNoOld"))
+        mid = by_no.get(str(int(old_raw)) if no_raw == 0 and old_raw != 0 else str(int(no_raw)))
+        for j in SLOTS:
+            up, note = _num(r.get(f"CusMemUpAmt{j}")), _s(r.get(f"CusReceiptNote{j}"))
+            d = _as_date(r.get(f"CusReceiptDate{j}"))
+            if up <= 0 or not _AMRUTHA.search(note) or _PATRIKA.search(note) or d is None or mid is None:
+                continue
+            number = _s(r.get(f"CusReceiptNo{j}"))
+            found = (db.query(Receipt).join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id)
+                     .filter(ReceiptAllocation.member_id == mid, ReceiptAllocation.is_deleted == False, Receipt.receipt_date == d,  # noqa: E712
+                             Receipt.source == SOURCE, Receipt.is_deleted == False).all())  # noqa: E712
+            rec = next((x for x in found if x.receipt_number == number or x.receipt_number.startswith(number + "/")), None) or (found[0] if found else None)
+            if rec is None:
+                missing += 1
+                continue
+            wanted[rec.id] += up
+            notes.setdefault(rec.id, note)
+    changed, moved = 0, 0.0
+    for rid, want in wanted.items():
+        items = db.query(ReceiptItem).filter(ReceiptItem.receipt_id == rid, ReceiptItem.is_deleted == False).order_by(ReceiptItem.line_no).all()  # noqa: E712
+        have = sum(float(i.amount) for i in items if i.particular_name == "Donation" and i.sub_particular_id == amr.id)
+        left = round(want - have, 2)
+        if left <= 0.005:
+            continue
+        taken = 0.0
+        for i in items:
+            if left <= 0.005:
+                break
+            if i.particular_name != "Donation" or i.sub_particular_id != pat.id:
+                continue
+            cut = min(float(i.amount), left)
+            left -= cut
+            taken += cut
+            i.amount = float(i.amount) - cut
+            if i.amount <= 0.0001:
+                i.is_deleted, i.deleted_at = True, now
+        if taken <= 0:
+            continue
+        existing = next((i for i in items if not i.is_deleted and i.particular_name == "Donation" and i.sub_particular_id == amr.id), None)
+        if existing is not None:
+            existing.amount = float(existing.amount) + taken
+        else:
+            db.add(ReceiptItem(receipt_id=rid, item_type="DONATION", particular_id=p["donation"].id, particular_name=p["donation"].name_en,
+                               sub_particular_id=amr.id, sub_particular_name=amr.name_en, description=notes[rid] or None, amount=taken,
+                               line_no=max([i.line_no or 0 for i in items] + [0]) + 1,
+                               pays_for_membership=bool(p["donation"].pays_for_membership), created_by=user_id))
+        changed += 1
+        moved += taken
+    db.commit()
+    return {"receipts_changed": changed, "amount_moved_to_amrutha_mahotsava": moved, "receipts_not_found": missing}
