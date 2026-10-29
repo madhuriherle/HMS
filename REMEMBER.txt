@@ -3,6 +3,7 @@
                          (DO NOT VIOLATE OR MODIFY)
 ================================================================================
 Last Updated: 14-October-2026 (rules 6-15 added, 8.4 / 11.7-11.8 / 12.9-12.11 added; 11.10 reworded, 11.11 and 15.10 added)
+Updated 29-October-2026: rules 16 (old register and member data), 17 (list and screen choices) and 18 (working notes) added
 
 --------------------------------------------------------------------------------
 RULE 1: MEMBER RECORD ID (id) vs. PERMANENT MEMBERSHIP NUMBER (member_code)
@@ -242,7 +243,7 @@ RULE 9: DATA COMES FROM THE SERVER, NOT FROM THE FRONTEND
 9.2  Phone numbers: digits allowed per country come from the phone_lengths list. India is
      exactly 10 digits and starts with 6, 7, 8 or 9. The field stops accepting digits at
      the country's maximum.
-9.3  Dates are shown DD-MM-YYYY (formatDate) and times 24-hour HH:MM; money as
+9.3  Dates are shown DD-MM-YYYY (formatDate), a date of birth is also TYPED that way (rule 16.12), and times 24-hour HH:MM; money as
      ₹1,234.00 via formatMoney (rupee sign, Indian grouping, two decimals).
      Downloads keep amounts as plain numbers.
 
@@ -627,6 +628,7 @@ RULE 14: SETTINGS AND ADMIN TOOLS
 RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
 --------------------------------------------------------------------------------
 15.1 Membership does NOT expire: no "renewals due" list, panel, reminder button or count.
+     Valid till / Expiry is not shown on any screen (rule 16.10); old expiry dates stay stored only.
 15.2 A membership type has no "Online List" setting (it was never saved or used). Add one
      only if the server enforces it.
 15.3 Particulars and Sub-Type are ONE picker (components/ParticularPicker.jsx): a single
@@ -723,5 +725,138 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
       applicant never gets a membership number (approve refuses with 409) and is listed under the Rejected status
       filter; Re-open (PUT /members/{id}/reopen, reason required) puts them back to UNAPPROVED. Disagree no longer deletes.
 
-================================================================================
+--------------------------------------------------------------------------------
+RULE 16: THE OLD REGISTER, MEMBER DATA AND THE CHECKS (OCT 2026 - THE USER'S DECISIONS)
+--------------------------------------------------------------------------------
+16.1 WHAT WAS IMPORTED (UAT only; prod has none of it). MstMember.xlsx: 31,974 members and 38,335 receipts
+     (services/legacy_import.py, Member Import page > Old register check, scripts/legacy_*.py). MstApplication.xlsx:
+     97 applicants (services/unapproved_import.py, the Import button on Unapproved Membership: it previews first, then
+     imports; a repeat run skips people already in). The membership number is CusNo (CusNoOld is kept as the old
+     number and is the number when CusNo is 0). An applicant is UNAPPROVED with NO membership number; their CusNo
+     is kept in members.legacy_ref_number. Every backfill script in backend/scripts is safe to repeat and touches
+     only imported members. Take a backup before running one (a deploy already takes one).
+16.2 THE UPGRADE COLUMN (CusMemUpAmt) IS DONATION > PATRIKA NIDHI, never membership, whatever the year or amount.
+     Exception (the office's decision): an upgrade amount whose receipt note names the 75-year Amrutha Mahotsava
+     campaign (any spelling of "Amrutha Mahotsava", "A.M Office", a plain "ABHIYANA" and the local drives such as
+     YELLAPURA / SAGARA / SHIMOGA / GIRINAGAR ABHIYANA) goes to Donation > Amrutha Mahotsava Abhiyana (a sub type
+     the import makes; 140 lines, Rs 14,000 on UAT, services/legacy_import.py _AMRUTHA, scripts/legacy_retag_amrutha.py).
+     PATRIKA FUND / PATRIKA NIDHI notes stay Patrika Nidhi. Receipt totals never change by a move.
+16.3 REGISTER RECEIPTS. Every register record is a receipt of its own. A number used again in the SAME financial year
+     keeps the earliest record; the others get /2, /3 ... (a number is unique per financial year, so the same number
+     in ANOTHER year is simply another number). A line with no date is not imported; a date before 1943 or in the
+     future is not imported; no number (or one already taken on another date) gets a made-up number FY<yy>-<nnn>,
+     marked is_old_receipt (shown UNKNOWN). The register's numbers are never changed to hide a repeat: the office
+     corrects one by editing the receipt. REPEATED RECEIPT NUMBERS page (Receipt Tracking > the repeat icon,
+     /dashboard/receipts/repeats, GET /receipts/repeats): a back icon and a search, each number is a heading with every
+     record that used it under it, each record has View and Edit (Edit opens in a NEW TAB). The receipt popup shows one
+     plain line "Same number also used by:" (GET /receipts/{id}/same-number). No colours, no REPEAT tags on the list.
+16.4 GENDER IS NEVER GUESSED. Only the title says it: SRI = male, SMT. / KUM. = female, anything else (DR., PROF. ...)
+     stays blank. The new member form and the children rows start with NO gender (no default Male); the title still
+     moves the gender, and the gender moves the title.
+16.5 NAMES ARE NOT SPLIT. An imported name is kept whole in full_name_en and first_name_en; middle and last stay empty
+     (rule 15.22 for typed ones). A name such as UMA is a valid name: there is no "name too short" check.
+16.6 PLACE COMES FROM OUR OWN DATA. State, district and taluk are taken from our postal-code row for the pincode; the
+     file's CusState / CusDistrict / CusTaluk are ignored (the state is a fallback only when the pincode is unknown). A
+     row with the pincode and post columns swapped is read right (services/legacy_import.py _pin_and_post). On the member form the
+     place is picked top-down as searchable lists that open downward: State > District > Taluk > Pincode / Post office.
+     "Locality / Area" is READ ONLY and fills from the picked post office (the B.O / S.O / H.O ending removed). There is
+     no Native Place box and no Employment box: one "Occupation / Designation" field (designation).
+16.7 GUARDIAN. CusRelation G puts the name in members.guardian_name (its own field, shown as Guardian); S/O, W/O, D/O
+     put it in father_husband_name with the prefix ("S/O RAMA BHAT"). A guardian is not counted as a family member.
+16.8 THE MAGAZINE. (a) CusMagazine = No means NO magazine, whatever else the row says (Online / Print, the type and the
+     receipts are all ignored for it). (b) THE MAGAZINE NEEDS NO EMAIL: magazine_email is never kept, imported or shown
+     (an e-copy is read on the site); the member's own email is separate. (c) AN EXPIRED OR DELETED (INACTIVE) MEMBER
+     NEVER GETS A SUBSCRIPTION STARTED, not by approval, an edit, a receipt or the backfill, and is never listed in the
+     "paid members requested the magazine but have no active subscription" banner (services/magazine_subscriptions.py).
+     The import starts a subscription only for ACTIVE, approved members.
+16.9 BLOOD GROUP IS ONE FORM: A+, A-, B+, B-, AB+, AB-, O+, O-. core/blood_group.py turns "O+VE", "A +VE", "AB -VE",
+     "b+" into it on every save and import; scripts/legacy_normalize_blood_group.py fixes stored ones. A bare "A" or "AB"
+     (no sign) is left as typed.
+16.10 THE DATES OF A MEMBER (services/member_dates.py; one place, used by every screen; nothing is stored):
+      - IMPORTED, approved: Registered on and Member since = the date of the FIRST receipt that is not cancelled; with no
+        receipt, the register's own enrolled date when it is a real one (the import stamps the import day on a membership
+        with no enrolled date: that is not real); otherwise EMPTY. Approved on is EMPTY (the import approved everybody on
+        one day). The import day is shown only as "Imported on" (imported_on), never as the member's date.
+      - IMPORTED applicant: Registered on = the register's enrolled date, else the first receipt; no approval, no member since.
+      - ANY OTHER member: Registered on = the day the form was registered, Approved on = the approval day, Member since =
+        the approval day; not approved yet = no approval and no member since.
+      The profile, the lists, the Unapproved popup and Receipt Entry read registered_on / approved_on / member_since from the
+      server. VALID TILL / EXPIRY IS NOT SHOWN ANYWHERE (rule 15.1); the data stays stored.
+16.11 STORED DATA IS READ AS IT IS. The typed-in rules (at least 18 years old, mobile and alternate number shape, blood
+      group form) belong to the INPUT schemas (MemberBase, MemberCreate, MemberUpdate), never to the response (MemberFields /
+      MemberInDBBase). An imported child or a short alternate number must still open (it caused an internal server error on
+      Edit for 7,354 members). The ALTERNATE NUMBER may be a landline: digits with a space or a dash (an STD code), 6 to 15
+      digits; the main mobile stays 10 to 12 digits.
+16.12 DATE OF BIRTH IS TYPED AND SHOWN AS DD-MM-YYYY EVERYWHERE: use components/DateInput.jsx (never a raw type="date" box,
+      which follows the computer's format); Excel files write it as DD-MM-YYYY text.
+16.13 DATA CHECK (Membership List > Data Check, /dashboard/membership/data-check, GET /data-check/members, privilege
+      members.list.read; services/data_check.py). One tab per problem: date of birth in the future, under 18, over 110,
+      alternate number not 10 to 12 digits, wrong email, no pincode or district, printed magazine with no address, no
+      date of birth, no mobile number, no address. Each tab has search, paging (200 max), Excel, a KYC column and filter
+      (All / Not verified / Verified), the KYC popup and an Edit button that opens in a new tab. By decision it has NO tab
+      for: an online magazine with no email, active/inactive against expiry, a short name, odd characters in a name.
+16.14 THE KYC POPUP (components/VerifyMemberModal.jsx, also on Duplicate Members): wide (max-w-5xl), the call outcome and
+      remark on top, then three cards: Identity (name, gender, date of birth, father / husband, guardian), Contact (mobile,
+      WhatsApp, alternate number, email, how the magazine reaches them: not needed / online / printed) and Address (lines
+      1 and 2, state, district, taluk, locality, pincode / post office). It opens at the box the list is about. It saves
+      through the normal member update (same rules, same approval gate).
+16.15 THE MEMBER PROFILE. The Personal Details tab lists EVERY field and shows a dash for an empty one (so Aadhaar and the
+      rest are always there); the Overview stays brief and hides empty rows (rule 12.11). There is no Print profile button.
+      The quick-facts strip is Member since, Last receipt, Payment.
+16.16 NO DATABASE ID ON ANY SCREEN (rule 1.1): not in the Assign a receipt popup (name and mobile only), not in the user
+      list, nowhere. Test a new screen for it.
+16.17 FILE FORMATS ARE SHOWN, FROM THE SERVER. Every import popup / card has a "File format" box: what the file is, a
+      "See every column" list and a format file to download. The columns come from the server, so the screen and the
+      import cannot disagree: /meta/import-format/members (the CSV), /members/legacy-import/format and /template
+      (MstMember), /members/unapproved-applications/import/format and /template (MstApplication). The format file's
+      first sheet holds only headings (uploading it unchanged imports nobody); a second sheet explains each column.
 
+--------------------------------------------------------------------------------
+RULE 17: LIST AND SCREEN CHOICES MADE IN OCT 2026 (DO NOT BRING BACK)
+--------------------------------------------------------------------------------
+17.1 FILTER BARS FIT ONE LINE. Receipt Tracking: Search, Period (the financial years with the months of the chosen year
+     inside the same list), Type, Status, Mode, reset, the Repeated Numbers icon, Export. There is NO Day Book. A closed
+     filter box shows a short name (Type, Status, Mode) through the option's `display` (components/FilterSelect.jsx).
+     Unapproved Membership: Type, Payment (receipt not assigned / assigned / no receipt on record / payment mismatch),
+     District, Exported for approval (all / exported / not exported yet; NO date box). There is no Awaiting decision /
+     Rejected box: that screen lists applicants awaiting a decision only. The buttons read Import and Export.
+17.2 THE MARK FOR AN APPLICANT WHO WENT ON THE MEETING PDF is a small tinted document tile beside the name, only when
+     exported; the hover says "Exported for approval - DD-MM-YYYY". No text line under the name. Nothing shows under the
+     name for an imported applicant's source.
+17.3 THE SIDE MENU COLLAPSES to an icon strip (a small plain hamburger in the dark menu header, desktop only; a hover
+     tooltip names each icon; clicking a group opens the menu again; the choice is kept in localStorage
+     hms_sidebar_collapsed). Search lists in popups open downward with a search box inside (SearchableFormSelect).
+17.4 THE APPROVE POPUP is wide, with a cream body and white cards: a table of the applicants (type, receipt, payment), the
+     date and the note side by side.
+17.5 EXISTING UNAPPROVED-LIST RULES STAY: the Payment filter and the shortage on a row, the red warning in the approve popup,
+     View opens the application popup on the list itself (not the profile page), no State filter on member lists.
+17.6 AN EDIT LINK THAT LEAVES THE LIST (Repeated Receipt Numbers, Data Check) OPENS IN A NEW TAB so the list stays where it is.
+17.7 THE MEMBER LISTS DO NOT SHOW A GREEN "Exactly 1 member found" CARD; the list already sorts.
+
+--------------------------------------------------------------------------------
+RULE 18: WORKING NOTES FROM THIS WORK (ALL AGENTS)
+--------------------------------------------------------------------------------
+18.1 PUSH AND DEPLOY: commit after every change. Push to GitHub when the user says push (an unrequested push is refused by
+     the permission check). Deploy to UAT only when the user says so (11.1), and the deploy takes its own database backup.
+     When the user says not to deploy, do not (a later "deploy" then carries every waiting commit). PROD stays untouched.
+18.2 IF A COMMAND IS BLOCKED by the safety check or the permission classifier, STOP and tell the user what was meant and
+     why; do not find a way round it. The VPS password must never be written into a file, a memory or a commit; it is passed
+     inline for one command and it must be rotated.
+18.3 THE DEPLOY SEQUENCE THAT WORKS: copy the committed files into the clean build copy, build with MSYS_NO_PATHCONV=1
+     and VITE_API_URL=/api/v1 and --base=/, check there is no localhost:8000 in the bundle and the index loads
+     /assets/..., tar the dist, git-archive HEAD:backend, run the deploy (backup, backend build, web copy), then compare the
+     live index.html asset name with the built one. A file that holds another agent's unfinished work is committed as
+     HEAD + only your lines (git hash-object -w, git update-index --cacheinfo), never as the whole working copy.
+18.4 DATA FIXES ON AN ENVIRONMENT go through a script in backend/scripts (safe to repeat, prints what changed), run twice to
+     prove it, and are checked with a count before and after. When PROD is asked for, run the same scripts there after a
+     backup and a rehearsal: legacy_backfill_gender, legacy_backfill_names, legacy_backfill_guardian,
+     legacy_retag_patrika, legacy_retag_amrutha, legacy_normalize_blood_group, and clear members.magazine_email.
+18.5 TWO TESTS FAIL ONLY WHEN MANY TESTS RUN TOGETHER (the shared test database keeps rows): test_starter_gotras_and_
+     qualifications_seed_only_into_empty_masters and test_unapproved_list_carries_receipts_and_label_list_pages. Each passes alone
+     and fails the same way without the change under test; report them, do not "fix" the feature for them.
+18.6 THE USER OFTEN WANTS AN IDEA FIRST, in short plain words with examples (rule 11.5): "tell me idea", "mock", "list all
+     ideas" are all requests to propose, not to build. A mock goes in the scratchpad as a private page.
+18.7 UAT NOW RUNS ALEMBIC 20261029_0110 (members.guardian_name). Prod is behind it: the old register, the guardian field and
+     everything in rules 16 and 17 are on UAT only until the user asks for a prod update (rule 11.9).
+
+================================================================================
