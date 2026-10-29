@@ -1384,6 +1384,7 @@ def _location_names(db: Session, member: Member) -> dict:
         "district_name": name(District, member.district_id),
         "taluk_name": name(Taluk, member.taluk_id),
         "pincode": name(PostalCode, member.pincode_id, "pincode"),
+        "post_office_name": name(PostalCode, member.pincode_id, "post_office_name"),
     }
 
 
@@ -2634,6 +2635,11 @@ def _profile_personal(db: Session, member: Member) -> dict:
         "mobile_owner_name": member.mobile_owner_name,
         "whatsapp_owner_relation": member.whatsapp_owner_relation,
         "whatsapp_owner_name": member.whatsapp_owner_name,
+        "old_membership_number": member.old_membership_number,
+        "legacy_ref_number": member.legacy_ref_number,
+        "verification_status": member.verification_status,
+        "verified_at": member.verified_at,
+        "verification_remark": member.verification_remark,
         "created_at": member.created_at,
     }
 
@@ -2663,6 +2669,7 @@ def _profile_contact(db: Session, member: Member) -> dict:
         "label_point": member.label_point,
         "address_remarks": member.address_remarks,
         "country": member.country,
+        "mobile_raw": member.mobile_raw if not member.mobile else None,   # what the old register had when its number was unusable
         **_location_names(db, member),
     }
 

@@ -406,6 +406,8 @@ function IdentitySection({ core }) {
       {personal.loading ? <Empty>Loading…</Empty> : !p ? <Empty>This section could not be loaded.</Empty> : (
         <>
           <Row label="Membership number">{core.memberCode}</Row>
+          <Row label="Old membership number">{p.old_membership_number}</Row>
+          <Row label="Application number">{p.legacy_ref_number}</Row>
           <Row label="Full name">{[p.name_title, p.first_name_en, p.middle_name_en, p.last_name_en].filter(Boolean).join(' ')}</Row>
           <Row label="Kannada name">{p.full_name_kn}</Row>
           <Row label="Date of birth">
@@ -429,6 +431,10 @@ function IdentitySection({ core }) {
           </Row>
           <Row label="Member status">{p.member_status}</Row>
           <Row label="Approval status">{p.approval_status}</Row>
+          <Row label="KYC verification">
+            {p.verification_status && [p.verification_status, p.verified_at ? formatDate(p.verified_at) : ''].filter(Boolean).join(' · ')}
+          </Row>
+          <Row label="Verification remark">{p.verification_remark}</Row>
           <Row label="Registered through">{shownSource(p.registration_source)}</Row>
           <Row label="Registered on">{p.created_at ? formatDateTime(p.created_at) : ''}</Row>
           {p.remarks && <div className="col-span-full"><Row label="Remarks">{p.remarks}</Row></div>}
@@ -492,6 +498,7 @@ function ContactFamilySection({ core }) {
           <Row label="Mobile owner">{p?.mobile_owner_name}</Row>
           <Row label="WhatsApp owner">{[p?.whatsapp_owner_name, belongsTo(p?.whatsapp_owner_relation)].filter(Boolean).join(' · ')}</Row>
           <Row label="Alternate mobile">{c.alternate_mobile}</Row>
+          <Row label="Mobile in the old register">{c.mobile_raw}</Row>
           <Row label="Email">{c.email}</Row>
           {relatives.map(([relation, name, number]) => (
             <Row key={relation} label={`${relation}'s name`}><RelativeValue name={name} number={number} links={links} /></Row>
@@ -499,6 +506,7 @@ function ContactFamilySection({ core }) {
           {children.map((ch, i) => (
             <Row key={`c${i}`} label={`Child ${i + 1}${ch.gender ? ` · ${ch.gender}` : ''}`}>
               <RelativeValue name={ch.name} number={ch.membership_number} links={links} />
+              {ch.dob && <span className="ml-2 font-normal text-[#A89B92]">b. {formatDate(ch.dob)}</span>}
             </Row>
           ))}
           {fam && (fam.has_children === true || fam.has_children === false) && <Row label="Has children">{fam.has_children ? 'Yes' : 'No'}</Row>}
@@ -535,6 +543,7 @@ function AddressSection({ core }) {
           <Row label="Grama">{c.grama}</Row>
           <Row label="Village">{c.village}</Row>
           <Row label="Post">{c.post}</Row>
+          <Row label="Post office">{c.post_office_name}</Row>
           <Row label="City">{c.city}</Row>
           <Row label="Taluk">{c.taluk_name}</Row>
           <Row label="District">{c.district_name}</Row>
