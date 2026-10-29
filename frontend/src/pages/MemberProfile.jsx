@@ -519,7 +519,6 @@ function ContactFamilySection({ core }) {
           <Row label="Email">{c.email}</Row>
           <Row label="Magazine">{c.magazine_needed === true ? 'Needed' : c.magazine_needed === false ? 'Not needed' : ''}</Row>
           <Row label="Magazine kind">{c.magazine_needed ? (c.magazine_kind === 'EMAIL' ? 'Online (read on the site)' : c.magazine_kind === 'PHYSICAL' ? 'Printed (posted)' : c.magazine_kind) : ''}</Row>
-          <Row label="Magazine email">{c.magazine_email}</Row>
           <Row label="Magazine address">{c.magazine_delivery_address}</Row>
           {relatives.map(([relation, name, number]) => (
             <Row key={relation} label={`${relation}'s name`}><RelativeValue name={name} number={number} links={links} /></Row>
@@ -894,7 +893,6 @@ function MagazineTab({ id }) {
                   value={{ PHYSICAL: 'Physical copy', EMAIL: 'E-copy' }[d.magazine_kind] || d.magazine_kind}
                 />
               )}
-              {d.magazine_email && <Field label="E-copy email" value={d.magazine_email} />}
               <div className="lg:col-span-2">
                 <Field label="Delivery address" value={address || d.member_address || 'No address on record'} stack />
                 {!address && d.member_address && <p className="text-[11px] text-[#863221] -mt-1 mb-2">Same as the member address (no separate delivery address set).</p>}

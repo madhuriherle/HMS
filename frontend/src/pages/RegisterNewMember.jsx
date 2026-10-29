@@ -204,7 +204,6 @@ export default function RegisterNewMember() {
     // the different postal address is filled in on its own fields, like the communication address
     magLine: '', magPin: '', magLocality: '', magTaluk: '', magDistrict: '', magState: '',
     magazineKind: 'PHYSICAL',
-    magazineEmail: '',
     referredMembershipNo: '',
     referredMembershipName: '',
     familyMembershipNo: '',
@@ -351,7 +350,6 @@ export default function RegisterNewMember() {
           magazineDeliveryAddress: m.magazine_delivery_address || '',
           magLine: m.magazine_delivery_address || '', // a saved address is one text: it shows whole in the first box
           magazineKind: m.magazine_kind === 'EMAIL' ? 'EMAIL' : 'PHYSICAL',
-          magazineEmail: m.magazine_email || '',
           referredMembershipNo: m.referred_by_number || '',
           referredMembershipName: m.referred_by_name || '',
           familyMembershipNo: m.family_membership_number || '',

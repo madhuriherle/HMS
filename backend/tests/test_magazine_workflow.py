@@ -280,13 +280,13 @@ def test_yes_puts_the_member_on_the_subscription_with_the_kind(client, admin_hea
     assert res.status_code in (200, 201), res.text
     mid = res.json()["id"]
     m = client.get(f"{API}/members/{mid}", headers=h).json()
-    assert (m["magazine_kind"], m["magazine_email"]) == ("EMAIL", "reader@example.com")
+    assert (m["magazine_kind"], m["magazine_email"]) == ("EMAIL", None)    # the magazine needs no email: a typed one is not kept
     assert client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"] == []  # not before approval
     _approve_member(client, h, mid)
     subs = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"]
     assert len(subs) == 1 and subs[0]["delivery_status"] == "ACTIVE"
     prof = client.get(f"{API}/members/{mid}/profile/magazine", headers=h).json()
-    assert prof["magazine_kind"] == "EMAIL" and prof["magazine_email"] == "reader@example.com"
+    assert prof["magazine_kind"] == "EMAIL" and "magazine_email" not in prof
 
 
 def test_a_physical_copy_is_the_default_and_needs_no_email(client, admin_headers):

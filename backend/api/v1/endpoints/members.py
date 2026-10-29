@@ -363,8 +363,8 @@ MAGAZINE_KINDS = {"PHYSICAL", "EMAIL"}
 
 
 def _magazine_choice(data: dict, *, needed, own_email=None) -> None:
-    """Check the magazine choice and tidy it: the kind must be known, an e-copy is read online so an email is
-    optional (kept when typed, else the member's own), and a member who only wants the e-copy has no delivery address."""
+    """Check the magazine choice and tidy it: the kind must be known, an e-copy is read on the site so it needs no email (none is
+    kept), and a member who only wants the e-copy has no delivery address."""
     kind = data.get("magazine_kind")
     if kind is not None and kind not in MAGAZINE_KINDS:
         raise HTTPException(400, f"magazine_kind must be one of {sorted(MAGAZINE_KINDS)}")
@@ -372,10 +372,7 @@ def _magazine_choice(data: dict, *, needed, own_email=None) -> None:
         return
     kind = kind or "PHYSICAL"
     data["magazine_kind"] = kind
-    if kind == "EMAIL":
-        data["magazine_email"] = (data.get("magazine_email") or own_email or "").strip() or None
-    else:
-        data["magazine_email"] = None
+    data["magazine_email"] = None          # the magazine needs no email, whichever way it is read
     if kind == "EMAIL":
         data["magazine_delivery_address"] = None
 
@@ -2470,7 +2467,6 @@ def read_member_profile(
                 {
                     "id": s.id,
                     "delivery_kind": member.magazine_kind,
-                    "delivery_email": member.magazine_email,
                     "delivery_status": s.delivery_status,
                     "address_override": s.address_override,
                     "notes": s.notes,
@@ -2759,7 +2755,6 @@ def _profile_contact(db: Session, member: Member) -> dict:
     return {
         "magazine_needed": member.magazine_needed,
         "magazine_kind": member.magazine_kind,
-        "magazine_email": member.magazine_email,
         "magazine_delivery_address": member.magazine_delivery_address,
         "mobile": member.mobile,
         "mobile_country_code": member.mobile_country_code,
@@ -3103,7 +3098,6 @@ def _profile_magazine(db: Session, member: Member, actor=None) -> dict:
         "magazine_needed": member.magazine_needed,
         "magazine_delivery_address": getattr(member, "magazine_delivery_address", None),
         "magazine_kind": member.magazine_kind,
-        "magazine_email": member.magazine_email,
         "member_address": _member_label_address(member),
         "subscription_log": _subscription_log(db, member, actor),
         "issues": [i for sub in subs for i in _issue_history(db, sub)],

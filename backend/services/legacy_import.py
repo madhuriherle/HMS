@@ -547,7 +547,6 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
             district_id=pc.district_id if pc else None, taluk_id=pc.taluk_id if pc else None,
             referred_by_number=str(ref_no) if ref_no else None, referred_by_name=_s(r.get("CusNameRef"))[:150] or None,
             magazine_needed=wants, magazine_kind="EMAIL" if (wants and online) else ("PHYSICAL" if wants else None),
-            magazine_email=(email if (wants and online) else None),
             remarks=" | ".join(notes) or None,
             **native_fields(r, ", ".join(addr)),
             approval_status=("UNAPPROVED" if applicants else "APPROVED"), registration_status=("PENDING" if applicants else "APPROVED"),
