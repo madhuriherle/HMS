@@ -2730,11 +2730,27 @@ def _profile_personal(db: Session, member: Member) -> dict:
         "verified_at": member.verified_at,
         "verification_remark": member.verification_remark,
         "created_at": member.created_at,
+        "membership_type_category": member.membership_type_category,
+        "registration_payment": member.registration_payment,
+        "approved_at": member.approved_at,
+        "approved_by_name": _user_name(db, member.approved_by),
+        "verified_by_name": _user_name(db, member.verified_by),
+        "login_count": member.login_count or 0,
     }
+
+
+def _user_name(db: Session, user_id) -> Optional[str]:
+    if not user_id:
+        return None
+    return db.query(User.name).filter(User.id == user_id).scalar()
 
 
 def _profile_contact(db: Session, member: Member) -> dict:
     return {
+        "magazine_needed": member.magazine_needed,
+        "magazine_kind": member.magazine_kind,
+        "magazine_email": member.magazine_email,
+        "magazine_delivery_address": member.magazine_delivery_address,
         "mobile": member.mobile,
         "mobile_country_code": member.mobile_country_code,
         "whatsapp_number": member.whatsapp_number,

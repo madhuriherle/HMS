@@ -339,9 +339,14 @@ const initialOf = (name) => String(name || '?').trim().charAt(0).toUpperCase();
 const GridContext = React.createContext(false);
 
 // a label / value row for the key-value panels; an empty value is not drawn
-const Row = ({ label, children, stack = false }) => {
+// the Personal Details tab lists every field, an empty one with a dash; the other places hide an empty row
+const ShowEmptyContext = React.createContext(false);
+
+const Row = ({ label, children: value, stack = false }) => {
   const compact = React.useContext(GridContext);
-  if (!children) return null;
+  const showEmpty = React.useContext(ShowEmptyContext);
+  if (!value && !showEmpty) return null;
+  const children = value || <span className="font-normal text-[#B8ADA5]">—</span>;
   if (compact || stack) {
     return (
       <div className={`${compact ? 'py-1' : 'py-2.5'} text-xs min-w-0`}>
@@ -409,6 +414,7 @@ function IdentitySection({ core }) {
           <Row label="Membership number">{core.memberCode}</Row>
           <Row label="Old membership number">{p.old_membership_number}</Row>
           <Row label="Application number">{p.legacy_ref_number}</Row>
+          <Row label="Title">{p.name_title}</Row>
           <Row label="Full name">{[p.name_title, p.first_name_en, p.middle_name_en, p.last_name_en].filter(Boolean).join(' ')}</Row>
           <Row label="Kannada name">{p.full_name_kn}</Row>
           <Row label="Date of birth">
@@ -436,8 +442,18 @@ function IdentitySection({ core }) {
             {p.verification_status && [p.verification_status, p.verified_at ? formatDate(p.verified_at) : ''].filter(Boolean).join(' · ')}
           </Row>
           <Row label="Verification remark">{p.verification_remark}</Row>
+          <Row label="KYC by">{p.verified_by_name}</Row>
           <Row label="Registered through">{shownSource(p.registration_source)}</Row>
           <Row label="Registered on">{p.created_at ? formatDateTime(p.created_at) : ''}</Row>
+          <Row label="Approved on">{p.approved_at ? formatDateTime(p.approved_at) : ''}</Row>
+          <Row label="Approved by">{p.approved_by_name}</Row>
+          <Row label="Membership category">{p.membership_type_category}</Row>
+          <Row label="Payment at registration">
+            {p.registration_payment && typeof p.registration_payment === 'object'
+              ? Object.entries(p.registration_payment).filter(([, v]) => v !== null && v !== '' && typeof v !== 'object').map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(' · ')
+              : p.registration_payment}
+          </Row>
+          <Row label="App logins">{p.login_count ? String(p.login_count) : ''}</Row>
           {p.remarks && <div className="col-span-full"><Row label="Remarks">{p.remarks}</Row></div>}
         </>
       )}
@@ -501,6 +517,10 @@ function ContactFamilySection({ core }) {
           <Row label="Alternate mobile">{c.alternate_mobile}</Row>
           <Row label="Mobile in the old register">{c.mobile_raw}</Row>
           <Row label="Email">{c.email}</Row>
+          <Row label="Magazine">{c.magazine_needed === true ? 'Needed' : c.magazine_needed === false ? 'Not needed' : ''}</Row>
+          <Row label="Magazine kind">{c.magazine_needed ? (c.magazine_kind === 'EMAIL' ? 'Online (read on the site)' : c.magazine_kind === 'PHYSICAL' ? 'Printed (posted)' : c.magazine_kind) : ''}</Row>
+          <Row label="Magazine email">{c.magazine_email}</Row>
+          <Row label="Magazine address">{c.magazine_delivery_address}</Row>
           {relatives.map(([relation, name, number]) => (
             <Row key={relation} label={`${relation}'s name`}><RelativeValue name={name} number={number} links={links} /></Row>
           ))}
@@ -608,17 +628,19 @@ function PersonalTab({ id, memberCode }) {
     ['Mobile', c.mobile], ['Address', c.address_line1], ['PIN code', c.pincode], ['Taluk', c.taluk_name]
   ].filter(([, v]) => !v).map(([label]) => label) : [];
   return (
-    <div className="space-y-4">
-      {missing.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
-          <b>Not filled in:</b> {missing.join(', ')}
-        </div>
-      )}
-      <IdentitySection core={core} />
-      <ContactFamilySection core={core} />
-      <AddressSection core={core} />
-      <AuditStrip core={core} />
-    </div>
+    <ShowEmptyContext.Provider value>
+      <div className="space-y-4">
+        {missing.length > 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
+            <b>Not filled in:</b> {missing.join(', ')}
+          </div>
+        )}
+        <IdentitySection core={core} />
+        <ContactFamilySection core={core} />
+        <AddressSection core={core} />
+        <AuditStrip core={core} />
+      </div>
+    </ShowEmptyContext.Provider>
   );
 }
 
