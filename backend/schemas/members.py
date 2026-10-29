@@ -148,16 +148,6 @@ class MemberBase(BaseModel):
             raise ValueError(f"gender must be one of: {', '.join(sorted(VALID_GENDERS))}")
         return v
 
-    @field_validator("date_of_birth")
-    @classmethod
-    def _validate_dob(cls, v: Optional[date]) -> Optional[date]:
-        if v:
-            today = date.today()
-            age = today.year - v.year - ((today.month, today.day) < (v.month, v.day))
-            if age < rules.MIN_MEMBER_AGE:
-                raise ValueError(f"Member must be at least {rules.MIN_MEMBER_AGE} years old")
-        return v
-
     @field_validator("mobile", "alternate_mobile")
     @classmethod
     def _validate_mobile(cls, v: Optional[str]) -> Optional[str]:
@@ -179,6 +169,17 @@ class MemberCreate(MemberBase):
     # an existing member being entered by hand: saved already Approved with the membership number typed in
     existing_member: bool = False
     existing_membership_number: Optional[str] = None
+
+    # the age rule applies to what is typed in, not to a record already on file (imported members can be children)
+    @field_validator("date_of_birth")
+    @classmethod
+    def _validate_dob(cls, v: Optional[date]) -> Optional[date]:
+        if v:
+            today = date.today()
+            age = today.year - v.year - ((today.month, today.day) < (v.month, v.day))
+            if age < rules.MIN_MEMBER_AGE:
+                raise ValueError(f"Member must be at least {rules.MIN_MEMBER_AGE} years old")
+        return v
 
 
 class MemberUpdate(BaseModel):
