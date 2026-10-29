@@ -14,7 +14,6 @@ import {
   TrendingUp,
   CalendarDays,
   Pencil,
-  Printer,
 } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
@@ -1600,9 +1599,6 @@ export default function MemberProfile() {
                     <Pencil className="w-3.5 h-3.5" /> Edit Profile
                   </Link>
                 )}
-                <button type="button" title="Print profile" onClick={() => window.print()} className="text-xs bg-[#F7EDE6] hover:bg-[#EFE6DE] text-[#510601] px-3 py-2 rounded-lg transition">
-                  <Printer className="w-3.5 h-3.5" />
-                </button>
               </div>
             </div>
 
