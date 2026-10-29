@@ -14,9 +14,7 @@ import {
   X,
   FileSpreadsheet,
   Phone,
-  Calendar,
 } from 'lucide-react';
-import Modal from '../components/Modal';
 import { isReceiptUnmapped } from '../utils/displayHelpers';
 import PermissionGate from '../components/PermissionGate';
 import useAuth from '../hooks/useAuth';
@@ -29,7 +27,6 @@ import { fetchReceiptPage } from '../utils/apiAdapters';
 import { currentRules } from '../hooks/useRules';
 import { formatMoney } from '../utils/money';
 
-import ModalFooter from '../components/ModalFooter';
 import ReceiptViewModal from '../components/ReceiptViewModal';
 // Financial year (April-March) of an ISO date: 2026-10-12 -> 2026-27
 const getCurrentFY = (date = new Date()) => {
@@ -125,7 +122,6 @@ export default function ReceiptTracking() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [periodMode, setPeriodMode] = useState('FY'); // ALL, TODAY, MONTH, FY, CUSTOM
-  const [dayBook, setDayBook] = useState(null); // { date, data }
 
   // Modals State
   const [viewingReceipt, setViewingReceipt] = useState(null);
@@ -311,15 +307,6 @@ export default function ReceiptTracking() {
     }
   };
 
-  const loadDayBook = async (date) => {
-    try {
-      const { data } = await api.get('/receipts/day-book', { params: { from_date: date, to_date: date } });
-      setDayBook({ date, data });
-    } catch (error) {
-      showToast(apiErrorMessage(error, 'Could not load the day book.'), 'error');
-    }
-  };
-
   // ----------------------------------------------------
   // ACTION HANDLERS
   // ----------------------------------------------------
@@ -440,14 +427,6 @@ export default function ReceiptTracking() {
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
             >
               Repeated Numbers
-            </button>
-            <button
-              type="button"
-              onClick={() => loadDayBook(new Date().toISOString().slice(0, 10))}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
-            >
-              <Calendar className="w-4 h-4" />
-              Day Book
             </button>
             <button
               type="button"
@@ -775,53 +754,6 @@ export default function ReceiptTracking() {
       {/* ============================================================ */}
       <ReceiptViewModal receipt={viewingReceipt} onClose={() => setViewingReceipt(null)} />
 
-      {/* ============================================================ */}
-      {/* DAY BOOK                                                     */}
-      {/* ============================================================ */}
-      <Modal isOpen={Boolean(dayBook)} onClose={() => setDayBook(null)}>
-        {dayBook && (
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-[#E8DFD8] shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl flex items-center justify-between gap-3">
-              <h3 className="text-lg font-bold text-[#180200] font-serif">Day Book</h3>
-              <input
-                type="date"
-                value={dayBook.date}
-                onChange={(e) => e.target.value && loadDayBook(e.target.value)}
-                className="px-3 py-1.5 bg-white border border-[#E8DFD8] rounded-xl text-xs focus:outline-none focus:border-[#510601]"
-              />
-            </div>
-            <div className="p-6">
-            <div className="flex items-baseline justify-between">
-              <span className="text-xs text-[#863221]">{dayBook.data.receipt_count} receipt(s)</span>
-              <span className="text-2xl font-bold font-mono text-[#510601]">{formatMoney(dayBook.data.total)}</span>
-            </div>
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div>
-                <p className="font-bold text-[#863221] uppercase tracking-wider text-[10px] mb-1.5">By payment mode</p>
-                {dayBook.data.by_payment_mode.length === 0 && <p className="text-[#863221]/70">No receipts.</p>}
-                {dayBook.data.by_payment_mode.map((m) => (
-                  <div key={m.payment_mode} className="flex justify-between py-1 border-b border-[#E8DFD8]/60">
-                    <span>{m.payment_mode} <span className="text-[#863221]/70">({m.count})</span></span>
-                    <span className="font-mono font-bold">{formatMoney(m.amount)}</span>
-                  </div>
-                ))}
-              </div>
-              <div>
-                <p className="font-bold text-[#863221] uppercase tracking-wider text-[10px] mb-1.5">By particular</p>
-                {dayBook.data.by_particular.length === 0 && <p className="text-[#863221]/70">No receipts.</p>}
-                {dayBook.data.by_particular.map((p) => (
-                  <div key={p.particular} className="flex justify-between py-1 border-b border-[#E8DFD8]/60">
-                    <span>{p.particular}</span>
-                    <span className="font-mono font-bold">{formatMoney(p.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            </div>
-            <ModalFooter kind="view" onCancel={() => setDayBook(null)} />
-          </div>
-        )}
-      </Modal>
     </div>
     </PermissionGate>
   );
