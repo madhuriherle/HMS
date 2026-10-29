@@ -8,11 +8,24 @@ import { notify } from '../utils/notify';
 import { formatDate } from '../utils/dateUtils';
 
 // Members whose stored data looks wrong, one tab per problem. Only a pointer for the office: the member is corrected on the Edit screen.
+// `extra`: the columns this problem needs beside the common ones (heading and what to show)
+const DOB_COLUMNS = [
+  { head: 'Date of birth', cell: (m) => (m.dob ? formatDate(m.dob) : '—'), nowrap: true },
+  { head: 'Age', cell: (m) => (m.age == null ? '—' : m.age < 0 ? 'Future date' : `${m.age} years`), nowrap: true }
+];
 const TABS = [
-  { id: 'future_dob', label: 'Date of birth in the future', hint: 'The date of birth is after today: a typing mistake in the register.' },
-  { id: 'under_18', label: 'Under 18', hint: 'The date of birth makes the member younger than 18: most likely a wrong year.' },
-  { id: 'very_old', label: 'Over 110', hint: 'The date of birth makes the member older than 110: most likely a wrong year.' },
-  { id: 'alt_number', label: 'Alternate number', hint: 'The alternate number is not 10 to 12 digits (a landline with its STD code, or a short number).' }
+  { id: 'future_dob', label: 'Date of birth in the future', hint: 'The date of birth is after today: a typing mistake in the register.', extra: DOB_COLUMNS },
+  { id: 'under_18', label: 'Under 18', hint: 'The date of birth makes the member younger than 18: most likely a wrong year.', extra: DOB_COLUMNS },
+  { id: 'very_old', label: 'Over 110', hint: 'The date of birth makes the member older than 110: most likely a wrong year.', extra: DOB_COLUMNS },
+  { id: 'alt_number', label: 'Alternate number', hint: 'The alternate number is not 10 to 12 digits (a landline with its STD code, or a short number).',
+    extra: [{ head: 'Alternate number', cell: (m) => m.alternate_mobile || '—', nowrap: true, mono: true }] },
+  { id: 'bad_email', label: 'Wrong email', hint: 'The email address is not in a valid format (for example no @, or a space or stray character in it).',
+    extra: [{ head: 'Email', cell: (m) => m.email || '—', mono: true }] },
+  { id: 'no_place', label: 'No pincode or district', hint: 'The member has no pincode or no district, so the state, district and taluk cannot be filled.',
+    extra: [{ head: 'Missing', cell: (m) => (m.missing || []).join(', ') || '—' }] },
+  { id: 'print_no_address', label: 'Printed magazine, no address', hint: 'The member gets the printed magazine but has no address (and no separate magazine address) to post it to.', extra: [] },
+  { id: 'odd_name', label: 'Odd characters in name', hint: 'The name has something other than letters, spaces, dots, apostrophes or hyphens (a digit, a slash, a stray symbol).', extra: [] },
+  { id: 'short_name', label: 'Name too short', hint: 'The name has fewer than 4 letters: probably only initials or a half-typed name.', extra: [] }
 ];
 
 export default function DataCheck() {
@@ -55,7 +68,6 @@ export default function DataCheck() {
   };
 
   const tab = TABS.find((t) => t.id === kind);
-  const dobTab = kind !== 'alt_number';
   const th = 'px-3 py-2.5 text-left whitespace-nowrap';
   return (
     <div className="space-y-4 pb-6">
@@ -119,8 +131,7 @@ export default function DataCheck() {
                 <th className={th}>Membership no</th>
                 <th className={th}>Old no</th>
                 <th className={th}>Mobile</th>
-                {dobTab ? <th className={th}>Date of birth</th> : <th className={th}>Alternate number</th>}
-                {dobTab && <th className={th}>Age</th>}
+                {tab.extra.map((c) => <th key={c.head} className={th}>{c.head}</th>)}
                 <th className={th}>District</th>
                 <th className={th}>Status</th>
                 {canEdit && <th className={th} />}
@@ -135,12 +146,9 @@ export default function DataCheck() {
                   <td className="px-3 py-2.5">{m.membership_no || '—'}</td>
                   <td className="px-3 py-2.5">{m.old_no || '—'}</td>
                   <td className="px-3 py-2.5">{m.mobile || '—'}</td>
-                  {dobTab ? (
-                    <td className="px-3 py-2.5 whitespace-nowrap">{m.dob ? formatDate(m.dob) : '—'}</td>
-                  ) : (
-                    <td className="px-3 py-2.5 whitespace-nowrap font-mono">{m.alternate_mobile || '—'}</td>
-                  )}
-                  {dobTab && <td className="px-3 py-2.5 whitespace-nowrap">{m.age == null ? '—' : m.age < 0 ? 'Future date' : `${m.age} years`}</td>}
+                  {tab.extra.map((c) => (
+                    <td key={c.head} className={`px-3 py-2.5 ${c.nowrap ? 'whitespace-nowrap' : ''} ${c.mono ? 'font-mono' : ''}`}>{c.cell(m)}</td>
+                  ))}
                   <td className="px-3 py-2.5">{m.district || '—'}</td>
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     {[m.approval !== 'APPROVED' ? m.approval : '', m.status].filter(Boolean).map((s) => s.charAt(0) + s.slice(1).toLowerCase()).join(' · ') || '—'}
