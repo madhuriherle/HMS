@@ -109,12 +109,13 @@ def read_members(
                     func.upper(func.trim(MemberMembership.membership_number)).in_(waiting))),
             ))
     if membership_type_id:
-        query = query.join(
-            MemberMembership, MemberMembership.member_id == Member.id
-        ).filter(
-            MemberMembership.membership_type_id == membership_type_id,
-            MemberMembership.is_deleted == False,
-        ).distinct()
+        # an IN, not a join with DISTINCT: the member row has a JSON column (children) and Postgres cannot DISTINCT json
+        query = query.filter(Member.id.in_(
+            db.query(MemberMembership.member_id).filter(
+                MemberMembership.membership_type_id == membership_type_id,
+                MemberMembership.is_deleted == False,  # noqa: E712
+            )
+        ))
     if no_membership_type:
         query = query.filter(~Member.id.in_(
             db.query(MemberMembership.member_id).filter(
