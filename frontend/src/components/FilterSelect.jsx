@@ -29,7 +29,8 @@ export default function FilterSelect({
 
   // Find current option label
   const selectedOption = options.find((opt) => String(opt.value) === String(value));
-  const displayLabel = selectedOption ? selectedOption.label : placeholder;
+  // an option can show a shorter text in the closed box (`display`), e.g. "Type" for "All Receipt Types"
+  const displayLabel = selectedOption ? selectedOption.display || selectedOption.label : placeholder;
 
   return (
     <div ref={containerRef} className={`relative inline-block ${widthClass} ${className}`}>

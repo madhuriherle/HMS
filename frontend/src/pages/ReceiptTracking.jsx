@@ -14,6 +14,7 @@ import {
   X,
   FileSpreadsheet,
   Phone,
+  Repeat,
 } from 'lucide-react';
 import { isReceiptUnmapped } from '../utils/displayHelpers';
 import PermissionGate from '../components/PermissionGate';
@@ -227,7 +228,7 @@ export default function ReceiptTracking() {
 
   // Receipt Type and Sub Type as one list: each type, then its sub types under it
   const typeOptions = useMemo(() => {
-    const out = [{ value: 'ALL', label: 'All Receipt Types' }];
+    const out = [{ value: 'ALL', label: 'All Receipt Types', display: 'Type' }];
     particularOptions.forEach((t) => {
       const subs = filterOptions.sub_types?.[t] || [];
       out.push({ value: `T|${t}`, label: subs.length ? `${t} (all)` : t, bold: true });
@@ -253,9 +254,15 @@ export default function ReceiptTracking() {
     const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const now = new Date();
     setFyFilter('ALL');
+    setMonthFilter('ALL');
     setFromDate('');
     setToDate('');
-    if (val.startsWith('FY|')) {
+    if (val.startsWith('FYM|')) {
+      const [, fy, month] = val.split('|'); // a month of that financial year
+      setPeriodMode('FY');
+      setFyFilter(fy);
+      setMonthFilter(month);
+    } else if (val.startsWith('FY|')) {
       setPeriodMode('FY');
       setFyFilter(val.slice(3));
     } else if (val === 'TODAY') {
@@ -424,9 +431,10 @@ export default function ReceiptTracking() {
               type="button"
               onClick={() => navigate('/dashboard/receipts/repeats')}
               title="Receipt numbers the register used more than once (32170, 32170/2)"
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
+              aria-label="Repeated Numbers"
+              className="inline-flex items-center justify-center h-9 w-9 text-[#510601] bg-white border border-[#E8DFD8] rounded-xl hover:bg-[#FAF7F2] cursor-pointer"
             >
-              Repeated Numbers
+              <Repeat className="w-4 h-4" />
             </button>
             <button
               type="button"
@@ -440,32 +448,25 @@ export default function ReceiptTracking() {
           </>
         }
       >
-        {/* Period: one dropdown for the financial year and the date range */}
+        {/* Period: the financial years, with the months of the chosen year under it (April to March), and the date range */}
         <FilterSelect
-          value={periodMode === 'FY' ? `FY|${fyFilter}` : periodMode}
+          value={periodMode === 'FY' ? (monthFilter !== 'ALL' ? `FYM|${fyFilter}|${monthFilter}` : `FY|${fyFilter}`) : periodMode}
           onChange={choosePeriod}
           options={[
             { value: 'ALL', label: 'All Time' },
             { value: 'TODAY', label: 'Today' },
             { value: 'MONTH', label: 'This Month' },
-            ...fyOptions.map((f) => ({ value: `FY|${f}`, label: `FY ${f}` })),
+            ...fyOptions.flatMap((f) => [
+              { value: `FY|${f}`, label: `FY ${f}` },
+              ...(periodMode === 'FY' && fyFilter === f
+                ? [[4, 'April'], [5, 'May'], [6, 'June'], [7, 'July'], [8, 'August'], [9, 'September'], [10, 'October'], [11, 'November'], [12, 'December'], [1, 'January'], [2, 'February'], [3, 'March']]
+                  .map(([n, label]) => ({ value: `FYM|${f}|${n}`, label, indent: true, display: `${label} ${f}` }))
+                : [])
+            ]),
             { value: 'CUSTOM', label: 'Custom Dates...' }
           ]}
           widthClass="w-full sm:w-44"
         />
-        {/* Month: the months of the financial year, April to March */}
-        {(periodMode === 'FY' || periodMode === 'ALL') && (
-          <FilterSelect
-            value={monthFilter}
-            onChange={setMonthFilter}
-            options={[
-              { value: 'ALL', label: 'All Months' },
-              ...[[4, 'April'], [5, 'May'], [6, 'June'], [7, 'July'], [8, 'August'], [9, 'September'], [10, 'October'], [11, 'November'], [12, 'December'], [1, 'January'], [2, 'February'], [3, 'March']]
-                .map(([n, label]) => ({ value: String(n), label }))
-            ]}
-            widthClass="w-full sm:w-36"
-          />
-        )}
         {periodMode === 'CUSTOM' && (
           <>
             <input
@@ -490,7 +491,7 @@ export default function ReceiptTracking() {
           value={subTypeFilter !== 'ALL' ? `S|${subTypeFilter}` : particularsFilter !== 'ALL' ? `T|${particularsFilter}` : 'ALL'}
           onChange={chooseType}
           options={typeOptions}
-          widthClass="w-full sm:w-52"
+          widthClass="w-full sm:w-44"
         />
 
         {/* Status: whether the receipt is linked to a member, plus the old-register receipts with no real number (FY43-001 style) or no amount */}
@@ -501,22 +502,22 @@ export default function ReceiptTracking() {
             else { setNumberFilter('ALL'); setStatusFilter(val); }
           }}
           options={[
-            { value: 'ALL', label: 'All Statuses' },
+            { value: 'ALL', label: 'All Statuses', display: 'Status' },
             { value: 'Assigned', label: 'Assigned' },
             { value: 'Unassigned', label: 'Unassigned' },
             { value: 'Cancelled', label: 'Cancelled' },
             { value: 'UNKNOWN', label: 'Unknown number (dummy)' },
             { value: 'ZERO', label: 'No amount' }
           ]}
-          widthClass="w-full sm:w-52"
+          widthClass="w-full sm:w-40"
         />
 
         {/* Payment Mode */}
         <FilterSelect
           value={modeFilter}
           onChange={(val) => setModeFilter(val)}
-          options={[{ value: 'ALL', label: 'All Payment Modes' }, ...modeOptions.map((m) => ({ value: m, label: m }))]}
-          widthClass="w-full sm:w-44"
+          options={[{ value: 'ALL', label: 'All Payment Modes', display: 'Mode' }, ...modeOptions.map((m) => ({ value: m, label: m }))]}
+          widthClass="w-full sm:w-36"
         />
       </SearchFilterBar>
 
