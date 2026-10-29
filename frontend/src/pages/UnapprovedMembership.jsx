@@ -662,76 +662,63 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           widthClass="w-full sm:w-44"
         />
 
-        {/* 2. Receipt Status (the Assigned queue is already limited to assigned receipts) */}
-        {!assignedOnly && <FilterSelect
-          value={receiptStatusFilter}
-          onChange={(val) => {
-            setReceiptStatusFilter(val);
-            setCurrentPage(1);
-          }}
-          options={[
-            { value: 'ALL', label: 'Receipt Status' },
-            { value: 'Pending', label: 'Unassigned' },
-            { value: 'Assigned', label: 'Assigned' }
-          ]}
-          widthClass="w-full sm:w-40"
-        />}
-
-        {/* 3. Payment Status: no receipt on record, or the receipts pay less than the price of the type they chose */}
+        {/* 2. Payment: whether a receipt is attached, and whether what was paid covers the price of the type they chose */}
         <FilterSelect
-          value={paymentFilter}
+          value={paymentFilter !== 'ALL' ? paymentFilter : receiptStatusFilter === 'Pending' ? 'UNASSIGNED' : receiptStatusFilter === 'Assigned' && !assignedOnly ? 'ASSIGNED' : 'ALL'}
           onChange={(val) => {
-            setPaymentFilter(val);
+            setReceiptStatusFilter(assignedOnly ? 'Assigned' : val === 'UNASSIGNED' ? 'Pending' : val === 'ASSIGNED' ? 'Assigned' : 'ALL');
+            setPaymentFilter(val === 'NO_RECEIPT' || val === 'MISMATCH' ? val : 'ALL');
             setCurrentPage(1);
           }}
           options={[
-            { value: 'ALL', label: 'Payment Status' },
+            { value: 'ALL', label: 'Payment', display: 'Payment' },
+            ...(assignedOnly ? [] : [{ value: 'UNASSIGNED', label: 'Receipt not assigned' }, { value: 'ASSIGNED', label: 'Receipt assigned' }]),
             { value: 'NO_RECEIPT', label: 'No receipt on record' },
             { value: 'MISMATCH', label: 'Payment mismatch' }
           ]}
           widthClass="w-full sm:w-44"
         />
 
-        {/* 4. District */}
-        <FilterSelect
-          value={districtFilter}
-          onChange={(val) => {
-            setDistrictFilter(val);
-            setCurrentPage(1);
-          }}
-          options={[
-            { value: 'ALL', label: 'All Districts' },
-            ...filterDistricts.map((d) => ({ value: d.name, label: d.name }))
-          ]}
-          widthClass="w-full sm:w-48"
-        />
-
-        {/* Meeting PDF (the rare filter) behind one button, so the card stays in one line: only the applicants that were on an exported PDF, or on the one exported on a given day */}
-        {statusFilter === 'UNAPPROVED' && (
-          <FilterMore count={exportFilter !== 'ALL' ? 1 : 0}>
-            <FilterSelect
-              value={exportFilter}
-              onChange={(val) => {
-                setExportFilter(val);
-                if (val !== 'EXPORTED') setExportedOn('');
-                setCurrentPage(1);
-              }}
-              options={[
-                { value: 'ALL', label: 'All (exported or not)' },
-                { value: 'EXPORTED', label: 'Only exported' },
-                { value: 'NOT_EXPORTED', label: 'Not exported yet' }
-              ]}
-            />
-            {exportFilter === 'EXPORTED' && (
-              <DateInput
-                value={exportedOn}
-                onChange={(e) => { setExportedOn(e.target.value); setCurrentPage(1); }}
-                placeholder="Exported on"
-                className="w-full h-9 px-3 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]"
+        {/* The rarer filters behind one button, so the card stays in one line: the district, and the meeting PDF (only the applicants that
+            were on an exported PDF, or on the one exported on a given day) */}
+        <FilterMore count={(districtFilter !== 'ALL' ? 1 : 0) + (statusFilter === 'UNAPPROVED' && exportFilter !== 'ALL' ? 1 : 0)}>
+          <FilterSelect
+            value={districtFilter}
+            onChange={(val) => {
+              setDistrictFilter(val);
+              setCurrentPage(1);
+            }}
+            options={[
+              { value: 'ALL', label: 'All Districts' },
+              ...filterDistricts.map((d) => ({ value: d.name, label: d.name }))
+            ]}
+          />
+          {statusFilter === 'UNAPPROVED' && (
+            <>
+              <FilterSelect
+                value={exportFilter}
+                onChange={(val) => {
+                  setExportFilter(val);
+                  if (val !== 'EXPORTED') setExportedOn('');
+                  setCurrentPage(1);
+                }}
+                options={[
+                  { value: 'ALL', label: 'Meeting PDF: all' },
+                  { value: 'EXPORTED', label: 'Meeting PDF: only exported' },
+                  { value: 'NOT_EXPORTED', label: 'Meeting PDF: not exported yet' }
+                ]}
               />
-            )}
-          </FilterMore>
-        )}
+              {exportFilter === 'EXPORTED' && (
+                <DateInput
+                  value={exportedOn}
+                  onChange={(e) => { setExportedOn(e.target.value); setCurrentPage(1); }}
+                  placeholder="Exported on"
+                  className="w-full h-9 px-3 text-xs bg-white border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601]"
+                />
+              )}
+            </>
+          )}
+        </FilterMore>
       </SearchFilterBar>
 
       {/* ---------------------------------------------------- */}
@@ -806,13 +793,17 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                       {/* Name & Source */}
                       <td className="py-3.5 px-4">
                         <span className="font-bold text-[#180200] text-sm">{m.fullName || m.name}</span>
-                        <div className="text-[11px] text-[#863221] mt-0.5 font-mono">
-                          {m.registrationSource || '—'}
-                        </div>
+                        {/* a small mark for an applicant who was on a meeting PDF; the date shows on hover */}
                         {m.last_exported_on && (
-                          <div className="text-[10px] text-[#863221] mt-0.5" title="The latest meeting PDF this applicant was on">
-                            On meeting PDF · {formatDate(m.last_exported_on)}
-                          </div>
+                          <FileText
+                            className="inline-block w-3.5 h-3.5 ml-1.5 -mt-0.5 text-[#863221]/70"
+                            title={`On the meeting PDF of ${formatDate(m.last_exported_on)}`}
+                            aria-label={`On the meeting PDF of ${formatDate(m.last_exported_on)}`}
+                          />
+                        )}
+                        {/* only a real source (an online or office registration); an imported applicant has none to show */}
+                        {m.registrationSource && m.registrationSource !== 'MIGRATION' && (
+                          <div className="text-[11px] text-[#863221] mt-0.5 font-mono">{m.registrationSource}</div>
                         )}
                         {statusFilter === 'REJECTED' && m.rejection && (
                           <div className="text-[10px] text-[#9B2C2C] mt-0.5 max-w-[240px]">
