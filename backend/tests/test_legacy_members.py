@@ -422,7 +422,7 @@ def test_upgrade_with_an_amrutha_mahotsava_note_goes_to_that_campaign(client, ad
         assert lines("88001") == ([("Amrutha Mahotsava Abhiyana", 100.0), (None, 1000.0)], 1100.0)
         assert lines("88002") == ([("Amrutha Mahotsava Abhiyana", 100.0)], 100.0)
         assert lines("88003")[0] == [("Patrika Nidhi", 100.0)] and lines("88004")[0] == [("Patrika Nidhi", 100.0)]
-        assert lines("88005")[0] == [("Patrika Nidhi", 100.0)]       # a local drive keeps the Patrika Nidhi heading until the office says otherwise
+        assert lines("88005")[0] == [("Amrutha Mahotsava Abhiyana", 100.0)]    # a local drive (Yellapura ...) is part of the campaign too
         # receipts imported before the rule: the helper moves the campaign amounts, once, and the totals stay
         for number in ("88001", "88002"):
             rec = db.query(Receipt).filter(Receipt.receipt_number == number).one()

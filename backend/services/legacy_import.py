@@ -21,9 +21,9 @@ from typing import Any, Optional
 
 # the old register wrote Patrika Nidhi (the magazine fund) payments in the upgrade or the donation column with this note
 _PATRIKA = re.compile(r"patrika|\bp\.?\s*nidhi\b", re.I)
-# ... and the 75-year Amrutha Mahotsava campaign ("Amruthamahosthava Abhiyana" and its many spellings, "A.M Office"): an upgrade amount with
-# such a note is a donation to that campaign, not Patrika Nidhi
-_AMRUTHA = re.compile(r"amr[iuy]|amrt|mritam|mahos|a\.?\s?m\.?\s*office", re.I)
+# ... and the 75-year Amrutha Mahotsava campaign ("Amruthamahosthava Abhiyana" and its many spellings, "A.M Office", a plain "ABHIYANA" and the
+# local drives such as "YELLAPURA ABHIYANA"): an upgrade amount with such a note is a donation to that campaign, not Patrika Nidhi
+_AMRUTHA = re.compile(r"amr[iuy]|amrt|mritam|mahos|a\.?\s?m\.?\s*office|abhiy|bhiyan", re.I)
 AMRUTHA_SUB = "Amrutha Mahotsava Abhiyana"
 _KANNADA = re.compile("[\u0C80-\u0CFF]")
 FIRST_YEAR = 1943          # the Sabha began in 1943: no receipt can be older
