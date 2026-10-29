@@ -14,6 +14,7 @@ import {
   TrendingUp,
   CalendarDays,
   Pencil,
+  Printer,
 } from 'lucide-react';
 import useAuth from '../hooks/useAuth';
 import PermissionGate from '../components/PermissionGate';
@@ -67,30 +68,6 @@ const Field = ({ label, value, stack = false }) =>
 const Empty = ({ children }) => <p className="text-xs text-[#863221]/70">{children}</p>;
 
 const phone = (code, number) => (number ? `${code || ''} ${number}`.trim() : '');
-
-// A relative named on the profile: link to their own profile when their membership number is a member.
-function Relative({ relation, name, number, links }) {
-  const linked = number ? links[number.toUpperCase()] : null;
-  return (
-    <div className="flex items-center justify-between gap-3 py-2 border-b last:border-b-0 border-[#E8DFD8]/70">
-      <div>
-        <div className="text-[10px] uppercase font-bold text-[#863221] tracking-wider">{relation}</div>
-        <div className="text-sm font-semibold text-[#180200]">
-          {name || '—'}
-          {number && <span className="ml-2 font-mono text-xs font-normal text-[#863221]">{number}</span>}
-        </div>
-      </div>
-      {linked && (
-        <Link
-          to={`/dashboard/membership/profile/${linked}`}
-          className="text-xs font-semibold text-[#510601] border border-[#E8DFD8] rounded-lg px-2.5 py-1 hover:bg-[#FAF7F2]"
-        >
-          View profile
-        </Link>
-      )}
-    </div>
-  );
-}
 
 // ── one tab's data, fetched when the tab is first opened and kept while the member stays the same ──
 function useSection(id, section, params) {
@@ -227,133 +204,6 @@ function CreditBanner({ credit }) {
 const initialOf = (name) => String(name || '?').trim().charAt(0).toUpperCase();
 
 
-function OverviewTab({ id }) {
-  const state = useSection(id, 'overview');
-  const { hasPermission } = useAuth();
-  return (
-    <Loading state={state}>
-      {(d) => {
-        const b = d.basic;
-        const c = d.contact;
-        const m = d.membership;
-        const f = d.family;
-        const credit = m.credit;
-        const target = credit?.target_type;
-        const pct = target?.price ? Math.min(100, Math.round((credit.credit_total / target.price) * 100)) : 100;
-        const since = m.current?.member_since || d.membership?.member_since || m.current?.activated_at || m.current?.applied_at;
-        const personal = [
-          ['Gender', b.gender],
-          ['Date of birth', b.date_of_birth ? formatDate(b.date_of_birth) : ''],
-          ['Blood group', b.blood_group],
-          ['Gotra', b.gotra],
-          ['Qualification', b.qualification],
-          ['Occupation', b.occupation],
-          ['Native place', b.native_place]
-        ];
-        const contact = [
-          ['Mobile', phone(c.mobile_country_code, c.mobile)],
-          ['WhatsApp', phone(c.whatsapp_country_code, c.whatsapp_number)],
-          ['Email', c.email],
-          ['Address', c.address]
-        ];
-        const relatives = [
-          ['Father', f.father_name, f.father_membership_number],
-          ['Mother', f.mother_name, f.mother_membership_number],
-          ['Spouse', f.spouse_name, f.spouse_membership_number]
-        ].filter(([, name]) => name);
-        const hasMagazine = d.magazine.magazine_needed || d.magazine.subscriptions.length > 0 || d.magazine.services.length > 0;
-
-        return (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-            <Panel
-              icon={CreditCard}
-              title="Membership"
-              tag={m.current ? <span className={`chip ${m.current.status === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>{m.current.status}</span> : 'Plan'}
-            >
-              {!m.current ? (
-                <Row label="Status">No membership yet</Row>
-              ) : (
-                <>
-                  <Row label="Type">{m.current.type_name_en}</Row>
-                  <Row label="Membership number">{m.current.membership_number || (m.current.old_membership_number ? 'None yet' : 'Given on approval')}</Row>
-                  {m.current.old_membership_number && <Row label="Old membership number">{m.current.old_membership_number}</Row>}
-                  <Row label="Member since">{since ? formatDate(since) : ''}</Row>
-                  <Row label="Valid till">{m.current.expires_at ? formatDate(m.current.expires_at) : ''}</Row>
-                  <Row label="Receipts">{d.receipts.total ? `${d.receipts.total} · last ${formatDate(d.receipts.latest[0]?.receipt_date)}` : 'None yet'}</Row>
-                  <div className="py-2.5 text-xs">
-                    <div className="flex items-start justify-between gap-4">
-                      <span className="text-[#7D7068] font-medium">Credit</span>
-                      <span className="font-semibold font-mono text-[#180200]">
-                        {inr(credit?.credit_total || 0)}
-                        {target && <span className="font-normal text-[#863221]"> / {inr(target.price)}</span>}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 w-full bg-[#E8DFD8] rounded-full h-1.5 overflow-hidden">
-                      <div className="bg-[#510601] h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="block mt-1 text-[11px] text-[#863221]">{target ? `${pct}% to ${target.name_en}` : 'Highest tier reached'}</span>
-                  </div>
-                </>
-              )}
-            </Panel>
-
-            <Panel icon={User} title="Personal" tag="Core data" cols={4} className="lg:col-span-2">
-              {personal.map(([label, value]) => <Row key={label} label={label}>{value}</Row>)}
-            </Panel>
-
-            <Panel icon={Phone} title="Contact" tag="Reach" cols={2}>
-              {contact.filter(([label]) => label !== 'Address').map(([label, value]) => <Row key={label} label={label}>{value}</Row>)}
-            </Panel>
-
-            <Panel icon={MapPin} title="Address" tag="Location" cols={2}>
-              <Row label="Address" stack>{c.address}</Row>
-            </Panel>
-
-            <Panel icon={Users} title="Family" tag="Relations">
-              {relatives.length === 0 && f.children_count === 0 ? (
-                <Row label="Family">Not provided yet</Row>
-              ) : (
-                <>
-                  {relatives.map(([relation, name, number]) => (
-                    <Row key={relation} label={relation}>{[name, number].filter(Boolean).join(' · ')}</Row>
-                  ))}
-                  {f.children_count > 0 && <Row label="Children">{`${f.children_count} ${f.children_count === 1 ? 'child' : 'children'}`}</Row>}
-                </>
-              )}
-            </Panel>
-
-            {hasMagazine && (
-              <Panel icon={BookOpen} title="Magazine & services" tag="Subscriptions">
-                {d.magazine.subscriptions.map((st, i) => (
-                  <Row key={`s${i}`} label="Magazine">
-                    <span className={`chip ${String(st).toUpperCase() === 'ACTIVE' ? 'chip-on' : 'chip-off'}`}>{st}</span>
-                  </Row>
-                ))}
-                {d.magazine.services.map((sv, i) => <Row key={`v${i}`} label="Service">{sv}</Row>)}
-              </Panel>
-            )}
-
-            <Panel icon={History} title="Recent activity" tag="Latest" className="lg:col-span-2">
-              {d.activity.length === 0 ? (
-                <Row label="Activity">No activity recorded yet</Row>
-              ) : (
-                d.activity.map((e) => (
-                  <div key={e.id} className="py-2.5 flex items-start justify-between gap-4 text-xs">
-                    <span className="font-semibold text-[#180200] min-w-0 break-words">{e.description}</span>
-                    <span className="text-[#7D7068] font-mono shrink-0 text-right">
-                      {e.acted_by_name || 'System'} · {e.created_at ? formatDateTime(e.created_at) : ''}
-                    </span>
-                  </div>
-                ))
-              )}
-            </Panel>
-          </div>
-        );
-      }}
-    </Loading>
-  );
-}
-
 // a Panel with `cols` lays its rows out in a compact grid (label above the value); without it the rows are a list
 const GridContext = React.createContext(false);
 
@@ -411,12 +261,73 @@ const belongsTo = (v) => (v && String(v).trim().toLowerCase() !== 'self' ? v : '
 const groupAadhaar = (v) => (/^\d{12}$/.test(String(v || '')) ? String(v).replace(/(\d{4})(?=\d)/g, '$1 ') : v);
 
 // Personal details, contact & address and family on one screen
-function PersonalTab({ id }) {
-  const personal = useSection(id, 'personal');
-  const contact = useSection(id, 'contact');
-  const family = useSection(id, 'family');
+// imported members say nothing about how they were registered (the source is only shown for the others)
+const shownSource = (v) => (String(v || '').toUpperCase() === 'MIGRATION' ? '' : v);
+
+// The three sections below share one read of the member's personal, contact and family data (made once by the page).
+const SectionTag = ({ n }) => <span className="text-xs text-[#A89B92]">Section {String(n).padStart(2, '0')}</span>;
+
+function IdentitySection({ core }) {
+  const { personal } = core;
+  const p = personal.data;
+  const age = p ? ageOf(p.date_of_birth) : null;
+  return (
+    <Panel icon={User} title="Identity & Bio" tag={<SectionTag n={1} />} cols={4}>
+      {personal.loading ? <Empty>Loading…</Empty> : !p ? <Empty>This section could not be loaded.</Empty> : (
+        <>
+          <Row label="Membership number">{core.memberCode}</Row>
+          <Row label="Full name">{[p.name_title, p.first_name_en, p.middle_name_en, p.last_name_en].filter(Boolean).join(' ')}</Row>
+          <Row label="Kannada name">{p.full_name_kn}</Row>
+          <Row label="Date of birth">
+            {p.date_of_birth && <>{formatDate(p.date_of_birth)}{age !== null && <span className="ml-1 font-normal text-[#A89B92]">({age} yrs)</span>}</>}
+          </Row>
+          <Row label="Blood group">
+            {p.blood_group && <span className="inline-block px-2 py-0.5 rounded bg-red-50 border border-red-200 text-red-700 font-bold text-[11px]">{p.blood_group}</span>}
+          </Row>
+          <Row label="Gotra">{p.gotra}</Row>
+          <Row label="Gender">{p.gender}</Row>
+          <Row label="Marital status">{p.is_married === true ? 'Married' : p.is_married === false ? 'Unmarried' : ''}</Row>
+          <Row label="Vocation">{p.occupation}</Row>
+          <Row label="Qualification">{p.qualification}</Row>
+          <Row label="Native place">{p.native_place}</Row>
+          <Row label="Designation">{p.designation}</Row>
+          <Row label="Company">{p.company}</Row>
+          <Row label="Category">{p.category}</Row>
+          <Row label="Website">{p.website}</Row>
+          <Row label="Aadhaar number">
+            {p.aadhaar_number && <span className="font-mono text-[11px]">{groupAadhaar(p.aadhaar_number)}</span>}
+          </Row>
+          <Row label="Member status">{p.member_status}</Row>
+          <Row label="Approval status">{p.approval_status}</Row>
+          <Row label="Registered through">{shownSource(p.registration_source)}</Row>
+          <Row label="Registered on">{p.created_at ? formatDateTime(p.created_at) : ''}</Row>
+          {p.remarks && <div className="col-span-full"><Row label="Remarks">{p.remarks}</Row></div>}
+        </>
+      )}
+    </Panel>
+  );
+}
+
+// a relative's name with their membership number, a link to their own profile when that number is a member
+function RelativeValue({ name, number, links }) {
+  const linked = number ? links[number.toUpperCase()] : null;
+  return (
+    <>
+      {name || '—'}
+      {number && (linked
+        ? <Link to={`/dashboard/membership/profile/${linked}`} className="ml-2 font-mono font-normal text-[#510601] underline">{number}</Link>
+        : <span className="ml-2 font-mono font-normal text-[#863221]">{number}</span>)}
+    </>
+  );
+}
+
+function ContactFamilySection({ core }) {
+  const { personal, contact, family } = core;
   const [links, setLinks] = useState({}); // membership number -> member id
   const fam = family.data;
+  const c = contact.data;
+  const p = personal.data;
+  const children = Array.isArray(fam?.children) ? fam.children : [];
 
   // resolve the membership numbers written against parents / spouse / children to real members
   useEffect(() => {
@@ -425,7 +336,7 @@ function PersonalTab({ id }) {
       fam.father_membership_number,
       fam.mother_membership_number,
       fam.spouse_membership_number,
-      ...(Array.isArray(fam.children) ? fam.children.map((c) => c.membership_number) : [])
+      ...(Array.isArray(fam.children) ? fam.children : []).map((ch) => ch.membership_number)
     ].filter(Boolean);
     [...new Set(numbers)].forEach((n) => {
       api
@@ -437,128 +348,93 @@ function PersonalTab({ id }) {
     });
   }, [fam]);
 
-  const p = personal.data;
-  const c = contact.data;
-  const children = Array.isArray(fam?.children) ? fam.children : [];
-  const hasFamily = fam && (fam.father_name || fam.mother_name || fam.spouse_name || children.length > 0);
-  const age = p ? ageOf(p.date_of_birth) : null;
-  const chip = 'px-2 py-0.5 rounded text-[11px] bg-[#F7EDE6] text-[#8D4C32]';
-
+  const relatives = fam
+    ? [['Father', fam.father_name, fam.father_membership_number], ['Mother', fam.mother_name, fam.mother_membership_number], ['Spouse', fam.spouse_name, fam.spouse_membership_number]].filter(([, name]) => name)
+    : [];
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Panel icon={User} title="Identity & Bio" tag="Core data">
-          {personal.loading ? <Empty>Loading…</Empty> : !p ? <Empty>This section could not be loaded.</Empty> : (
-            <>
-              <Row label="Full name">{[p.name_title, p.first_name_en, p.middle_name_en, p.last_name_en].filter(Boolean).join(' ')}</Row>
-              <Row label="Name (Kannada)">{p.full_name_kn}</Row>
-              <Row label="Gender">{p.gender}</Row>
-              <Row label="Date of birth">
-                {p.date_of_birth && (
-                  <>{formatDate(p.date_of_birth)}{age !== null && <span className="ml-1 font-normal text-[#A89B92]">({age} yrs)</span>}</>
-                )}
-              </Row>
-              <Row label="Blood group">
-                {p.blood_group && <span className="px-2 py-0.5 rounded-md bg-red-50 border border-red-100 text-red-600 font-bold">{p.blood_group}</span>}
-              </Row>
-              <Row label="Marital status">{p.is_married === true ? 'Married' : p.is_married === false ? 'Unmarried' : ''}</Row>
-              <Row label="Aadhaar number">
-                {p.aadhaar_number && <span className="font-mono text-[11px] px-2 py-0.5 rounded border border-stone-200 bg-stone-50">{groupAadhaar(p.aadhaar_number)}</span>}
-              </Row>
-            </>
-          )}
-        </Panel>
-
-        <Panel icon={Briefcase} title="Community & Vocation" tag="Affiliation">
-          {personal.loading ? <Empty>Loading…</Empty> : !p ? null : (
-            <>
-              <Row label="Gotra">{p.gotra}</Row>
-              <Row label="Native place">{p.native_place}</Row>
-              <Row label="Qualification">{p.qualification}</Row>
-              <Row label="Occupation">{p.occupation}</Row>
-              <Row label="Designation">{p.designation}</Row>
-              <Row label="Company">{p.company}</Row>
-              <Row label="Website">{p.website}</Row>
-              <Row label="Category">{p.category}</Row>
-            </>
-          )}
-        </Panel>
-
-        <Panel icon={Phone} title="Contact" tag="Reach" cols={2}>
-          {contact.loading ? <Empty>Loading…</Empty> : !c ? <Empty>This section could not be loaded.</Empty> : (
-            <>
-              <Row label="Mobile">{phone(c.mobile_country_code, c.mobile)}</Row>
-              {/* whose number it is ("Belongs To / Relation" on the form); "Self" is the normal case and says nothing */}
-              <Row label="Mobile belongs to">{belongsTo(p?.applied_on_behalf_of)}</Row>
-              <Row label="WhatsApp">{phone(c.whatsapp_country_code, c.whatsapp_number)}</Row>
-              <Row label="Alternate mobile">{c.alternate_mobile}</Row>
-              <Row label="Email">{c.email}</Row>
-            </>
-          )}
-        </Panel>
-
-        <Panel icon={MapPin} title="Address" tag="Location" cols={2}>
-          {contact.loading ? <Empty>Loading…</Empty> : !c ? null : (
-            <>
-              <Row label="Address" stack>{[c.address_line1, c.address_line2].filter(Boolean).join(', ')}</Row>
-              <Row label="Address (Kannada)">{[c.address_line1_kn, c.address_line2_kn].filter(Boolean).join(', ')}</Row>
-              <Row label="Locality">{[c.locality, c.locality_kn].filter(Boolean).join(' / ')}</Row>
-              <Row label="Area">{c.area}</Row>
-              <Row label="Place">{c.place}</Row>
-              <Row label="Grama">{c.grama}</Row>
-              <Row label="Village">{c.village}</Row>
-              <Row label="Post">{c.post}</Row>
-              <Row label="City">{c.city}</Row>
-              <Row label="Taluk">{c.taluk_name}</Row>
-              <Row label="District">{c.district_name}</Row>
-              <Row label="State">{c.state_name}</Row>
-              <Row label="PIN code">{c.pincode}</Row>
-              <Row label="Country">{c.country}</Row>
-              <Row label="Landmark">{c.label_point}</Row>
-              <Row label="Address remarks">{c.address_remarks}</Row>
-              <Row label="Native address">{c.native_same_as_current ? `Same as communication address${c.native_address ? ` (${c.native_address})` : ''}` : c.native_address}</Row>
-            </>
-          )}
-        </Panel>
-      </div>
-
-      <Card icon={Users} title="Family">
-        {family.loading ? (
-          <Empty>Loading…</Empty>
-        ) : !fam ? (
-          <Empty>This section could not be loaded.</Empty>
-        ) : !hasFamily ? (
-          <Empty>No family details recorded.</Empty>
-        ) : (
-          <div>
-            {fam.father_name && <Relative relation="Father" name={fam.father_name} number={fam.father_membership_number} links={links} />}
-            {fam.mother_name && <Relative relation="Mother" name={fam.mother_name} number={fam.mother_membership_number} links={links} />}
-            {fam.spouse_name && <Relative relation="Spouse" name={fam.spouse_name} number={fam.spouse_membership_number} links={links} />}
-            {children.map((ch, i) => (
-              <Relative
-                key={i}
-                relation={`Child ${i + 1}${ch.gender ? ` · ${ch.gender}` : ''}`}
-                name={ch.name}
-                number={ch.membership_number}
-                links={links}
-              />
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {p && (p.registration_source || p.created_at || p.remarks) && (
-        <div className="bg-white rounded-2xl border border-[#EFE6DE] shadow-xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-[#7D7068]">
-          <div className="flex items-center gap-3">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-            <span>
-              Registration: <strong className="text-[#241B16]">{p.registration_source || '—'}</strong>
-              {p.created_at && <> on <strong className="text-[#241B16]">{formatDateTime(p.created_at)}</strong></>}
-            </span>
-          </div>
-          {p.remarks && <span className="text-[11px] text-[#A89B92]">Remarks: {p.remarks}</span>}
-        </div>
+    <Panel icon={Users} title="Contact & Family" tag={<SectionTag n={2} />} cols={3}>
+      {contact.loading ? <Empty>Loading…</Empty> : !c ? <Empty>This section could not be loaded.</Empty> : (
+        <>
+          <Row label="Mobile number">{phone(c.mobile_country_code, c.mobile)}</Row>
+          {/* whose number it is ("Belongs To / Relation" on the form); "Self" is the normal case and says nothing */}
+          <Row label="Mobile belongs to">{belongsTo(p?.applied_on_behalf_of)}</Row>
+          <Row label="WhatsApp">{phone(c.whatsapp_country_code, c.whatsapp_number)}</Row>
+          <Row label="Mobile owner">{p?.mobile_owner_name}</Row>
+          <Row label="WhatsApp owner">{[p?.whatsapp_owner_name, belongsTo(p?.whatsapp_owner_relation)].filter(Boolean).join(' · ')}</Row>
+          <Row label="Alternate mobile">{c.alternate_mobile}</Row>
+          <Row label="Email">{c.email}</Row>
+          {relatives.map(([relation, name, number]) => (
+            <Row key={relation} label={`${relation}'s name`}><RelativeValue name={name} number={number} links={links} /></Row>
+          ))}
+          {children.map((ch, i) => (
+            <Row key={`c${i}`} label={`Child ${i + 1}${ch.gender ? ` · ${ch.gender}` : ''}`}>
+              <RelativeValue name={ch.name} number={ch.membership_number} links={links} />
+            </Row>
+          ))}
+          {fam && (fam.has_children === true || fam.has_children === false) && <Row label="Has children">{fam.has_children ? 'Yes' : 'No'}</Row>}
+          <Row label="Family membership">{[fam?.family_membership_number, fam?.family_membership_name].filter(Boolean).join(' · ')}</Row>
+          <Row label="Referred by">{[fam?.referred_by_number, fam?.referred_by_name || fam?.referred_by?.name_en].filter(Boolean).join(' · ')}</Row>
+          {fam && relatives.length === 0 && children.length === 0 && <Row label="Family">None recorded</Row>}
+        </>
       )}
+    </Panel>
+  );
+}
+
+function AddressSection({ core }) {
+  const { contact } = core;
+  const c = contact.data;
+  const primary = c ? [[c.address_line1, c.address_line2].filter(Boolean).join(', '), c.taluk_name && `TQ : ${c.taluk_name}`, c.pincode && `- ${c.pincode}`].filter(Boolean).join(' ') : '';
+  return (
+    <Panel icon={MapPin} title="Address Details" tag={<SectionTag n={3} />} cols={4}>
+      {contact.loading ? <Empty>Loading…</Empty> : !c ? <Empty>This section could not be loaded.</Empty> : (
+        <>
+          {primary && (
+            <div className="col-span-full bg-[#FAF7F2] p-3 rounded-xl border border-[#EFE6DE] text-xs flex items-start gap-2">
+              <MapPin className="w-3.5 h-3.5 text-[#A89B92] mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <span className="text-[10px] font-bold text-[#A89B92] uppercase">Primary address line</span>
+                <p className="font-semibold text-[#180200] break-words">{primary}</p>
+              </div>
+            </div>
+          )}
+          <Row label="Address (Kannada)">{[c.address_line1_kn, c.address_line2_kn].filter(Boolean).join(', ')}</Row>
+          <Row label="Locality">{[c.locality, c.locality_kn].filter(Boolean).join(' / ')}</Row>
+          <Row label="Area">{c.area}</Row>
+          <Row label="Place">{c.place}</Row>
+          <Row label="Grama">{c.grama}</Row>
+          <Row label="Village">{c.village}</Row>
+          <Row label="Post">{c.post}</Row>
+          <Row label="City">{c.city}</Row>
+          <Row label="Taluk">{c.taluk_name}</Row>
+          <Row label="District">{c.district_name}</Row>
+          <Row label="State">{c.state_name}</Row>
+          <Row label="PIN code">{c.pincode}</Row>
+          <Row label="Country">{c.country}</Row>
+          <Row label="Landmark">{c.label_point}</Row>
+          <Row label="Address remarks">{c.address_remarks}</Row>
+          <Row label="Native address">{c.native_same_as_current ? `Same as communication address${c.native_address ? ` (${c.native_address})` : ''}` : c.native_address}</Row>
+        </>
+      )}
+    </Panel>
+  );
+}
+
+// the green strip at the end of the profile: how the member was registered
+function AuditStrip({ core }) {
+  const p = core.personal.data;
+  const source = shownSource(p?.registration_source);
+  if (!p || !(source || p.remarks)) return null;
+  return (
+    <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+      <div className="flex items-center gap-2 text-emerald-900 font-medium">
+        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+        <span>Registration type: <strong className="uppercase font-bold">{source || '—'}</strong></span>
+      </div>
+      <div className="text-emerald-700 text-[11px]">
+        {p.created_at && <>Processed on <span className="font-semibold">{formatDateTime(p.created_at)}</span></>}
+        {p.remarks && <span className="ml-3">Remarks: {p.remarks}</span>}
+      </div>
     </div>
   );
 }
@@ -576,7 +452,7 @@ function MembershipTab({ id }) {
               {d.payment_check.no_receipt
                 ? `No membership receipt is on record for this ${d.payment_check.type_name} member.`
                 : `${d.payment_check.type_name}: the price on ${formatDate(d.payment_check.reference_date)} (the latest receipt) was ${inr(d.payment_check.price_then)} and ${inr(d.payment_check.paid)} is recorded, short by ${inr(d.payment_check.shortfall)}.`}{' '}
-              An old receipt is probably missing. Add it on Receipt Entry with its real date (an Unknown receipt only if there is no real one). The type is not changed until then.
+             
             </div>
           )}
           {d.approval && (
@@ -642,7 +518,6 @@ function MembershipTab({ id }) {
                   </tbody>
                 </table>
               </div>
-              <p className="mt-2 text-[11px] text-[#863221]">The price is the one the type held now had in the year of each receipt. What counts is the total against the price on the date of the latest receipt.</p>
             </Card>
           )}
           <Card icon={History} title="Type changes">
@@ -1338,14 +1213,15 @@ function ActivityTab({ id }) {
 }
 
 const TABS = [
-  { key: 'overview', label: 'Overview', icon: User, Component: OverviewTab },
-  { key: 'personal', label: 'Personal Details', icon: User, Component: PersonalTab },
-  { key: 'membership', label: 'Membership', icon: CreditCard, Component: MembershipTab, count: 'membership' },
+  { key: 'identity', label: 'Identity & Bio', icon: User, Component: IdentitySection, core: true },
+  { key: 'contact', label: 'Contact & Family', icon: Users, Component: ContactFamilySection, core: true },
+  { key: 'address', label: 'Address Details', icon: MapPin, Component: AddressSection, core: true },
+  { key: 'membership', label: 'Membership Info', icon: Award, Component: MembershipTab, count: 'membership' },
   { key: 'receipts', label: 'Receipts', icon: FileText, Component: ReceiptsTab, count: 'receipts' },
   { key: 'magazine', label: 'Magazine', icon: BookOpen, Component: MagazineTab, count: 'magazine' },
-  { key: 'services', label: 'Services', icon: MapPin, Component: ServicesTab, count: 'services' },
+  { key: 'services', label: 'Services', icon: Briefcase, Component: ServicesTab, count: 'services' },
   { key: 'events', label: 'Events', icon: CalendarDays, Component: EventsTab, count: 'events' },
-  { key: 'activity', label: 'Activity & History', icon: History, Component: ActivityTab }
+  { key: 'activity', label: 'Audit & System Log', icon: History, Component: ActivityTab }
 ];
 
 // An application that is not approved yet opens as a read-only popup with the basic details entered.
@@ -1392,7 +1268,7 @@ export function UnapprovedPopup({ id, s, name, onClose }) {
               <Row label="Gotra">{p.gotra}</Row>
               <Row label="Qualification">{p.qualification}</Row>
               <Row label="Occupation">{p.occupation}</Row>
-              <Row label="Registered through">{p.registration_source}</Row>
+              <Row label="Registered through">{shownSource(p.registration_source)}</Row>
               <Row label="Registered on">{p.created_at ? formatDateTime(p.created_at) : ''}</Row>
             </>
           )}
@@ -1419,22 +1295,56 @@ export function UnapprovedPopup({ id, s, name, onClose }) {
   );
 }
 
+// One section of the profile: its tab component is mounted when the block comes near the screen (so the page does not
+// ask for every section at once) and stays mounted after.
+function LazySection({ tab, id, onOpen, core }) {
+  const ref = useRef(null);
+  const [seen, setSeen] = useState(Boolean(tab.core));
+  useEffect(() => {
+    if (seen || !ref.current || typeof IntersectionObserver === 'undefined') {
+      if (!seen) setSeen(true);
+      return undefined;
+    }
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && setSeen(true), { rootMargin: '600px 0px' });
+    io.observe(ref.current);
+    return () => io.disconnect();
+  }, [seen]);
+  const Component = tab.Component;
+  return (
+    <section id={`sec-${tab.key}`} ref={ref} className="scroll-mt-4 space-y-3">
+      {!tab.core && (
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-4 bg-[#510601] rounded-full" />
+          <h2 className="text-sm font-bold uppercase tracking-wide text-[#241B16]">{tab.label}</h2>
+        </div>
+      )}
+      {seen ? <Component id={id} onOpen={onOpen} core={core} /> : <div className="min-h-[160px]"><Empty>Loading…</Empty></div>}
+    </section>
+  );
+}
+
 export default function MemberProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { hasPermission } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const [summaryCode, setSummaryCode] = useState('');
+  const core = { personal: useSection(id, 'personal'), contact: useSection(id, 'contact'), family: useSection(id, 'family'), memberCode: summaryCode };
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState('');
 
-  const requestedTab = ['contact', 'family'].includes(searchParams.get('tab')) ? 'personal' : searchParams.get('tab'); // old links
-  const tabKey = TABS.some((t) => t.key === requestedTab) ? requestedTab : 'overview';
-  const ActiveTab = TABS.find((t) => t.key === tabKey).Component;
-  const openTab = useCallback(
-    (key) => setSearchParams({ tab: key }, { replace: true }),
-    [setSearchParams]
-  );
+  const OLD_LINKS = { overview: 'identity', personal: 'identity', family: 'contact' }; // old links
+  const asked = searchParams.get('tab');
+  const requestedTab = OLD_LINKS[asked] || asked;
+  const [tabKey, setTabKey] = useState(TABS.some((t) => t.key === requestedTab) ? requestedTab : 'identity');
+  const jumping = useRef(false);
+  const openTab = useCallback((key) => {
+    setTabKey(key);
+    jumping.current = true;
+    document.getElementById(`sec-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => { jumping.current = false; }, 900);
+  }, []);
 
   // the header: name, photo, status, credit and a count for each tab (one small call)
   useEffect(() => {
@@ -1443,7 +1353,7 @@ export default function MemberProfile() {
     setSummary(null);
     api
       .get(`/members/${id}/profile/summary`)
-      .then(({ data }) => alive && setSummary(data))
+      .then(({ data }) => { if (alive) { setSummary(data); setSummaryCode(data.member_code || ''); } })
       .catch((error) => notify(apiErrorMessage(error, 'Could not load this member.'), 'error'))
       .finally(() => alive && setLoading(false));
     return () => {
@@ -1468,6 +1378,20 @@ export default function MemberProfile() {
 
   const s = summary;
   const fullName = s ? memberName(s, true) : '';
+
+  // the menu highlights the section on screen; a link with ?tab= scrolls to it once the page is drawn
+  useEffect(() => {
+    if (!s || String(s.approval_status).toUpperCase() !== 'APPROVED') return undefined;
+    if (requestedTab && requestedTab !== 'identity') setTimeout(() => openTab(tabKey), 300);
+    const io = new IntersectionObserver((entries) => {
+      if (jumping.current) return;
+      const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+      if (top) setTabKey(top.target.id.replace('sec-', ''));
+    }, { rootMargin: '-10% 0px -70% 0px' });
+    TABS.forEach((t) => { const el = document.getElementById(`sec-${t.key}`); if (el) io.observe(el); });
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s]);
 
   return (
     <PermissionGate required="members.list.read">
@@ -1514,9 +1438,12 @@ export default function MemberProfile() {
                     to={`/dashboard/membership/edit/${s.id}`}
                     className="text-xs bg-white hover:bg-[#FAF7F2] border border-[#E8DFD8] text-[#510601] px-3.5 py-2 rounded-lg font-semibold inline-flex items-center gap-1.5 transition"
                   >
-                    <Pencil className="w-3.5 h-3.5" /> Edit
+                    <Pencil className="w-3.5 h-3.5" /> Edit Profile
                   </Link>
                 )}
+                <button type="button" title="Print profile" onClick={() => window.print()} className="text-xs bg-[#F7EDE6] hover:bg-[#EFE6DE] text-[#510601] px-3 py-2 rounded-lg transition">
+                  <Printer className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 
@@ -1564,8 +1491,9 @@ export default function MemberProfile() {
                 })}
               </nav>
 
-              <div className="md:col-span-9 min-w-0">
-            <ActiveTab key={`${id}-${tabKey}`} id={id} onOpen={openTab} />
+              <div className="md:col-span-9 min-w-0 space-y-4">
+                {TABS.map((t) => <LazySection key={`${id}-${t.key}`} tab={t} id={id} onOpen={openTab} core={core} />)}
+                <AuditStrip core={core} />
               </div>
             </div>
           </>
