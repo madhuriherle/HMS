@@ -7230,6 +7230,9 @@ def test_unapproved_list_carries_receipts_and_label_list_pages(client, admin_hea
     assert [m["id"] for m in only_paid["data"]] == [paid["id"]]
     only_unpaid = client.get("/api/v1/members/", headers=H, params={"approval_status": "UNAPPROVED", "search": "Zlabel", "receipt_assigned": False}).json()
     assert [m["id"] for m in only_unpaid["data"]] == [unpaid["id"]]
+    # a receipt number typed in the search box finds the member it is mapped to (and no one else)
+    by_number = client.get("/api/v1/members/", headers=H, params={"approval_status": "UNAPPROVED", "receipt_assigned": True, "search": older["receipt_number"]}).json()
+    assert [m["id"] for m in by_number["data"]] == [paid["id"]]
 
     # label list: only members who have paid, with the date of the latest receipt; search and dates run on all of them
     labels = client.get("/api/v1/members/label-list", headers=H, params={"search": "Zlabel", "limit": 200}).json()

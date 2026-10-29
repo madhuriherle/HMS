@@ -88,23 +88,13 @@ def read_members(
             query = query.filter(no_mobile, Member.mobile_raw.isnot(None), Member.mobile_raw != "")
     if payment_status:
         wanted = payment_status.upper()
-        # the applicants (unapproved list) are judged by the type they chose, the members by the type they hold
-        asked_of_applicants = bool(approval_status) and approval_status.upper() != "APPROVED"
         if wanted in ("NO_RECEIPT", "MISMATCH"):
             from services import membership_credit
+            # the applicants (unapproved list) are judged by the type they chose, the members by the type they hold
+            asked_of_applicants = bool(approval_status) and approval_status.upper() != "APPROVED"
             ids = [mid for mid, c in membership_credit.payment_check_rows(db, applicants=asked_of_applicants).items()
                    if c["mismatch"] and (c["no_receipt"] if wanted == "NO_RECEIPT" else not c["no_receipt"])]
             query = query.filter(Member.id.in_(ids or [0]))
-        elif wanted == "NOT_MAPPED" and asked_of_applicants:
-            # an applicant has no membership number yet: a receipt waiting for them carries their application number or their mobile
-            from models.receipts import Receipt
-            waiting = [Receipt.is_deleted == False, Receipt.receipt_status == "UNASSIGNED", Receipt.payment_status != "CANCELLED"]  # noqa: E712
-            typed_refs = db.query(func.upper(func.trim(Receipt.payer_membership_no))).filter(*waiting, Receipt.payer_membership_no.isnot(None))
-            mobiles = db.query(func.trim(Receipt.payer_mobile)).filter(*waiting, Receipt.payer_mobile.isnot(None), Receipt.payer_mobile != "")
-            query = query.filter(or_(
-                func.upper(func.trim(Member.legacy_ref_number)).in_(typed_refs),
-                func.trim(Member.mobile).in_(mobiles),
-            ))
         elif wanted == "NOT_MAPPED":
             from models.receipts import Receipt
             typed = func.upper(func.trim(Receipt.payer_membership_no))
@@ -141,7 +131,15 @@ def read_members(
         ))
     if search:
         from models.masters import District, PostalCode  # the list also shows the place: search it too
+        from models.receipts import Receipt as _SearchReceipt, ReceiptAllocation as _SearchAllocation
         query = query.filter(or_(
+            # a receipt number typed in the box finds the member it is mapped to
+            Member.id.in_(
+                db.query(_SearchAllocation.member_id).join(_SearchReceipt, _SearchReceipt.id == _SearchAllocation.receipt_id).filter(
+                    _SearchAllocation.is_deleted == False, _SearchAllocation.member_id.isnot(None),  # noqa: E712
+                    _SearchReceipt.is_deleted == False, _SearchReceipt.receipt_number.ilike(f"%{search.strip()}%"),  # noqa: E712
+                )
+            ),
             Member.full_name_en.ilike(f"%{search}%"),
             Member.first_name_en.ilike(f"%{search}%"),
             Member.last_name_en.ilike(f"%{search}%"),
