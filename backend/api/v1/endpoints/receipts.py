@@ -26,7 +26,7 @@ from services.sequences import generate_next_number
 from services import approval_gate
 from services.exports import render_export
 from datetime import date, datetime, timedelta, timezone
-from sqlalchemy import func, or_
+from sqlalchemy import case, func, or_
 from models.masters import MembershipType, Particular, PaymentMode
 
 from services import membership_credit, receipt_status
@@ -339,6 +339,77 @@ def create_receipt(
     return created
 
 
+# A register number used again keeps the earliest record and the others get a tail: 32170, 32170/2, 32170/3 ...
+_TAIL = re.compile(r"^(.+)/([0-9]+)$")
+_REPEAT_NAMES = ("REPEAT", "REPEAT_2", "REPEAT_3", "REPEAT_4PLUS")
+
+
+def _repeat_kinds(db: Session) -> dict:
+    """The SQL test for each repeat filter. PostgreSQL uses a regular expression; SQLite (the test database) has no
+    regex operator, so it gets the same test with GLOB / LIKE."""
+    n = Receipt.receipt_number
+    if db.get_bind().dialect.name == "postgresql":
+        return {
+            "REPEAT": n.op("~")(r"/[0-9]+$"),
+            "REPEAT_2": n.op("~")(r".+/2$"),
+            "REPEAT_3": n.op("~")(r".+/3$"),
+            "REPEAT_4PLUS": n.op("~")(r".+/([4-9]|[1-9][0-9]+)$"),
+        }
+    tail = n.op("GLOB")("*/[0-9]*")
+    return {
+        "REPEAT": tail,
+        "REPEAT_2": n.like("%/2"),
+        "REPEAT_3": n.like("%/3"),
+        "REPEAT_4PLUS": tail & ~n.like("%/2") & ~n.like("%/3"),
+    }
+
+
+def repeat_base(number: Optional[str]) -> Optional[str]:
+    m = _TAIL.match(number or "")
+    return m.group(1) if m else None
+
+
+def repeat_tail(number: Optional[str]) -> Optional[int]:
+    m = _TAIL.match(number or "")
+    return int(m.group(2)) if m else None
+
+
+@router.get("/{id}/same-number")
+def receipts_with_same_number(
+    id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """Every live receipt that shares this receipt's register number (32170, 32170/2, 32170/3 ...), first one first.
+
+    Read only: the receipt popup uses it to say "the register used this number before" and to open the original."""
+    me = db.query(Receipt).filter(Receipt.id == id, Receipt.is_deleted == False).first()  # noqa: E712
+    if not me:
+        raise HTTPException(404, "Receipt not found")
+    base = repeat_base(me.receipt_number) or me.receipt_number
+    rows = (
+        db.query(Receipt)
+        .filter(
+            Receipt.is_deleted == False,  # noqa: E712
+            Receipt.financial_year == me.financial_year,
+            or_(Receipt.receipt_number == base, Receipt.receipt_number.startswith(base + "/", autoescape=True)),
+        )
+        .limit(50)
+        .all()
+    )
+    rows = [r for r in rows if r.receipt_number == base or repeat_base(r.receipt_number) == base]  # base/<digits> only
+    rows.sort(key=lambda r: repeat_tail(r.receipt_number) or 1)
+    return {
+        "base": base,
+        "current_id": me.id,
+        "items": [{
+            "id": r.id, "receipt_number": r.receipt_number, "receipt_date": r.receipt_date, "payer_name": r.payer_name,
+            "amount": float(r.net_amount), "payment_mode": r.payment_mode, "receipt_status": r.receipt_status,
+            "repeat_no": repeat_tail(r.receipt_number),
+        } for r in rows],
+    }
+
+
 @router.get("/tracking")
 def read_receipt_tracking(
     db: Session = Depends(deps.get_db),
@@ -388,11 +459,14 @@ def read_receipt_tracking(
         filters.append(Receipt.id == receipt_id)
     if receipt_status:
         filters.append(Receipt.receipt_status == receipt_status.upper())
+    kind_filter = None  # added last, so the repeat counts below can be counted without it
+    repeat_kinds = _repeat_kinds(db)
     if number_kind:
         kind = number_kind.upper()
-        if kind not in ("UNKNOWN", "KNOWN", "ZERO"):
-            raise HTTPException(400, "number_kind must be UNKNOWN, KNOWN or ZERO")
-        filters.append(Receipt.net_amount == 0 if kind == "ZERO" else Receipt.is_old_receipt == (kind == "UNKNOWN"))  # noqa: E712
+        if kind not in ("UNKNOWN", "KNOWN", "ZERO") and kind not in repeat_kinds:
+            raise HTTPException(400, "number_kind must be UNKNOWN, KNOWN, ZERO, REPEAT, REPEAT_2, REPEAT_3 or REPEAT_4PLUS")
+        kind_filter = repeat_kinds[kind] if kind in repeat_kinds else (
+            Receipt.net_amount == 0 if kind == "ZERO" else Receipt.is_old_receipt == (kind == "UNKNOWN"))  # noqa: E712
     if member_ids:
         wanted = [int(x) for x in member_ids.split(",") if x.strip().isdigit()][:LIST_PAGE_MAX]
         filters.append(Receipt.id.in_(
@@ -482,6 +556,15 @@ def read_receipt_tracking(
             ),
         ))
 
+    # How many receipts carry a repeat tail (/2, /3 ...) under every other filter, for the chips above the list.
+    repeat_counts = dict(zip(
+        ("repeat", "repeat_2", "repeat_3", "repeat_4plus"),
+        db.query(*[func.coalesce(func.sum(case((repeat_kinds[k], 1), else_=0)), 0) for k in _REPEAT_NAMES]).filter(*filters).one(),
+    ))
+    repeat_counts = {k: int(v or 0) for k, v in repeat_counts.items()}
+    if kind_filter is not None:
+        filters.append(kind_filter)
+
     # Per-mode summary over the SAME filter set, before pagination narrows it.
     mode_summary = dict(
         db.query(Receipt.payment_mode, func.count())
@@ -568,6 +651,8 @@ def read_receipt_tracking(
             "cheque_date": r.cheque_date,
             "is_renewal": r.is_renewal,
             "is_old_receipt": r.is_old_receipt,
+            "repeat_of": repeat_base(r.receipt_number),  # the number this one repeats (32170 for 32170/2), else None
+            "repeat_no": repeat_tail(r.receipt_number),  # 2 for 32170/2, else None
             "source": r.source,
             # Payee columns: a member (profile-linked) or an associate
             # (non-member donor). payee_type tells the UI which detail to open.
@@ -605,6 +690,7 @@ def read_receipt_tracking(
             "by_payment_mode": mode_summary,
             "by_status": {k or "UNASSIGNED": v for k, v in by_status.items()},
             "total_amount": total_amount,
+            "repeat_counts": repeat_counts,
         },
         "total": total,
         "page": page,

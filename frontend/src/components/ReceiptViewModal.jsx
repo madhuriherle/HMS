@@ -5,6 +5,8 @@ import Modal from './Modal';
 import ModalFooter from './ModalFooter';
 import { formatMoney } from '../utils/money';
 import { formatDate } from '../utils/dateUtils';
+import { fetchReceiptPage } from '../utils/apiAdapters';
+import RepeatNumber, { ordinal, splitRepeat } from './RepeatNumber';
 
 // Helper for number to words (Indian Numbering System)
 const numberToWords = (num) => {
@@ -37,8 +39,33 @@ const fullLabel = (i) => (lineLabel(i) !== i.particular ? `${i.particular} › $
  * The receipt view popup: payee, particulars with the total, payment details, period and remarks. `receipt` is a
  * receipt row as the Receipt Tracking list returns it (normalised); the popup is closed with `onClose`.
  */
-export default function ReceiptViewModal({ receipt, onClose, onChange = null, changeTitle = '' }) {
+export default function ReceiptViewModal({ receipt: receiptProp, onClose, onChange = null, changeTitle = '' }) {
   const [allocations, setAllocations] = useState([]);
+  // "Open the original": the popup can show another receipt of the same register number; it goes back when the caller opens a new one
+  const [swapped, setSwapped] = useState(null);
+  const [sameNumber, setSameNumber] = useState(null); // { items: [...] } every receipt that shares this register number
+  useEffect(() => { setSwapped(null); }, [receiptProp?.id]);
+  const receipt = swapped || receiptProp;
+  const openOther = async (id) => {
+    try {
+      const { rows } = await fetchReceiptPage({ receipt_id: id, limit: 1 });
+      if (rows[0]) setSwapped(rows[0]);
+    } catch (_) {
+      /* the banner stays as it was */
+    }
+  };
+
+  useEffect(() => {
+    if (!receipt?.id) {
+      setSameNumber(null);
+      return undefined;
+    }
+    let current = true;
+    api.get(`/receipts/${receipt.id}/same-number`)
+      .then((res) => { if (current) setSameNumber(res.data); })
+      .catch(() => { if (current) setSameNumber(null); });
+    return () => { current = false; };
+  }, [receipt?.id]);
 
   useEffect(() => {
     if (!receipt?.id) {
@@ -70,7 +97,7 @@ export default function ReceiptViewModal({ receipt, onClose, onChange = null, ch
               </div>
               <div>
                 <h2 className="text-base font-bold text-[#180200]">
-                  Receipt {receipt.receiptNumber}
+                  Receipt <RepeatNumber number={receipt.receiptNumber} />
                 </h2>
                 <p className="text-xs text-[#863221]">
                   Issued on {formatDate(receipt.receiptDate)}
@@ -87,6 +114,64 @@ export default function ReceiptViewModal({ receipt, onClose, onChange = null, ch
 
           {/* Modal Body */}
           <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+            {/* The register used this number more than once: say so, link the original and the others */}
+            {sameNumber?.items?.length > 1 && (() => {
+              const items = sameNumber.items;
+              const first = items[0];
+              const mine = items.find((i) => i.id === receipt.id) || {};
+              const tail = splitRepeat(receipt.receiptNumber)?.tail;
+              const alike = tail && mine.id !== first.id
+                && String(mine.payer_name || '').trim().toLowerCase() === String(first.payer_name || '').trim().toLowerCase()
+                && Number(mine.amount) === Number(first.amount);
+              return (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-2.5 text-blue-900">
+                  <p className="text-xs font-bold">
+                    {tail
+                      ? `This number was used before. This is the ${ordinal(tail)} record with ${sameNumber.base}.`
+                      : `The register used this number ${items.length} times (${items.length - 1} more).`}
+                  </p>
+                  {tail && mine.id !== first.id && (
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {[['Original', first], ['This one', mine]].map(([label, r]) => (
+                        <div key={label} className={`rounded-lg bg-white border p-2.5 ${r === mine ? 'border-blue-400 ring-1 ring-blue-300' : 'border-blue-200'}`}>
+                          <div className="text-[9px] font-extrabold uppercase tracking-wider text-[#863221]">{label} · {r.receipt_number}</div>
+                          <div className="font-bold text-[#180200] mt-0.5">{r.payer_name || '—'}</div>
+                          <div className="text-[#180200]">{formatDate(r.receipt_date)}</div>
+                          <div className="font-mono text-[#180200]">{formatMoney(r.amount)}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {alike && (
+                    <p className="text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 rounded-lg px-2.5 py-1.5">
+                      Looks alike: the same name and the same amount. Worth checking.
+                    </p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {tail && mine.id !== first.id && (
+                      <button
+                        type="button"
+                        onClick={() => openOther(first.id)}
+                        className="px-3 py-1.5 rounded-lg bg-blue-700 text-white font-bold text-xs hover:bg-blue-800 cursor-pointer"
+                      >
+                        Open the original ({first.receipt_number})
+                      </button>
+                    )}
+                    {items.map((i) => (
+                      <button
+                        key={i.id}
+                        type="button"
+                        onClick={() => i.id !== receipt.id && openOther(i.id)}
+                        aria-current={i.id === receipt.id}
+                        className={`px-2.5 py-1 rounded-lg border bg-white font-bold text-[11px] cursor-pointer ${i.id === receipt.id ? 'border-blue-700 ring-1 ring-blue-700 text-blue-900' : 'border-blue-200 text-blue-800 hover:bg-blue-100'}`}
+                      >
+                        {i.receipt_number} · {(i.payer_name || '').split(' ')[0] || '—'} · {formatDate(i.receipt_date)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
             {/* Member Details */}
             <div className="bg-white rounded-xl p-4 border border-[#E8DFD8] space-y-2.5">
               <span className="text-[11px] font-bold text-[#510601] uppercase tracking-wider flex items-center gap-1.5">
