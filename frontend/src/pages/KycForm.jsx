@@ -3,6 +3,7 @@ import { ShieldCheck, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import api from '../api';
 import { apiErrorMessage } from '../utils/apiError';
 import { memberName } from '../utils/memberName';
+import DateInput from '../components/DateInput';
 
 // ── Member KYC update — public, token-authenticated (no sign-in) ──────────────
 // The admin sends a KYC request from the member profile; the member opens the
@@ -153,16 +154,27 @@ export default function KycForm() {
                   <span className="block text-[11px] font-semibold text-[#180200]">
                     {f.label} <span className="font-normal text-[#863221]">· {f.kannada}</span>
                   </span>
-                  <input
-                    type={f.date ? 'date' : 'text'}
-                    max={f.date ? todayISO() : undefined}
-                    inputMode={f.phone ? 'numeric' : undefined}
-                    value={values[f.key] || ''}
-                    onChange={(e) => f.phone
-                      ? set(f.key, e.target.value.replace(/\D/g, '').slice(0, 15))
-                      : set(f.key, e.target.value)}
-                    className={`mt-1 w-full px-3 py-2 rounded-xl text-sm border bg-white outline-none transition-colors ${errors[f.key] ? 'border-[#ED4636]' : 'border-[#E8DFD8] focus:border-[#510601]'}`}
-                  />
+                  {f.date ? (
+                    <div className="mt-1">
+                      <DateInput
+                        value={values[f.key] || ''}
+                        max={todayISO()}
+                        placeholder="DD-MM-YYYY"
+                        onChange={(e) => set(f.key, e.target.value)}
+                        className={`px-3 py-2 rounded-xl text-sm border bg-white outline-none transition-colors ${errors[f.key] ? 'border-[#ED4636]' : 'border-[#E8DFD8] focus:border-[#510601]'}`}
+                      />
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      inputMode={f.phone ? 'numeric' : undefined}
+                      value={values[f.key] || ''}
+                      onChange={(e) => f.phone
+                        ? set(f.key, e.target.value.replace(/\D/g, '').slice(0, 15))
+                        : set(f.key, e.target.value)}
+                      className={`mt-1 w-full px-3 py-2 rounded-xl text-sm border bg-white outline-none transition-colors ${errors[f.key] ? 'border-[#ED4636]' : 'border-[#E8DFD8] focus:border-[#510601]'}`}
+                    />
+                  )}
                   {errors[f.key] && <span className="block mt-1 text-[11px] text-[#ED4636]">Please check this entry.</span>}
                 </label>
               ))}

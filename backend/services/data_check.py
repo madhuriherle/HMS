@@ -114,7 +114,7 @@ def rows_xlsx(kind: str, rows: list) -> bytes:
     ws = wb.create_sheet("Data check")
     ws.append(["Problem", "Name", "Membership no", "Old no", "Mobile", "Alternate number", "Email", "Date of birth", "Age", "District", "Missing", "Approval", "Status"])
     for r in rows:
-        ws.append([KINDS[kind], r["name"], r["membership_no"], r["old_no"], r["mobile"], r["alternate_mobile"], r["email"], r["dob"], r["age"], r["district"], ", ".join(r["missing"]), r["approval"], r["status"]])
+        ws.append([KINDS[kind], r["name"], r["membership_no"], r["old_no"], r["mobile"], r["alternate_mobile"], r["email"], r["dob"].strftime("%d-%m-%Y") if r["dob"] else "", r["age"], r["district"], ", ".join(r["missing"]), r["approval"], r["status"]])
     out = io.BytesIO()
     wb.save(out)
     return out.getvalue()

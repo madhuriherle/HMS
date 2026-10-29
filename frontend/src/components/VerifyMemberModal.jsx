@@ -8,6 +8,7 @@ import { formatDateTime } from '../utils/dateUtils';
 import { lookupPin, loadLocations, searchPostalCodes } from '../utils/serverData';
 import { notify } from '../utils/notify';
 import useRules from '../hooks/useRules';
+import DateInput from './DateInput';
 
 // Helpers to extract and reconstruct full name
 const nameOf = (m) => m?.full_name_en || [m?.first_name_en, m?.middle_name_en, m?.last_name_en].filter(Boolean).join(' ') || '';
@@ -382,13 +383,15 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = 
                 </label>
                 <label className="block">
                   <span className={headingClass}>Date of birth</span>
-                  <input
-                    ref={(el) => { boxes.current.date_of_birth = el; }}
-                    type="date"
-                    value={form.date_of_birth}
-                    onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
-                    className={`${inputClass} mt-1 ${mark('date_of_birth')}`}
-                  />
+                  <div className="mt-1">
+                    <DateInput
+                      value={form.date_of_birth}
+                      onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
+                      autoFocus={focus === 'date_of_birth'}
+                      placeholder="DD-MM-YYYY"
+                      className={`${inputClass} font-mono ${mark('date_of_birth')}`}
+                    />
+                  </div>
                 </label>
               </div>
               <label className="block">

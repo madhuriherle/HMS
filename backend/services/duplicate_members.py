@@ -158,6 +158,12 @@ def find_groups(db, kind: str, search: Optional[str] = None, verification: Optio
     return out
 
 
+def _dmy(iso) -> str:
+    """2026-10-08 -> 08-10-2026 (the form every date is shown in)."""
+    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", str(iso or ""))
+    return f"{m.group(3)}-{m.group(2)}-{m.group(1)}" if m else (iso or "")
+
+
 def groups_xlsx(groups: list) -> bytes:
     from openpyxl import Workbook
 
@@ -166,7 +172,7 @@ def groups_xlsx(groups: list) -> bytes:
     ws.append(["Group", "Why", "Name", "Membership no", "Old no", "Mobile", "Date of birth", "Father / husband / guardian", "Village / area", "Post office", "Taluk", "Pincode", "District", "Gender", "Approval", "Status", "KYC", "KYC on", "KYC remark", "Members with this exact name"])
     for n, g in enumerate(groups, 1):
         for m in g["members"]:
-            ws.append([n, g["reason"], m["name"], m["membership_no"], m["old_no"], m["mobile"], m["dob"], m["father"], m["place"], m["post_office"], m["taluk"], m["pincode"], m["district"],
+            ws.append([n, g["reason"], m["name"], m["membership_no"], m["old_no"], m["mobile"], _dmy(m["dob"]), m["father"], m["place"], m["post_office"], m["taluk"], m["pincode"], m["district"],
                        m["gender"], m["approval"], m["status"], m["verification"].replace("_", " ").title(), m["verified_at"], m["verification_remark"],
                        m.get("same_name_count", "")])
     out = io.BytesIO()
