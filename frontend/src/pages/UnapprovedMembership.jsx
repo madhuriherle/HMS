@@ -1010,9 +1010,9 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
           title={
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="truncate">Assign a receipt to {assigningMember.fullName || assigningMember.name}</span>
-              <span className="text-[11px] font-mono font-normal text-[#863221]">
-                ID {assigningMember.id}{assigningMember.mobile ? ` · ${assigningMember.mobile}` : ''}
-              </span>
+              {assigningMember.mobile && (
+                <span className="text-[11px] font-mono font-normal text-[#863221]">{assigningMember.mobile}</span>
+              )}
               <span className={`chip ${replacingReceipt || assigningMember.receiptStatus === 'Assigned' ? 'chip-on' : 'chip-warn'}`}>
                 {replacingReceipt ? `Replacing receipt ${replacingReceipt.receiptNumber}` : assigningMember.receiptStatus === 'Assigned' ? `Receipt ${assigningMember.assignedReceiptNumber}` : 'Not assigned'}
               </span>

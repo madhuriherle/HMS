@@ -644,7 +644,6 @@ export default function UserManagement() {
                                 </span>
                               )}
                             </p>
-                            <span className="text-[11px] text-[#863221]/60 font-mono">ID {user.id}</span>
                           </div>
                         </div>
                       </td>
