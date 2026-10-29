@@ -185,6 +185,7 @@ export default function RegisterNewMember() {
     districtId: '',
     talukId: '',
     pincodeId: '',
+    post: '',
     locality: '',
     localityKn: '',
     taluk: '',
@@ -331,6 +332,7 @@ export default function RegisterNewMember() {
           districtId: m.district_id ? String(m.district_id) : '',
           talukId: m.taluk_id ? String(m.taluk_id) : '',
           pincodeId: m.pincode_id ? String(m.pincode_id) : '',
+          post: m.post || '',
           locality: m.locality || m.post || pin?.area || '',
           localityKn: m.locality_kn || '',
           taluk: m.taluk_name || '',
@@ -629,8 +631,8 @@ export default function RegisterNewMember() {
   }, [formData.talukId]);
 
   const nameOfPlace = (list, id) => list.find((x) => String(x.id) === String(id))?.name || '';
-  // there is no Locality box: the locality is the post office picked (cleared with it)
-  const clearPostOffice = (prev) => ({ ...prev, pincodeId: '', postalCode: '', locality: '' });
+  // the post office is picked from the list; the member's own Locality / Area is typed and is never overwritten by it
+  const clearPostOffice = (prev) => ({ ...prev, pincodeId: '', postalCode: '', post: '' });
   const onStateChange = (id) => {
     setFormData((prev) => ({ ...clearPostOffice(prev), stateId: id, districtId: '', talukId: '', state: nameOfPlace(locations.states, id), district: '', taluk: '' }));
     if (formErrors.postalCode) setFormErrors((prev) => ({ ...prev, postalCode: '' }));
@@ -644,7 +646,7 @@ export default function RegisterNewMember() {
   const onPickPostOffice = (id) => {
     const row = pinOptions.find((x) => String(x.id) === String(id));
     if (!row) { setFormData((prev) => clearPostOffice(prev)); return; }
-    setFormData((prev) => ({ ...prev, pincodeId: String(row.id), postalCode: row.postalCode, locality: row.area || '' }));
+    setFormData((prev) => ({ ...prev, pincodeId: String(row.id), postalCode: row.postalCode, post: row.area || '', locality: prev.locality || row.area || '' }));
     if (formErrors.postalCode) setFormErrors((prev) => ({ ...prev, postalCode: '' }));
   };
 
@@ -852,7 +854,7 @@ export default function RegisterNewMember() {
       address_line1_kn: (formData.addressKn || '').trim() || null,
       locality: (formData.locality || '').trim() || null,
       locality_kn: (formData.localityKn || '').trim() || null,
-      post: (formData.locality || '').trim() || null,
+      post: (formData.post || '').trim() || null,
       state_id: formData.stateId ? Number(formData.stateId) : null,
       district_id: formData.districtId ? Number(formData.districtId) : null,
       taluk_id: formData.talukId ? Number(formData.talukId) : null,
@@ -1656,7 +1658,7 @@ export default function RegisterNewMember() {
                               hasError={Boolean(formErrors.postalCode)}
                               options={[
                                 ...(formData.pincodeId && !pinOptions.some((x) => String(x.id) === String(formData.pincodeId))
-                                  ? [{ value: String(formData.pincodeId), label: `${formData.postalCode} — ${formData.locality || 'current'}` }]
+                                  ? [{ value: String(formData.pincodeId), label: `${formData.postalCode} — ${formData.post || formData.locality || 'current'}` }]
                                   : []),
                                 ...pinOptions.map((x) => ({ value: String(x.id), label: `${x.postalCode} — ${x.area}` }))
                               ]}
@@ -1671,6 +1673,20 @@ export default function RegisterNewMember() {
                         </>
                       );
                     })()}
+                  </div>
+
+                  {/* Locality / Area: the member's own area or town (the post office is the field above) */}
+                  <div>
+                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
+                      Locality / Area:
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Area or town"
+                      value={formData.locality}
+                      onChange={(e) => setFormData({ ...formData, locality: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
+                    />
                   </div>
 
                   {/* Post Office / Locality (Kannada) */}
