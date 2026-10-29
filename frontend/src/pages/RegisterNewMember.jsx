@@ -190,7 +190,6 @@ export default function RegisterNewMember() {
     taluk: '',
     district: '',
     state: '',
-    nativePlace: '',
     appliedOnBehalfOf: 'Self',
     behalfOtherText: '',
     mobileOwnerName: '',
@@ -340,7 +339,6 @@ export default function RegisterNewMember() {
           taluk: m.taluk_name || '',
           district: m.district_name || '',
           state: m.state_name || '',
-          nativePlace: m.native_place_text || '',
           appliedOnBehalfOf: !m.applied_on_behalf_of ? 'Self' : BEHALF_OPTIONS.includes(m.applied_on_behalf_of) ? m.applied_on_behalf_of : 'Others',
           behalfOtherText: m.applied_on_behalf_of && !BEHALF_OPTIONS.includes(m.applied_on_behalf_of) ? m.applied_on_behalf_of : '',
           mobileOwnerName: m.mobile_owner_name || '',
@@ -861,7 +859,6 @@ export default function RegisterNewMember() {
       designation: (formData.designation || '').trim() || null,
       native_same_as_current: !!formData.nativeSame,
       native_address: (formData.nativeSame ? formData.address : formData.nativeAddress || '').trim() || null,
-      native_place_text: formData.nativePlace.trim() || null,
       address_line1: formData.address.trim(),
       address_line1_kn: (formData.addressKn || '').trim() || null,
       locality: (formData.locality || '').trim() || null,
@@ -1696,20 +1693,6 @@ export default function RegisterNewMember() {
                       type="text"
                       value={formData.locality}
                       onChange={(e) => setFormData({ ...formData, locality: e.target.value })}
-
-                      className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
-                    />
-                  </div>
-
-                  {/* Native Place */}
-                  <div>
-                    <label className="block text-sm text-[#3D140C] mb-1.5 font-semibold">
-                      Native Place:
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.nativePlace}
-                      onChange={(e) => setFormData({ ...formData, nativePlace: e.target.value })}
 
                       className="w-full px-3.5 py-2.5 bg-[#FAF7F2] hover:bg-[#FDFBF7] focus:bg-white border border-[#E8DFD8] hover:border-[#8C1801]/60 rounded-lg text-sm text-[#180200] placeholder:text-[#9E8B7F] focus:outline-none focus:border-[#510601] focus:ring-2 focus:ring-[#510601]/20 shadow-2xs transition-all"
                     />
