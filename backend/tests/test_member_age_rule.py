@@ -44,3 +44,17 @@ def test_stored_short_alternate_number_does_not_break_reading(client, admin_head
     # typing a bad number in is still refused
     bad = client.post("/api/v1/members/", headers=admin_headers, json={"first_name_en": "BadAlt", "mobile": "94" + str(int(time.time() * 1000))[-8:], "alternate_mobile": "123"})
     assert bad.status_code == 422
+
+
+def test_alternate_number_may_be_a_landline(client, admin_headers):
+    """The alternate number can be a landline with its STD code and a dash; a mobile and a bad number are still checked."""
+    member = _create_member(client, admin_headers, "91" + str(int(time.time() * 1000))[-8:], "LandlineAlt")
+    url = f"/api/v1/members/{member['id']}"
+    ok = client.put(url, headers=admin_headers, json={"alternate_mobile": "080-23580117"})
+    assert ok.status_code == 200, ok.text
+    assert client.get(url, headers=admin_headers).json()["alternate_mobile"] == "080-23580117"
+    assert client.put(url, headers=admin_headers, json={"alternate_mobile": "98a45"}).status_code == 422
+    assert client.put(url, headers=admin_headers, json={"alternate_mobile": "123"}).status_code == 422
+    assert client.put(url, headers=admin_headers, json={"alternate_mobile": ""}).status_code == 200
+    # the main mobile stays strict
+    assert client.put(url, headers=admin_headers, json={"mobile": "080-23580117"}).status_code == 422

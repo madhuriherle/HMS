@@ -17,6 +17,7 @@ def members_with_wrong_data(
     search: Optional[str] = None,   # a name, mobile or membership number
     page: int = 1, limit: int = 25,
     export: Optional[str] = None,   # "excel": every row of the list
+    verification: Optional[str] = None,   # verified | not_verified: by the member's KYC call
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.require_permission("members.list.read")),
 ) -> Any:
@@ -27,7 +28,7 @@ def members_with_wrong_data(
     kind = (kind or "").lower()
     page, limit = max(1, page), max(1, min(limit, LIST_PAGE_MAX))
     try:
-        out = data_check.find(db, kind, search, page, limit, everything=bool(export))
+        out = data_check.find(db, kind, search, page, limit, everything=bool(export), verification=verification if verification in ("verified", "not_verified") else None)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     if export:

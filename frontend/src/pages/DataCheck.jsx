@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, Download, Loader2, Pencil, Search } from 'lucide-react';
 import api from '../api';
 import Pager from '../components/Pager';
+import VerificationBadge from '../components/VerificationBadge';
+import VerifyMemberModal from '../components/VerifyMemberModal';
 import useAuth from '../hooks/useAuth';
 import { notify } from '../utils/notify';
 import { formatDate } from '../utils/dateUtils';
@@ -14,26 +16,29 @@ const DOB_COLUMNS = [
   { head: 'Age', cell: (m) => (m.age == null ? '—' : m.age < 0 ? 'Future date' : `${m.age} years`), nowrap: true }
 ];
 const TABS = [
-  { id: 'future_dob', label: 'Date of birth in the future', hint: 'The date of birth is after today: a typing mistake in the register.', extra: DOB_COLUMNS },
-  { id: 'under_18', label: 'Under 18', hint: 'The date of birth makes the member younger than 18: most likely a wrong year.', extra: DOB_COLUMNS },
-  { id: 'very_old', label: 'Over 110', hint: 'The date of birth makes the member older than 110: most likely a wrong year.', extra: DOB_COLUMNS },
-  { id: 'alt_number', label: 'Alternate number', hint: 'The alternate number is not 10 to 12 digits (a landline with its STD code, or a short number).',
+  { id: 'future_dob', focus: 'date_of_birth', label: 'Date of birth in the future', hint: 'The date of birth is after today: a typing mistake in the register.', extra: DOB_COLUMNS },
+  { id: 'under_18', focus: 'date_of_birth', label: 'Under 18', hint: 'The date of birth makes the member younger than 18: most likely a wrong year.', extra: DOB_COLUMNS },
+  { id: 'very_old', focus: 'date_of_birth', label: 'Over 110', hint: 'The date of birth makes the member older than 110: most likely a wrong year.', extra: DOB_COLUMNS },
+  { id: 'alt_number', focus: 'alternate_mobile', label: 'Alternate number', hint: 'The alternate number is not 10 to 12 digits (a landline with its STD code, or a short number).',
     extra: [{ head: 'Alternate number', cell: (m) => m.alternate_mobile || '—', nowrap: true, mono: true }] },
-  { id: 'bad_email', label: 'Wrong email', hint: 'The email address is not in a valid format (for example no @, or a space or stray character in it).',
+  { id: 'bad_email', focus: 'email', label: 'Wrong email', hint: 'The email address is not in a valid format (for example no @, or a space or stray character in it).',
     extra: [{ head: 'Email', cell: (m) => m.email || '—', mono: true }] },
-  { id: 'no_place', label: 'No pincode or district', hint: 'The member has no pincode or no district, so the state, district and taluk cannot be filled.',
+  { id: 'no_place', focus: 'place', label: 'No pincode or district', hint: 'The member has no pincode or no district, so the state, district and taluk cannot be filled.',
     extra: [{ head: 'Missing', cell: (m) => (m.missing || []).join(', ') || '—' }] },
-  { id: 'print_no_address', label: 'Printed magazine, no address', hint: 'The member gets the printed magazine but has no address (and no separate magazine address) to post it to.', extra: [] },
-  { id: 'no_dob', label: 'No date of birth', hint: 'The member has no date of birth.', extra: [] },
-  { id: 'no_mobile', label: 'No mobile number', hint: 'The member has no mobile number.',
+  { id: 'print_no_address', focus: 'address', label: 'Printed magazine, no address', hint: 'The member gets the printed magazine but has no address (and no separate magazine address) to post it to.', extra: [] },
+  { id: 'no_dob', focus: 'date_of_birth', label: 'No date of birth', hint: 'The member has no date of birth.', extra: [] },
+  { id: 'no_mobile', focus: 'mobile', label: 'No mobile number', hint: 'The member has no mobile number.',
     extra: [{ head: 'Alternate number', cell: (m) => m.alternate_mobile || '—', nowrap: true, mono: true }] },
-  { id: 'no_address', label: 'No address', hint: 'The member has no address.',
+  { id: 'no_address', focus: 'address', label: 'No address', hint: 'The member has no address.',
     extra: [{ head: 'Pincode / district missing', cell: (m) => (m.missing || []).join(', ') || '—' }] },
 ];
 
 export default function DataCheck() {
   const { hasPermission } = useAuth();
   const canEdit = hasPermission('members.list.write');
+  const [kyc, setKyc] = useState('');            // '' = all, verified, not_verified
+  const [verifying, setVerifying] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [kind, setKind] = useState('future_dob');
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
@@ -50,16 +55,16 @@ export default function DataCheck() {
   useEffect(() => {
     let current = true;
     setLoading(true);
-    api.get('/data-check/members', { params: { kind, page, limit: pageSize, ...(debounced ? { search: debounced } : {}) } })
+    api.get('/data-check/members', { params: { kind, page, limit: pageSize, ...(kyc ? { verification: kyc } : {}), ...(debounced ? { search: debounced } : {}) } })
       .then(({ data: d }) => { if (current) setData(d); })
       .catch((e) => { if (current) notify(e.response?.data?.detail || 'Could not load the list from the server.', 'error'); })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [kind, page, pageSize, debounced]);
+  }, [kind, page, pageSize, debounced, kyc, reloadKey]);
 
   const download = async () => {
     try {
-      const { data: blob } = await api.get('/data-check/members', { params: { kind, export: 'excel', ...(debounced ? { search: debounced } : {}) }, responseType: 'blob' });
+      const { data: blob } = await api.get('/data-check/members', { params: { kind, export: 'excel', ...(kyc ? { verification: kyc } : {}), ...(debounced ? { search: debounced } : {}) }, responseType: 'blob' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = `members_${kind}.xlsx`;
@@ -98,6 +103,15 @@ export default function DataCheck() {
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={kyc}
+            onChange={(e) => { setKyc(e.target.value); setPage(1); }}
+            className="px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601]"
+          >
+            <option value="">All KYC</option>
+            <option value="not_verified">Not verified</option>
+            <option value="verified">Verified</option>
+          </select>
           <div className="relative">
             <Search className="w-4 h-4 text-[#9E8B7F] absolute left-3 top-1/2 -translate-y-1/2" />
             <input
@@ -137,6 +151,7 @@ export default function DataCheck() {
                 {tab.extra.map((c) => <th key={c.head} className={th}>{c.head}</th>)}
                 <th className={th}>District</th>
                 <th className={th}>Status</th>
+                <th className={th}>KYC</th>
                 {canEdit && <th className={th} />}
               </tr>
             </thead>
@@ -156,6 +171,13 @@ export default function DataCheck() {
                   <td className="px-3 py-2.5 whitespace-nowrap">
                     {[m.approval !== 'APPROVED' ? m.approval : '', m.status].filter(Boolean).map((s) => s.charAt(0) + s.slice(1).toLowerCase()).join(' · ') || '—'}
                   </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">
+                    <VerificationBadge
+                      status={m.verification}
+                      onClick={canEdit ? () => setVerifying(m.id) : undefined}
+                      title={[m.verified_at && formatDate(m.verified_at), m.verification_remark].filter(Boolean).join(' · ') || (canEdit ? 'Record a KYC call and correct the details' : '')}
+                    />
+                  </td>
                   {canEdit && (
                     <td className="px-3 py-2.5 text-right">
                       <a href={`/dashboard/membership/edit/${m.id}`} target="_blank" rel="noopener noreferrer" className="btn-act" title="Edit the member (opens in a new tab)">
@@ -169,6 +191,8 @@ export default function DataCheck() {
           </table>
         </div>
       )}
+
+      {verifying && <VerifyMemberModal memberId={verifying} focus={tab.focus} onClose={() => setVerifying(null)} onSaved={() => setReloadKey((k) => k + 1)} />}
 
       <Pager page={page} pages={data.pages} total={data.total} pageSize={pageSize} onPage={setPage} onPageSize={(n) => { setPageSize(n); setPage(1); }} />
     </div>

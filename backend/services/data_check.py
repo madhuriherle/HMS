@@ -77,10 +77,12 @@ def _row(m: Member, district: Optional[str]) -> dict:
         "alternate_mobile": m.alternate_mobile, "dob": m.date_of_birth, "age": _age(m.date_of_birth), "district": district,
         "email": m.email, "missing": [w for w, empty in (("Pincode", m.pincode_id is None), ("District", m.district_id is None)) if empty],
         "approval": m.approval_status, "status": m.member_status,
+        "verification": m.verification_status or "NOT_VERIFIED", "verified_at": m.verified_at, "verification_remark": m.verification_remark,
     }
 
 
-def find(db: Session, kind: str, search: Optional[str] = None, page: int = 1, limit: int = 25, everything: bool = False) -> dict:
+def find(db: Session, kind: str, search: Optional[str] = None, page: int = 1, limit: int = 25, everything: bool = False,
+         verification: Optional[str] = None) -> dict:
     cond = _filter(kind, db)
     q = db.query(Member, District.name_en).outerjoin(District, District.id == Member.district_id).filter(Member.is_deleted == False, cond)  # noqa: E712
     wanted = (search or "").strip()
@@ -88,6 +90,10 @@ def find(db: Session, kind: str, search: Optional[str] = None, page: int = 1, li
         like = f"%{wanted}%"
         q = q.filter(or_(Member.full_name_en.ilike(like), Member.first_name_en.ilike(like), Member.last_name_en.ilike(like), Member.mobile.ilike(like),
                          Member.membership_number.ilike(like), Member.old_membership_number.ilike(like)))
+    if verification == "verified":
+        q = q.filter(Member.verification_status == "VERIFIED")
+    elif verification == "not_verified":
+        q = q.filter(or_(Member.verification_status.is_(None), Member.verification_status != "VERIFIED"))
     total = q.count()
     # the most wrong first: a date of birth furthest from today, then by name
     if kind in ("future_dob", "under_18"):

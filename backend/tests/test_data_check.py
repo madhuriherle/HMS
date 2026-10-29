@@ -91,3 +91,21 @@ def test_data_check_more_problems(client, admin_headers):
     assert post_ok not in {r["id"] for r in noaddr}
     place = client.get("/api/v1/data-check/members", headers=admin_headers, params={"kind": "no_place", "search": tag, "limit": 50}).json()["rows"]
     assert place and all("Pincode" in r["missing"] or "District" in r["missing"] for r in place)
+
+
+def test_data_check_kyc_filter(client, admin_headers):
+    today = date.today()
+    tag = "KY" + "".join(chr(97 + int(c)) for c in str(int(time.time()))[-6:])
+    called = _make(client, admin_headers, tag + "Called", dob=today.replace(year=today.year + 3))
+    waiting = _make(client, admin_headers, tag + "Waiting", dob=today.replace(year=today.year + 4))
+    assert client.put(f"/api/v1/members/{called}/verification", headers=admin_headers, json={"status": "VERIFIED", "remark": "rang them"}).status_code == 200
+
+    def ids(**p):
+        r = client.get("/api/v1/data-check/members", headers=admin_headers, params={"kind": "future_dob", "search": tag, "limit": 50, **p})
+        assert r.status_code == 200, r.text
+        return {x["id"]: x for x in r.json()["rows"]}
+
+    both = ids()
+    assert set(both) == {called, waiting}
+    assert both[called]["verification"] == "VERIFIED" and both[waiting]["verification"] == "NOT_VERIFIED"
+    assert set(ids(verification="verified")) == {called} and set(ids(verification="not_verified")) == {waiting}

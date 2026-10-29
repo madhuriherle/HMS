@@ -35,6 +35,17 @@ VALID_SERVICE_OPTIN_STATUSES = {"ACTIVE", "CANCELLED"}
 VALID_SERVICE_OPTIN_SOURCES = {"ADMIN", "MOBILE_APP", "WEBSITE"}
 
 
+def _clean_alternate(v: Optional[str]) -> Optional[str]:
+    """The alternate number is a second mobile or a landline: digits, with a space or a dash allowed (an STD code), 6 to 15 digits."""
+    if v is None or str(v).strip() == "":
+        return None
+    v = str(v).strip()
+    digits = sum(c.isdigit() for c in v)
+    if any(not (c.isdigit() or c in " -") for c in v) or not (6 <= digits <= 15):
+        raise ValueError("alternate number must be 6 to 15 digits (a landline may have its STD code and a dash)")
+    return v
+
+
 class MemberFields(BaseModel):
     full_name_en: Optional[str] = None  # the name as typed; first / middle / last are filled from it when not given
     first_name_en: str = ""
@@ -124,7 +135,12 @@ class MemberBase(MemberFields):
     """The rules for what is typed in. A record already on file (MemberInDBBase, the response) is read as it is: an imported
     member can hold a short alternate number or be a child, and opening them must not fail."""
 
-    @field_validator("whatsapp_number", "alternate_mobile")
+    @field_validator("alternate_mobile")
+    @classmethod
+    def _validate_alternate(cls, v: Optional[str]) -> Optional[str]:
+        return _clean_alternate(v)
+
+    @field_validator("whatsapp_number")
     @classmethod
     def _validate_whatsapp(cls, v: Optional[str]) -> Optional[str]:
         if v is None or v == "":
@@ -154,7 +170,7 @@ class MemberBase(MemberFields):
             raise ValueError(f"gender must be one of: {', '.join(sorted(VALID_GENDERS))}")
         return v
 
-    @field_validator("mobile", "alternate_mobile")
+    @field_validator("mobile")
     @classmethod
     def _validate_mobile(cls, v: Optional[str]) -> Optional[str]:
         if v is None or v == "":
@@ -315,7 +331,7 @@ class MemberUpdate(BaseModel):
                 raise ValueError(f"Member must be at least {rules.MIN_MEMBER_AGE} years old")
         return v
 
-    @field_validator("mobile", "alternate_mobile")
+    @field_validator("mobile")
     @classmethod
     def _validate_mobile(cls, v: Optional[str]) -> Optional[str]:
         if v is None or v == "":
@@ -324,6 +340,11 @@ class MemberUpdate(BaseModel):
         if not v.isdigit() or not (rules.MOBILE_MIN_DIGITS <= len(v) <= rules.MOBILE_MAX_DIGITS):
             raise ValueError("mobile must be 10-12 digits")
         return v
+
+    @field_validator("alternate_mobile")
+    @classmethod
+    def _validate_alternate(cls, v: Optional[str]) -> Optional[str]:
+        return _clean_alternate(v)
 
 
 class MemberInDBBase(MemberFields):

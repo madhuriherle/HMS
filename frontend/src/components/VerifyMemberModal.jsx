@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import api from '../api';
 import Modal from './Modal';
 import ModalFooter from './ModalFooter';
@@ -31,12 +31,18 @@ const OUTCOMES = [
 const inputClass = 'w-full px-3 py-1.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] font-normal normal-case';
 const headingClass = 'text-[11px] font-bold uppercase tracking-wider text-[#7D7068]';
 
-export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
+// `focus`: the box to start at (the problem the list found): name, mobile, alternate_mobile, email, date_of_birth, address or place
+export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = null }) {
+  const boxes = useRef({});
+  const mark = (key) => (focus === key || (key === 'place' && ['state', 'district', 'taluk', 'pin'].includes(focus)) ? 'ring-2 ring-[#510601]/30 border-[#510601]' : '');
   const [member, setMember] = useState(null);
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [] });
   const [form, setForm] = useState({
     name: '',
     mobile: '',
+    alternate_mobile: '',
+    email: '',
+    address_line1: '',
     date_of_birth: '',
     father_husband_name: '',
     guardian_name: '',
@@ -69,6 +75,9 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
         setForm({
           name: nameOf(d),
           mobile: d.mobile || '',
+          alternate_mobile: d.alternate_mobile || '',
+          email: d.email || '',
+          address_line1: d.address_line1 || '',
           date_of_birth: d.date_of_birth ? d.date_of_birth.slice(0, 10) : '',
           father_husband_name: d.father_husband_name || d.father_name || '',
           guardian_name: d.guardian_name || '',
@@ -82,6 +91,11 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
         setCalls(v.data.calls || []);
         setStatus(v.data.status && v.data.status !== 'NOT_VERIFIED' ? v.data.status : 'VERIFIED');
         setRemark(v.data.remark || '');
+        // start at the box the list is about
+        setTimeout(() => {
+          const key = focus === 'place' ? (!d.state_id ? 'state' : !d.district_id ? 'district' : !d.taluk_id ? 'taluk' : 'pin') : focus;
+          boxes.current[key]?.focus?.();
+        }, 60);
       })
       .catch((e) => {
         notify(e.response?.data?.detail || 'Could not load the member.', 'error');
@@ -177,6 +191,22 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
     // 2. Mobile
     if (form.mobile !== (member.mobile || '')) {
       changed.mobile = form.mobile.trim() || null;
+    }
+
+    // 2b. Alternate number (a second mobile, or a landline with its STD code), email and address
+    if (form.alternate_mobile.trim() !== (member.alternate_mobile || '').trim()) {
+      changed.alternate_mobile = form.alternate_mobile.trim() || null;
+    }
+    if (form.email.trim() !== (member.email || '').trim()) {
+      const mail = form.email.trim();
+      if (mail && !/^[^\s@,;]+@[^\s@,;]+\.[A-Za-z]{2,}$/.test(mail)) {
+        notify('The email address is not valid (one address, like name@example.com).', 'error');
+        return;
+      }
+      changed.email = mail || null;
+    }
+    if (form.address_line1.trim() !== (member.address_line1 || '').trim()) {
+      changed.address_line1 = form.address_line1.trim() || null;
     }
 
     // 3. Date of birth
@@ -323,21 +353,48 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
               <label className="block">
                 <span className={headingClass}>Mobile *</span>
                 <input
+                  ref={(el) => { boxes.current.mobile = el; }}
                   type="tel"
                   maxLength={10}
                   value={form.mobile}
                   onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                  className={`${inputClass} mt-1 font-mono`}
+                  className={`${inputClass} mt-1 font-mono ${mark('mobile')}`}
+                />
+              </label>
+
+              <label className="block">
+                <span className={headingClass}>Alternate number</span>
+                <input
+                  ref={(el) => { boxes.current.alternate_mobile = el; }}
+                  type="tel"
+                  maxLength={20}
+                  value={form.alternate_mobile}
+                  placeholder="Mobile, or a landline with its STD code"
+                  onChange={(e) => setForm({ ...form, alternate_mobile: e.target.value.replace(/[^0-9 -]/g, '') })}
+                  className={`${inputClass} mt-1 font-mono ${mark('alternate_mobile')}`}
+                />
+              </label>
+
+              <label className="block">
+                <span className={headingClass}>Email</span>
+                <input
+                  ref={(el) => { boxes.current.email = el; }}
+                  type="text"
+                  maxLength={191}
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className={`${inputClass} mt-1 ${mark('email')}`}
                 />
               </label>
 
               <label className="block">
                 <span className={headingClass}>Date of birth</span>
                 <input
+                  ref={(el) => { boxes.current.date_of_birth = el; }}
                   type="date"
                   value={form.date_of_birth}
                   onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
-                  className={`${inputClass} mt-1`}
+                  className={`${inputClass} mt-1 ${mark('date_of_birth')}`}
                 />
               </label>
 
@@ -369,8 +426,22 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
               </div>
 
               <label className="block">
+                <span className={headingClass}>Address</span>
+                <input
+                  ref={(el) => { boxes.current.address = el; }}
+                  type="text"
+                  maxLength={255}
+                  value={form.address_line1}
+                  placeholder="House / street / area"
+                  onChange={(e) => setForm({ ...form, address_line1: e.target.value })}
+                  className={`${inputClass} mt-1 ${mark('address')}`}
+                />
+              </label>
+
+              <label className="block">
                 <span className={headingClass}>State</span>
                 <select
+                  ref={(el) => { boxes.current.state = el; }}
                   value={form.state_id}
                   onChange={(e) => onStateChange(e.target.value)}
                   className={`${inputClass} mt-1`}
@@ -385,6 +456,7 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
               <label className="block">
                 <span className={headingClass}>District</span>
                 <select
+                  ref={(el) => { boxes.current.district = el; }}
                   value={form.district_id}
                   onChange={(e) => onDistrictChange(e.target.value)}
                   disabled={!form.state_id}
@@ -400,6 +472,7 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
               <label className="block">
                 <span className={headingClass}>Taluk</span>
                 <select
+                  ref={(el) => { boxes.current.taluk = el; }}
                   value={form.taluk_id}
                   onChange={(e) => onTalukChange(e.target.value)}
                   disabled={!form.district_id}
@@ -415,6 +488,7 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved }) {
               <label className="block">
                 <span className={headingClass}>Pincode / Post office</span>
                 <select
+                  ref={(el) => { boxes.current.pin = el; }}
                   value={chosenPinId ? String(chosenPinId) : ''}
                   onChange={(e) => onPickPostOffice(e.target.value)}
                   disabled={!form.taluk_id}
