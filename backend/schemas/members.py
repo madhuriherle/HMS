@@ -35,7 +35,7 @@ VALID_SERVICE_OPTIN_STATUSES = {"ACTIVE", "CANCELLED"}
 VALID_SERVICE_OPTIN_SOURCES = {"ADMIN", "MOBILE_APP", "WEBSITE"}
 
 
-class MemberBase(BaseModel):
+class MemberFields(BaseModel):
     full_name_en: Optional[str] = None  # the name as typed; first / middle / last are filled from it when not given
     first_name_en: str = ""
     middle_name_en: Optional[str] = None
@@ -117,6 +117,11 @@ class MemberBase(BaseModel):
     pincode_id: Optional[int] = None
 
     registration_source: str = "ONLINE"
+
+
+class MemberBase(MemberFields):
+    """The rules for what is typed in. A record already on file (MemberInDBBase, the response) is read as it is: an imported
+    member can hold a short alternate number or be a child, and opening them must not fail."""
 
     @field_validator("whatsapp_number", "alternate_mobile")
     @classmethod
@@ -319,7 +324,7 @@ class MemberUpdate(BaseModel):
         return v
 
 
-class MemberInDBBase(MemberBase):
+class MemberInDBBase(MemberFields):
     id: int
     membership_number: Optional[str] = None
     member_code: Optional[str] = None  # the same number, under its old name
