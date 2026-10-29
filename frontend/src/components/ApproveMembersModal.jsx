@@ -26,6 +26,7 @@ export default function ApproveMembersModal({
 
   const isBulk = members.length > 1;
   const singleMember = members[0];
+  const short = members.filter((m) => m.payment_mismatch).length;
 
   const handleConfirm = async () => {
     if (!approvalDate) {
@@ -80,7 +81,7 @@ export default function ApproveMembersModal({
       isOpen={isOpen}
       onClose={() => !busy && onClose()}
       title={isBulk ? `Approve ${members.length} Members` : 'Approve Membership Application'}
-      maxWidthClass="max-w-lg"
+      maxWidthClass="max-w-3xl"
       footer={
         <ModalFooter
           kind="confirm"
@@ -92,85 +93,110 @@ export default function ApproveMembersModal({
         />
       }
     >
-      <div className="p-6 space-y-4">
-        {/* Applicant Summary */}
-        <div className="p-3.5 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs space-y-2">
+      <div className="flex-1 bg-[#F6F1EA] p-5 sm:p-6 space-y-4">
+        {/* Who is being approved */}
+        <section className="bg-white border border-[#E8DFD8] rounded-2xl shadow-xs overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-[#EFE6DE] bg-[#FDFBF8]">
+            <div className="text-sm font-bold text-[#180200]">
+              {isBulk ? `${members.length} selected applicants` : singleMember.fullName || singleMember.name}
+            </div>
+            <div className="flex items-center gap-2 text-[11px] font-semibold">
+              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">Receipt assigned</span>
+              {short > 0 && (
+                <span className="px-2 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-200">
+                  {short} {short === 1 ? 'has' : 'have'} a payment shortage
+                </span>
+              )}
+            </div>
+          </div>
+
           {isBulk ? (
-            <>
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-[#180200] text-sm">
-                  {members.length} Selected Applicants
-                </span>
-                <span className="text-[11px] font-semibold text-[#863221] bg-white px-2 py-0.5 rounded-md border border-[#E8DFD8]">
-                  All receipts assigned
-                </span>
-              </div>
-              <div className="max-h-28 overflow-y-auto divide-y divide-[#E8DFD8]/60 pr-1 border-t border-[#E8DFD8]/60 pt-1.5">
-                {members.map((m) => (
-                  <div key={m.id} className="py-1 flex items-center justify-between">
-                    <span className="font-semibold text-[#180200]">{m.fullName || m.name}</span>
-                    <span className="text-[11px] text-[#7D7068]">
-                      {m.payment_mismatch && (
-                        <b className="text-red-700 mr-2">{m.payment_no_receipt ? 'No payment' : `Short ₹${Number(m.payment_shortfall).toLocaleString('en-IN')}`}</b>
-                      )}
-                      {m.membershipType || ''}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
+            <div className="max-h-72 overflow-y-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="sticky top-0 bg-[#FAF7F2] text-[10px] uppercase tracking-wider text-[#863221]">
+                  <tr>
+                    <th className="py-2 px-4 font-bold w-10">#</th>
+                    <th className="py-2 px-2 font-bold">Applicant</th>
+                    <th className="py-2 px-2 font-bold">Type</th>
+                    <th className="py-2 px-2 font-bold">Receipt</th>
+                    <th className="py-2 px-4 font-bold text-right">Payment</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#EFE6DE]">
+                  {members.map((m, i) => (
+                    <tr key={m.id} className="hover:bg-[#FDFBF8]">
+                      <td className="py-2 px-4 text-[#A89B92]">{i + 1}</td>
+                      <td className="py-2 px-2 font-semibold text-[#180200]">{m.fullName || m.name}</td>
+                      <td className="py-2 px-2 text-[#5A4A42]">{m.membershipType || '—'}</td>
+                      <td className="py-2 px-2 font-mono text-[#5A4A42]">{m.receiptNumber || m.assignedReceiptNumber || '—'}</td>
+                      <td className="py-2 px-4 text-right">
+                        {m.payment_mismatch ? (
+                          <b className="text-red-700">{m.payment_no_receipt ? 'No payment' : `Short ₹${Number(m.payment_shortfall).toLocaleString('en-IN')}`}</b>
+                        ) : (
+                          <span className="text-emerald-700 font-medium">OK</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
-            <>
-              <div className="font-bold text-[#180200] text-sm">
-                {singleMember.fullName || singleMember.name}
-              </div>
+            <div className="p-4 space-y-3">
               {singleMember.payment_mismatch && (
-                <div className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-2.5 py-1.5">
+                <div className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                   {singleMember.payment_no_receipt
                     ? 'No payment on record for this applicant.'
                     : `Paid ₹${Number(singleMember.payment_shortfall).toLocaleString('en-IN')} less than the price of the chosen type.`}
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-2 text-[#863221]">
-                <div>Type: <strong className="text-[#180200]">{singleMember.membershipType || '—'}</strong></div>
-                <div>Mobile: <strong className="text-[#180200] font-mono">{singleMember.mobile || singleMember.mobileNumber || '—'}</strong></div>
-                <div>Receipt: <strong className="text-[#180200] font-mono">{singleMember.receiptNumber || singleMember.assignedReceiptNumber || 'Assigned'}</strong></div>
-                <div>Taluk: <strong className="text-[#180200]">{singleMember.talukName || singleMember.taluk || '—'}</strong></div>
-              </div>
-            </>
+              <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+                {[
+                  ['Type', singleMember.membershipType || '—'],
+                  ['Mobile', singleMember.mobile || singleMember.mobileNumber || '—'],
+                  ['Receipt', singleMember.receiptNumber || singleMember.assignedReceiptNumber || 'Assigned'],
+                  ['Taluk', singleMember.talukName || singleMember.taluk || '—']
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-[10px] font-semibold uppercase tracking-wider text-[#A89B92] mb-0.5">{label}</dt>
+                    <dd className="font-semibold text-[#180200] break-words">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
           )}
-        </div>
+        </section>
 
-        {/* Approval Date Selection */}
-        <div>
-          <label className="block text-xs font-bold text-[#180200] mb-1">
-            Approval Date <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="date"
-            value={approvalDate}
-            max={getTodayDateStr()}
-            onChange={(e) => setApprovalDate(e.target.value)}
-            disabled={busy}
-            className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] font-medium"
-            required
-          />
-        </div>
-
-        {/* Approval Note / Resolution */}
-        <div>
-          <label className="block text-xs font-bold text-[#180200] mb-1">
-            Approval Note / Meeting Reference <span className="text-[#7D7068] font-normal">(Optional)</span>
-          </label>
-          <textarea
-            value={approvalNote}
-            onChange={(e) => setApprovalNote(e.target.value)}
-            disabled={busy}
-            rows={2}
-            placeholder="e.g. EC Meeting Res #4, Approved by Executive Committee..."
-            className="w-full px-3 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] placeholder:text-[#9E8B7F]"
-          />
-        </div>
+        {/* The decision: date and note */}
+        <section className="bg-white border border-[#E8DFD8] rounded-2xl shadow-xs p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-[#180200] mb-1.5">
+              Approval Date <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={approvalDate}
+              max={getTodayDateStr()}
+              onChange={(e) => setApprovalDate(e.target.value)}
+              disabled={busy}
+              className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] font-medium"
+              required
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-bold text-[#180200] mb-1.5">
+              Approval Note / Meeting Reference <span className="text-[#7D7068] font-normal">(Optional)</span>
+            </label>
+            <textarea
+              value={approvalNote}
+              onChange={(e) => setApprovalNote(e.target.value)}
+              disabled={busy}
+              rows={2}
+              placeholder="e.g. EC Meeting Res #4, Approved by Executive Committee..."
+              className="w-full px-3 py-2 bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl text-xs text-[#180200] focus:outline-none focus:border-[#510601] placeholder:text-[#9E8B7F]"
+            />
+          </div>
+        </section>
       </div>
     </Modal>
   );
