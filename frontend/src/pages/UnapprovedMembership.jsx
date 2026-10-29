@@ -795,11 +795,13 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
                         <span className="font-bold text-[#180200] text-sm">{m.fullName || m.name}</span>
                         {/* a small mark for an applicant who was on a meeting PDF; the date shows on hover */}
                         {m.last_exported_on && (
-                          <FileText
-                            className="inline-block w-3.5 h-3.5 ml-1.5 -mt-0.5 text-[#863221]/70"
+                          <span
+                            className="inline-flex items-center justify-center w-6 h-6 ml-2 -mt-0.5 align-middle rounded-md bg-[#FBEFEA] border border-[#F0D5CB] text-[#B4412A] cursor-default"
                             title={`On the meeting PDF of ${formatDate(m.last_exported_on)}`}
                             aria-label={`On the meeting PDF of ${formatDate(m.last_exported_on)}`}
-                          />
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                          </span>
                         )}
                         {/* only a real source (an online or office registration); an imported applicant has none to show */}
                         {m.registrationSource && m.registrationSource !== 'MIGRATION' && (
