@@ -2573,9 +2573,21 @@ def _profile_summary(db: Session, member: Member) -> dict:
         1 for v in (member.father_name or member.father_husband_name, member.mother_name, member.spouse_name) if v
     ) + len(member.children_details or [])
     mm, mt = active if active else (None, None)
+    last_receipt = (
+        db.query(func.max(Receipt.receipt_date))
+        .join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id)
+        .filter(ReceiptAllocation.member_id == mid, ReceiptAllocation.is_deleted == False,  # noqa: E712
+                Receipt.is_deleted == False, Receipt.receipt_status != "CANCELLED")  # noqa: E712
+        .scalar()
+    )
+    check = membership_credit.payment_check_rows(db, member_ids=[mid], applicants=str(member.approval_status).upper() != "APPROVED").get(mid) or {}
     return {
         "id": member.id,
         "member_code": member.member_code,
+        "member_since": calculate_member_since(db, member),
+        "valid_till": mm.expires_at if mm else None,
+        "last_receipt_date": last_receipt,
+        "payment": {"judged": bool(check), "mismatch": bool(check.get("mismatch")), "no_receipt": bool(check.get("no_receipt")), "shortfall": check.get("shortfall")},
         "name_title": member.name_title,
         "first_name_en": member.first_name_en,
         "middle_name_en": member.middle_name_en,
@@ -2674,6 +2686,20 @@ def _profile_contact(db: Session, member: Member) -> dict:
     }
 
 
+def _family_members(db: Session, member: Member) -> list:
+    """The other members who carry the same family membership number (at most 50), for the family card."""
+    number = (member.family_membership_number or "").strip()
+    if not number:
+        return []
+    rows = (
+        db.query(Member).filter(Member.is_deleted == False, Member.id != member.id,  # noqa: E712
+                                func.upper(func.trim(Member.family_membership_number)) == number.upper())
+        .order_by(Member.id).limit(50).all()
+    )
+    return [{"id": m.id, "member_code": m.member_code, "name": " ".join(x for x in (m.name_title, m.first_name_en, m.middle_name_en, m.last_name_en) if x),
+             "approval_status": m.approval_status} for m in rows]
+
+
 def _profile_family(db: Session, member: Member) -> dict:
     masters = _member_master_details(db, member)
     return {
@@ -2691,6 +2717,7 @@ def _profile_family(db: Session, member: Member) -> dict:
         "referred_by_number": member.referred_by_number,
         "referred_by_name": member.referred_by_name,
         "referred_by": masters.get("referred_by"),
+        "family_members": _family_members(db, member),
     }
 
 

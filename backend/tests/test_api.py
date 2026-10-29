@@ -6766,6 +6766,9 @@ def test_member_profile_comes_one_tab_at_a_time(client, admin_headers):
     assert body["id"] == mid and body["first_name_en"] == "Tabbed Person" and set(body["counts"]) == {
         "family", "membership", "receipts", "magazine", "services", "events"}
     assert body["membership_credit"] is not None and "paid_so_far" not in body
+    # the quick facts strip and the family card
+    assert {"member_since", "valid_till", "last_receipt_date", "payment"} <= set(body) and set(body["payment"]) == {"judged", "mismatch", "no_receipt", "shortfall"}
+    assert client.get(f"/api/v1/members/{mid}/profile/family", headers=H).json()["family_members"] == []
     ov = client.get(f"/api/v1/members/{mid}/profile/overview", headers=H)
     assert ov.status_code == 200, ov.text
     assert set(ov.json()) == {"basic", "contact", "membership", "family", "receipts", "magazine", "activity"}

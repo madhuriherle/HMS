@@ -513,6 +513,25 @@ function ContactFamilySection({ core }) {
           <Row label="Family membership">{[fam?.family_membership_number, fam?.family_membership_name].filter(Boolean).join(' · ')}</Row>
           <Row label="Referred by">{[fam?.referred_by_number, fam?.referred_by_name || fam?.referred_by?.name_en].filter(Boolean).join(' · ')}</Row>
           {fam && relatives.length === 0 && children.length === 0 && <Row label="Family">None recorded</Row>}
+          {fam?.family_members?.length > 0 && (
+            <div className="col-span-full border-t border-[#EFE6DE]/70 pt-3">
+              <dt className="text-[11px] font-semibold text-[#7D7068] uppercase tracking-wider mb-1.5">
+                Family members{fam.family_membership_number ? ` · ${fam.family_membership_number}` : ''}
+              </dt>
+              <dd className="flex flex-wrap gap-2">
+                {fam.family_members.map((fm) => (
+                  <Link
+                    key={fm.id}
+                    to={`/dashboard/membership/profile/${fm.id}`}
+                    className="text-xs border border-[#E8DFD8] rounded-lg px-2.5 py-1 hover:bg-[#FAF7F2] text-[#180200]"
+                  >
+                    <span className="font-semibold">{fm.name}</span>
+                    {fm.member_code && <span className="ml-1.5 font-mono text-[#863221]">{fm.member_code}</span>}
+                  </Link>
+                ))}
+              </dd>
+            </div>
+          )}
         </>
       )}
     </Panel>
@@ -581,8 +600,19 @@ function AuditStrip({ core }) {
 // Personal Details: the full record (read when this tab is opened)
 function PersonalTab({ id, memberCode }) {
   const core = { personal: useSection(id, 'personal'), contact: useSection(id, 'contact'), family: useSection(id, 'family'), memberCode };
+  const p = core.personal.data;
+  const c = core.contact.data;
+  const missing = p && c ? [
+    ['Date of birth', p.date_of_birth], ['Blood group', p.blood_group], ['Gotra', p.gotra], ['Email', c.email],
+    ['Mobile', c.mobile], ['Address', c.address_line1], ['PIN code', c.pincode], ['Taluk', c.taluk_name]
+  ].filter(([, v]) => !v).map(([label]) => label) : [];
   return (
     <div className="space-y-4">
+      {missing.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
+          <b>Not filled in:</b> {missing.join(', ')}
+        </div>
+      )}
       <IdentitySection core={core} />
       <ContactFamilySection core={core} />
       <AddressSection core={core} />
@@ -1550,6 +1580,23 @@ export default function MemberProfile() {
                   <Printer className="w-3.5 h-3.5" />
                 </button>
               </div>
+            </div>
+
+            {/* Quick facts */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                ['Member since', s.member_since ? formatDate(s.member_since) : '—', ''],
+                ['Valid till', s.valid_till ? formatDate(s.valid_till) : '—', ''],
+                ['Last receipt', s.last_receipt_date ? formatDate(s.last_receipt_date) : '—', ''],
+                ['Payment',
+                  !s.payment?.judged ? '—' : s.payment?.no_receipt ? 'No receipt on record' : s.payment?.mismatch ? `Short by ${inr(s.payment.shortfall)}` : 'Paid in full',
+                  s.payment?.mismatch ? 'text-red-700' : 'text-emerald-700']
+              ].map(([label, value, tone]) => (
+                <div key={label} className="bg-white rounded-xl border border-[#EFE6DE] shadow-xs px-4 py-2.5">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#A89B92]">{label}</div>
+                  <div className={`text-sm font-semibold mt-0.5 ${tone || 'text-[#180200]'}`}>{value}</div>
+                </div>
+              ))}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
