@@ -7,6 +7,8 @@
 6. Label generation with only_paid filtering and custom delivery address usage.
 """
 
+from datetime import date
+
 from test_frontend_contract import API, _approve_member, _send_label_batch, _sfx
 from test_receipt_entry_flow import _entry_payload
 
@@ -340,7 +342,8 @@ def test_the_profile_lists_the_members_pauses(client, admin_headers):
     assert prof["pauses"][0]["pause_end_date"] is None
 
 
-def test_an_issue_shows_as_sent_once_its_label_batch_is_marked_sent(client, admin_headers):
+def test_printing_the_labels_sends_the_issue(client, admin_headers):
+    """Printing is sending: the batch is Sent on the print day, the issue shows S at once, and a return can be marked straight away."""
     h, s = admin_headers, _sfx()
     mid = _register(client, h, s, approve=True, magazine_kind="PHYSICAL").json()["id"]
     sub = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"][0]
@@ -349,48 +352,42 @@ def test_an_issue_shows_as_sent_once_its_label_batch_is_marked_sent(client, admi
     made = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": issue, "only_paid": False, "force": True})
     assert made.status_code in (200, 201), made.text
     batch_id = made.json()["batch_id"]
+    row = {b["id"]: b for b in client.get(f"{API}/magazines/label-batches", headers=h, params={"limit": 200}).json()["data"]}[batch_id]
+    assert row["status"] == "SENT" and row["sent_date"] == date.today().isoformat()
 
     def may():
         grid = client.get(f"{API}/magazines/subscriptions/{sub['id']}/monthly", headers=h, params={"year": year}).json()
         return grid["months"][4]
 
-    assert may()["mark"] == "" and may()["sent"] is False          # labels printed, not marked sent yet
-    # a return needs a posted issue
-    early = client.post(f"{API}/magazines/returns", headers=h, json={"subscription_id": sub["id"], "issue_month_year": issue, "return_date": f"{year}-05-20"})
-    assert early.status_code == 409 and "mark its label batch as sent" in early.json()["detail"]
+    assert may()["mark"] == "S" and may()["sent"] is True          # printed = sent, no second step
     # the same filters again is refused unless forced; a cancelled batch no longer counts
     again = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": issue, "only_paid": False})
     assert again.status_code == 409 and "already exists" in again.json()["detail"]
     forced = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": issue, "only_paid": False, "force": True})
     assert forced.status_code == 200
     assert client.post(f"{API}/magazines/label-batches/{forced.json()['batch_id']}/cancel", headers=h).json()["status"] == "CANCELLED"
-
-    sent = _send_label_batch(client, h, batch_id, f"{year}-05-03")
-    assert sent["status"] == "SENT" and sent["sent_date"] == f"{year}-05-03"
-    assert may()["mark"] == "S" and may()["sent"] is True
-    assert client.post(f"{API}/magazines/label-batches/{batch_id}/send", headers=h).status_code == 409   # already sent
-    assert client.post(f"{API}/magazines/label-batches/{batch_id}/cancel", headers=h).status_code == 409  # undo the send first
-    # a return still wins over the send, and it blocks undoing the send
+    # a return wins over the send, and once one is marked the batch cannot be cancelled
     assert client.post(f"{API}/magazines/returns", headers=h, json={
         "subscription_id": sub["id"], "issue_month_year": issue, "return_date": f"{year}-05-20",
     }).status_code in (200, 201)
     assert may()["mark"] == "R"
-    assert client.post(f"{API}/magazines/label-batches/{batch_id}/undo-send", headers=h).status_code == 409
+    assert client.post(f"{API}/magazines/label-batches/{batch_id}/cancel", headers=h).status_code == 409
 
 
-def test_undoing_a_sent_mark_and_cancelling_a_batch(client, admin_headers):
+def test_cancelling_a_wrong_print_and_correcting_the_posted_date(client, admin_headers):
     h, s = admin_headers, _sfx()
     _register(client, h, s, approve=True, magazine_kind="PHYSICAL")
     issue = f"{1960 + int(s) % 9}-02"
     batch_id = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": issue, "only_paid": False, "force": True}).json()["batch_id"]
-    _send_label_batch(client, h, batch_id)
-    assert client.post(f"{API}/magazines/label-batches/{batch_id}/send", headers=h, params={"sent_date": "2999-01-01"}).status_code == 409
-    undone = client.post(f"{API}/magazines/label-batches/{batch_id}/undo-send", headers=h)
-    assert undone.status_code == 200 and undone.json()["status"] == "GENERATED" and undone.json()["sent_date"] is None
+    assert client.post(f"{API}/magazines/label-batches/{batch_id}/send", headers=h, params={"sent_date": "2999-01-01"}).status_code == 400   # not in the future
+    fixed = client.post(f"{API}/magazines/label-batches/{batch_id}/send", headers=h, params={"sent_date": "2020-02-06"})
+    assert fixed.status_code == 200 and fixed.json()["status"] == "SENT" and fixed.json()["sent_date"] == "2020-02-06"   # posted on another day
+    assert client.post(f"{API}/magazines/label-batches/{batch_id}/undo-send", headers=h).status_code in (404, 405)       # there is no such step now
     cancelled = client.post(f"{API}/magazines/label-batches/{batch_id}/cancel", headers=h, params={"reason": "printed for the wrong taluk"})
     assert cancelled.status_code == 200 and cancelled.json()["status"] == "CANCELLED"
     assert cancelled.json()["cancel_reason"] == "printed for the wrong taluk"
-    assert client.post(f"{API}/magazines/label-batches/{batch_id}/send", headers=h).status_code == 409   # a cancelled batch cannot be sent
+    assert client.post(f"{API}/magazines/label-batches/{batch_id}/send", headers=h).status_code == 409   # a cancelled batch cannot be changed
+    assert client.post(f"{API}/magazines/label-batches/{batch_id}/cancel", headers=h).status_code == 409
     listed = {b["id"]: b for b in client.get(f"{API}/magazines/label-batches", headers=h, params={"limit": 200}).json()["data"]}
     assert listed[batch_id]["status"] == "CANCELLED"
 
@@ -485,7 +482,7 @@ def test_the_delivery_history_lists_each_issue(client, admin_headers):
     by_issue = {i["issue_month_year"]: i for i in got if i["issue_month_year"].startswith(str(year))}
     assert by_issue[f"{year}-03"]["result"] == "SENT"
     assert by_issue[f"{year}-04"]["result"] == "RETURNED" and by_issue[f"{year}-04"]["detail"] == "address wrong"
-    assert by_issue[f"{year}-05"]["result"] == "LISTED"
+    assert by_issue[f"{year}-05"]["result"] == "SENT"          # printed is sent: no issue waits as "listed" any more
     assert [i["issue_month_year"] for i in got] == sorted((i["issue_month_year"] for i in got), reverse=True)
     prof = client.get(f"{API}/members/{mid}/profile/magazine", headers=h).json()
     assert {i["issue_month_year"] for i in prof["issues"]} >= {f"{year}-03", f"{year}-04", f"{year}-05"}

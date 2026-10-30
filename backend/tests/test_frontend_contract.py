@@ -33,7 +33,7 @@ def _approve_member(client, headers, member_id):
 
 
 def _send_label_batch(client, headers, batch_id, sent_date=None):
-    """Step 2 of the monthly run: the printed labels were posted."""
+    """A printed batch is already Sent; this only sets the day the labels were posted."""
     params = {"sent_date": sent_date} if sent_date else {}
     done = client.post(f"{API}/magazines/label-batches/{batch_id}/send", headers=headers, params=params)
     assert done.status_code == 200, done.text

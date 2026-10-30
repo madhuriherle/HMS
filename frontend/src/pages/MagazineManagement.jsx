@@ -22,7 +22,6 @@ import {
   Plus,
   Search,
   X,
-  RefreshCw,
   History,
   Pencil,
   Trash2,
@@ -36,7 +35,6 @@ import {
   AlertCircle,
   FileText,
   Calendar,
-  PackageCheck,
 } from 'lucide-react';
 
 // ── constants ────────────────────────────────────────────────
@@ -1396,7 +1394,7 @@ function ReturnForm({ subOptions, presetSubscriptionId, onClose, onSaved }) {
                 onChange={(e) => { setForm((f) => ({ ...f, issue_month_year: e.target.value })); setErrors((er) => ({ ...er, issue_month_year: '' })); }}
                 className={INPUT}
               />
-              <p className="mt-1 text-[11px] text-[#863221]/80">Only an issue whose label batch is marked as sent to this member can be marked returned.</p>
+              <p className="mt-1 text-[11px] text-[#863221]/80">Only an issue whose labels were printed for this member can be marked returned.</p>
               <FieldError>{errors.issue_month_year}</FieldError>
             </div>
             <div>
@@ -1511,32 +1509,8 @@ function LabelsTab({ locations, canWrite }) {
   useEffect(() => { setPage(1); }, [pageSize]);
 
   // step 2: the printed labels were posted. Step 3 (a return) is only possible after this.
-  const markSent = async (batch) => {
-    const ok = await confirmYesNo({ title: 'Mark as sent?', text: `${batch.batch_name} (${batch.total_labels ?? 0} labels) was posted today. A return can be marked for this issue only after this.`, confirmText: 'Yes, mark sent' });
-    if (!ok) return;
-    try {
-      await api.post(`/magazines/label-batches/${batch.id}/send`);
-      notify(`${batch.batch_name} marked as sent.`);
-      load();
-    } catch (error) {
-      notify(error.response?.data?.detail || 'Could not mark the batch as sent.', 'error');
-    }
-  };
-
-  const undoSent = async (batch) => {
-    const ok = await confirmYesNo({ title: 'Undo the sent mark?', text: `${batch.batch_name} goes back to Generated. This is only for a batch marked as sent by mistake.`, confirmText: 'Yes, undo', danger: true });
-    if (!ok) return;
-    try {
-      await api.post(`/magazines/label-batches/${batch.id}/undo-send`);
-      notify(`${batch.batch_name} is back to Generated.`);
-      load();
-    } catch (error) {
-      notify(error.response?.data?.detail || 'Could not undo the sent mark.', 'error');
-    }
-  };
-
   const cancelBatch = async (batch) => {
-    const ok = await confirmYesNo({ title: 'Cancel this batch?', text: `${batch.batch_name} was printed wrongly and will not be sent. Cancelled batches stay in the list for the record.`, confirmText: 'Yes, cancel it', danger: true });
+    const ok = await confirmYesNo({ title: 'Cancel this batch?', text: `${batch.batch_name} was printed wrongly. Cancelled batches stay in the list for the record. This is not possible once a return is marked for the issue.`, confirmText: 'Yes, cancel it', danger: true });
     if (!ok) return;
     try {
       await api.post(`/magazines/label-batches/${batch.id}/cancel`);
@@ -1694,18 +1668,12 @@ function LabelsTab({ locations, canWrite }) {
                       ) : b.status === 'CANCELLED' ? (
                         <span className="inline-flex items-center rounded-full border border-stone-300 bg-stone-100 px-2 py-0.5 text-[11px] font-bold text-stone-600">Cancelled</span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">Generated, not sent</span>
+                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">Printed</span>
                       )}
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-center gap-1.5">
-                        {canWrite && b.status === 'GENERATED' && (
-                          <button type="button" onClick={() => markSent(b)} className="btn-act" title="The labels were posted: mark this batch as sent"><PackageCheck className="w-3.5 h-3.5" /><span>Mark sent</span></button>
-                        )}
-                        {canWrite && b.status === 'SENT' && (
-                          <button type="button" onClick={() => undoSent(b)} className="btn-act" title="Marked as sent by mistake"><RefreshCw className="w-3.5 h-3.5" /><span>Undo sent</span></button>
-                        )}
-                        {canWrite && b.status === 'GENERATED' && (
+                        {canWrite && b.status !== 'CANCELLED' && (
                           <button type="button" onClick={() => cancelBatch(b)} className="btn-act" title="Printed wrongly: cancel this batch"><X className="w-3.5 h-3.5" /><span>Cancel</span></button>
                         )}
                         <button type="button" onClick={() => setDetail(b)} className="btn-act" title="View labels"><Eye className="w-3.5 h-3.5" /><span>View</span></button>

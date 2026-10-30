@@ -615,8 +615,8 @@ def create_return(
         ).first()
     )
     if not sent_to_member:
-        raise HTTPException(409, f"Issue {return_in.issue_month_year} was not sent to this member: mark its label batch as sent first, "
-                                 "and the member must be on that batch.")
+        raise HTTPException(409, f"Issue {return_in.issue_month_year} was not sent to this member: the member must be on a printed label "
+                                 "batch of that issue.")
 
     obj = MagazineReturn(**return_in.model_dump(), created_by=current_user.id)
     db.add(obj)
@@ -735,7 +735,8 @@ def generate_labels(
     only_paid: bool = False,
     force: bool = False,
 ) -> Any:
-    """Generate a magazine label batch (state/district/taluk-wise), in district, taluk and pincode order.
+    """Generate (print) a magazine label batch (state/district/taluk-wise), in district, taluk and pincode order. Printing
+    marks the batch SENT on today's date: a copy can be marked returned from then on.
 
     The list is everyone with an ACTIVE subscription who wants the printed copy: approved members, and applicants who have paid (a
     subscription starts for an applicant when a receipt is assigned). Stopped subscriptions, expired or deleted members and rejected
@@ -771,7 +772,8 @@ def generate_labels(
         generation_date=dt.today(),
         issue_month_year=issue_month_year,
         filters_applied=filters_text,
-        status="GENERATED",
+        status="SENT",                 # printing the labels IS sending the issue (the office's rule): no separate "mark sent" step
+        sent_date=dt.today(),
         created_by=current_user.id
     )
     db.add(batch)
@@ -1047,11 +1049,12 @@ def mark_label_batch_sent(
     current_user: User = Depends(deps.require_permission("magazines.write")),
     batch_id: int, sent_date: Optional[date] = None,
 ) -> Any:
-    """Step 2: the printed labels were posted. Returns can be marked for this issue only after this."""
+    """A printed batch is already Sent (printing is sending). This only corrects the posted date, when the labels were posted on a
+    day other than the print day; a cancelled batch cannot be changed."""
     batch = _label_batch(db, batch_id)
-    if batch.status != "GENERATED":
-        raise HTTPException(409, f"This batch is {batch.status.title()}; only a Generated batch can be marked as sent.")
-    sent_on = sent_date or date.today()
+    if batch.status == "CANCELLED":
+        raise HTTPException(409, "This batch is cancelled; its posted date cannot be changed.")
+    sent_on = sent_date or batch.sent_date or date.today()
     if sent_on > date.today():
         raise HTTPException(400, "The sent date cannot be in the future.")
     batch.status, batch.sent_date, batch.updated_by = "SENT", sent_on, current_user.id
@@ -1059,17 +1062,9 @@ def mark_label_batch_sent(
     return _batch_row(batch)
 
 
-@router.post("/label-batches/{batch_id}/undo-send")
-def undo_label_batch_sent(
-    *, db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.require_permission("magazines.write")),
-    batch_id: int,
-) -> Any:
-    """Marked as sent by mistake: back to Generated. Blocked once a return is marked on an issue sent by this batch."""
-    batch = _label_batch(db, batch_id)
-    if batch.status != "SENT":
-        raise HTTPException(409, "Only a batch marked as sent can be undone.")
-    returned = (
+def _returns_marked_on(db: Session, batch: MagazineLabelBatch):
+    """A return marked on this batch's issue for a member who is on the batch (None when there is none)."""
+    return (
         db.query(MagazineReturn.id)
         .join(MagazineSubscription, MagazineSubscription.id == MagazineReturn.subscription_id)
         .join(MagazineLabelBatchItem, (MagazineLabelBatchItem.recipient_id == MagazineSubscription.member_id) & (MagazineLabelBatchItem.recipient_type == "MEMBER"))
@@ -1079,11 +1074,6 @@ def undo_label_batch_sent(
             MagazineReturn.is_deleted == False,  # noqa: E712
         ).first()
     )
-    if returned:
-        raise HTTPException(409, "Returns are already marked for this issue; remove them before undoing the sent mark.")
-    batch.status, batch.sent_date, batch.updated_by = "GENERATED", None, current_user.id
-    db.commit()
-    return _batch_row(batch)
 
 
 @router.post("/label-batches/{batch_id}/cancel")
@@ -1092,10 +1082,12 @@ def cancel_label_batch(
     current_user: User = Depends(deps.require_permission("magazines.write")),
     batch_id: int, reason: Optional[str] = None,
 ) -> Any:
-    """A batch printed wrongly: cancel it before it is sent (a sent batch is undone first)."""
+    """A batch printed wrongly: cancel it. Once a return is marked for the issue it can no longer be cancelled."""
     batch = _label_batch(db, batch_id)
-    if batch.status != "GENERATED":
-        raise HTTPException(409, "Only a Generated batch can be cancelled; undo the sent mark first." if batch.status == "SENT" else "This batch is already cancelled.")
+    if batch.status == "CANCELLED":
+        raise HTTPException(409, "This batch is already cancelled.")
+    if _returns_marked_on(db, batch):
+        raise HTTPException(409, "Returns are already marked for this issue; remove them before cancelling the batch.")
     batch.status, batch.cancel_reason, batch.updated_by = "CANCELLED", (reason or getattr(db, "_action_reason", None) or None), current_user.id
     db.commit()
     return _batch_row(batch)

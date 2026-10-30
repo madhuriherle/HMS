@@ -704,20 +704,22 @@ RULE 15: DECISIONS ALREADY MADE (DO NOT BRING BACK)
 15.24 RANKS ARE NEVER SHOWN. Super Admin is rank 0 (god mode, hidden from everyone else), Admin is rank 1. No screen or
       error message names a rank number, a rank gate to a role, or "a higher rank" (rule 13.6). The Modules page
       keeps its Rank gate field (rank-0 users only).
-15.25 THE MAGAZINE MONTHLY RUN IS THREE STEPS (migration 0091). (1) Generate labels: one label batch per issue month and
-      filter set; an identical batch (same issue, same filters, not cancelled) is refused with 409 unless force=true (the
-      screen asks "Generate another anyway?"). Everyone with an ACTIVE subscription who wants the printed copy is listed,
-      in district, taluk, pincode order (e-copy members, a pause covering any day of the issue month, expired / deleted
-      members and rejected applicants are left out; an applicant who has paid IS listed, rule 16.8). Affiliations, associates
-      and press join a full run only, never a run filtered by state, district or taluk. (2) Mark sent:
-      POST /magazines/label-batches/{id}/send (status GENERATED -> SENT, sent_date today; undo-send is allowed until a
-      return is marked on that issue; cancel is allowed only while GENERATED). The batch itself carries the status; the
-      old Delivery Batches screen and its write routes are gone (the table and the GET routes stay for history).
-      (3) Mark returned: only for an issue whose label batch is SENT and contains that member, once per issue. The
-      monthly "S" box and the history read the batch status. A subscription is ACTIVE, PAUSED or STOPPED (Cancelled was
-      merged into Stopped); stopping or starting on the Magazine page also sets the member's magazine_needed, and
+15.25 THE MAGAZINE MONTHLY RUN IS TWO STEPS (migrations 0091 and 0111; the user's rule of 30-Oct-2026: PRINTED MEANS SENT).
+      (1) Generate / print labels: one label batch per issue month and filter set; an identical batch (same issue, same
+      filters, not cancelled) is refused with 409 unless force=true (the screen asks "Generate another anyway?"). The batch is
+      SENT on the print day at once (sent_date = today); there is no "Mark sent" or "Undo sent" button and no Generated waiting
+      state (migration 0111 turned every old Generated batch into Sent). POST /magazines/label-batches/{id}/send now only
+      CORRECTS the posted date (never in the future, not on a cancelled batch). Everyone with an ACTIVE subscription who wants the
+      printed copy is listed, in district, taluk, pincode order (e-copy members, a pause covering any day of the issue month,
+      expired / deleted members and rejected applicants are left out; an applicant who has paid IS listed, rule 16.8).
+      Affiliations, associates and press join a full run only, never a run filtered by state, district or taluk. A wrong print is
+      CANCELLED (reason kept); a batch cannot be cancelled once a return is marked for its issue.
+      (2) Mark returned: for an issue the member was printed on (a Sent batch that holds them), once per issue, straight after
+      printing. The monthly "S" box and the history read the batch status. A subscription is ACTIVE, PAUSED or STOPPED
+      (Cancelled was merged into Stopped); stopping or starting on the Magazine page also sets the member's magazine_needed, and
       deleting a subscription sets it to No. A member's Yes starts the subscription at FINAL APPROVAL
       (services/member_activation.py) or, for an applicant, the day a receipt is assigned (rule 16.8).
+
 15.26 MEETING PDF AND AGREE / DISAGREE (migration 0092). Unapproved Membership has Export PDF: it lists every applicant the
       current search and filters give (all pages), POST /members/meeting-export, and logs each one in
       member_meeting_exports with today's date. Nothing is blocked by it: Agree stays available for everyone; the
