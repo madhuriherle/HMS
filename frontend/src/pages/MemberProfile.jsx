@@ -220,8 +220,7 @@ function OverviewTab({ id }) {
           ['Blood group', b.blood_group],
           ['Gotra', b.gotra],
           ['Qualification', b.qualification],
-          ['Occupation', b.occupation],
-          ['Native place', b.native_place]
+          ['Designation', b.designation]
         ];
         const contact = [
           ['Mobile', phone(c.mobile_country_code, c.mobile)],
@@ -424,13 +423,8 @@ function IdentitySection({ core }) {
           <Row label="Gotra">{p.gotra}</Row>
           <Row label="Gender">{p.gender}</Row>
           <Row label="Marital status">{p.is_married === true ? 'Married' : p.is_married === false ? 'Unmarried' : ''}</Row>
-          <Row label="Vocation">{p.occupation}</Row>
           <Row label="Qualification">{p.qualification}</Row>
-          <Row label="Native place">{p.native_place}</Row>
           <Row label="Designation">{p.designation}</Row>
-          <Row label="Company">{p.company}</Row>
-          <Row label="Category">{p.category}</Row>
-          <Row label="Website">{p.website}</Row>
           <Row label="Aadhaar number">
             {p.aadhaar_number && <span className="font-mono text-[11px]">{groupAadhaar(p.aadhaar_number)}</span>}
           </Row>
@@ -448,12 +442,6 @@ function IdentitySection({ core }) {
           <Row label="Imported on">{p.imported_on ? formatDate(p.imported_on) : ''}</Row>
           <Row label="Approved by">{p.approved_by_name}</Row>
           <Row label="Membership category">{p.membership_type_category}</Row>
-          <Row label="Payment at registration">
-            {p.registration_payment && typeof p.registration_payment === 'object'
-              ? Object.entries(p.registration_payment).filter(([, v]) => v !== null && v !== '' && typeof v !== 'object').map(([k, v]) => `${k.replace(/_/g, ' ')}: ${v}`).join(' · ')
-              : p.registration_payment}
-          </Row>
-          <Row label="App logins">{p.login_count ? String(p.login_count) : ''}</Row>
           {p.remarks && <div className="col-span-full"><Row label="Remarks">{p.remarks}</Row></div>}
         </>
       )}
@@ -598,46 +586,15 @@ function AddressSection({ core }) {
   );
 }
 
-// the green strip at the end of the profile: how the member was registered
-function AuditStrip({ core }) {
-  const p = core.personal.data;
-  const source = shownSource(p?.registration_source);
-  if (!p || !(source || p.remarks)) return null;
-  return (
-    <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-      <div className="flex items-center gap-2 text-emerald-900 font-medium">
-        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-        <span>Registration type: <strong className="uppercase font-bold">{source || '—'}</strong></span>
-      </div>
-      <div className="text-emerald-700 text-[11px]">
-        {p.registered_on && <>Registered on <span className="font-semibold">{formatDate(p.registered_on)}</span></>}
-        {p.remarks && <span className="ml-3">Remarks: {p.remarks}</span>}
-      </div>
-    </div>
-  );
-}
-
 // Personal Details: the full record (read when this tab is opened)
 function PersonalTab({ id, memberCode }) {
   const core = { personal: useSection(id, 'personal'), contact: useSection(id, 'contact'), family: useSection(id, 'family'), memberCode };
-  const p = core.personal.data;
-  const c = core.contact.data;
-  const missing = p && c ? [
-    ['Date of birth', p.date_of_birth], ['Blood group', p.blood_group], ['Gotra', p.gotra], ['Email', c.email],
-    ['Mobile', c.mobile], ['Address', c.address_line1], ['PIN code', c.pincode], ['Taluk', c.taluk_name]
-  ].filter(([, v]) => !v).map(([label]) => label) : [];
   return (
     <ShowEmptyContext.Provider value>
       <div className="space-y-4">
-        {missing.length > 0 && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-900">
-            <b>Not filled in:</b> {missing.join(', ')}
-          </div>
-        )}
         <IdentitySection core={core} />
         <ContactFamilySection core={core} />
         <AddressSection core={core} />
-        <AuditStrip core={core} />
       </div>
     </ShowEmptyContext.Provider>
   );
@@ -1601,13 +1558,10 @@ export default function MemberProfile() {
             </div>
 
             {/* Quick facts */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {[
                 ['Member since', s.member_since ? formatDate(s.member_since) : '—', ''],
-                ['Last receipt', s.last_receipt_date ? formatDate(s.last_receipt_date) : '—', ''],
-                ['Payment',
-                  !s.payment?.judged ? '—' : s.payment?.no_receipt ? 'No receipt on record' : s.payment?.mismatch ? `Short by ${inr(s.payment.shortfall)}` : 'Paid in full',
-                  s.payment?.mismatch ? 'text-red-700' : 'text-emerald-700']
+                ['Last receipt', s.last_receipt_date ? formatDate(s.last_receipt_date) : '—', '']
               ].map(([label, value, tone]) => (
                 <div key={label} className="bg-white rounded-xl border border-[#EFE6DE] shadow-xs px-4 py-2.5">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-[#A89B92]">{label}</div>
