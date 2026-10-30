@@ -43,7 +43,7 @@ export default function DataCheck() {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);   // the most a request may carry (rule 10.6)
   const [data, setData] = useState({ rows: [], total: 0, pages: 1 });
   const [loading, setLoading] = useState(true);
 
