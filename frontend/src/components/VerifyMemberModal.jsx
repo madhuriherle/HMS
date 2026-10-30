@@ -190,7 +190,8 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = 
 
   // Filtered dropdown lists based on normal membership hierarchy
   const filteredDistricts = locations.districts.filter((d) => !form.state_id || String(d.stateId) === String(form.state_id));
-  const filteredTaluks = locations.taluks.filter((t) => !form.district_id || String(t.districtId) === String(form.district_id));
+  // an inactive taluk is not offered (the one the member already has stays)
+  const filteredTaluks = locations.taluks.filter((t) => (!form.district_id || String(t.districtId) === String(form.district_id)) && (t.status === 'Active' || String(t.id) === String(form.taluk_id)));
 
   const save = async () => {
     const changed = {};

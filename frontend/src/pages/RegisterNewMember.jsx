@@ -1610,7 +1610,8 @@ export default function RegisterNewMember() {
                     {(() => {
                       const labelClass = 'block text-sm text-[#3D140C] mb-1.5 font-semibold';
                       const districts = locations.districts.filter((d) => !formData.stateId || String(d.stateId) === String(formData.stateId));
-                      const taluks = locations.taluks.filter((x) => !formData.districtId || String(x.districtId) === String(formData.districtId));
+                      // an inactive taluk is not offered (the one the member already has stays, so opening a record never blanks it)
+                      const taluks = locations.taluks.filter((x) => (!formData.districtId || String(x.districtId) === String(formData.districtId)) && (x.status === 'Active' || String(x.id) === String(formData.talukId)));
                       return (
                         <>
                           <div>
