@@ -27,6 +27,8 @@ _PATRIKA = re.compile(r"patrika|\bp\.?\s*nidhi\b", re.I)
 _AMRUTHA = re.compile(r"amr[iuy]|amrt|mritam|mahos|a\.?\s?m\.?\s*office|abhiy|bhiyan", re.I)
 AMRUTHA_SUB = "Amrutha Mahotsava Abhiyana"
 _KANNADA = re.compile("[\u0C80-\u0CFF]")
+# a note that carries an Aadhaar number ("Aadhaar NO-7717 7571 9100", "Adhar no:272089327532"): the office does not want it kept
+_AADHAAR_NOTE = re.compile(r"\ba+dh?a+r+a*\b", re.I)
 FIRST_YEAR = 1943          # the Sabha began in 1943: no receipt can be older
 SLOTS = range(1, 7)
 TYPE_FIXES = {"POSHAK": "POSHAKA", "AJEEV": "AJEEVA", "A": "AJEEVA"}   # typos in the old register ("A" is a guess)
@@ -511,7 +513,9 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
         is_deleted = _s(r.get("DeleteMark")) == "*"
         for key in ("CusNote", "CusStatusNote"):
             if _lines(r.get(key)):
-                notes.append(" ".join(_lines(r.get(key))))
+                text = " ".join(_lines(r.get(key)))
+                if not _AADHAAR_NOTE.search(text):     # an Aadhaar number typed into a note is not wanted in the remarks
+                    notes.append(text)
         if is_deleted:
             notes.append("Marked deleted (*) in the old register")
         if status_text == "expired":

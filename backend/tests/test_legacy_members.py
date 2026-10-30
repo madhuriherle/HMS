@@ -436,3 +436,24 @@ def test_upgrade_with_an_amrutha_mahotsava_note_goes_to_that_campaign(client, ad
         assert legacy_import.retag_amrutha_receipts(db, rows, 1)["receipts_changed"] == 0
     finally:
         db.close()
+
+
+def test_an_aadhaar_note_is_not_kept_in_the_remarks(client, admin_headers):
+    """A register note that carries an Aadhaar number is dropped; other notes stay."""
+    from db.session import SessionLocal
+    from models.members import Member
+    from services import legacy_import
+
+    s = _sfx()
+    _create_membership_type(client, admin_headers, "AD" + s[-5:], "Ajeeva")
+    rows = legacy_import.read_register(_register([
+        _row(996001, "AADHAAR NOTE", CusNote="Aadhaar NO,2570 96787584"),
+        _row(996002, "OTHER NOTE", CusNote="Called on 12-04-2010"),
+    ]))
+    db = SessionLocal()
+    try:
+        legacy_import.import_members(db, rows, 1, run_id="d" + s[-8:], file_name="MstMember.xlsx")
+        got = {m.membership_number: m.remarks for m in db.query(Member).filter(Member.membership_number.in_(["996001", "996002"]))}
+        assert not got["996001"] and got["996002"] == "Called on 12-04-2010"
+    finally:
+        db.close()
