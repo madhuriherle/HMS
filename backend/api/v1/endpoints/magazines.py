@@ -79,6 +79,14 @@ def read_subscription(
     return sub
 
 
+def _refuse_if_cannot_receive(member: Member) -> None:
+    """An expired or deleted (inactive) member, and a rejected applicant, never get the magazine: no one can start it for them."""
+    if member.member_status != "ACTIVE":
+        raise HTTPException(400, "An expired or deleted member does not get the magazine")
+    if member.approval_status == "REJECTED":
+        raise HTTPException(400, "A rejected applicant does not get the magazine")
+
+
 @router.post("/subscriptions", response_model=Union[schemas_magazines.MagazineSubscription, PendingApproval], status_code=201)
 @approval_gate.gated("magazines", "CREATE", "MagazineSubscription", "magazines.write")
 def create_subscription(
@@ -92,6 +100,7 @@ def create_subscription(
         raise HTTPException(400, f"Member {sub_in.member_id} not found")
     if sub_in.delivery_status not in VALID_DELIVERY_STATUSES:
         raise HTTPException(400, f"delivery_status must be one of {sorted(VALID_DELIVERY_STATUSES)}")
+    _refuse_if_cannot_receive(member)
     existing = _get_member_subscription(db, sub_in.member_id)
     if existing:
         raise HTTPException(409, f"Member already has a subscription (id={existing.id}, status={existing.delivery_status})")
@@ -120,6 +129,10 @@ def update_subscription(
     if "delivery_status" in data:
         if data["delivery_status"] not in VALID_DELIVERY_STATUSES:
             raise HTTPException(400, f"delivery_status must be one of {sorted(VALID_DELIVERY_STATUSES)}")
+    if data.get("delivery_status") == "ACTIVE":      # starting (or restarting) is refused for someone who can never get the magazine
+        owner = db.query(Member).filter(Member.id == sub.member_id).first()
+        if owner is not None:
+            _refuse_if_cannot_receive(owner)
     result = crud_magazines.subscription.update(db, db_obj=sub, obj_in=data, updated_by=current_user.id)
     if "delivery_status" in data:
         member = db.query(Member).filter(Member.id == sub.member_id).first()
@@ -1384,24 +1397,59 @@ def read_all_recipients(
     return _collect_recipients(db, recipient_type, delivery_status, search)[:LIST_PAGE_MAX]
 
 
-def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_status: Optional[str], search: Optional[str]) -> list:
-    """Every recipient matching the type, status and search (not paged)."""
+def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_status: Optional[str], search: Optional[str], *,
+                        copy: Optional[str] = None, state_id: Optional[int] = None, district_id: Optional[int] = None,
+                        taluk_id: Optional[int] = None, receipt: Optional[str] = None) -> list:
+    """Every recipient matching the type, status, search and the other filters (not paged).
+
+    Recipient types: MEMBER = approved members, APPLICANT = members not approved yet (rejected ones are left out),
+    AFFILIATION, ASSOCIATE and PRESS. A person is listed when they said Yes to the magazine or already have a subscription;
+    with no subscription their status is NOT_STARTED. copy = PRINTED | ONLINE. A place filter (state, district, taluk) lists
+    people only (an affiliation, associate or press has no place). receipt = PAID | NO_RECEIPT (people only)."""
+    from sqlalchemy import and_, exists
+    from models.receipts import Receipt, ReceiptAllocation
     from models.engagements import Affiliation, AffiliationMagazineSetting, Associate, AssociateMagazineSetting, PressMedia, PressMediaMagazineSetting
 
     recipients: List[schemas_magazines.MagazineRecipientItem] = []
 
-    # 1. MEMBERS
-    if not recipient_type or recipient_type.upper() in ("ALL", "MEMBER"):
+    kind = (recipient_type or "ALL").upper()
+    wanted_copy = (copy or "").upper()
+    place_filtered = bool(state_id or district_id or taluk_id)
+    non_member_filtered = bool(wanted_copy == "ONLINE" or place_filtered or receipt)   # these filters describe people only
+
+    # 1. PEOPLE: approved members and applicants
+    if kind in ("ALL", "MEMBER", "APPLICANT"):
+        approvals = {"MEMBER": ("APPROVED",), "APPLICANT": ("UNAPPROVED",)}.get(kind, ("APPROVED", "UNAPPROVED"))
+        paid_exists = exists().where(and_(
+            ReceiptAllocation.member_id == Member.id, ReceiptAllocation.is_deleted == False,  # noqa: E712
+            ReceiptAllocation.receipt_id == Receipt.id, Receipt.is_deleted == False, Receipt.receipt_status != "CANCELLED",  # noqa: E712
+        ))
         q = (
-            db.query(MagazineSubscription, Member)
-            .join(Member, Member.id == MagazineSubscription.member_id)
+            db.query(MagazineSubscription, Member, paid_exists.label("paid"))
+            .select_from(Member)
+            .outerjoin(MagazineSubscription, and_(MagazineSubscription.member_id == Member.id, MagazineSubscription.is_deleted == False))  # noqa: E712
             .filter(
-                MagazineSubscription.is_deleted == False,  # noqa: E712
                 Member.is_deleted == False,  # noqa: E712
+                Member.approval_status.in_(approvals),
+                or_(MagazineSubscription.id.isnot(None), Member.magazine_needed == True),  # noqa: E712
             )
         )
         if delivery_status and delivery_status.upper() != "ALL":
-            q = q.filter(MagazineSubscription.delivery_status == delivery_status.upper())
+            if delivery_status.upper() == "NOT_STARTED":
+                q = q.filter(MagazineSubscription.id.is_(None))
+            else:
+                q = q.filter(MagazineSubscription.delivery_status == delivery_status.upper())
+        if wanted_copy == "PRINTED":
+            q = q.filter(or_(Member.magazine_kind.is_(None), Member.magazine_kind != "EMAIL"))
+        elif wanted_copy == "ONLINE":
+            q = q.filter(Member.magazine_kind == "EMAIL")
+        if state_id: q = q.filter(Member.state_id == state_id)
+        if district_id: q = q.filter(Member.district_id == district_id)
+        if taluk_id: q = q.filter(Member.taluk_id == taluk_id)
+        if (receipt or "").upper() == "PAID":
+            q = q.filter(paid_exists)
+        elif (receipt or "").upper() == "NO_RECEIPT":
+            q = q.filter(~paid_exists)
         if search:
             s = f"%{search}%"
             q = q.filter(
@@ -1411,18 +1459,21 @@ def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_sta
                 (Member.member_code.ilike(s)) |
                 (Member.mobile.ilike(s))
             )
-        for sub, m in q.all():
+        for sub, m, paid in q.all():
             name = m.display_name or m.full_name_kn or f"Member {m.id}"
             recipients.append(
                 schemas_magazines.MagazineRecipientItem(
-                    recipient_type="MEMBER",
+                    recipient_type="MEMBER" if m.approval_status == "APPROVED" else "APPLICANT",
                     recipient_id=m.id,
                     name=name,
                     code_or_reg=m.member_code or m.membership_number,
                     mobile=m.mobile,
-                    delivery_status=sub.delivery_status,
+                    delivery_status=sub.delivery_status if sub else "NOT_STARTED",
+                    copy_kind="ONLINE" if m.magazine_kind == "EMAIL" else "PRINTED",
+                    member_status=m.member_status,
+                    has_receipt=bool(paid),
                     address=_member_label_address(m),
-                    address_override=sub.address_override or getattr(m, "magazine_delivery_address", None),
+                    address_override=(sub.address_override if sub else None) or getattr(m, "magazine_delivery_address", None),
                     state_id=m.state_id,
                     district_id=m.district_id,
                     taluk_id=m.taluk_id,
@@ -1437,7 +1488,7 @@ def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_sta
         ).first()
 
     # 2. AFFILIATIONS
-    if not recipient_type or recipient_type.upper() in ("ALL", "AFFILIATION"):
+    if kind in ("ALL", "AFFILIATION") and not non_member_filtered:
         q_aff = db.query(Affiliation).filter(Affiliation.is_deleted == False)  # noqa: E712
         if search:
             s = f"%{search}%"
@@ -1466,7 +1517,7 @@ def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_sta
             )
 
     # 3. ASSOCIATES
-    if not recipient_type or recipient_type.upper() in ("ALL", "ASSOCIATE"):
+    if kind in ("ALL", "ASSOCIATE") and not non_member_filtered:
         q_asc = db.query(Associate).filter(Associate.is_deleted == False)  # noqa: E712
         if search:
             s = f"%{search}%"
@@ -1496,7 +1547,7 @@ def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_sta
             )
 
     # 4. PRESS & MEDIA
-    if not recipient_type or recipient_type.upper() in ("ALL", "PRESS"):
+    if kind in ("ALL", "PRESS") and not non_member_filtered:
         q_prs = db.query(PressMedia).filter(PressMedia.is_deleted == False)  # noqa: E712
         if search:
             s = f"%{search}%"
@@ -1533,20 +1584,26 @@ def read_recipients_page(
     current_user: User = Depends(deps.require_permission("magazines.read")),
     page: int = 1,
     limit: int = 25,
-    recipient_type: Optional[str] = None,
-    delivery_status: Optional[str] = None,
+    recipient_type: Optional[str] = None,   # ALL | MEMBER (approved) | APPLICANT (not approved yet) | AFFILIATION | ASSOCIATE | PRESS
+    delivery_status: Optional[str] = None,  # ACTIVE | PAUSED | STOPPED | NOT_STARTED
     search: Optional[str] = None,
     with_returns: bool = False,   # members whose subscription has a returned issue
+    copy: Optional[str] = None,       # PRINTED | ONLINE
+    state_id: Optional[int] = None,
+    district_id: Optional[int] = None,
+    taluk_id: Optional[int] = None,
+    receipt: Optional[str] = None,    # PAID | NO_RECEIPT
 ) -> Any:
-    """One page of the combined recipients (members with a subscription, affiliations, associates, press). The search
-    and the filters run on all of them; `summary` counts the whole set matching the type and the search, whatever the
-    status filter, and a member row carries its subscription, the pause running today and its returned-issue count."""
+    """One page of the combined recipients (approved members, applicants, affiliations, associates, press). The search
+    and the filters run on all of them; `summary` counts the whole set matching the type, the search and the other filters,
+    whatever the status filter, and a person's row carries their subscription, the pause running today and its returned-issue count."""
     from models.magazines import MagazineReturn
 
-    everything = _collect_recipients(db, recipient_type, None, search)
-    summary = {"total": len(everything), "active": 0, "paused": 0, "stopped": 0}
+    everything = _collect_recipients(db, recipient_type, None, search, copy=copy, state_id=state_id, district_id=district_id,
+                                     taluk_id=taluk_id, receipt=receipt)
+    summary = {"total": len(everything), "active": 0, "paused": 0, "stopped": 0, "not_started": 0}
     for r in everything:
-        key = "active" if r.delivery_status == "ACTIVE" else "paused" if r.delivery_status == "PAUSED" else "stopped"
+        key = {"ACTIVE": "active", "PAUSED": "paused", "NOT_STARTED": "not_started"}.get(r.delivery_status, "stopped")
         summary[key] += 1
 
     rows = everything
@@ -1562,7 +1619,7 @@ def read_recipients_page(
                 MagazineSubscription.id.in_(returned_sub_ids or {0}), MagazineSubscription.is_deleted == False  # noqa: E712
             ).all()
         }
-        rows = [r for r in rows if r.recipient_type == "MEMBER" and r.recipient_id in members_with_returns]
+        rows = [r for r in rows if r.recipient_type in ("MEMBER", "APPLICANT") and r.recipient_id in members_with_returns]
 
     limit = _page_limit(limit)
     page = max(1, page)
@@ -1570,7 +1627,7 @@ def read_recipients_page(
     window = rows[(page - 1) * limit: page * limit]
 
     # the member rows of this page: their subscription, the running pause and the returns
-    member_ids = [r.recipient_id for r in window if r.recipient_type == "MEMBER"]
+    member_ids = [r.recipient_id for r in window if r.recipient_type in ("MEMBER", "APPLICANT")]
     subs = {}
     if member_ids:
         from core.pagination import _to_plain
@@ -1599,7 +1656,7 @@ def read_recipients_page(
     data = []
     for r in window:
         item = r.model_dump()
-        if r.recipient_type == "MEMBER":
+        if r.recipient_type in ("MEMBER", "APPLICANT"):
             sub = subs.get(r.recipient_id)
             item["subscription"] = _to_plain(sub, set()) if sub else None
             pause = pauses.get(sub.id) if sub else None

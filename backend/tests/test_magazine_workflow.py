@@ -549,3 +549,45 @@ def test_inactive_member_is_never_listed_or_started(client, admin_headers):
     bf = client.post(f"{API}/magazines/backfill-subscriptions", headers=h, json={"member_ids": [m["id"]]})
     assert bf.status_code == 200 and bf.json()["created_count"] == 0
     assert client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": m["id"]}).json()["data"] == []
+
+
+def test_nobody_can_start_the_magazine_for_an_inactive_member(client, admin_headers):
+    """Not even by hand: starting a subscription for an expired or deleted (inactive) member is refused."""
+    h, s = admin_headers, _sfx()
+    m = client.post(f"{API}/members/", headers=h, json={"first_name_en": f"InactiveHand{s}", "mobile": "92" + s.zfill(8), "magazine_needed": True}).json()
+    from db.session import SessionLocal
+    from models.members import Member
+    with SessionLocal() as db:
+        db.query(Member).filter(Member.id == m["id"]).update({"member_status": "INACTIVE"})
+        db.commit()
+    made = client.post(f"{API}/magazines/subscriptions", headers=h, json={"member_id": m["id"], "delivery_status": "ACTIVE"})
+    assert made.status_code == 400 and "expired or deleted" in made.text
+
+
+def test_recipients_list_groups_and_filters(client, admin_headers):
+    """The recipients list: approved members, applicants (paid or not), affiliations ...; filters for copy, status, place and receipt."""
+    h, s = admin_headers, _sfx()
+    applicant = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]            # said Yes, not approved, no receipt
+    online = _register(client, h, s + "9", approve=True, magazine_kind="EMAIL").json()["id"]
+
+    def listed(**p):
+        r = client.get(f"{API}/magazines/recipients", headers=h, params={"limit": 200, **p})
+        assert r.status_code == 200, r.text
+        return {(x["recipient_type"], x["recipient_id"]): x for x in r.json()["data"]}, r.json()["summary"]
+
+    app_rows, _ = listed(recipient_type="APPLICANT")
+    assert ("APPLICANT", applicant) in app_rows and app_rows[("APPLICANT", applicant)]["delivery_status"] == "NOT_STARTED"
+    assert app_rows[("APPLICANT", applicant)]["has_receipt"] is False
+    assert ("MEMBER", applicant) not in listed(recipient_type="MEMBER")[0]
+    body = _entry_payload(f"GRP-{s}", "Group Payer", payment_mode="CASH", allocations=[{"member_id": applicant, "allocated_amount": 500}])
+    assert client.post(f"{API}/receipts/", headers=h, json=body).status_code in (200, 201)
+    paid_rows, summary = listed(recipient_type="APPLICANT", receipt="PAID")
+    assert paid_rows[("APPLICANT", applicant)]["delivery_status"] == "ACTIVE" and paid_rows[("APPLICANT", applicant)]["has_receipt"] is True
+    assert ("APPLICANT", applicant) not in listed(recipient_type="APPLICANT", receipt="NO_RECEIPT")[0]
+    online_rows, _ = listed(copy="ONLINE")
+    assert ("MEMBER", online) in online_rows and ("APPLICANT", applicant) not in online_rows
+    assert all(k[0] in ("MEMBER", "APPLICANT") for k in online_rows), "an online filter lists people only"
+    printed_rows, _ = listed(copy="PRINTED")
+    assert ("MEMBER", online) not in printed_rows
+    assert {"total", "active", "paused", "stopped", "not_started"} <= set(summary)
+    assert listed(district_id=987654)[0] == {}, "a place filter with no one in it lists nobody, not the affiliations"

@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 
 // ── constants ────────────────────────────────────────────────
-const DELIVERY_STATUSES = ['ACTIVE', 'PAUSED', 'STOPPED'];
+const DELIVERY_STATUSES = ['ACTIVE', 'PAUSED', 'STOPPED', 'NOT_STARTED'];
 // The server only accepts these three when starting/stopping (PAUSED is set by a pause).
 const SETTABLE_STATUSES = ['ACTIVE', 'STOPPED'];
 const FOLLOW_UP_STATUSES = ['PENDING', 'CONTACTED', 'RESOLVED'];
@@ -50,17 +50,23 @@ const CHIP_STYLES = {
   ACTIVE: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   PAUSED: 'bg-amber-50 text-amber-700 border-amber-200',
   STOPPED: 'bg-gray-100 text-gray-600 border-gray-200',
+  NOT_STARTED: 'bg-white text-gray-500 border-dashed border-gray-300',
   PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
   CONTACTED: 'bg-blue-50 text-blue-700 border-blue-200',
   RESOLVED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
 // the words staff see for a delivery status
-const STATUS_LABELS = { ACTIVE: 'Subscribed', PAUSED: 'Paused', STOPPED: 'Stopped' };
+const STATUS_LABELS = { ACTIVE: 'Subscribed', PAUSED: 'Paused', STOPPED: 'Stopped', NOT_STARTED: 'Not started' };
 const statusLabel = (v) => STATUS_LABELS[v] || v;
+
+// who a recipient is, in words (the server's types are MEMBER = approved, APPLICANT = not approved yet)
+const TYPE_LABELS = { MEMBER: 'Member', APPLICANT: 'Applicant', AFFILIATION: 'Affiliation', ASSOCIATE: 'Associate', PRESS: 'Press & Media' };
+const isPerson = (type) => type === 'MEMBER' || type === 'APPLICANT';
 
 const RECIPIENT_TYPE_CHIPS = {
   MEMBER: 'bg-slate-100 text-slate-700 border-slate-200',
+  APPLICANT: 'bg-amber-50 text-amber-700 border-amber-200',
   AFFILIATION: 'bg-purple-50 text-purple-700 border-purple-200',
   ASSOCIATE: 'bg-blue-50 text-blue-700 border-blue-200',
   PRESS: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -263,8 +269,17 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [returnsFilter, setReturnsFilter] = useState('ALL');
+  const [copyFilter, setCopyFilter] = useState('ALL');         // PRINTED | ONLINE
+  const [receiptFilter, setReceiptFilter] = useState('ALL');   // PAID | NO_RECEIPT
+  const [districtFilter, setDistrictFilter] = useState('ALL');
+  const [talukFilter, setTalukFilter] = useState('ALL');
+  const [places, setPlaces] = useState({ districts: [], taluks: [] });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+
+  useEffect(() => {
+    loadLocations({ postalCodes: false }).then((l) => setPlaces({ districts: l.districts || [], taluks: l.taluks || [] })).catch(() => {});
+  }, []);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -288,6 +303,10 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
           ...(typeFilter !== 'ALL' ? { recipient_type: typeFilter } : {}),
           ...(statusFilter !== 'ALL' ? { delivery_status: statusFilter } : {}),
           ...(returnsFilter === 'WITH' ? { with_returns: true } : {}),
+          ...(copyFilter !== 'ALL' ? { copy: copyFilter } : {}),
+          ...(receiptFilter !== 'ALL' ? { receipt: receiptFilter } : {}),
+          ...(districtFilter !== 'ALL' ? { district_id: districtFilter } : {}),
+          ...(talukFilter !== 'ALL' ? { taluk_id: talukFilter } : {}),
         },
       });
       if (seq !== requestSeq.current) return;
@@ -303,14 +322,14 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
     } finally {
       if (seq === requestSeq.current) setLoadingRows(false);
     }
-  }, [page, pageSize, debouncedSearch, typeFilter, statusFilter, returnsFilter, rememberName]);
+  }, [page, pageSize, debouncedSearch, typeFilter, statusFilter, returnsFilter, copyFilter, receiptFilter, districtFilter, talukFilter, rememberName]);
 
   useEffect(() => {
     loadRecipients();
   }, [loadRecipients, reloadKey]);
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, typeFilter, statusFilter, returnsFilter, pageSize]);
+  }, [debouncedSearch, typeFilter, statusFilter, returnsFilter, copyFilter, receiptFilter, districtFilter, talukFilter, pageSize]);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 350);
     return () => clearTimeout(timer);
@@ -364,7 +383,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
   return (
     <div className="space-y-5">
         <PageActions>
-          <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={(typeFilter !== 'ALL' ? 1 : 0) + (statusFilter !== 'ALL' ? 1 : 0) + (returnsFilter !== 'ALL' ? 1 : 0)} />
+          <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={[typeFilter, statusFilter, returnsFilter, copyFilter, receiptFilter, districtFilter, talukFilter].filter((v) => v !== 'ALL').length} />
           {canWrite && (
             <button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
               <Plus className="w-4 h-4" />
@@ -389,8 +408,9 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
             value={typeFilter}
             onChange={(v) => { setTypeFilter(v); setPage(1); }}
             options={[
-              { value: 'ALL', label: 'All Recipient Types' },
-              { value: 'MEMBER', label: 'Members' },
+              { value: 'ALL', label: 'Everyone' },
+              { value: 'MEMBER', label: 'Approved members' },
+              { value: 'APPLICANT', label: 'Unapproved members' },
               { value: 'AFFILIATION', label: 'Affiliations' },
               { value: 'ASSOCIATE', label: 'Associates' },
               { value: 'PRESS', label: 'Press & Media' },
@@ -409,6 +429,32 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
             options={[{ value: 'ALL', label: 'All Returns' }, { value: 'WITH', label: 'With Returns' }]}
             widthClass="w-40"
           />
+          <FilterSelect
+            value={copyFilter}
+            onChange={(v) => { setCopyFilter(v); setPage(1); }}
+            options={[{ value: 'ALL', label: 'Printed or Online' }, { value: 'PRINTED', label: 'Printed copy' }, { value: 'ONLINE', label: 'Online copy' }]}
+            widthClass="w-44"
+          />
+          <FilterSelect
+            value={receiptFilter}
+            onChange={(v) => { setReceiptFilter(v); setPage(1); }}
+            options={[{ value: 'ALL', label: 'Receipt: any' }, { value: 'PAID', label: 'Receipt assigned' }, { value: 'NO_RECEIPT', label: 'No receipt yet' }]}
+            widthClass="w-44"
+          />
+          <FilterSelect
+            value={districtFilter}
+            onChange={(v) => { setDistrictFilter(v); setTalukFilter('ALL'); setPage(1); }}
+            options={[{ value: 'ALL', label: 'All Districts' }, ...places.districts.filter((d) => d.status === 'Active').map((d) => ({ value: String(d.id), label: d.name }))]}
+            widthClass="w-48"
+          />
+          {districtFilter !== 'ALL' && (
+            <FilterSelect
+              value={talukFilter}
+              onChange={(v) => { setTalukFilter(v); setPage(1); }}
+              options={[{ value: 'ALL', label: 'All Taluks' }, ...places.taluks.filter((x) => String(x.districtId) === String(districtFilter) && x.status === 'Active').map((x) => ({ value: String(x.id), label: x.name }))]}
+              widthClass="w-44"
+            />
+          )}
         </div>
       )}
 
@@ -431,7 +477,8 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                 <EmptyRow colSpan={5} icon={BookOpen} title="No recipients found" hint="Start a subscription or enable magazine delivery for affiliates, associates or press." />
               ) : (
                 rows.map((row) => {
-                  const sub = row.recipient_type === 'MEMBER' ? row.subscription : null;
+                  const person = isPerson(row.recipient_type);
+                  const sub = person ? row.subscription : null;
                   return (
                     <tr key={`${row.recipient_type}-${row.recipient_id}`} className="hover:bg-amber-50/40 transition-colors">
                       <td className="px-4 py-3.5">
@@ -439,10 +486,17 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                         {row.code_or_reg ? (
                           <div className="text-[11px] text-gray-500 font-mono">{row.code_or_reg}</div>
                         ) : null}
+                        {person && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            <span className="rounded-full border border-[#E8DFD8] bg-[#FAF7F2] px-1.5 py-px text-[10px] font-semibold text-[#863221]">{row.copy_kind === 'ONLINE' ? 'Online copy' : 'Printed copy'}</span>
+                            {row.member_status === 'INACTIVE' && <span className="rounded-full border border-gray-300 bg-gray-100 px-1.5 py-px text-[10px] font-semibold text-gray-600">Inactive</span>}
+                            {row.has_receipt === false && <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-semibold text-amber-700">No receipt yet</span>}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3.5">
                         <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${RECIPIENT_TYPE_CHIPS[row.recipient_type] || 'bg-[#FAF7F2] text-[#863221] border-[#E8DFD8]'}`}>
-                          {row.recipient_type}
+                          {TYPE_LABELS[row.recipient_type] || row.recipient_type}
                         </span>
                       </td>
                       <td className="px-4 py-3.5">
@@ -469,7 +523,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                       </td>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                          {row.recipient_type === 'MEMBER' && sub && (
+                          {person && sub && (
                             <>
                               <button type="button" onClick={() => setMonthlyFor(sub)} className="btn-act" title="Monthly marks">
                                 <Calendar className="w-3.5 h-3.5" /><span>Monthly</span>
@@ -516,7 +570,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                               )}
                             </>
                           )}
-                          {row.recipient_type === 'MEMBER' && !sub && canWrite && (
+                          {person && !sub && canWrite && row.member_status !== 'INACTIVE' && (
                             <button
                               type="button"
                               onClick={() => {
@@ -529,7 +583,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                               <Plus className="w-3.5 h-3.5" /><span>Start</span>
                             </button>
                           )}
-                          {row.recipient_type !== 'MEMBER' && canWrite && (
+                          {!person && canWrite && (
                             <button
                               type="button"
                               onClick={() => setNonMemberSetting(row)}

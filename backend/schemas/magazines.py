@@ -117,12 +117,15 @@ class UnsubscribedPaidMember(BaseModel):
 
 
 class MagazineRecipientItem(BaseModel):
-    recipient_type: str  # MEMBER, AFFILIATION, ASSOCIATE, PRESS
+    recipient_type: str  # MEMBER (approved), APPLICANT (not approved yet), AFFILIATION, ASSOCIATE, PRESS
     recipient_id: int
     name: str
     code_or_reg: Optional[str] = None
     mobile: Optional[str] = None
-    delivery_status: str  # ACTIVE, PAUSED, STOPPED
+    delivery_status: str  # ACTIVE, PAUSED, STOPPED, or NOT_STARTED (said Yes, no subscription)
+    copy_kind: Optional[str] = None      # PRINTED or ONLINE (a person's choice; an affiliation, associate or press gets the printed copy)
+    member_status: Optional[str] = None  # ACTIVE or INACTIVE (a person only)
+    has_receipt: Optional[bool] = None   # a person only: a receipt is assigned
     address: Optional[str] = None
     address_override: Optional[str] = None
     state_id: Optional[int] = None

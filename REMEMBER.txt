@@ -840,6 +840,12 @@ RULE 17: LIST AND SCREEN CHOICES MADE IN OCT 2026 (DO NOT BRING BACK)
      View opens the application popup on the list itself (not the profile page), no State filter on member lists.
 17.6 AN EDIT LINK THAT LEAVES THE LIST (Repeated Receipt Numbers, Data Check) OPENS IN A NEW TAB so the list stays where it is.
 17.7 THE MEMBER LISTS DO NOT SHOW A GREEN "Exactly 1 member found" CARD; the list already sorts.
+17.8 THE MAGAZINE SUBSCRIPTIONS LIST SHOWS EVERY KIND OF RECIPIENT (GET /magazines/recipients): approved members, unapproved members
+     (applicants), affiliations, associates and press & media. A person is listed when they said Yes or already have a subscription
+     (no subscription = "Not started"). Filters: who (everyone / approved / unapproved / affiliations / associates / press), delivery
+     (subscribed / paused / stopped / not started), copy (printed / online), receipt (assigned / none yet), district and taluk, returns,
+     search. A place or copy-online or receipt filter lists people only. Nobody can START the magazine for an expired or deleted
+     (inactive) member or a rejected applicant, not even by hand (POST /magazines/subscriptions and a restart both answer 400).
 
 --------------------------------------------------------------------------------
 RULE 18: WORKING NOTES FROM THIS WORK (ALL AGENTS)
