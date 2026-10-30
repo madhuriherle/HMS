@@ -697,6 +697,18 @@ def _member_label_address(member) -> str:
     return chr(10).join(l for l in lines if l)
 
 
+def _in_postal_order(db: Session, rows: list) -> list:
+    """(subscription, member) rows sorted by district, taluk, pincode and name, so a district-wise run prints in post-office order."""
+    from models.masters import District, PostalCode, Taluk
+    if not rows:
+        return rows
+    districts = {d.id: d.name_en for d in db.query(District).all()}
+    taluks = {t.id: t.name_en for t in db.query(Taluk).all()}
+    pins = {p.id: p.pincode for p in db.query(PostalCode).filter(PostalCode.id.in_({m.pincode_id for _s, m in rows if m.pincode_id})).all()} if any(m.pincode_id for _s, m in rows) else {}
+    key = lambda r: (districts.get(r[1].district_id) or "~", taluks.get(r[1].taluk_id) or "~", pins.get(r[1].pincode_id) or "~", (r[1].full_name_en or "").upper())  # noqa: E731
+    return sorted(rows, key=key)
+
+
 @router.post("/generate-labels")
 @approval_gate.gated("magazines", "CREATE", "MagazineLabelBatch", "magazines.write")
 def generate_labels(
@@ -710,12 +722,14 @@ def generate_labels(
     only_paid: bool = False,
     force: bool = False,
 ) -> Any:
-    """Generate a magazine label batch (state/district/taluk-wise).
+    """Generate a magazine label batch (state/district/taluk-wise), in district, taluk and pincode order.
 
-    Members with STOPPED subscriptions are excluded, a pause that covers the issue month is skipped, members who
-    are not approved yet are left out, returned issues are flagged. only_paid=True restricts the member list to
-    members whose subscription has a receipt allocation ('receipt generated members'). A batch for the same issue
-    and the same filters that is not cancelled is refused (409) unless force=true.
+    The list is everyone with an ACTIVE subscription who wants the printed copy: approved members, and applicants who have paid (a
+    subscription starts for an applicant when a receipt is assigned). Stopped subscriptions, expired or deleted members and rejected
+    applicants are excluded, a pause that covers the issue month is skipped, returned issues are flagged. Paying is not checked here (the
+    subscription itself says who is on the list); only_paid=True is kept for a caller that wants it. Affiliations, associates and press
+    are added only when no state, district or taluk filter is given. A batch for the same issue and filters that is not cancelled is
+    refused (409) unless force=true.
     """
     from models.engagements import Affiliation, Associate, PressMedia
     from models.receipts import ReceiptAllocation
@@ -760,7 +774,8 @@ def generate_labels(
             MagazineSubscription.delivery_status == "ACTIVE",
             MagazineSubscription.is_deleted == False,
             Member.is_deleted == False,
-            Member.approval_status == "APPROVED",
+            Member.approval_status.in_(("APPROVED", "UNAPPROVED")),   # an applicant is on the list once paid (that is when the subscription starts)
+            Member.member_status == "ACTIVE",                         # never an expired or deleted member
             # a member who wants only the e-copy gets no posted label
             or_(Member.magazine_kind.is_(None), Member.magazine_kind != "EMAIL"),
         )
@@ -770,6 +785,7 @@ def generate_labels(
     if taluk_id: member_subs = member_subs.filter(Member.taluk_id == taluk_id)
 
     rows = member_subs.all()
+    rows = _in_postal_order(db, rows)
 
     if only_paid and rows:
         member_ids = {m.id for _, m in rows}
@@ -816,23 +832,25 @@ def generate_labels(
 
     from models.engagements import AffiliationMagazineSetting, AssociateMagazineSetting, PressMediaMagazineSetting
 
+    filtered_by_place = bool(state_id or district_id or taluk_id)   # affiliations, associates and press have no place filter: they join a full run only
+
     def _override(model, fk, owner):
         r = db.query(model).filter(getattr(model, fk) == owner.id, model.is_deleted == False).first()
         return r.address_override if r and r.address_override else None
 
-    for aff in db.query(Affiliation).filter(Affiliation.magazine_enabled == True, Affiliation.is_deleted == False).all():  # noqa: E712
+    for aff in ([] if filtered_by_place else db.query(Affiliation).filter(Affiliation.magazine_enabled == True, Affiliation.is_deleted == False).all()):  # noqa: E712
         items.append(MagazineLabelBatchItem(
             label_batch_id=batch.id, recipient_type="AFFILIATION",
             recipient_id=aff.id, label_address=_override(AffiliationMagazineSetting, 'affiliation_id', aff) or aff.address, created_by=current_user.id
         ))
 
-    for assoc in db.query(Associate).filter(Associate.magazine_enabled == True, Associate.is_deleted == False).all():  # noqa: E712
+    for assoc in ([] if filtered_by_place else db.query(Associate).filter(Associate.magazine_enabled == True, Associate.is_deleted == False).all()):  # noqa: E712
         items.append(MagazineLabelBatchItem(
             label_batch_id=batch.id, recipient_type="ASSOCIATE",
             recipient_id=assoc.id, label_address=_override(AssociateMagazineSetting, 'associate_id', assoc) or assoc.address, created_by=current_user.id
         ))
 
-    for press in db.query(PressMedia).filter(PressMedia.magazine_enabled == True, PressMedia.is_deleted == False).all():  # noqa: E712
+    for press in ([] if filtered_by_place else db.query(PressMedia).filter(PressMedia.magazine_enabled == True, PressMedia.is_deleted == False).all()):  # noqa: E712
         items.append(MagazineLabelBatchItem(
             label_batch_id=batch.id, recipient_type="PRESS",
             recipient_id=press.id, label_address=_override(PressMediaMagazineSetting, 'press_media_id', press) or press.address, created_by=current_user.id
@@ -1303,7 +1321,7 @@ def read_unsubscribed_paid_members(
         .filter(
             Member.is_deleted == False,  # noqa: E712
             Member.magazine_needed == True,  # noqa: E712
-            Member.approval_status == "APPROVED",  # an applicant gets the subscription at approval
+            Member.approval_status.in_(("APPROVED", "UNAPPROVED")),   # an applicant who has paid is on the list too
             Member.member_status == "ACTIVE",      # an expired or deleted member never gets the magazine, so is never listed to be started
             ReceiptAllocation.is_deleted == False,  # noqa: E712
             ~Member.id.in_(subscribed),

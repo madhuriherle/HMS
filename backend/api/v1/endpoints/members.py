@@ -1568,6 +1568,8 @@ def reject_member(
     unassigned = receipt_status.unassign_member_receipts(db, id, current_user.id, at=now)
     member.approval_status = "REJECTED"
     member.updated_by = current_user.id
+    from services.magazine_subscriptions import sync_member_magazine_subscription
+    sync_member_magazine_subscription(db, member, magazine_needed=False, user_id=current_user.id)   # their receipts are gone: no magazine
     db.add(MemberApprovalHistory(
         member_id=id, action="REJECT", old_status="UNAPPROVED", new_status="REJECTED",
         reason=reason.strip(), acted_by=current_user.id, acted_at=now, created_by=current_user.id,

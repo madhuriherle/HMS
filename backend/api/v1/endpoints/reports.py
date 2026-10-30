@@ -546,6 +546,9 @@ def report_labels(
                 MagazineSubscription.delivery_status == "ACTIVE",
                 MagazineSubscription.is_deleted == False,
                 Member.is_deleted == False,
+                Member.approval_status.in_(("APPROVED", "UNAPPROVED")),   # an applicant who has paid is on the list; a rejected one is not
+                Member.member_status == "ACTIVE",                         # never an expired or deleted member
+                or_(Member.magazine_kind.is_(None), Member.magazine_kind != "EMAIL"),   # the online copy has no label
             )
         )
         if district_id:

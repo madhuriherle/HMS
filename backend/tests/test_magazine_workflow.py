@@ -395,12 +395,29 @@ def test_undoing_a_sent_mark_and_cancelling_a_batch(client, admin_headers):
     assert listed[batch_id]["status"] == "CANCELLED"
 
 
-def test_an_unapproved_applicant_gets_no_subscription_or_label_until_approval(client, admin_headers):
+def test_an_applicant_is_on_the_list_once_a_receipt_is_assigned_and_leaves_when_rejected(client, admin_headers):
+    """An unapproved applicant gets the magazine from the day a receipt is assigned to them (not before, not after a rejection)."""
     h, s = admin_headers, _sfx()
     mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]
+    subs_url, year = f"{API}/magazines/subscriptions", 1970 + int(s) % 9
+    assert client.get(subs_url, headers=h, params={"member_id": mid}).json()["data"] == []   # no receipt yet: nothing
     body = _entry_payload(f"UNAP-{s}", "Applicant Payer", payment_mode="CASH", allocations=[{"member_id": mid, "allocated_amount": 500}])
     assert client.post(f"{API}/receipts/", headers=h, json=body).status_code in (200, 201)
-    assert client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"] == []   # a receipt does not start it either
+    subs = client.get(subs_url, headers=h, params={"member_id": mid}).json()["data"]
+    assert len(subs) == 1 and subs[0]["delivery_status"] == "ACTIVE"          # the receipt started it, approved or not
+    gen = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": f"{year}-06", "force": True}).json()
+    labelled = {i["recipient_id"] for i in client.get(f"{API}/magazines/label-batches/{gen['batch_id']}", headers=h).json()["data"] if i["recipient_type"] == "MEMBER"}
+    assert mid in labelled                                                      # and the label list carries the applicant
+    rej = client.put(f"{API}/members/{mid}/reject", headers=h, params={"reason": "not agreed"})
+    assert rej.status_code == 200, rej.text
+    assert client.get(subs_url, headers=h, params={"member_id": mid}).json()["data"][0]["delivery_status"] == "STOPPED"   # rejected: off the list
+
+
+def test_an_approved_member_can_stop_and_start_the_magazine(client, admin_headers):
+    h, s = admin_headers, _sfx()
+    mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]
+    body = _entry_payload(f"UNAP2-{s}", "Applicant Payer", payment_mode="CASH", allocations=[{"member_id": mid, "allocated_amount": 500}])
+    assert client.post(f"{API}/receipts/", headers=h, json=body).status_code in (200, 201)
     _approve_member(client, h, mid)
     subs = client.get(f"{API}/magazines/subscriptions", headers=h, params={"member_id": mid}).json()["data"]
     assert len(subs) == 1 and subs[0]["delivery_status"] == "ACTIVE"
@@ -412,6 +429,42 @@ def test_an_unapproved_applicant_gets_no_subscription_or_label_until_approval(cl
     assert client.put(f"{API}/magazines/subscriptions/{subs[0]['id']}", headers=h, json={"delivery_status": "CANCELLED"}).status_code == 400   # merged into Stopped
     assert client.put(f"{API}/magazines/subscriptions/{subs[0]['id']}", headers=h, json={"delivery_status": "ACTIVE"}).status_code == 200
     assert client.get(f"{API}/members/{mid}", headers=h).json()["magazine_needed"] is True
+
+
+def test_a_district_run_has_no_affiliates_and_labels_print_in_postal_order(client, admin_headers):
+    """Affiliations, associates and press join a full run only; the labels come in district, taluk, pincode order."""
+    h, s = admin_headers, _sfx()
+    year = 1960 + int(s) % 9
+    full = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": f"{year}-02", "force": True}).json()
+    types_full = {i["recipient_type"] for i in client.get(f"{API}/magazines/label-batches/{full['batch_id']}", headers=h).json()["data"]}
+    part = client.post(f"{API}/magazines/generate-labels", headers=h, params={"issue_month_year": f"{year}-03", "state_id": 987654, "force": True}).json()
+    types_part = {i["recipient_type"] for i in client.get(f"{API}/magazines/label-batches/{part['batch_id']}", headers=h).json()["data"]}
+    assert not (types_part & {"AFFILIATION", "ASSOCIATE", "PRESS"}), types_part
+    assert full["total_labels"] >= part["total_labels"]
+
+
+def test_postal_order_sorts_by_district_taluk_pincode_then_name(client):
+    from types import SimpleNamespace as N
+    from db.session import SessionLocal
+    from models.masters import District, State, Taluk
+    from api.v1.endpoints.magazines import _in_postal_order
+
+    db = SessionLocal()
+    try:
+        st = State(name_en="PostalSt" + _sfx()[-4:], code="PS" + _sfx()[-4:], status=True)
+        db.add(st)
+        db.flush()
+        da, dz = District(name_en="Adistrict" + _sfx()[-4:], state_id=st.id, status=True), District(name_en="Zdistrict" + _sfx()[-4:], state_id=st.id, status=True)
+        db.add_all([da, dz])
+        db.flush()
+        rows = [(None, N(district_id=dz.id, taluk_id=None, pincode_id=None, full_name_en="Zed")),
+                (None, N(district_id=da.id, taluk_id=None, pincode_id=None, full_name_en="Bee")),
+                (None, N(district_id=da.id, taluk_id=None, pincode_id=None, full_name_en="Ant")),
+                (None, N(district_id=None, taluk_id=None, pincode_id=None, full_name_en="No place"))]
+        assert [m.full_name_en for _s, m in _in_postal_order(db, rows)] == ["Ant", "Bee", "Zed", "No place"]
+    finally:
+        db.rollback()
+        db.close()
 
 
 def test_the_delivery_history_lists_each_issue(client, admin_headers):

@@ -2,8 +2,9 @@
 
 Ensures synchronization of magazine delivery subscriptions with member profile changes
 and receipt allocations:
-1. When a member's `magazine_needed` is True and the member is APPROVED (at final approval, or on a later edit):
-   - Creates or reactivates an ACTIVE MagazineSubscription. An applicant who is not approved yet gets none.
+1. When a member's `magazine_needed` is True and the member is ACTIVE (never an expired or deleted one) and is APPROVED, or is an
+   applicant who has PAID (a receipt is assigned to them):
+   - Creates or reactivates an ACTIVE MagazineSubscription. An applicant with no receipt yet, and a rejected one, get none.
    - Synchronizes `address_override` with `magazine_delivery_address`.
    - Mirrors into member service opt-ins.
 2. When a member's `magazine_needed` is set to False (on edit):
@@ -45,8 +46,10 @@ def sync_member_magazine_subscription(
     )
 
     if effective_needed:
-        if member.approval_status != "APPROVED":
-            return sub  # the subscription starts at final approval, not at registration
+        if member.approval_status == "REJECTED":
+            return sub  # a rejected applicant is not on the list
+        if member.approval_status != "APPROVED" and not has_paid(db, member.id):
+            return sub  # an applicant is on the list from the day a receipt is assigned to them (until then, nothing)
         if member.member_status != "ACTIVE":
             return sub  # an expired or deleted (inactive) member never gets a subscription started, whoever asks
         if not sub:
@@ -80,6 +83,15 @@ def sync_member_magazine_subscription(
         return sub
 
 
+def has_paid(db: Session, member_id: int) -> bool:
+    """True when a receipt (not deleted, not cancelled) is assigned to the member."""
+    from models.receipts import Receipt, ReceiptAllocation
+    return db.query(ReceiptAllocation.id).join(Receipt, Receipt.id == ReceiptAllocation.receipt_id).filter(
+        ReceiptAllocation.member_id == member_id, ReceiptAllocation.is_deleted == False,  # noqa: E712
+        Receipt.is_deleted == False, Receipt.receipt_status != "CANCELLED",  # noqa: E712
+    ).first() is not None
+
+
 def ensure_subscription_on_receipt_assigned(
     db: Session,
     member_ids: Iterable[int],
@@ -97,7 +109,7 @@ def ensure_subscription_on_receipt_assigned(
             Member.id.in_(valid_ids),
             Member.is_deleted == False,
             Member.magazine_needed == True,  # noqa: E712
-            Member.approval_status == "APPROVED",  # an applicant waiting for approval gets none yet
+            Member.approval_status.in_(("APPROVED", "UNAPPROVED")),   # an applicant gets it when a receipt is assigned (this call is that moment)
             Member.member_status == "ACTIVE",      # an expired or deleted member never gets one, not even by the backfill
         )
         .all()

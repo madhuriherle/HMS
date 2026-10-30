@@ -1432,7 +1432,7 @@ function LabelsTab({ locations, canWrite }) {
   const [detail, setDetail] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const [gen, setGen] = useState({ issue_month_year: thisMonth(), state_id: '', district_id: '', taluk_id: '', only_paid: true });
+  const [gen, setGen] = useState({ issue_month_year: thisMonth(), state_id: '', district_id: '', taluk_id: '' });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [total, setTotal] = useState(0);
@@ -1523,7 +1523,6 @@ function LabelsTab({ locations, canWrite }) {
           state_id: gen.state_id || undefined,
           district_id: gen.district_id || undefined,
           taluk_id: gen.taluk_id || undefined,
-          only_paid: gen.only_paid,
           ...(force ? { force: true } : {}),
         },
       });
@@ -1593,10 +1592,7 @@ function LabelsTab({ locations, canWrite }) {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <label className="inline-flex items-center gap-2 text-xs font-semibold text-[#863221] cursor-pointer">
-            <input type="checkbox" checked={gen.only_paid} onChange={(e) => setGen((g) => ({ ...g, only_paid: e.target.checked }))} className="h-4 w-4 rounded border-stone-300 text-[#8C1801]" />
-            Paid members only (receipt allocated)
-          </label>
+          <span className="text-xs text-[#863221]">Everyone with an active printed subscription, in district, taluk and pincode order.</span>
           {canWrite && (
             <button type="button" onClick={() => generate(false)} disabled={busy} className={BTN_PRIMARY}>
               <Printer className="w-4 h-4" /><span>{busy ? 'Generating…' : 'Generate & Download PDF'}</span>
