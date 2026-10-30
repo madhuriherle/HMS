@@ -571,7 +571,7 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
           onChange={setMembershipTypeId}
           options={[
             { value: '', label: 'All Types' },
-            ...membershipTypes.map((mt) => ({ value: String(mt.id), label: mt.name_en || mt.name })),
+            ...membershipTypes.filter((mt) => mt.status === 'Active').map((mt) => ({ value: String(mt.id), label: mt.name_en || mt.name })),
           ]}
           widthClass="w-full sm:w-44"
         />

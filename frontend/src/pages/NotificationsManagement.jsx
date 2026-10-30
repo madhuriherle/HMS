@@ -641,7 +641,7 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
                   className="w-full px-2.5 py-2 bg-white border border-[#E8DFD8] rounded-xl text-xs text-[#180200] cursor-pointer"
                 >
                   <option value="">All Types</option>
-                  {membershipTypes.map((mt) => (
+                  {membershipTypes.filter((mt) => mt.status === 'Active').map((mt) => (
                     <option key={mt.id} value={mt.id}>{mt.name_en || mt.name}</option>
                   ))}
                 </select>

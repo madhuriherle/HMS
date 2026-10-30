@@ -364,7 +364,7 @@ export default function LabelList() {
           }}
           options={[
             { value: 'ALL', label: 'All Membership Types' },
-            ...membershipTypes.map((mt) => ({ value: mt.id, label: mt.name }))
+            ...membershipTypes.filter((mt) => mt.status === 'Active').map((mt) => ({ value: mt.id, label: mt.name }))
           ]}
           widthClass="w-full sm:w-56"
         />

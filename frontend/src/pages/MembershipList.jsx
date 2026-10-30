@@ -430,7 +430,7 @@ export default function MembershipList() {
           }}
           options={[
             { value: 'ALL', label: 'All Types' },
-            ...membershipTypes.map((mt) => ({ value: mt.name, label: mt.name })),
+            ...membershipTypes.filter((mt) => mt.status === 'Active').map((mt) => ({ value: mt.name, label: mt.name })),
             { value: 'None', label: 'None / Not Yet Reached' }
           ]}
           widthClass="w-full sm:w-44"
