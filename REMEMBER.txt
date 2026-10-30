@@ -171,6 +171,12 @@ RULE 6: NUMBERING (RECEIPTS AND MEMBERSHIP NUMBERS)
      0001). Save & New keeps the date just used, so old receipts can be entered one after another. The
      Receipt Tracking footer counts Assigned, Unassigned and Cancelled separately by real status.
 
+6.5  THE NUMBER RECEIPT ENTRY OFFERS COMES FROM THE OFFICE'S OWN SERIES ONLY. Receipts imported from the old register
+     (source OLD_REGISTER or UNAPPROVED_IMPORT) are never counted when the next number is worked out
+     (services/numbering._legacy_highest): the paper books have several series and typing mistakes (one receipt was 725600
+     for 72560 and made Receipt Entry offer 725601). A number already taken is still skipped. The register's own numbers are
+     corrected on the receipt itself.
+
 --------------------------------------------------------------------------------
 RULE 7: LOOKUPS
 --------------------------------------------------------------------------------

@@ -12,6 +12,7 @@ from datetime import date
 from typing import Callable, Optional
 
 from fastapi import HTTPException
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -189,8 +190,10 @@ def _legacy_highest(db: Session, f: Fmt, d: date) -> int:
     from models.receipts import Receipt
 
     rx = _regex(f, d)
-    # a receipt in the Recycle Bin still holds its number (it can be restored); only a permanent delete frees it
-    q = db.query(Receipt.receipt_number)
+    # a receipt in the Recycle Bin still holds its number (it can be restored); only a permanent delete frees it.
+    # The numbers of the OLD REGISTER (imported members and applicants) are not counted: they come from the paper books, in several
+    # series and with typing mistakes (725600 for 72560), and they must never push the number the office is offered.
+    q = db.query(Receipt.receipt_number).filter(or_(Receipt.source.is_(None), Receipt.source.notin_(("OLD_REGISTER", "UNAPPROVED_IMPORT"))))
     if f.restart == "FY":
         q = q.filter(Receipt.financial_year == financial_year_for(d))
     highest = 0
