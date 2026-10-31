@@ -167,7 +167,7 @@ def test_receipts_import(client, admin_headers):
             assert [float(a.allocated_amount) for a in allocs] == [100.0]
         dummy = db.query(Receipt).join(ReceiptAllocation, ReceiptAllocation.receipt_id == Receipt.id).filter(
             ReceiptAllocation.member_id == ids["920001"], Receipt.is_old_receipt == True).one()  # noqa: E712
-        assert dummy.receipt_number == "FY91-001" and float(dummy.net_amount) == 0 and dummy.receipt_date == date(1991, 7, 1)
+        assert dummy.receipt_number == "FY91-0001" and float(dummy.net_amount) == 0 and dummy.receipt_date == date(1991, 7, 1)
         mixed = db.query(Receipt).filter(Receipt.receipt_number == "9").one()
         assert float(mixed.net_amount) == 550 and mixed.receipt_type == "MEMBERSHIP"
         names = {i.particular_name + "/" + (i.sub_particular_name or "") for i in db.query(ReceiptItem).filter(ReceiptItem.receipt_id == mixed.id).all()}
@@ -477,5 +477,31 @@ def test_an_aadhaar_number_in_a_note_goes_to_the_aadhaar_box(client, admin_heade
         db.refresh(got[str(base + 1)])
         assert got[str(base + 1)].aadhaar_number == "257096787584" and not got[str(base + 1)].remarks
         assert legacy_import.backfill_aadhaar(db, rows)["seeded"] == 0
+    finally:
+        db.close()
+
+
+def test_old_three_digit_unknown_numbers_are_padded_to_four(client):
+    from datetime import date
+    from db.session import SessionLocal
+    from models.receipts import Receipt
+    from services import legacy_import
+    from test_receipt_repeats import _receipt
+
+    year = 1944 + int(_sfx()) % 50
+    db = SessionLocal()
+    try:
+        code = f"{year % 100:02d}"
+        old, taken = _receipt(db, f"FY{code}-001", on=date(year, 6, 1)), _receipt(db, f"FY{code}-0002", on=date(year, 6, 2))
+        also = _receipt(db, f"FY{code}-002", on=date(year, 6, 3))     # its padded form is taken: left alone
+        for r in (old, taken, also):
+            r.is_old_receipt = True
+        db.commit()
+        ids = (old.id, taken.id, also.id)
+        out = legacy_import.pad_unknown_numbers(db)
+        db.expire_all()
+        assert db.get(Receipt, ids[0]).receipt_number == f"FY{code}-0001" and out["renumbered"] >= 1
+        assert db.get(Receipt, ids[1]).receipt_number == f"FY{code}-0002" and db.get(Receipt, ids[2]).receipt_number == f"FY{code}-002"
+        assert legacy_import.pad_unknown_numbers(db)["renumbered"] == 0
     finally:
         db.close()

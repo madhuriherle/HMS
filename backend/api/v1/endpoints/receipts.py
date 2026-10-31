@@ -65,7 +65,7 @@ def _allocated_member_ids(db: Session, receipt_id: int) -> list:
 
 def _sort_receipts(q, sort_by, sort_dir):
     """Newest financial year first and, inside a year, the highest receipt number first (old receipt at the bottom, new on top);
-    unknown (old) receipt numbers such as NR-0001 or FY24-001 come after the real ones of their year. Or the column the caller asked for.
+    unknown (old) receipt numbers such as NR-0001 or FY24-0001 come after the real ones of their year. Or the column the caller asked for.
     Receipt numbers are compared as numbers (0031 < 998 < 1058), not as text."""
     from core.sorting import sort_query
     direction = (sort_dir or "desc").lower()
@@ -443,7 +443,7 @@ def read_receipt_tracking(
     fy: Optional[str] = None,           # financial year "2025-26" (1 Apr - 31 Mar)
     mode: Optional[str] = None,         # payment mode as shown: "Cash", or the bank/account name
     member_ids: Optional[str] = None,   # comma separated member ids (their receipts), at most 200
-    number_kind: Optional[str] = None,  # UNKNOWN (dummy number, FY43-001 style) | KNOWN (real number) | ZERO (no amount)
+    number_kind: Optional[str] = None,  # UNKNOWN (dummy number, FY43-0001 style) | KNOWN (real number) | ZERO (no amount)
 ) -> Any:
     """Receipt register for the Receipt Tracking screen.
 

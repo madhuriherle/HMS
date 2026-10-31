@@ -761,6 +761,14 @@ RULE 16: THE OLD REGISTER, MEMBER DATA AND THE CHECKS (OCT 2026 - THE USER'S DEC
      /dashboard/receipts/repeats, GET /receipts/repeats): a back icon and a search, each number is a heading with every
      record that used it under it, each record has View and Edit (Edit opens in a NEW TAB). The receipt popup shows one
      plain line "Same number also used by:" (GET /receipts/{id}/same-number). No colours, no REPEAT tags on the list.
+16.3a UNKNOWN RECEIPT NUMBERS ARE IN TWO SERIES (the user's decision, 31-Oct-2026). (1) The made-up numbers the OLD-REGISTER IMPORT gives
+      (a line with a date but no usable number) are FYyy-nnnn: FY + the last two digits of the financial year's START year + a
+      dash + a 4-digit counter that restarts each financial year (a receipt dated 22-05-1964 is FY64-0001; FY43 is the earliest,
+      the Sabha began in 1943). They are marked is_old_receipt (UNKNOWN); a line with a date and an amount keeps its amount, a line
+      with a date and nothing else is Rs 0. services/legacy_import (build_plan, import_receipts); scripts/legacy_pad_unknown_numbers.py
+      pads the older 3-digit ones (FY64-001) to 4 digits. (2) An unknown receipt TYPED ON RECEIPT ENTRY (the "Unknown receipt" tick)
+      keeps its own series from Settings > Number Formats (OLD_RECEIPT, NR-0001 on UAT). Do not mix the two.
+
 16.4 GENDER IS NEVER GUESSED. Only the title says it: SRI = male, SMT. / KUM. = female, anything else (DR., PROF. ...)
      stays blank. The new member form and the children rows start with NO gender (no default Male); the title still
      moves the gender, and the gender moves the title.

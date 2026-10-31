@@ -51,7 +51,7 @@ def test_register_rules(client):
         db.close()
     c = plan["counts"]
     assert c["members"] == 6 and c["deleted"] == 1
-    assert sorted(d["dummy"] for d in plan["dummies"]) == ["FY80-001"]
+    assert sorted(d["dummy"] for d in plan["dummies"]) == ["FY80-0001"]
     assert {d["cus_no"] for d in plan["dummies"]} == {2}
     line = lambda no: next(ln for m in plan["members"] if m["cus_no"] == no for ln in m["lines"])
     # every record is a receipt of its own: the earliest keeps 100, then by date and membership number 100/2 (Bharath, same date), 100/3 (Charan)

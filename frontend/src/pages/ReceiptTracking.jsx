@@ -494,7 +494,7 @@ export default function ReceiptTracking() {
           widthClass="w-full sm:w-44"
         />
 
-        {/* Status: whether the receipt is linked to a member, plus the old-register receipts with no real number (FY43-001 style) or no amount */}
+        {/* Status: whether the receipt is linked to a member, plus the old-register receipts with no real number (FY43-0001 style) or no amount */}
         <FilterSelect
           value={numberFilter !== 'ALL' ? numberFilter : statusFilter}
           onChange={(val) => {

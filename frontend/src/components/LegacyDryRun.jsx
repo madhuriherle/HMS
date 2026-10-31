@@ -13,7 +13,7 @@ const LABELS = [
   ['deleted', 'Marked deleted (*)'],
   ['receipt_lines', 'Receipt lines'],
   ['receipts_to_import', 'Receipts that would be imported'],
-  ['receipts_dummy_number', 'Dummy receipts (FY43-001 style)'],
+  ['receipts_dummy_number', 'Dummy receipts (FY43-0001 style)'],
   ['receipts_zero_amount', 'Receipts with a number but no amount'],
   ['receipts_shared_by_members', 'One receipt shared by several members'],
   ['receipts_wrong_date', 'Wrong dates (before 1943 or in the future), not imported'],

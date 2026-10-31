@@ -5,7 +5,7 @@ puts them in one Excel file. The rules (agreed with the office):
   * CusNo is the membership number, CusNoOld the old number (0 = none), CusNoNew is not used;
   * the upgrade column (CusMemUpAmt) is Patrika Nidhi money, whatever the year or the amount (the office confirmed): it is a
     Donation > Patrika Nidhi line and never counts as membership. Membership is the membership column (CusMemAmt) only;
-  * up to 6 receipt lines per member; a line with a date but no number gets a dummy number FY43-001 (the last two
+  * up to 6 receipt lines per member; a line with a date but no number gets a dummy number FY43-0001 (the last two
     digits of the financial year, then a running number) and keeps its amount (0 when there is none);
   * receipts before 1943 or after today are wrong dates and are not imported (the member is);
   * every register record is a receipt of its own (the register never says that two members paid together). A receipt number is unique
@@ -135,7 +135,7 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
     taken = {n.strip().upper() for (n,) in db.query(Member.membership_number).filter(Member.membership_number != None, Member.registration_source != "MIGRATION").all()}  # noqa: E711
     taken |= {n.strip().upper() for (n,) in db.query(MemberMembership.membership_number).join(Member, Member.id == MemberMembership.member_id)
               .filter(MemberMembership.membership_number != None, Member.registration_source != "MIGRATION").all()}  # noqa: E711
-    dummy_used = defaultdict(int)       # FY code -> highest FYyy-nnn already in the database
+    dummy_used = defaultdict(int)       # FY code -> highest FYyy-nnnn already in the database (an older 3-digit one counts too)
     for (n,) in db.query(Receipt.receipt_number).filter(Receipt.receipt_number.like("FY%-%")).all():
         m = re.fullmatch(r"FY(\d\d)-(\d+)", n or "")
         if m:
@@ -259,7 +259,7 @@ def build_plan(db, rows: list, today: Optional[date] = None) -> dict:
                 ln["kind"] = "NO_NUMBER"
             code = f"{financial_year_start(ln['date']) % 100:02d}"
             seq[code] += 1
-            ln["dummy"] = f"FY{code}-{seq[code]:03d}"
+            ln["dummy"] = f"FY{code}-{seq[code]:04d}"
             dummies.append({**ln, "reason": ("number already used on another date" if ln["kind"] == "NUMBER_TAKEN"
                                              else "no receipt number" + (", no amount" if not (ln["membership"] or ln["upgrade"] or ln["other"]) else ""))})
         elif not (ln["membership"] or ln["upgrade"] or ln["other"] or ln["patrika"] or ln["amrutha"]):
@@ -652,7 +652,7 @@ def _particulars(db, user_id: int) -> dict:
 def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int = 500, applicants: bool = False) -> dict:
     """Create the receipts of the old register for the members already imported. Lines with no date are not imported (the
     office chose to ignore them) and neither are dates before 1943 or in the future: they are returned in the lists.
-    A receipt number is kept; with none (or one already used on another date that year) the receipt gets FY43-001 and is
+    A receipt number is kept; with none (or one already used on another date that year) the receipt gets FY43-0001 and is
     marked unknown. Every register record is a receipt of its own (a repeated number gets /2, /3). The members' types are
     never changed. A member who already has receipts from this import is left out, so the run can be repeated.
     applicants=True: the register is the applications register; its people are found by application number (legacy_ref_number) and the
@@ -680,7 +680,7 @@ def import_receipts(db, rows: list, user_id: int, *, progress=None, batch: int =
         code = f"{fy_start % 100:02d}"
         top = max((int(m.group(1)) for (n,) in db.query(Receipt.receipt_number).filter(Receipt.receipt_number.like(f"FY{code}-%")).all()
                    for m in [re.fullmatch(r"FY\d\d-(\d+)", n or "")] if m), default=0)
-        return f"FY{code}-{top + 1:03d}"
+        return f"FY{code}-{top + 1:04d}"
     p = _particulars(db, user_id)
 
     groups, order = {}, []
@@ -1458,3 +1458,21 @@ def backfill_aadhaar(db, rows: list) -> dict:
                 sub.notes, cleaned = new_note, cleaned + 1
     db.commit()
     return {"seeded": seeded, "conflicts": conflicts, "notes_cleaned": cleaned, "member_not_found": not_found}
+
+
+def pad_unknown_numbers(db) -> dict:
+    """The made-up numbers an earlier import gave (FY64-001) get the 4-digit counter the new ones have (FY64-0001). Only the number
+    changes; a number whose padded form is already taken in its year is left alone. Safe to repeat."""
+    from models.receipts import Receipt
+
+    changed = 0
+    for r in db.query(Receipt).filter(Receipt.is_old_receipt == True, Receipt.receipt_number.like("FY%-%")).all():  # noqa: E712
+        m = re.fullmatch(r"(FY\d\d)-(\d{1,3})", r.receipt_number or "")
+        if not m:
+            continue
+        new = f"{m.group(1)}-{int(m.group(2)):04d}"
+        if db.query(Receipt.id).filter(Receipt.financial_year == r.financial_year, Receipt.receipt_number == new, Receipt.id != r.id).first() is None:
+            r.receipt_number = new
+            changed += 1
+    db.commit()
+    return {"renumbered": changed}
