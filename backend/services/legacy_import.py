@@ -29,7 +29,7 @@ AMRUTHA_SUB = "Amrutha Mahotsava Abhiyana"
 _KANNADA = re.compile("[\u0C80-\u0CFF]")
 # An Aadhaar number typed into a note ("Aadhaar NO-7717 7571 9100", "Adhar No:872 ... Return 11-08-2025"): the number belongs in the member's
 # Aadhaar number box, and the note is not kept.
-_AADHAAR_NOTE = re.compile(r"\ba+dh?a+r+a*\b(?:\s*(?:card\s*)?(?:no|number)\b\.?)?[\s:,.\-]*(?P<num>\d[\d \-]*)?", re.I)
+_AADHAAR_NOTE = re.compile(r"\ba+dh?a+r+a*\b(?:\s*(?:card\s*)?(?:no[ps]?|number)\b\.?)?[\s:,.\-]*(?P<num>\d[\d \-]*)?", re.I)
 
 
 def split_aadhaar(text: str) -> tuple:

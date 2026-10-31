@@ -454,12 +454,14 @@ def test_an_aadhaar_number_in_a_note_goes_to_the_aadhaar_box(client, admin_heade
         _row(base + 2, "AADHAAR IN MAGAZINE NOTE", CusMagazine="Yes", CusNoteMagazine="Adhar No:870219980875 Return 11-08-2025"),
         _row(base + 3, "OTHER NOTE", CusNote="Called on 12-04-2010"),
         _row(base + 4, "SHORT NUMBER", CusStatusNote="Adhar No:75594151029"),
+        _row(base + 5, "TYPO IN LABEL", CusStatusNote="Adhar Nop:664621019304"),
     ]))
     db = SessionLocal()
     try:
         out = legacy_import.import_members(db, rows, 1, run_id="d" + s[-8:], file_name="MstMember.xlsx")
-        assert out["created"] == 4, out
-        got = {m.membership_number: m for m in db.query(Member).filter(Member.membership_number.in_([str(base + i) for i in (1, 2, 3, 4)]))}
+        assert out["created"] == 5, out
+        got = {m.membership_number: m for m in db.query(Member).filter(Member.membership_number.in_([str(base + i) for i in (1, 2, 3, 4, 5)]))}
+        assert got[str(base + 5)].aadhaar_number == "664621019304" and not got[str(base + 5)].remarks
         assert got[str(base + 1)].aadhaar_number == "257096787584" and not got[str(base + 1)].remarks
         assert got[str(base + 2)].aadhaar_number == "870219980875"
         sub = db.query(MagazineSubscription).filter(MagazineSubscription.member_id == got[str(base + 2)].id).first()
