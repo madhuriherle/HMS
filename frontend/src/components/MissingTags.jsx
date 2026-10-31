@@ -7,7 +7,7 @@ export default function MissingTags({ noNumber, amount }) {
   const noAmount = Number(amount) === 0;
   if (!noNumber && !noAmount) return null;
   return (
-    <span className="ml-1.5 inline-flex flex-wrap items-center gap-1 align-middle">
+    <span className="ml-2 inline-flex flex-nowrap items-center gap-1 whitespace-nowrap align-middle">
       {noNumber && <span className={TAG} title="Old receipt added afterwards (dummy number)">UNKNOWN</span>}
       {noNumber && <span className={SUB} title="The real receipt number is not known; this one is made up">No number</span>}
       {noAmount && <span className={SUB} title="The amount is not known (Rs 0)">No amount</span>}

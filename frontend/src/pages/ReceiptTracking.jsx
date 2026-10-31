@@ -618,7 +618,7 @@ export default function ReceiptTracking() {
                       className="transition-colors bg-white hover:bg-[#FAF7F2] text-[#180200]"
                     >
                       {/* Column 1: Receipt Number */}
-                      <td className="py-3.5 px-4 font-mono font-bold text-xs">
+                      <td className="py-3.5 px-4 font-mono font-bold text-xs whitespace-nowrap">
                         <span className="text-[#510601] tracking-wider">{receipt.receiptNumber}</span>
                         {(receipt.receiptStatus === 'CANCELLED' || String(receipt.status || '').toUpperCase() === 'CANCELLED') && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide bg-red-50 text-red-700 border border-red-200 align-middle">CANCELLED</span>}
                         <MissingTags noNumber={receipt.is_old_receipt} amount={receipt.amount} />
