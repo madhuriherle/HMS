@@ -12,6 +12,8 @@ import fullLogo from '../assets/logo.png';
 // This table only turns the icon *name* stored on a module into a component.
 const ICONS = MENU_ICONS;
 
+const displayMenuName = (name) => name === 'Labels & Delivery' ? 'Print & Delivery' : name;
+
 // Only modules that open a page of this panel belong in the sidebar.
 const isPanelRoute = (route) => typeof route === 'string' && route.startsWith('/dashboard');
 
@@ -25,24 +27,25 @@ const leaves = (node) => {
 const entries = (node) => {
   const kids = (node.submodules || []).flatMap(leaves);
   if (isPanelRoute(node.route) && kids.length) {
-    return [{ name: node.name, path: node.route, children: kids.map((c) => ({ name: c.name, path: c.route })) }];
+    return [{ name: displayMenuName(node.name), path: node.route, children: kids.map((c) => ({ name: displayMenuName(c.name), path: c.route })) }];
   }
-  return kids.length ? kids.map((c) => ({ name: c.name, path: c.route })) : isPanelRoute(node.route) ? [{ name: node.name, path: node.route }] : [];
+  return kids.length ? kids.map((c) => ({ name: displayMenuName(c.name), path: c.route })) : isPanelRoute(node.route) ? [{ name: displayMenuName(node.name), path: node.route }] : [];
 };
 
 const toMenuItems = (nodes) =>
   (nodes || [])
     .map((node) => {
+      const displayName = displayMenuName(node.name);
       const Icon = ICONS[node.icon] || Circle;
       const children = (node.submodules || []).flatMap(entries);
       if (children.length) {
         return {
-          name: node.name,
+          name: displayName,
           icon: Icon,
           submenus: children,
         };
       }
-      return isPanelRoute(node.route) ? { name: node.name, icon: Icon, path: node.route } : null;
+      return isPanelRoute(node.route) ? { name: displayName, icon: Icon, path: node.route } : null;
     })
     .filter(Boolean);
 

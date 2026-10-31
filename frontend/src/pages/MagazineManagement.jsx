@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import PageActions, { PageActionsSlot } from '../components/PageActions';
+import { useLocation } from 'react-router-dom';
+import PageActions from '../components/PageActions';
 import PageTitle from '../components/PageTitle';
 import Modal from '../components/Modal';
 import ModalFooter from '../components/ModalFooter';
@@ -137,7 +137,7 @@ export default function MagazineManagement() {
   const area = tab === 'labels-delivery' ? 'magazines.labels_delivery' : 'magazines.subscribers';
   const canWrite = hasPermission(`${area}.write`);
   const canDelete = hasPermission(`${area}.delete`);
-  const sectionTitle = { subscriptions: 'Subscriptions', 'labels-delivery': 'Labels & Delivery' }[tab];
+  const sectionTitle = { subscriptions: 'Subscriptions', 'labels-delivery': 'Print & Delivery' }[tab];
   const [locations, setLocations] = useState({ states: [], districts: [], taluks: [] });
 
   // names of the people on screen, filled by the list that shows them (the screen never downloads every member)
@@ -181,20 +181,6 @@ export default function MagazineManagement() {
       <div className="space-y-6 pb-12">
         {/* Dynamic Page Title in Header Bar */}
         <PageTitle>{sectionTitle}</PageTitle>
-
-        {/* Action Toolbar */}
-        <div className="flex flex-wrap items-center justify-end gap-4 -mb-2">
-          <PageActions>
-            <Link
-              to="/dashboard/magazine/labels"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#E8DFD8] bg-white px-3.5 py-2 text-xs font-semibold text-[#863221] hover:bg-[#FAF7F2] shadow-xs transition-colors"
-            >
-              <Printer className="h-4 w-4 text-[#510601]" />
-              <span>Quick Label List</span>
-            </Link>
-          </PageActions>
-          <PageActionsSlot />
-        </div>
 
         {unsubscribedPaid.length > 0 && (
           <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[#510601]">
@@ -438,7 +424,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
           <FilterSelect
             value={copyFilter}
             onChange={(v) => { setCopyFilter(v); setPage(1); }}
-            options={[{ value: 'ALL', label: 'Printed or Online' }, { value: 'PRINTED', label: 'Printed copy' }, { value: 'ONLINE', label: 'Online copy' }]}
+            options={[{ value: 'ALL', label: 'Physical Copy or E-Magazine' }, { value: 'PRINTED', label: 'Physical Copy' }, { value: 'ONLINE', label: 'E-Magazine' }]}
             widthClass="w-44"
           />
           <FilterSelect
@@ -494,7 +480,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                         ) : null}
                         {person && (
                           <div className="mt-1 flex flex-wrap items-center gap-1">
-                            <span className="rounded-full border border-[#E8DFD8] bg-[#FAF7F2] px-1.5 py-px text-[10px] font-semibold text-[#863221]">{row.copy_kind === 'ONLINE' ? 'Online copy' : 'Printed copy'}</span>
+                            <span className="rounded-full border border-[#E8DFD8] bg-[#FAF7F2] px-1.5 py-px text-[10px] font-semibold text-[#863221]">{row.copy_kind === 'ONLINE' ? 'E-Magazine' : 'Physical Copy'}</span>
                             {row.member_status === 'INACTIVE' && <span className="rounded-full border border-gray-300 bg-gray-100 px-1.5 py-px text-[10px] font-semibold text-gray-600">Inactive</span>}
                             {row.has_receipt === false && <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-semibold text-amber-700">No receipt yet</span>}
                           </div>
@@ -519,7 +505,9 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                         </div>
                       </td>
                       <td className="px-4 py-3.5 text-xs text-gray-600 max-w-[240px]">
-                        {row.address_override ? (
+                        {person && row.copy_kind === 'ONLINE' ? (
+                          <span className="text-gray-400">Not required</span>
+                        ) : row.address_override ? (
                           <span className="text-amber-700 font-medium">Override: {row.address_override}</span>
                         ) : row.address ? (
                           <span className="truncate block" title={row.address}>{row.address}</span>
@@ -531,9 +519,11 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                         <div className="flex items-center justify-center gap-1.5 flex-wrap">
                           {person && sub && (
                             <>
-                              <button type="button" onClick={() => setMonthlyFor(sub)} className="btn-act" title="Monthly marks">
-                                <Calendar className="w-3.5 h-3.5" /><span>Monthly</span>
-                              </button>
+                              {row.copy_kind !== 'ONLINE' && (
+                                <button type="button" onClick={() => setMonthlyFor(sub)} className="btn-act" title="Monthly physical-copy marks">
+                                  <Calendar className="w-3.5 h-3.5" /><span>Monthly</span>
+                                </button>
+                              )}
                               {canWrite && sub.delivery_status !== 'ACTIVE' && (
                                 <button type="button" onClick={() => changeStatus(sub, 'ACTIVE')} className="btn-act" title="Start delivery">
                                   <Play className="w-3.5 h-3.5" /><span>Start</span>
@@ -544,7 +534,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                                   <Pause className="w-3.5 h-3.5" /><span>Stop</span>
                                 </button>
                               )}
-                              {canWrite && sub.delivery_status === 'ACTIVE' && (() => {
+                              {row.copy_kind !== 'ONLINE' && canWrite && sub.delivery_status === 'ACTIVE' && (() => {
                                 const running = row.active_pause;
                                 return running ? (
                                   <button type="button" onClick={() => resumeDelivery(running)} className="btn-act" title="Resume the paused delivery">
@@ -556,14 +546,16 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                                   </button>
                                 );
                               })()}
-                              {canWrite && (
+                              {row.copy_kind !== 'ONLINE' && canWrite && (
                                 <button type="button" onClick={() => setReturnFor(sub)} className="btn-act" title="Mark a returned issue">
                                   <Undo2 className="w-3.5 h-3.5" /><span>Return</span>
                                 </button>
                               )}
-                              <button type="button" onClick={() => setHistoryFor(sub)} className="btn-act" title="Pauses and returns of this member">
-                                <History className="w-3.5 h-3.5" /><span>History</span>
-                              </button>
+                              {row.copy_kind !== 'ONLINE' && (
+                                <button type="button" onClick={() => setHistoryFor(sub)} className="btn-act" title="Physical-copy pauses and returns">
+                                  <History className="w-3.5 h-3.5" /><span>History</span>
+                                </button>
+                              )}
                               {canWrite && (
                                 <button type="button" onClick={() => { setEditing(sub); setFormOpen(true); }} className="btn-act" title="Edit">
                                   <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
@@ -805,11 +797,11 @@ function SubscriptionForm({ editing, memberName, onClose, onSaved }) {
                 {SETTABLE_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             )}
-            <p className="mt-1 text-[11px] text-gray-500">Use Start / Stop to change delivery. PAUSED is set automatically when a pause covers today.</p>
+            <p className="mt-1 text-[11px] text-gray-500">Use Start / Stop to change the subscription. PAUSED is set automatically when a physical-copy pause covers today.</p>
           </div>
 
           <div>
-            <label className={LABEL}>Address override</label>
+            <label className={LABEL}>Physical Copy Address Override</label>
             <textarea
               rows={2}
               value={form.address_override}
@@ -1402,7 +1394,7 @@ function ReturnForm({ subOptions, presetSubscriptionId, onClose, onSaved }) {
                 onChange={(e) => { setForm((f) => ({ ...f, issue_month_year: e.target.value })); setErrors((er) => ({ ...er, issue_month_year: '' })); }}
                 className={INPUT}
               />
-              <p className="mt-1 text-[11px] text-[#863221]/80">Only an issue whose labels were printed for this member can be marked returned.</p>
+              <p className="mt-1 text-[11px] text-[#863221]/80">Only a Physical Copy issue whose labels were printed for this member can be marked returned.</p>
               <FieldError>{errors.issue_month_year}</FieldError>
             </div>
             <div>
@@ -1492,11 +1484,47 @@ function LabelsTab({ locations, canWrite }) {
   const [detail, setDetail] = useState(null);
   const [busy, setBusy] = useState(false);
 
+  const [recipients, setRecipients] = useState([]);
+  const [recipientsLoading, setRecipientsLoading] = useState(true);
+  const [recipientSearch, setRecipientSearch] = useState('');
+  const [debouncedRecipientSearch, setDebouncedRecipientSearch] = useState('');
+  const [recipientPage, setRecipientPage] = useState(1);
+  const [recipientPageSize, setRecipientPageSize] = useState(200);
+  const [recipientTotal, setRecipientTotal] = useState(0);
+  const [recipientPages, setRecipientPages] = useState(1);
+
   const [gen, setGen] = useState({ issue_month_year: thisMonth(), state_id: '', district_id: '', taluk_id: '' });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(200);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
+
+  const loadRecipients = useCallback(async () => {
+    setRecipientsLoading(true);
+    try {
+      const { data } = await api.get('/magazines/recipients', {
+        params: {
+          page: recipientPage,
+          limit: recipientPageSize,
+          copy: 'PRINTED',
+          delivery_status: 'ACTIVE',
+          ...(debouncedRecipientSearch.trim() ? { search: debouncedRecipientSearch.trim() } : {}),
+          ...(gen.state_id ? { state_id: gen.state_id } : {}),
+          ...(gen.district_id ? { district_id: gen.district_id } : {}),
+          ...(gen.taluk_id ? { taluk_id: gen.taluk_id } : {}),
+        },
+      });
+      const list = Array.isArray(data?.data) ? data.data : [];
+      setRecipients(list);
+      setRecipientTotal(data?.total ?? 0);
+      setRecipientPages(Math.max(1, data?.pages ?? 1));
+      if (recipientPage > Math.max(1, data?.pages ?? 1)) setRecipientPage(Math.max(1, data?.pages ?? 1));
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Could not load Physical Copy recipients.', 'error');
+    } finally {
+      setRecipientsLoading(false);
+    }
+  }, [recipientPage, recipientPageSize, debouncedRecipientSearch, gen.state_id, gen.district_id, gen.taluk_id]);
 
   // a page of label batches: each one carries its own status (Generated, Sent, Cancelled)
   const load = useCallback(async () => {
@@ -1515,6 +1543,14 @@ function LabelsTab({ locations, canWrite }) {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setPage(1); }, [pageSize]);
+  useEffect(() => { loadRecipients(); }, [loadRecipients]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedRecipientSearch(recipientSearch), 300);
+    return () => clearTimeout(timer);
+  }, [recipientSearch]);
+  useEffect(() => {
+    setRecipientPage(1);
+  }, [debouncedRecipientSearch, gen.state_id, gen.district_id, gen.taluk_id, recipientPageSize]);
 
   // step 2: the printed labels were posted. Step 3 (a return) is only possible after this.
   const cancelBatch = async (batch) => {
@@ -1597,10 +1633,15 @@ function LabelsTab({ locations, canWrite }) {
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-[#E8DFD8] bg-white p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-[#180200] mb-4 flex items-center gap-2">
-          <Printer className="h-4 w-4 text-[#8C1801]" /> Generate Labels
+        <h3 className="text-sm font-bold text-[#180200] mb-1 flex items-center gap-2">
+          <Printer className="h-4 w-4 text-[#8C1801]" /> Physical Copy Recipients
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <p className="mb-4 text-xs text-[#863221]">Only active Physical Copy subscriptions appear here. Search filters the list; location filters also define the PDF scope.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div>
+            <label className={LABEL}>Search</label>
+            <input value={recipientSearch} onChange={(e) => setRecipientSearch(e.target.value)} placeholder="Name or member no." className={INPUT} />
+          </div>
           <div>
             <label className={LABEL}>Issue month</label>
             <input type="month" value={gen.issue_month_year} onChange={(e) => setGen((g) => ({ ...g, issue_month_year: e.target.value }))} className={INPUT} />
@@ -1628,7 +1669,7 @@ function LabelsTab({ locations, canWrite }) {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-[#863221]">Everyone with an active printed subscription, in district, taluk and pincode order.</span>
+          <span className="text-xs text-[#863221]"><strong className="text-[#510601]">{recipientTotal.toLocaleString()}</strong> Physical Copy recipients match these filters.</span>
           {canWrite && (
             <button type="button" onClick={() => generate(false)} disabled={busy} className={BTN_PRIMARY}>
               <Printer className="w-4 h-4" /><span>{busy ? 'Generating…' : 'Generate & Download PDF'}</span>
@@ -1638,12 +1679,55 @@ function LabelsTab({ locations, canWrite }) {
         <div className="mt-4 rounded-lg bg-[#FAF7F2] border border-[#E8DFD8] p-3 text-xs text-[#863221] flex items-start gap-2.5">
           <AlertCircle className="w-4 h-4 text-[#8C1801] shrink-0 mt-0.5" />
           <div>
-            <span className="font-semibold text-[#510601]">Smart Auto-Exclusion Active:</span> Active subscriptions only. Paused delivery spans are skipped automatically, and returned issues are flagged on the dispatch labels.
+            <span className="font-semibold text-[#510601]">Physical Copy auto-exclusion active:</span> Active Physical Copy subscriptions only. Paused delivery spans are skipped automatically, and returned issues are flagged on the dispatch labels.
           </div>
         </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-[#E8DFD8] bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-gray-700">
+            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
+              <tr>
+                <TH>Recipient</TH><TH>Type</TH><TH>Address</TH><TH>Status</TH><TH>Returns</TH>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#E8DFD8]">
+              {recipientsLoading ? (
+                <EmptyRow colSpan={5} title="Loading Physical Copy recipients…" />
+              ) : recipients.length === 0 ? (
+                <EmptyRow colSpan={5} icon={Printer} title="No Physical Copy recipients found" hint="Try changing the search or location filters." />
+              ) : (
+                recipients.map((r) => (
+                  <tr key={`${r.recipient_type}-${r.recipient_id}`} className="hover:bg-amber-50/40 transition-colors">
+                    <td className="px-4 py-3.5">
+                      <div className="font-semibold text-gray-900">{r.name}</div>
+                      {r.code_or_reg && <div className="text-[11px] text-gray-500 font-mono">{r.code_or_reg}</div>}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${RECIPIENT_TYPE_CHIPS[r.recipient_type] || 'bg-[#FAF7F2] text-[#863221] border-[#E8DFD8]'}`}>
+                        {TYPE_LABELS[r.recipient_type] || r.recipient_type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-xs text-gray-600 max-w-[280px]">
+                      <span className="truncate block" title={r.address_override || r.address || ''}>{r.address_override || r.address || 'No address'}</span>
+                    </td>
+                    <td className="px-4 py-3.5"><Chip value={r.delivery_status} /></td>
+                    <td className="px-4 py-3.5 text-xs font-bold text-red-600">{r.return_count || 0}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {recipientTotal > 0 && <Pager page={recipientPage} pages={recipientPages} total={recipientTotal} pageSize={recipientPageSize} onPage={setRecipientPage} onPageSize={setRecipientPageSize} />}
+      </div>
+
+      <div className="overflow-hidden rounded-xl border border-[#E8DFD8] bg-white shadow-sm">
+        <div className="border-b border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3">
+          <h3 className="text-sm font-bold text-[#180200]">Print Batch History</h3>
+          <p className="mt-0.5 text-xs text-[#863221]">Previously generated Physical Copy label PDFs.</p>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-700">
             <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">

@@ -81,7 +81,7 @@ SUB_MODULE_AREAS = {
             "/magazines/subscriptions", "/magazines/pauses", "/magazines/returns", "/magazines/members",
             "/magazines/unsubscribed-paid-members", "/magazines/backfill-subscriptions",
         ]),
-        ("magazines.labels_delivery", "Magazine Labels & Delivery", [
+        ("magazines.labels_delivery", "Magazine Print & Delivery", [
             "/magazines/label-batches", "/magazines/delivery-batches", "/magazines/generate-labels", "/magazines/all-recipients", "/magazines/recipients",
         ]),
     ],
@@ -400,7 +400,7 @@ MENU_PAGE_CATALOG = [
     # Magazine, Reports and Notifications: one sidebar page per section (no tab rows). Each page opens with the
     # module's own privilege (magazines.read / reports.read / notifications.read).
     ("magazines.subscribers", "Subscriptions", "magazines", "/dashboard/magazine/subscriptions", "book-open", 1, "magazines.subscribers.read", None),
-    ("magazines.labels_delivery", "Labels & Delivery", "magazines", "/dashboard/magazine/labels-delivery", "printer", 2, "magazines.labels_delivery.read", None),
+    ("magazines.labels_delivery", "Print & Delivery", "magazines", "/dashboard/magazine/labels-delivery", "printer", 2, "magazines.labels_delivery.read", None),
     # PR & Communications group: Events first, then the registries (the "events" module stays as the privilege owner but is no longer a group)
     ("events.management", "Events", "engagements", "/dashboard/events", "calendar", 1, "events.read", None),
     ("engagements.affiliations", "Affiliations", "engagements", "/dashboard/engagements/affiliations", "users", 2, "engagements.affiliations.read", None),

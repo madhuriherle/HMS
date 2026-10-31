@@ -507,7 +507,7 @@ function ContactFamilySection({ core }) {
           <Row label="Mobile in the old register">{c.mobile_raw}</Row>
           <Row label="Email">{c.email}</Row>
           <Row label="Magazine">{c.magazine_needed === true ? 'Needed' : c.magazine_needed === false ? 'Not needed' : ''}</Row>
-          <Row label="Magazine kind">{c.magazine_needed ? (c.magazine_kind === 'EMAIL' ? 'Online (read on the site)' : c.magazine_kind === 'PHYSICAL' ? 'Printed (posted)' : c.magazine_kind) : ''}</Row>
+          <Row label="Magazine kind">{c.magazine_needed ? (c.magazine_kind === 'EMAIL' ? 'E-Magazine' : c.magazine_kind === 'PHYSICAL' ? 'Physical Copy' : c.magazine_kind) : ''}</Row>
           <Row label="Magazine address">{c.magazine_delivery_address}</Row>
           {relatives.map(([relation, name, number]) => (
             <Row key={relation} label={`${relation}'s name`}><RelativeValue name={name} number={number} links={links} /></Row>
@@ -848,7 +848,7 @@ function MagazineTab({ id }) {
               {d.magazine_kind && (
                 <Field
                   label="Magazine type"
-                  value={{ PHYSICAL: 'Physical copy', EMAIL: 'E-copy' }[d.magazine_kind] || d.magazine_kind}
+                  value={{ PHYSICAL: 'Physical Copy', EMAIL: 'E-Magazine' }[d.magazine_kind] || d.magazine_kind}
                 />
               )}
               <div className="lg:col-span-2">

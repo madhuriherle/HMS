@@ -162,7 +162,8 @@ function App() {
           <Route path="magazine/pauses-returns" element={<Navigate to="/dashboard/magazine/subscriptions" replace />} />
           <Route path="magazine/labels-delivery" element={<MagazineManagement />} />
           <Route path="magazines" element={<Navigate to="/dashboard/magazine" replace />} />
-          <Route path="magazine/labels" element={<PermissionGate required="members.label_list.read" title="Access Restricted"><LabelList /></PermissionGate>} />
+          {/* Legacy magazine label route now uses the single Print & Delivery workflow. */}
+          <Route path="magazine/labels" element={<Navigate to="/dashboard/magazine/labels-delivery" replace />} />
 
           {/* Events Module Routes */}
           <Route path="events" element={<PermissionGate required="events.read" title="Access Restricted" message="You need the Events privilege to view this page."><EventsManagement /></PermissionGate>} />

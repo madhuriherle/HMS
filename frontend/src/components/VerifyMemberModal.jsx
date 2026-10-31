@@ -468,11 +468,11 @@ export default function VerifyMemberModal({ memberId, onClose, onSaved, focus = 
                 <span className={headingClass}>Magazine</span>
                 <select value={form.magazine} onChange={(e) => setForm({ ...form, magazine: e.target.value })} className={`${inputClass} mt-1`}>
                   <option value="NONE">Not needed</option>
-                  <option value="EMAIL">Online (read on the site)</option>
-                  <option value="PHYSICAL">Printed (posted to the address)</option>
+                  <option value="EMAIL">E-Magazine</option>
+                  <option value="PHYSICAL">Physical Copy</option>
                 </select>
                 {form.magazine === 'PHYSICAL' && !form.address_line1.trim() && !member.magazine_delivery_address && (
-                  <span className="block mt-1 text-[11px] text-amber-700">A printed magazine needs an address: add it under Address.</span>
+                  <span className="block mt-1 text-[11px] text-amber-700">A Physical Copy needs an address: add it under Address.</span>
                 )}
               </label>
             </section>
