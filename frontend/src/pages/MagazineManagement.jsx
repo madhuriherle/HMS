@@ -166,13 +166,13 @@ export default function MagazineManagement() {
         const locs = await loadLocations({ postalCodes: false });
         if (cancelled) return;
         setLocations(locs);
-        await loadUnsubscribed();
       } catch (error) {
         if (!cancelled) notify(error.response?.data?.detail || 'Could not load magazine data.', 'error');
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
+    loadUnsubscribed();
     return () => { cancelled = true; };
   }, [loadUnsubscribed]);
 
@@ -228,6 +228,7 @@ export default function MagazineManagement() {
                 onChanged={loadUnsubscribed}
                 canWrite={canWrite}
                 canDelete={canDelete}
+                locations={locations}
               />
             )}
             {tab === 'labels-delivery' && (
@@ -255,7 +256,7 @@ export default function MagazineManagement() {
 }
 
 // ── Subscriptions ────────────────────────────────────────────
-function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canWrite, canDelete }) {
+function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canWrite, canDelete, locations }) {
   const [rows, setRows] = useState([]);       // ONE page of recipients (at most 200)
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
@@ -271,13 +272,20 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
   const [receiptFilter, setReceiptFilter] = useState('ALL');   // PAID | NO_RECEIPT
   const [districtFilter, setDistrictFilter] = useState('ALL');
   const [talukFilter, setTalukFilter] = useState('ALL');
-  const [places, setPlaces] = useState({ districts: [], taluks: [] });
+  const [places, setPlaces] = useState(() => ({
+    districts: locations?.districts || [],
+    taluks: locations?.taluks || [],
+  }));
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(200);
 
   useEffect(() => {
-    loadLocations({ postalCodes: false }).then((l) => setPlaces({ districts: l.districts || [], taluks: l.taluks || [] })).catch(() => {});
-  }, []);
+    if (locations?.districts?.length || locations?.taluks?.length) {
+      setPlaces({ districts: locations.districts || [], taluks: locations.taluks || [] });
+    } else {
+      loadLocations({ postalCodes: false }).then((l) => setPlaces({ districts: l.districts || [], taluks: l.taluks || [] })).catch(() => {});
+    }
+  }, [locations]);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
