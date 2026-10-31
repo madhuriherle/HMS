@@ -629,6 +629,21 @@ export default function ReceiptEntry() {
     };
   }, [formData.receiptNumber, formData.receiptDate, editId]);
 
+  // Edit: the next unknown number and the next normal number for the receipt's date, shown as a small hint (the saved number is never replaced)
+  const [nextHint, setNextHint] = useState(null);
+  useEffect(() => {
+    if (!isEdit) return undefined;
+    const date = formData.receiptDate;
+    const params = /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')) ? { date } : {};
+    let alive = true;
+    const timer = setTimeout(() => {
+      Promise.all([api.get('/receipts/old-number', { params }), api.get('/receipts/next-number', { params })])
+        .then(([old, normal]) => alive && setNextHint({ unknown: old.data.next_number || old.data.example, normal: normal.data.receipt_number }))
+        .catch(() => alive && setNextHint(null));
+    }, 300);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [isEdit, formData.receiptDate]);
+
   const loadReceiptDefaults = (date, { keepNumber = false, keepDate = false } = {}) => {
     const seq = (defaultsSeq.current += 1);
     api
@@ -1725,6 +1740,11 @@ export default function ReceiptEntry() {
                       />
                       <span className="text-[11px] font-semibold text-[#3D140C]">Unknown receipt</span>
                     </label>
+                    {isEdit && nextHint && (
+                      <p className="text-[11px] text-[#863221] mt-1">
+                        {formData.isOldReceipt ? 'Next unknown number' : 'Next number'}: <span className="font-mono font-semibold text-[#180200]">{formData.isOldReceipt ? nextHint.unknown : nextHint.normal}</span>
+                      </p>
+                    )}
                     {formData.isOldReceipt && oldInfo && (
                       <p className="text-[11px] text-[#863221] mt-1">
                         Last unknown receipt: <b className="font-mono text-[#180200]">{oldInfo.last_number || 'none yet'}</b>
