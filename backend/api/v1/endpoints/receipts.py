@@ -1467,6 +1467,12 @@ def update_receipt(
     if "payment_mode" in data and data["payment_mode"]:
         _validate_enum(data["payment_mode"], VALID_PAYMENT_MODES, "payment_mode")
 
+    # an unknown receipt becomes a normal one when its real amount is in (the date is always there); it is never made unknown here
+    flag = data.pop("is_old_receipt", None)
+    if flag is True or (flag is False and not receipt.is_old_receipt):
+        flag = None
+    if flag is False:
+        data["is_old_receipt"] = False
     new_items = receipt_in.items if "items" in data else None
     data.pop("items", None)
     if new_items is not None:
@@ -1486,6 +1492,8 @@ def update_receipt(
         )
 
     net = data.get("net_amount", float(receipt.net_amount))
+    if data.get("is_old_receipt") is False and net <= 0:
+        raise HTTPException(400, "Enter the real amount to make this a normal receipt")
     allocated = allocated_total(db, receipt.id)
     if net < allocated - 0.01:
         raise HTTPException(

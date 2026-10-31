@@ -197,6 +197,7 @@ class ReceiptUpdate(BaseModel):
     net_amount: Optional[float] = None
     source: Optional[ReceiptSource] = None
     is_renewal: Optional[bool] = None
+    is_old_receipt: Optional[bool] = None   # only False is accepted: an unknown receipt whose real date and amount are now filled in
     cheque_number: Optional[str] = None
     cheque_date: Optional[date] = None
     notes: Optional[str] = None
@@ -224,6 +225,7 @@ class ReceiptItemResponse(ReceiptItemBase):
     model_config = ConfigDict(from_attributes=True)
 
 class ReceiptInDBBase(ReceiptBase):
+    source: str = "ONLINE"      # what is read back may also be OLD_REGISTER or UNAPPROVED_IMPORT (imported receipts); only ONLINE / OFFLINE can be typed in
     is_old_receipt: bool = False
     id: int
     receipt_number: str

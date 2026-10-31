@@ -591,6 +591,10 @@ export default function ReceiptEntry() {
       })
       .catch(() => setOldInfo(null));
   const toggleOldReceipt = (checked) => {
+    if (isEdit) {   // Edit: the saved number stays; unticking only says the date and amount are now the real ones
+      setFormData((prev) => ({ ...prev, isOldReceipt: checked }));
+      return;
+    }
     setFormData((prev) => ({ ...prev, isOldReceipt: checked, receiptNumber: '' }));
     setFormErrors((prev) => ({ ...prev, receiptNumber: '' }));
     if (checked) loadOldInfo(formData.receiptDate);
@@ -686,6 +690,7 @@ export default function ReceiptEntry() {
         const isCash = mode.trim().toLowerCase() === 'cash';
         const detail = {
           receiptNumber: raw.receipt_number || '',
+          isOldReceipt: Boolean(raw.is_old_receipt),
           receiptDate: raw.receipt_date || '',
           name: raw.payer_name || '',
           panNo: raw.payer_pan || '',
@@ -861,7 +866,7 @@ export default function ReceiptEntry() {
         setFormErrors((prev) => ({ ...prev, receiptDate: '' }));
       }
       // a different financial year has its own series: re-suggest unless the user typed a number
-      if (value && value.length === 10 && value <= getTodayISODate()) {
+      if (!isEdit && value && value.length === 10 && value <= getTodayISODate()) {
         // an Unknown receipt keeps its own (old-receipt) kind of number when the date changes: the normal series must not replace it.
         // Its number follows the new date's financial year (a format that restarts every year numbers each year on its own)
         loadReceiptDefaults(value, { keepNumber: numberTouched.current || formData.isOldReceipt, keepDate: true });
@@ -1295,6 +1300,7 @@ export default function ReceiptEntry() {
       delete body.is_renewal; // editing never changes these
       delete body.is_cancelled;
       delete body.is_old_receipt;
+      if (editOriginal?.receipt?.is_old_receipt && !formData.isOldReceipt) body.is_old_receipt = false;   // unticked: the real date and amount are filled in
       delete body.source;
       await api.put(`/receipts/${editId}`, body);
 
@@ -1708,7 +1714,7 @@ export default function ReceiptEntry() {
 
               <div className="space-y-3">
 
-                {!isEdit && (
+                {(!isEdit || editOriginal?.receipt?.is_old_receipt) && (
                   <div>
                     <label className="inline-flex items-center gap-1.5 cursor-pointer select-none" title="An old payment that was never entered. Its number is typed in the old-receipt format.">
                       <input

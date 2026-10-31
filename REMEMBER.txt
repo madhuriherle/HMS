@@ -769,6 +769,13 @@ RULE 16: THE OLD REGISTER, MEMBER DATA AND THE CHECKS (OCT 2026 - THE USER'S DEC
       pads the older 3-digit ones (FY64-001) to 4 digits. (2) An unknown receipt TYPED ON RECEIPT ENTRY (the "Unknown receipt" tick)
       keeps its own series from Settings > Number Formats (OLD_RECEIPT, NR-0001 on UAT). Do not mix the two.
 
+16.3b UNKNOWN RECEIPT ON EDIT (31-Oct-2026). The Edit Receipt screen shows the Unknown receipt tick (ticked) for an unknown receipt only.
+      Unticking it, with the real date and an amount above Rs 0 filled in, makes it a normal receipt (the server refuses it at Rs 0 and
+      never makes a normal receipt unknown on Edit); the number is kept as it is and is not judged. A date change on Edit NEVER changes
+      the saved number (only a new receipt re-suggests it). Tags in Receipt Tracking / profile: UNKNOWN with the small sub-labels
+      "No number" (made-up number) and "No amount" (Rs 0), on a line under the number; a real number with Rs 0 shows only "No amount".
+      The receipt API reads back any source (OLD_REGISTER, UNAPPROVED_IMPORT), only ONLINE / OFFLINE can be typed in.
+
 16.4 GENDER IS NEVER GUESSED. Only the title says it: SRI = male, SMT. / KUM. = female, anything else (DR., PROF. ...)
      stays blank. The new member form and the children rows start with NO gender (no default Male); the title still
      moves the gender, and the gender moves the title.
