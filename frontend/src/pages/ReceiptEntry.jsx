@@ -1782,7 +1782,9 @@ export default function ReceiptEntry() {
                     {!formErrors.receiptNumber && numberCheck && numberCheck.number === String(formData.receiptNumber || '').trim() && (
                       numberCheck.available ? (
                         // an available number in the usual format shows nothing; only a problem is shown
-                        numberCheck.matches_format || formData.isOldReceipt ? null : (
+                        isEdit ? (
+                          <p className="text-[11px] text-emerald-700 mt-1 font-medium">Available</p>
+                        ) : numberCheck.matches_format || formData.isOldReceipt ? null : (
                           <p className="text-[11px] text-amber-700 mt-1 font-medium">
                             Available, but not like the usual format (for example {numberCheck.example}). You can still save it.
                           </p>
