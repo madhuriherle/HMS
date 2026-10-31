@@ -1,4 +1,5 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import MissingTags from '../components/MissingTags';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   User,
@@ -669,7 +670,7 @@ function MembershipTab({ id }) {
                         <td className="py-2 pr-3 whitespace-nowrap">{formatDate(r.receipt_date)} <span className="text-[#863221]">(FY {r.financial_year})</span></td>
                         <td className="py-2 pr-3 font-mono font-bold">
                           {r.receipt_number}
-                          {r.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200" title="Old receipt added afterwards (dummy)">UNKNOWN</span>}
+                          <MissingTags noNumber={r.is_old_receipt} amount={r.paid} />
                         </td>
                         <td className="py-2 pr-3 text-right font-mono">{inr(r.paid)}</td>
                         <td className="py-2 pr-3 text-right font-mono">{r.price_then != null ? inr(r.price_then) : <span className="text-[#863221]" title="No price is set for this type in that year (Membership Types > Price History)">no price set</span>}</td>

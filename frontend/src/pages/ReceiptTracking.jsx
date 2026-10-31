@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import MissingTags from '../components/MissingTags';
 import useSort from '../hooks/useSort';
 import SortTh from '../components/SortTh';
 import { useNavigate } from 'react-router-dom';
@@ -506,7 +507,7 @@ export default function ReceiptTracking() {
             { value: 'Assigned', label: 'Assigned' },
             { value: 'Unassigned', label: 'Unassigned' },
             { value: 'Cancelled', label: 'Cancelled' },
-            { value: 'UNKNOWN', label: 'Unknown number (dummy)' },
+            { value: 'UNKNOWN', label: 'No number' },
             { value: 'ZERO', label: 'No amount' }
           ]}
           widthClass="w-full sm:w-40"
@@ -535,7 +536,7 @@ export default function ReceiptTracking() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="font-mono font-bold text-xs text-[#510601]">{receipt.receiptNumber}{receipt.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide bg-amber-100 text-amber-800 border border-amber-200 align-middle" title="Old receipt added afterwards (dummy)">UNKNOWN</span>}</div>
+                  <div className="font-mono font-bold text-xs text-[#510601]">{receipt.receiptNumber}<MissingTags noNumber={receipt.is_old_receipt} amount={receipt.amount} /></div>
                   <div className="text-sm font-bold text-[#180200] truncate">{receipt.name || '—'}</div>
                   <div className="text-[11px] text-[#863221]">
                     {formatDate(receipt.receiptDate)} · {receipt.paymentMode || '—'}
@@ -620,7 +621,7 @@ export default function ReceiptTracking() {
                       <td className="py-3.5 px-4 font-mono font-bold text-xs">
                         <span className="text-[#510601] tracking-wider">{receipt.receiptNumber}</span>
                         {(receipt.receiptStatus === 'CANCELLED' || String(receipt.status || '').toUpperCase() === 'CANCELLED') && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide bg-red-50 text-red-700 border border-red-200 align-middle">CANCELLED</span>}
-                        {receipt.is_old_receipt && <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide bg-amber-100 text-amber-800 border border-amber-200 align-middle" title="Old receipt added afterwards (dummy)">UNKNOWN</span>}
+                        <MissingTags noNumber={receipt.is_old_receipt} amount={receipt.amount} />
                       </td>
 
                       {/* Column 2: Receipt Date */}

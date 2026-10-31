@@ -112,7 +112,8 @@ def _export_rows(db: Session, rows, data) -> list:
             "Period To Date": r.period_to_date, "Period To Time": d["period_to_time"],
             "Description": "; ".join(i["description"] for i in items if i.get("description") and i["description"] != i.get("particular")),
             "Notes": r.notes, "Receipt Status": r.receipt_status, "Payment Status": r.payment_status, "Source": r.source,
-            "Unknown Receipt": "Yes" if r.is_old_receipt else "No", "Renewal": "Yes" if r.is_renewal else "No",
+            "Unknown Receipt": "Yes" if r.is_old_receipt else "No",
+            "What Is Missing": ", ".join(x for x in (("No number" if r.is_old_receipt else ""), ("No amount" if float(r.net_amount or 0) == 0 else "")) if x), "Renewal": "Yes" if r.is_renewal else "No",
             "Entered By": users.get(r.created_by, ""), "Entered On": r.created_at, "Updated On": r.updated_at,
         })
     return out
