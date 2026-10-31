@@ -21,7 +21,7 @@ OPEN = {
     # the sidebar and lists every screen needs; each answers only what the role may see
     ("GET", "/api/v1/users/modules/menu"), ("GET", "/api/v1/dashboard/search"),
     ("GET", "/api/v1/meta/rules"), ("GET", "/api/v1/meta/lists"), ("GET", "/api/v1/meta/pin-prefixes"),
-    ("GET", "/api/v1/meta/pincode/{pin}"), ("GET", "/api/v1/meta/import-template/{kind}"),
+    ("GET", "/api/v1/meta/pincode/{pin}"), ("GET", "/api/v1/meta/import-template/{kind}"), ("GET", "/api/v1/meta/import-format/{kind}"),
     # the mobile app: members file requests that only take effect once approved, and read their own inbox
     ("POST", "/api/v1/members/profile-changes/"), ("POST", "/api/v1/approvals/type-changes"),
     ("POST", "/api/v1/approvals/deletion-requests"),
