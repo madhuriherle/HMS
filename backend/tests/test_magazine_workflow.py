@@ -410,6 +410,27 @@ def test_an_applicant_is_on_the_list_once_a_receipt_is_assigned_and_leaves_when_
     assert client.get(subs_url, headers=h, params={"member_id": mid}).json()["data"][0]["delivery_status"] == "STOPPED"   # rejected: off the list
 
 
+def test_an_applicant_subscription_is_stopped_when_receipt_is_cancelled(client, admin_headers):
+    """An unapproved applicant's subscription is stopped when their only receipt is cancelled."""
+    h, s = admin_headers, _sfx()
+    mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]
+    subs_url = f"{API}/magazines/subscriptions"
+    body = _entry_payload(f"CANAP-{s}", "Applicant Payer", payment_mode="CASH", allocations=[{"member_id": mid, "allocated_amount": 500}])
+    res = client.post(f"{API}/receipts/", headers=h, json=body)
+    assert res.status_code in (200, 201), res.text
+    rid = res.json()["id"]
+    subs = client.get(subs_url, headers=h, params={"member_id": mid}).json()["data"]
+    assert len(subs) == 1 and subs[0]["delivery_status"] == "ACTIVE"
+
+    # Cancel the receipt
+    c_res = client.post(f"{API}/receipts/{rid}/cancel", headers=h, json={"reason": "Payment cheque bounced"})
+    assert c_res.status_code == 200, c_res.text
+
+    # Subscription must now be STOPPED
+    subs_after = client.get(subs_url, headers=h, params={"member_id": mid}).json()["data"]
+    assert len(subs_after) == 1 and subs_after[0]["delivery_status"] == "STOPPED"
+
+
 def test_an_approved_member_can_stop_and_start_the_magazine(client, admin_headers):
     h, s = admin_headers, _sfx()
     mid = _register(client, h, s, magazine_kind="PHYSICAL").json()["id"]

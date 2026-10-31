@@ -222,3 +222,5 @@ export const PersonalMastersHub = () => (
     </div>
   </PermissionGate>
 );
+
+export default PersonalMastersHub;

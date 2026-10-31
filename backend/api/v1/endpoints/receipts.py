@@ -1579,6 +1579,8 @@ def delete_receipt(
     if members:
         db.flush()
         membership_credit.after_money_removed(db, members, current_user.id, frozen)
+        from services.magazine_subscriptions import sync_applicant_subscription_if_unpaid
+        sync_applicant_subscription_if_unpaid(db, members, current_user.id)
         db.commit()
     review_msg = f"receipt {receipt.receipt_number} was deleted"
     if reason:
@@ -1703,6 +1705,8 @@ def remove_allocation(
     receipt_status.refresh(db, receipt)
     if alloc.member_id:
         membership_credit.after_money_removed(db, [alloc.member_id], current_user.id, frozen)
+        from services.magazine_subscriptions import sync_applicant_subscription_if_unpaid
+        sync_applicant_subscription_if_unpaid(db, [alloc.member_id], current_user.id)
     db.commit()
     db.refresh(alloc)
     membership_credit.flag_for_review(db, [alloc.member_id], f"receipt {receipt.receipt_number} was un-assigned")
@@ -1739,6 +1743,8 @@ def cancel_receipt(
     member_ids = _allocated_member_ids(db, id)
     if member_ids:
         membership_credit.after_money_removed(db, member_ids, current_user.id, frozen)
+        from services.magazine_subscriptions import sync_applicant_subscription_if_unpaid
+        sync_applicant_subscription_if_unpaid(db, member_ids, current_user.id)
     db.commit()
     membership_credit.flag_for_review(db, _allocated_member_ids(db, id), f"receipt {receipt.receipt_number} was cancelled")
     return {"message": "Receipt cancelled successfully"}

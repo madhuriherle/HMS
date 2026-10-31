@@ -46,12 +46,18 @@ def sync_member_magazine_subscription(
     )
 
     if effective_needed:
-        if member.approval_status == "REJECTED":
-            return sub  # a rejected applicant is not on the list
-        if member.approval_status != "APPROVED" and not has_paid(db, member.id):
-            return sub  # an applicant is on the list from the day a receipt is assigned to them (until then, nothing)
-        if member.member_status != "ACTIVE":
-            return sub  # an expired or deleted (inactive) member never gets a subscription started, whoever asks
+        if (
+            member.approval_status == "REJECTED"
+            or (member.approval_status != "APPROVED" and not has_paid(db, member.id))
+            or member.member_status != "ACTIVE"
+        ):
+            if sub and sub.delivery_status != "STOPPED":
+                sub.delivery_status = "STOPPED"
+                sub.updated_by = user_id
+                db.add(sub)
+                db.flush()
+                sync_magazine_optin(db, member_id=member.id, linked_id=None, created_by=user_id)
+            return sub
         if not sub:
             sub = MagazineSubscription(
                 member_id=member.id,
@@ -144,3 +150,26 @@ def ensure_subscription_on_receipt_assigned(
             created_count += 1
 
     return created_count
+
+
+def sync_applicant_subscription_if_unpaid(
+    db: Session,
+    member_ids: Iterable[int],
+    user_id: Optional[int] = None,
+) -> None:
+    """When a receipt is unassigned, cancelled, or deleted, any affected unapproved
+    applicants who no longer have an active paid receipt have their subscription stopped."""
+    valid_ids = {mid for mid in member_ids if mid}
+    if not valid_ids:
+        return
+    applicants = (
+        db.query(Member)
+        .filter(
+            Member.id.in_(valid_ids),
+            Member.is_deleted == False,
+            Member.approval_status != "APPROVED",
+        )
+        .all()
+    )
+    for app in applicants:
+        sync_member_magazine_subscription(db, app, user_id=user_id)
