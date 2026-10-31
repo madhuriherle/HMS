@@ -119,7 +119,7 @@ function AffiliationsView({ canWrite, canDelete }) {
   const loadAffiliations = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { page, limit: 15 };
+      const params = { page, limit: 200 };
       if (magFilter === 'ENABLED') params.magazine_enabled = true;
       if (magFilter === 'DISABLED') params.magazine_enabled = false;
       const res = await api.get('/engagements/affiliations', { params });
@@ -412,9 +412,9 @@ function AffiliationsView({ canWrite, canDelete }) {
           <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/40">
             <Pager
               page={page}
-              pages={Math.max(1, Math.ceil(total / 15))}
+              pages={Math.max(1, Math.ceil(total / 200))}
               total={total}
-              pageSize={15}
+              pageSize={200}
               onPage={setPage}
               onPageSize={() => {}}
             />
@@ -575,7 +575,7 @@ function AssociatesView({ canWrite, canDelete }) {
   const loadAssociates = useCallback(async () => {
     setLoading(true);
     try {
-      const params = { page, limit: 15 };
+      const params = { page, limit: 200 };
       if (search.trim()) params.search = search.trim();
       if (magFilter === 'ENABLED') params.magazine_enabled = true;
       if (magFilter === 'DISABLED') params.magazine_enabled = false;
@@ -815,9 +815,9 @@ function AssociatesView({ canWrite, canDelete }) {
           <div className="p-4 border-t border-[#E8DFD8] bg-[#FAF7F2]/40">
             <Pager
               page={page}
-              pages={Math.max(1, Math.ceil(total / 15))}
+              pages={Math.max(1, Math.ceil(total / 200))}
               total={total}
-              pageSize={15}
+              pageSize={200}
               onPage={setPage}
               onPageSize={() => {}}
             />

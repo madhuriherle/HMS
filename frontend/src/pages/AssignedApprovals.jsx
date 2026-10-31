@@ -39,7 +39,7 @@ export default function AssignedApprovals() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selected, setSelected] = useState(new Set());
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
   const [busy, setBusy] = useState(false);

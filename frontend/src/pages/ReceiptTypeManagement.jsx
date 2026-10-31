@@ -38,7 +38,7 @@ export default function ReceiptTypeManagement() {
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(200);
 
   // Expandable row state (expanded receipt type IDs)
   const [expandedRows, setExpandedRows] = useState({}); // groups start closed; a click opens one
@@ -896,6 +896,7 @@ export default function ReceiptTypeManagement() {
                 <option value={5}>5</option>
                 <option value={10}>10</option>
                 <option value={20}>20</option>
+                <option value={200}>200</option>
               </select>
             </div>
           </div>

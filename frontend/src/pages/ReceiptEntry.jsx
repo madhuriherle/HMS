@@ -267,14 +267,14 @@ export default function ReceiptEntry() {
   const [typingOrder, setTypingOrder] = useState([]); // the three look-up boxes, most recently typed last
   const [rightSearchOpen, setRightSearchOpen] = useState(false);
   const [rightPage, setRightPage] = useState(1);
-  const [rightPageSize, setRightPageSize] = useState(10);
+  const [rightPageSize, setRightPageSize] = useState(200);
 
   // Search and pagination state for Bottom Unassigned Members Table
   const [unapprovedSearchQuery, setUnapprovedSearchQuery] = useState('');
   const [unapprovedSearchOpen, setUnapprovedSearchOpen] = useState(false);
   const [viewApplicant, setViewApplicant] = useState(null); // the applicant shown in the read-only popup
   const [unapprovedPage, setUnapprovedPage] = useState(1);
-  const [unapprovedPageSize, setUnapprovedPageSize] = useState(10);
+  const [unapprovedPageSize, setUnapprovedPageSize] = useState(200);
 
   // View Member Details Modal State
   const [viewingMember, setViewingMember] = useState(null);

@@ -167,7 +167,7 @@ function CampaignsTab({ canWrite, canDelete, districts, taluks, membershipTypes 
   const [channelFilter, setChannelFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
 
   // Campaign Form State
   const [formData, setFormData] = useState({
@@ -724,7 +724,7 @@ function TemplatesTab({ canWrite, canDelete }) {
   const [channelFilter, setChannelFilter] = useState('ALL');
   const [purposeFilter, setPurposeFilter] = useState('ALL');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -1285,7 +1285,7 @@ function InboxTab({ canWrite }) {
   const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
 
   const loadInbox = useCallback(async () => {
     setLoading(true);

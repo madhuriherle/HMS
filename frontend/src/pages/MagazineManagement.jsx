@@ -273,7 +273,7 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
   const [talukFilter, setTalukFilter] = useState('ALL');
   const [places, setPlaces] = useState({ districts: [], taluks: [] });
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
 
   useEffect(() => {
     loadLocations({ postalCodes: false }).then((l) => setPlaces({ districts: l.districts || [], taluks: l.taluks || [] })).catch(() => {});
@@ -947,7 +947,7 @@ function PausesTab({ subscriptions, memberName, canWrite, canDelete, subscriptio
   const [loading, setLoading] = useState(true);
   const [activeOnly, setActiveOnly] = useState(false);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(200);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
@@ -1192,7 +1192,7 @@ function ReturnsTab({ subscriptions, memberName, canWrite, canDelete, subscripti
   const [loading, setLoading] = useState(true);
   const [followFilter, setFollowFilter] = useState('ALL');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(200);
   const [formOpen, setFormOpen] = useState(false);
 
   const subOptions = useMemo(
@@ -1486,7 +1486,7 @@ function LabelsTab({ locations, canWrite }) {
 
   const [gen, setGen] = useState({ issue_month_year: thisMonth(), state_id: '', district_id: '', taluk_id: '' });
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
 
@@ -1709,7 +1709,7 @@ function LabelBatchModal({ batch, onClose }) {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
 
   // one page of the labels; the type and the returned-only filters run on the whole batch (rule 10.6)
   useEffect(() => {

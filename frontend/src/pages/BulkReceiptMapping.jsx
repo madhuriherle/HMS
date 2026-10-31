@@ -23,7 +23,7 @@ export default function BulkReceiptMapping() {
   const [totalUnassigned, setTotalUnassigned] = useState(0);
   const [totalMatched, setTotalMatched] = useState(0);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
   const [debouncedQuery, setDebouncedQuery] = useState('');

@@ -101,7 +101,7 @@ export default function LocationSetup() {
 
   // Pagination for PIN Directory Table
   const [postalCurrentPage, setPostalCurrentPage] = useState(1);
-  const [postalPageSize, setPostalPageSize] = useState(10);
+  const [postalPageSize, setPostalPageSize] = useState(200);
 
   // Add / Edit PIN Modal State
   const [isPostalModalOpen, setIsPostalModalOpen] = useState(false);

@@ -37,7 +37,7 @@ export default function ActivityLogs() {
 
   // Pagination
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(50);
+  const [limit, setLimit] = useState(200);
   const [totalCount, setTotalCount] = useState(0);
 
   // Data

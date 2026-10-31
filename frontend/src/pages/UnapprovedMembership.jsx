@@ -216,7 +216,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [paymentFilter, setPaymentFilter] = useState('ALL'); // ALL | NO_RECEIPT | MISMATCH: does what they paid cover the price of the type they chose
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
 
   // the page is read again whenever the page, the search, a filter or the sort changes (default: newest first)
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -261,7 +261,7 @@ export default function UnapprovedMembership({ assignedOnly = false }) {
   const [assignMatchOnly, setAssignMatchOnly] = useState(true);
   const [assignShowAll, setAssignShowAll] = useState(false); // off: only receipts with a Membership line (the only ones that can pay for a membership)
   const [assignPage, setAssignPage] = useState(1);
-  const [assignPageSize, setAssignPageSize] = useState(10);
+  const [assignPageSize, setAssignPageSize] = useState(200);
   const [assignView, setAssignView] = useState('cards'); // table | cards (cards by default)
   const [mappingReceiptId, setMappingReceiptId] = useState(null);
   const [receiptView, setReceiptView] = useState(null); // { member, receipt }: the receipt already assigned to an applicant

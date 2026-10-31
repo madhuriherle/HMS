@@ -27,7 +27,7 @@ export default function DuplicateMembers() {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
   const [data, setData] = useState({ groups: [], total: 0, pages: 1, members_in_groups: 0 });
   const [loading, setLoading] = useState(true);
   const [kyc, setKyc] = useState('');        // '' = all, verified, not_verified

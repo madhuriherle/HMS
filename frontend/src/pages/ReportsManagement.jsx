@@ -360,7 +360,7 @@ function MembersReportTab({ districts, taluks, membershipTypes, onDownload, canS
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
 
   // Filtered taluks by selected district
   const availableTaluks = useMemo(() => {
@@ -911,7 +911,7 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
   const [fySummary, setFySummary] = useState({});
   const [fyLoading, setFyLoading] = useState(false);
   const [fyPage, setFyPage] = useState(1);
-  const [fyPageSize, setFyPageSize] = useState(25);
+  const [fyPageSize, setFyPageSize] = useState(200);
 
   // Debounce search
   useEffect(() => {
@@ -978,7 +978,7 @@ function ReceiptsReportTab({ membershipTypes, onDownload }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
 
   useEffect(() => {
     (async () => {
@@ -1528,7 +1528,7 @@ function MagazinesReportTab({ districts, taluks, onDownload }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
 
   const loadData = useCallback(async () => {
     setLoading(true);

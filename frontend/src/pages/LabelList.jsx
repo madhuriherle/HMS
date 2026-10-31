@@ -47,7 +47,7 @@ export default function LabelList() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
 
   // Print Preview Modal
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
