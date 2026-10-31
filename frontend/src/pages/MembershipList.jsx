@@ -126,7 +126,7 @@ export default function MembershipList() {
   // ----------------------------------------------------
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('Active');   // inactive (expired or deleted) members are hidden until All Status or Inactive is picked
   const [stateFilter, setStateFilter] = useState('ALL');
   const [districtFilter, setDistrictFilter] = useState('ALL');
   const [paymentFilter, setPaymentFilter] = useState('ALL'); // ALL | NO_RECEIPT | MISMATCH | NOT_MAPPED
@@ -195,7 +195,7 @@ export default function MembershipList() {
   // Exactly one result for the current search/filters -> show that member in the green card on the left
   const activeFilterCount =
     (typeFilter !== 'ALL' ? 1 : 0) +
-    (statusFilter !== 'ALL' ? 1 : 0) +
+    (statusFilter !== 'Active' ? 1 : 0) +
     (stateFilter !== 'ALL' ? 1 : 0) +
     (districtFilter !== 'ALL' ? 1 : 0) +
     (paymentFilter !== 'ALL' ? 1 : 0);
@@ -231,7 +231,7 @@ export default function MembershipList() {
   const handleClearFilters = () => {
     setSearchQuery('');
     setTypeFilter('ALL');
-    setStatusFilter('ALL');
+    setStatusFilter('Active');
     setStateFilter('ALL');
     setDistrictFilter('ALL');
     setPaymentFilter('ALL');
@@ -332,7 +332,7 @@ export default function MembershipList() {
         }}
         activeFiltersCount={
           (typeFilter !== 'ALL' ? 1 : 0) +
-          (statusFilter !== 'ALL' ? 1 : 0) +
+          (statusFilter !== 'Active' ? 1 : 0) +
           (stateFilter !== 'ALL' ? 1 : 0) +
           (districtFilter !== 'ALL' ? 1 : 0) +
           (paymentFilter !== 'ALL' ? 1 : 0)
