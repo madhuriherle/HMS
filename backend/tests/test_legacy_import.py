@@ -11,7 +11,7 @@ def _register(rows):
     cols = ["CusNo", "CusNoNew", "CusNoOld", "CusTitle", "CusName", "CusMobile", "CusMemberType", "CusGotra", "CusStatus", "DeleteMark",
             "CusRelation", "CusNameFather",
             "CusPost", "CusPinCode", "CusState", "CusDistrict", "CusTaluk", "CusNameKannada", "CusMemUpAmt1",
-            "CusMagazine", "CusOnline", "CusEmail", "CusNote"]
+            "CusMagazine", "CusOnline", "CusEmail", "CusNote", "CusNoteMagazine", "CusStatusNote"]
     for j in range(1, 7):
         cols += [f"CusReceiptNo{j}", f"CusReceiptDate{j}", f"CusMemAmt{j}", f"CusMemUpAmt{j}", f"CusScholarAmt{j}", f"CusDon1Amt{j}", f"CusReceiptNote{j}"]
     wb = Workbook()

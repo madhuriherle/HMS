@@ -438,22 +438,42 @@ def test_upgrade_with_an_amrutha_mahotsava_note_goes_to_that_campaign(client, ad
         db.close()
 
 
-def test_an_aadhaar_note_is_not_kept_in_the_remarks(client, admin_headers):
-    """A register note that carries an Aadhaar number is dropped; other notes stay."""
+def test_an_aadhaar_number_in_a_note_goes_to_the_aadhaar_box(client, admin_headers):
+    """The number typed into a register note is seeded into the member's Aadhaar number and taken out of the note; the rest of a
+    note stays, and a number that is not 12 digits is left where it is."""
     from db.session import SessionLocal
+    from models.magazines import MagazineSubscription
     from models.members import Member
     from services import legacy_import
 
     s = _sfx()
+    base = 9_000_000 + int(s) * 10         # numbers no earlier run used
     _create_membership_type(client, admin_headers, "AD" + s[-5:], "Ajeeva")
     rows = legacy_import.read_register(_register([
-        _row(996001, "AADHAAR NOTE", CusNote="Aadhaar NO,2570 96787584"),
-        _row(996002, "OTHER NOTE", CusNote="Called on 12-04-2010"),
+        _row(base + 1, "AADHAAR IN NOTE", CusStatusNote="Aadhaar NO,2570 96787584"),
+        _row(base + 2, "AADHAAR IN MAGAZINE NOTE", CusMagazine="Yes", CusNoteMagazine="Adhar No:870219980875 Return 11-08-2025"),
+        _row(base + 3, "OTHER NOTE", CusNote="Called on 12-04-2010"),
+        _row(base + 4, "SHORT NUMBER", CusStatusNote="Adhar No:75594151029"),
     ]))
     db = SessionLocal()
     try:
-        legacy_import.import_members(db, rows, 1, run_id="d" + s[-8:], file_name="MstMember.xlsx")
-        got = {m.membership_number: m.remarks for m in db.query(Member).filter(Member.membership_number.in_(["996001", "996002"]))}
-        assert not got["996001"] and got["996002"] == "Called on 12-04-2010"
+        out = legacy_import.import_members(db, rows, 1, run_id="d" + s[-8:], file_name="MstMember.xlsx")
+        assert out["created"] == 4, out
+        got = {m.membership_number: m for m in db.query(Member).filter(Member.membership_number.in_([str(base + i) for i in (1, 2, 3, 4)]))}
+        assert got[str(base + 1)].aadhaar_number == "257096787584" and not got[str(base + 1)].remarks
+        assert got[str(base + 2)].aadhaar_number == "870219980875"
+        sub = db.query(MagazineSubscription).filter(MagazineSubscription.member_id == got[str(base + 2)].id).first()
+        assert sub is not None and "870219980875" not in (sub.notes or "") and "Return 11-08-2025" in (sub.notes or "")
+        assert got[str(base + 3)].aadhaar_number is None and got[str(base + 3)].remarks == "Called on 12-04-2010"
+        assert got[str(base + 4)].aadhaar_number is None and "75594151029" in (got[str(base + 4)].remarks or "")   # not 12 digits: left in its note
+        # members imported before this rule: the backfill seeds and cleans, once, and never overwrites a number already there
+        got[str(base + 1)].aadhaar_number, got[str(base + 1)].remarks = None, "Aadhaar NO,2570 96787584"
+        got[str(base + 3)].aadhaar_number = "111122223333"
+        db.commit()
+        out = legacy_import.backfill_aadhaar(db, rows)
+        assert out["seeded"] >= 1 and out["notes_cleaned"] >= 1, out
+        db.refresh(got[str(base + 1)])
+        assert got[str(base + 1)].aadhaar_number == "257096787584" and not got[str(base + 1)].remarks
+        assert legacy_import.backfill_aadhaar(db, rows)["seeded"] == 0
     finally:
         db.close()

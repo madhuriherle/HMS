@@ -821,6 +821,14 @@ RULE 16: THE OLD REGISTER, MEMBER DATA AND THE CHECKS (OCT 2026 - THE USER'S DEC
       The quick-facts strip is Member since, Last receipt, Payment.
 16.16 NO DATABASE ID ON ANY SCREEN (rule 1.1): not in the Assign a receipt popup (name and mobile only), not in the user
       list, nowhere. Test a new screen for it.
+16.16a AN AADHAAR NUMBER TYPED INTO A REGISTER NOTE IS SEEDED INTO THE AADHAAR NUMBER BOX AND TAKEN OUT OF THE NOTE (the user's rule,
+      31-Oct-2026: "seed the Aadhaar number if it is entered", never just delete it). 125 members had it, mostly in the magazine
+      note (CusNoteMagazine), a few in the status note. services/legacy_import.split_aadhaar finds a label (Aadhaar / Adhar / Aadhaara,
+      "no", ":") and takes the number only when it is exactly 12 digits; the rest of the note ("Return 11-08-2025") stays; a number
+      that is not 12 digits stays in its note, nothing is invented. A member who already has a number keeps it (a different one in the
+      note is counted as a conflict). The import does it for new members; scripts/legacy_backfill_aadhaar.py MstMember.xlsx does it for
+      members already imported (safe to repeat). Never use `number` for anything but the membership number inside the import loop.
+
 16.17 FILE FORMATS ARE SHOWN, FROM THE SERVER. Every import popup / card has a "File format" box: what the file is, a
       "See every column" list and a format file to download. The columns come from the server, so the screen and the
       import cannot disagree: /meta/import-format/members (the CSV), /members/legacy-import/format and /template

@@ -27,8 +27,22 @@ _PATRIKA = re.compile(r"patrika|\bp\.?\s*nidhi\b", re.I)
 _AMRUTHA = re.compile(r"amr[iuy]|amrt|mritam|mahos|a\.?\s?m\.?\s*office|abhiy|bhiyan", re.I)
 AMRUTHA_SUB = "Amrutha Mahotsava Abhiyana"
 _KANNADA = re.compile("[\u0C80-\u0CFF]")
-# a note that carries an Aadhaar number ("Aadhaar NO-7717 7571 9100", "Adhar no:272089327532"): the office does not want it kept
-_AADHAAR_NOTE = re.compile(r"\ba+dh?a+r+a*\b", re.I)
+# An Aadhaar number typed into a note ("Aadhaar NO-7717 7571 9100", "Adhar No:872 ... Return 11-08-2025"): the number belongs in the member's
+# Aadhaar number box, and the note is not kept.
+_AADHAAR_NOTE = re.compile(r"\ba+dh?a+r+a*\b(?:\s*(?:card\s*)?(?:no|number)\b\.?)?[\s:,.\-]*(?P<num>\d[\d \-]*)?", re.I)
+
+
+def split_aadhaar(text: str) -> tuple:
+    """(the 12-digit Aadhaar number a note holds, the note without it). A note with no Aadhaar label, with no number, or with a number
+    that is not exactly 12 digits is returned unchanged with None: nothing is invented and nothing is lost."""
+    m = _AADHAAR_NOTE.search(text or "")
+    if not m or not m.group("num"):
+        return None, text
+    digits = re.sub(r"\D", "", m.group("num"))
+    if len(digits) != 12:
+        return None, text
+    rest = (text[:m.start()] + " " + text[m.end():]).strip(" |,;:-.")
+    return digits, re.sub(r"\s{2,}", " ", rest)
 FIRST_YEAR = 1943          # the Sabha began in 1943: no receipt can be older
 SLOTS = range(1, 7)
 TYPE_FIXES = {"POSHAK": "POSHAKA", "AJEEV": "AJEEVA", "A": "AJEEVA"}   # typos in the old register ("A" is a guess)
@@ -511,11 +525,14 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
         addr = _lines(r.get("CusAddress"))
         status_text = _s(r.get("CusStatus")).lower()
         is_deleted = _s(r.get("DeleteMark")) == "*"
+        aadhaar = None
         for key in ("CusNote", "CusStatusNote"):
             if _lines(r.get(key)):
-                text = " ".join(_lines(r.get(key)))
-                if not _AADHAAR_NOTE.search(text):     # an Aadhaar number typed into a note is not wanted in the remarks
+                found, text = split_aadhaar(" ".join(_lines(r.get(key))))     # (not `number`: that is the membership number)
+                aadhaar = aadhaar or found
+                if text:
                     notes.append(text)
+        aadhaar = aadhaar or split_aadhaar(" ".join(_lines(r.get("CusNoteMagazine"))))[0]    # most Aadhaar numbers were typed into the magazine note
         if is_deleted:
             notes.append("Marked deleted (*) in the old register")
         if status_text == "expired":
@@ -537,7 +554,7 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
             membership_number=number, old_membership_number=old_no, legacy_ref_number=(cus_no if applicants else None),
             name_title=title, full_name_en=name, first_name_en=name[:100], middle_name_en=None, last_name_en=None,
             full_name_kn=_s(r.get("CusNameKannada")) or None, gender=gender, date_of_birth=_as_date(r.get("CusDoB")),
-            blood_group=(normalize_blood_group(_s(r.get("CusBloodGroup"))) or "")[:10] or None, father_husband_name=father[:150] if father else None,
+            blood_group=(normalize_blood_group(_s(r.get("CusBloodGroup"))) or "")[:10] or None, aadhaar_number=aadhaar, father_husband_name=father[:150] if father else None,
             guardian_name=guardian[:150] if guardian else None,
             gotra_id=gotra_id, gotra_text=gotra_text, email=email[:191] if email else None,
             mobile=mobile, mobile_raw=mobile_raw, alternate_mobile=alt,
@@ -573,7 +590,7 @@ def import_members(db, rows: list, user_id: int, *, run_id: str, file_name: str 
                 if wants and member.member_status == "ACTIVE" and not applicants:
                     sub = sync_member_magazine_subscription(db, member, user_id=user_id)
                     returned = [str(j) for j in range(1, 13) if _s(r.get(f"CusMagazineReturned{j}"))]
-                    magazine_notes = " ".join(_lines(r.get("CusNoteMagazine")))
+                    magazine_notes = split_aadhaar(" ".join(_lines(r.get("CusNoteMagazine"))))[1]    # the Aadhaar number is in its own box, not in the note
                     note = " | ".join(x for x in (magazine_notes, ("Returned issues marked in the old register: " + ", ".join(returned)) if returned else "") if x)
                     if sub is not None and note:
                         sub.notes = note[:2000]
@@ -1397,3 +1414,47 @@ def retag_amrutha_receipts(db, rows: list, user_id: int) -> dict:
         moved += taken
     db.commit()
     return {"receipts_changed": changed, "amount_moved_to_amrutha_mahotsava": moved, "receipts_not_found": missing}
+
+
+def backfill_aadhaar(db, rows: list) -> dict:
+    """Members imported before: the Aadhaar number typed into a register note (the magazine note, the status note, the note) goes into the
+    member's Aadhaar number box, and the number is taken out of the note where it was copied (the remarks, the magazine subscription's
+    note); the rest of a note ("Return 11-08-2025") stays. A member who already has an Aadhaar number keeps it (a different one in the
+    note is counted as a conflict, nothing is overwritten). A number that is not exactly 12 digits is left in its note. Safe to repeat."""
+    from models.magazines import MagazineSubscription
+    from models.members import Member
+
+    by_no = {n: i for n, i in db.query(Member.membership_number, Member.id).filter(Member.registration_source == "MIGRATION", Member.membership_number != None).all()}  # noqa: E711
+    seeded = conflicts = cleaned = not_found = 0
+    for r in rows:
+        no_raw, old_raw = _num(r.get("CusNo")), _num(r.get("CusNoOld"))
+        mid = by_no.get(str(int(old_raw)) if no_raw == 0 and old_raw != 0 else str(int(no_raw)))
+        found = None
+        for key in ("CusNote", "CusStatusNote", "CusNoteMagazine"):
+            found = found or split_aadhaar(" ".join(_lines(r.get(key))))[0]
+        if not found:
+            continue
+        if mid is None:
+            not_found += 1
+            continue
+        m = db.get(Member, mid)
+        if not m.aadhaar_number:
+            m.aadhaar_number = found
+            seeded += 1
+        elif m.aadhaar_number != found:
+            conflicts += 1
+
+        def scrub(text):
+            if not text:
+                return text
+            parts = [split_aadhaar(x.strip())[1] for x in text.split(" | ")]
+            return " | ".join(x for x in parts if x) or None
+        new_remarks = scrub(m.remarks)
+        if new_remarks != m.remarks:
+            m.remarks, cleaned = new_remarks, cleaned + 1
+        for sub in db.query(MagazineSubscription).filter(MagazineSubscription.member_id == mid, MagazineSubscription.is_deleted == False).all():  # noqa: E712
+            new_note = scrub(sub.notes)
+            if new_note != sub.notes:
+                sub.notes, cleaned = new_note, cleaned + 1
+    db.commit()
+    return {"seeded": seeded, "conflicts": conflicts, "notes_cleaned": cleaned, "member_not_found": not_found}
