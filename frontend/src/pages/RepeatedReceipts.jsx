@@ -18,7 +18,7 @@ export default function RepeatedReceipts() {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(200);
   const [data, setData] = useState({ groups: [], total: 0, pages: 1 });
   const [loading, setLoading] = useState(true);
   const [viewing, setViewing] = useState(null);    // one receipt in the usual receipt popup
