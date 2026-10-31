@@ -7,7 +7,8 @@ export default function FilterSelect({
   options = [],
   placeholder = '',
   className = '',
-  widthClass = 'w-44 sm:w-48'
+  widthClass = 'w-44 sm:w-48',
+  disabled = false
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef(null);
@@ -37,8 +38,9 @@ export default function FilterSelect({
       {/* Trigger Button */}
       <button
         type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        className={`w-full py-2 px-3 text-xs font-medium bg-[#FAF7F2]/60 hover:bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] text-[#180200] cursor-pointer transition-colors shadow-2xs flex items-center justify-between gap-2 text-left ${
+        disabled={disabled}
+        onClick={() => { if (!disabled) setIsOpen((prev) => !prev); }}
+        className={`w-full py-2 px-3 text-xs font-medium bg-[#FAF7F2]/60 hover:bg-[#FAF7F2] border border-[#E8DFD8] rounded-xl focus:outline-none focus:border-[#510601] focus:ring-1 focus:ring-[#510601] text-[#180200] ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} transition-colors shadow-2xs flex items-center justify-between gap-2 text-left ${
           isOpen ? 'border-[#510601] ring-1 ring-[#510601]' : ''
         }`}
         aria-haspopup="listbox"

@@ -5,8 +5,10 @@ Privileges: ``system.recycle_bin.read|write`` and ``system.cleanup.read|write`` 
 also limited to rank 0 roles.
 """
 from typing import Any, List, Optional
+from threading import Lock
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -14,8 +16,30 @@ from sqlalchemy.orm import Session
 from api import deps
 from models.users import User
 from services import data_cleanup, recycle_bin
+from db.session import SessionLocal
 
 router = APIRouter()
+
+_empty_jobs = {}
+_empty_jobs_lock = Lock()
+
+
+def _run_empty_recycle_job(job_id: str, entity: Optional[str], user_id: int) -> None:
+    db = SessionLocal()
+    try:
+        viewer = db.get(User, user_id)
+        items = recycle_bin.all_items(db, entity, viewer=viewer)
+        with _empty_jobs_lock:
+            _empty_jobs[job_id] = {"status": "running", "total": len(items)}
+        result = recycle_bin.purge(db, items, viewer=viewer)
+        with _empty_jobs_lock:
+            _empty_jobs[job_id] = {"status": "completed", **result, "total": len(items)}
+    except Exception as exc:  # background failures must be visible to the UI
+        db.rollback()
+        with _empty_jobs_lock:
+            _empty_jobs[job_id] = {"status": "failed", "error": str(exc)[:300]}
+    finally:
+        db.close()
 
 
 class BinItem(BaseModel):
@@ -59,12 +83,27 @@ def purge_from_recycle_bin(
 
 @router.post("/recycle-bin/empty")
 def empty_recycle_bin(
-    *, db: Session = Depends(deps.get_db), current_user: User = Depends(deps.require_permission("system.write")), body: BinEmpty,
+    *, background_tasks: BackgroundTasks, current_user: User = Depends(deps.require_permission("system.write")), body: BinEmpty,
 ) -> Any:
     """Permanently delete everything in the bin (or one record type). Records still used elsewhere stay."""
     if body.entity and body.entity not in recycle_bin.ENTITIES:
         raise HTTPException(400, "Unknown record type")
-    return recycle_bin.purge(db, recycle_bin.all_items(db, body.entity, viewer=current_user), viewer=current_user)
+    job_id = uuid4().hex
+    with _empty_jobs_lock:
+        _empty_jobs[job_id] = {"status": "queued"}
+    background_tasks.add_task(_run_empty_recycle_job, job_id, body.entity, current_user.id)
+    return {"job_id": job_id, "status": "queued", "message": "Recycle Bin cleanup started."}
+
+
+@router.get("/recycle-bin/empty/{job_id}")
+def empty_recycle_bin_status(
+    *, job_id: str, current_user: User = Depends(deps.require_permission("system.read")),
+) -> Any:
+    with _empty_jobs_lock:
+        job = _empty_jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "Cleanup job not found or the server was restarted.")
+    return job
 
 
 class CleanupIn(BaseModel):

@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import PageActions from '../components/PageActions';
 import PageTitle from '../components/PageTitle';
 import Modal from '../components/Modal';
 import ModalFooter from '../components/ModalFooter';
 import SearchFilterBar from '../components/SearchFilterBar';
 import FilterSelect from '../components/FilterSelect';
-import FilterToggle from '../components/FilterToggle';
 import SearchableFormSelect from '../components/SearchableFormSelect';
 import DateInput from '../components/DateInput';
 import PermissionGate from '../components/PermissionGate';
@@ -14,7 +13,7 @@ import Pager from '../components/Pager';
 import api from '../api';
 import { notify } from '../utils/notify';
 import { confirmYesNo } from '../utils/dialogs';
-import { loadLocations } from '../utils/serverData';
+import { loadLocations, searchPostalCodes } from '../utils/serverData';
 import { formatDate } from '../utils/dateUtils';
 import useAuth from '../hooks/useAuth';
 import {
@@ -180,7 +179,15 @@ export default function MagazineManagement() {
     <PermissionGate required={`${area}.read`} title="Access Restricted" message="You need the privilege for this Magazine page to open it.">
       <div className="space-y-6 pb-12">
         {/* Dynamic Page Title in Header Bar */}
-        <PageTitle>{sectionTitle}</PageTitle>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <PageTitle>{sectionTitle}</PageTitle>
+          {tab === 'labels-delivery' && (
+            <Link to="/dashboard/magazine/labels-delivery/history" className="inline-flex items-center gap-1.5 rounded-xl border border-[#E8DFD8] bg-white px-3.5 py-2 text-xs font-semibold text-[#863221] hover:bg-[#FAF7F2] shadow-xs transition-colors">
+              <History className="h-4 w-4 text-[#510601]" />
+              <span>Print History</span>
+            </Link>
+          )}
+        </div>
 
         {unsubscribedPaid.length > 0 && (
           <div className="rounded-xl border border-amber-300 bg-amber-50/80 p-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[#510601]">
@@ -241,6 +248,25 @@ export default function MagazineManagement() {
   );
 }
 
+export function MagazinePrintHistory() {
+  const { hasPermission } = useAuth();
+  const canWrite = hasPermission('magazines.labels_delivery.write');
+
+  return (
+    <PermissionGate required="magazines.labels_delivery.read" title="Access Restricted" message="You need the privilege for this Magazine page to open it.">
+      <div className="space-y-6 pb-12">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <PageTitle>Print History</PageTitle>
+          <Link to="/dashboard/magazine/labels-delivery" className="text-sm font-semibold text-[#863221] hover:text-[#510601] hover:underline">
+            Back to Print &amp; Delivery
+          </Link>
+        </div>
+        <PrintBatchHistory canWrite={canWrite} />
+      </div>
+    </PermissionGate>
+  );
+}
+
 // ── Subscriptions ────────────────────────────────────────────
 function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canWrite, canDelete, locations }) {
   const [rows, setRows] = useState([]);       // ONE page of recipients (at most 200)
@@ -249,29 +275,49 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
   const [, setSummary] = useState({ total: 0, active: 0, paused: 0, stopped: 0 });
   const [loadingRows, setLoadingRows] = useState(true);
   const [search, setSearch] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(false); // the filters are shown only when the filter icon is clicked
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [returnsFilter, setReturnsFilter] = useState('ALL');
-  const [copyFilter, setCopyFilter] = useState('ALL');         // PRINTED | ONLINE
+  const [copyFilter, setCopyFilter] = useState('PRINTED');     // PRINTED | ONLINE; controlled by the page tabs
   const [receiptFilter, setReceiptFilter] = useState('ALL');   // PAID | NO_RECEIPT
+  const [stateFilter, setStateFilter] = useState('ALL');
   const [districtFilter, setDistrictFilter] = useState('ALL');
   const [talukFilter, setTalukFilter] = useState('ALL');
+  const [pincodeFilter, setPincodeFilter] = useState('ALL');
   const [places, setPlaces] = useState(() => ({
+    states: locations?.states || [],
     districts: locations?.districts || [],
     taluks: locations?.taluks || [],
+    pincodes: [],
   }));
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(200);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [printMonth, setPrintMonth] = useState(thisMonth());
+  const [printBusy, setPrintBusy] = useState(false);
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
 
   useEffect(() => {
     if (locations?.districts?.length || locations?.taluks?.length) {
-      setPlaces({ districts: locations.districts || [], taluks: locations.taluks || [] });
+      setPlaces((current) => ({ ...current, states: locations.states || [], districts: locations.districts || [], taluks: locations.taluks || [] }));
     } else {
-      loadLocations({ postalCodes: false }).then((l) => setPlaces({ districts: l.districts || [], taluks: l.taluks || [] })).catch(() => {});
+      loadLocations({ postalCodes: false }).then((l) => setPlaces((current) => ({ ...current, states: l.states || [], districts: l.districts || [], taluks: l.taluks || [] }))).catch(() => {});
     }
   }, [locations]);
+
+  useEffect(() => {
+    setPincodeFilter('ALL');
+    if (talukFilter === 'ALL') {
+      setPlaces((current) => ({ ...current, pincodes: [] }));
+      return undefined;
+    }
+    let cancelled = false;
+    searchPostalCodes({ taluk_id: talukFilter }, 1000)
+      .then((pincodes) => { if (!cancelled) setPlaces((current) => ({ ...current, pincodes })); })
+      .catch(() => { if (!cancelled) setPlaces((current) => ({ ...current, pincodes: [] })); });
+    return () => { cancelled = true; };
+  }, [talukFilter]);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -291,14 +337,17 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
       const { data } = await api.get('/magazines/recipients', {
         params: {
           page, limit: pageSize,
+          subscribed_only: true,
           ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}),
           ...(typeFilter !== 'ALL' ? { recipient_type: typeFilter } : {}),
           ...(statusFilter !== 'ALL' ? { delivery_status: statusFilter } : {}),
           ...(returnsFilter === 'WITH' ? { with_returns: true } : {}),
           ...(copyFilter !== 'ALL' ? { copy: copyFilter } : {}),
           ...(receiptFilter !== 'ALL' ? { receipt: receiptFilter } : {}),
+           ...(stateFilter !== 'ALL' ? { state_id: stateFilter } : {}),
           ...(districtFilter !== 'ALL' ? { district_id: districtFilter } : {}),
           ...(talukFilter !== 'ALL' ? { taluk_id: talukFilter } : {}),
+           ...(pincodeFilter !== 'ALL' ? { pincode_id: pincodeFilter } : {}),
         },
       });
       if (seq !== requestSeq.current) return;
@@ -314,14 +363,14 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
     } finally {
       if (seq === requestSeq.current) setLoadingRows(false);
     }
-  }, [page, pageSize, debouncedSearch, typeFilter, statusFilter, returnsFilter, copyFilter, receiptFilter, districtFilter, talukFilter, rememberName]);
+  }, [page, pageSize, debouncedSearch, typeFilter, statusFilter, returnsFilter, copyFilter, receiptFilter, stateFilter, districtFilter, talukFilter, pincodeFilter, rememberName]);
 
   useEffect(() => {
     loadRecipients();
   }, [loadRecipients, reloadKey]);
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, typeFilter, statusFilter, returnsFilter, copyFilter, receiptFilter, districtFilter, talukFilter, pageSize]);
+  }, [debouncedSearch, typeFilter, statusFilter, returnsFilter, copyFilter, receiptFilter, stateFilter, districtFilter, talukFilter, pincodeFilter, pageSize]);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 350);
     return () => clearTimeout(timer);
@@ -331,6 +380,40 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
   const refreshAll = () => {
     loadRecipients();
     onChanged?.();
+  };
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [copyFilter, debouncedSearch, typeFilter, statusFilter, returnsFilter, receiptFilter, stateFilter, districtFilter, talukFilter, pincodeFilter, page]);
+
+  const printableRows = rows.filter((row) => row.subscription && row.copy_kind !== 'ONLINE');
+  const allPrintableSelected = printableRows.length > 0 && printableRows.every((row) => selectedIds.has(row.subscription.member_id));
+  const toggleSelected = (memberId) => setSelectedIds((current) => {
+    const next = new Set(current);
+    if (next.has(memberId)) next.delete(memberId); else next.add(memberId);
+    return next;
+  });
+  const printSelected = async () => {
+    if (!selectedIds.size) { notify('Select at least one Physical Copy subscriber.', 'error'); return; }
+    if (!/^\d{4}-\d{2}$/.test(printMonth)) { notify('Pick an issue month.', 'error'); return; }
+    setPrintBusy(true);
+    try {
+      const { data } = await api.post('/magazines/generate-labels', null, { params: { issue_month_year: printMonth, member_ids: Array.from(selectedIds) } });
+      if (data?.approval_request_id || data?.status === 'PENDING') { notify('Label batch submitted for approval.'); return; }
+      const res = await api.get(`/magazines/label-batches/${data.batch_id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data); const link = document.createElement('a'); link.href = url; link.download = `labels-${printMonth}.pdf`; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+      notify(`Label batch generated (${data.total_labels ?? 0} labels).`);
+      setSelectedIds(new Set());
+    } catch (error) {
+      let message = error.response?.data?.detail;
+      if (!message && error.response?.data instanceof Blob) { try { message = JSON.parse(await error.response.data.text()).detail; } catch (_) { /* default */ } }
+      notify(message || 'Could not print the selected labels.', 'error');
+    } finally { setPrintBusy(false); }
+  };
+  const openPrintPreview = () => {
+    if (!selectedIds.size) { notify('Select at least one Physical Copy subscriber.', 'error'); return; }
+    if (!/^\d{4}-\d{2}$/.test(printMonth)) { notify('Pick an issue month.', 'error'); return; }
+    setPrintPreviewOpen(true);
   };
 
   const resumeDelivery = async (pause) => {
@@ -375,7 +458,6 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
   return (
     <div className="space-y-5">
         <PageActions>
-          <FilterToggle open={filtersOpen} onToggle={() => setFiltersOpen((o) => !o)} count={[typeFilter, statusFilter, returnsFilter, copyFilter, receiptFilter, districtFilter, talukFilter].filter((v) => v !== 'ALL').length} />
           {canWrite && (
             <button type="button" onClick={() => { setEditing(null); setFormOpen(true); }} className={BTN_PRIMARY}>
               <Plus className="w-4 h-4" />
@@ -384,8 +466,20 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
           )}
         </PageActions>
 
-      {filtersOpen && (
-        <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center gap-3">
+      <div className="inline-flex rounded-xl border border-[#E8DFD8] bg-white p-1 shadow-sm">
+        {[['PRINTED', 'Physical Copy'], ['ONLINE', 'E-Magazine']].map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => { setCopyFilter(value); setPage(1); }}
+            className={`rounded-lg px-4 py-2 text-sm font-bold transition-colors cursor-pointer ${copyFilter === value ? 'bg-[#510601] text-white shadow-sm' : 'text-[#863221] hover:bg-[#FAF7F2]'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-[#E8DFD8] shadow-sm p-4 flex flex-wrap items-center gap-3">
           <div className="relative w-64">
             <Search className="w-4 h-4 text-[#863221]/60 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -422,31 +516,43 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
             widthClass="w-40"
           />
           <FilterSelect
-            value={copyFilter}
-            onChange={(v) => { setCopyFilter(v); setPage(1); }}
-            options={[{ value: 'ALL', label: 'Physical Copy or E-Magazine' }, { value: 'PRINTED', label: 'Physical Copy' }, { value: 'ONLINE', label: 'E-Magazine' }]}
-            widthClass="w-44"
-          />
-          <FilterSelect
             value={receiptFilter}
             onChange={(v) => { setReceiptFilter(v); setPage(1); }}
             options={[{ value: 'ALL', label: 'Receipt: any' }, { value: 'PAID', label: 'Receipt assigned' }, { value: 'NO_RECEIPT', label: 'No receipt yet' }]}
             widthClass="w-44"
           />
           <FilterSelect
+            value={stateFilter}
+            onChange={(v) => { setStateFilter(v); setDistrictFilter('ALL'); setTalukFilter('ALL'); setPincodeFilter('ALL'); setPage(1); }}
+            options={[{ value: 'ALL', label: 'All States' }, ...places.states.filter((s) => s.status === 'Active').map((s) => ({ value: String(s.id), label: s.name }))]}
+            widthClass="w-44"
+          />
+          <FilterSelect
             value={districtFilter}
-            onChange={(v) => { setDistrictFilter(v); setTalukFilter('ALL'); setPage(1); }}
-            options={[{ value: 'ALL', label: 'All Districts' }, ...places.districts.filter((d) => d.status === 'Active').map((d) => ({ value: String(d.id), label: d.name }))]}
+            onChange={(v) => { setDistrictFilter(v); setTalukFilter('ALL'); setPincodeFilter('ALL'); setPage(1); }}
+            options={[{ value: 'ALL', label: 'All Districts' }, ...places.districts.filter((d) => d.status === 'Active' && (stateFilter === 'ALL' || String(d.stateId) === String(stateFilter))).map((d) => ({ value: String(d.id), label: d.name }))]}
             widthClass="w-48"
           />
-          {districtFilter !== 'ALL' && (
-            <FilterSelect
-              value={talukFilter}
-              onChange={(v) => { setTalukFilter(v); setPage(1); }}
-              options={[{ value: 'ALL', label: 'All Taluks' }, ...places.taluks.filter((x) => String(x.districtId) === String(districtFilter) && x.status === 'Active').map((x) => ({ value: String(x.id), label: x.name }))]}
-              widthClass="w-44"
-            />
-          )}
+          <FilterSelect
+            value={talukFilter}
+            onChange={(v) => { setTalukFilter(v); setPage(1); }}
+            options={[{ value: 'ALL', label: districtFilter === 'ALL' ? 'Select District' : 'All Taluks' }, ...places.taluks.filter((x) => String(x.districtId) === String(districtFilter) && x.status === 'Active').map((x) => ({ value: String(x.id), label: x.name }))]}
+            widthClass="w-44"
+            disabled={districtFilter === 'ALL'}
+          />
+          <FilterSelect
+            value={pincodeFilter}
+            onChange={(v) => { setPincodeFilter(v); setPage(1); }}
+            options={[{ value: 'ALL', label: talukFilter === 'ALL' ? 'Select Taluk' : 'All Pincodes' }, ...places.pincodes.filter((p) => p.status === 'Active').map((p) => ({ value: String(p.id), label: p.postalCode }))]}
+            widthClass="w-44"
+            disabled={talukFilter === 'ALL'}
+          />
+        </div>
+
+      {copyFilter === 'PRINTED' && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3">
+          <div className="flex items-center gap-3 text-sm text-[#510601]"><input type="month" value={printMonth} onChange={(e) => setPrintMonth(e.target.value)} className="rounded-lg border border-[#E8DFD8] bg-white px-3 py-2 text-xs" aria-label="Issue month" /><span><strong>{selectedIds.size}</strong> selected</span></div>
+          {canWrite && <button type="button" onClick={openPrintPreview} disabled={printBusy || !selectedIds.size} className={BTN_PRIMARY}><Printer className="h-4 w-4" />Print Selected Labels</button>}
         </div>
       )}
 
@@ -455,9 +561,9 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
           <table className="w-full text-left text-sm text-gray-700">
             <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
               <tr>
+                <TH><input type="checkbox" checked={allPrintableSelected} onChange={() => setSelectedIds((current) => { const next = new Set(current); if (allPrintableSelected) printableRows.forEach((row) => next.delete(row.subscription.member_id)); else printableRows.forEach((row) => next.add(row.subscription.member_id)); return next; })} disabled={copyFilter !== 'PRINTED' || !printableRows.length} aria-label="Select all Physical Copy subscribers" /></TH>
                 <TH>Recipient</TH>
                 <TH>Type</TH>
-                <TH>Magazine</TH>
                 <TH>Address</TH>
                 <TH className="text-center">Actions</TH>
               </tr>
@@ -466,21 +572,19 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
               {loadingRows && rows.length === 0 ? (
                 <EmptyRow colSpan={5} title="Loading…" />
               ) : rows.length === 0 ? (
-                <EmptyRow colSpan={5} icon={BookOpen} title="No recipients found" hint="Start a subscription or enable magazine delivery for affiliates, associates or press." />
+                <EmptyRow colSpan={5} icon={BookOpen} title="No subscribers found" hint="Only active magazine subscriptions appear here." />
               ) : (
                 rows.map((row) => {
                   const person = isPerson(row.recipient_type);
                   const sub = person ? row.subscription : null;
+                  const physical = row.copy_kind !== 'ONLINE';
                   return (
                     <tr key={`${row.recipient_type}-${row.recipient_id}`} className="hover:bg-amber-50/40 transition-colors">
+                      <td className="w-10 px-3 py-3.5 align-top"><input type="checkbox" checked={Boolean(sub && selectedIds.has(sub.member_id))} onChange={() => sub && toggleSelected(sub.member_id)} disabled={copyFilter !== 'PRINTED' || !sub} aria-label={`Select ${row.name}`} /></td>
                       <td className="px-4 py-3.5">
                         <div className="font-semibold text-gray-900">{row.name}</div>
-                        {row.code_or_reg ? (
-                          <div className="text-[11px] text-gray-500 font-mono">{row.code_or_reg}</div>
-                        ) : null}
                         {person && (
                           <div className="mt-1 flex flex-wrap items-center gap-1">
-                            <span className="rounded-full border border-[#E8DFD8] bg-[#FAF7F2] px-1.5 py-px text-[10px] font-semibold text-[#863221]">{row.copy_kind === 'ONLINE' ? 'E-Magazine' : 'Physical Copy'}</span>
                             {row.member_status === 'INACTIVE' && <span className="rounded-full border border-gray-300 bg-gray-100 px-1.5 py-px text-[10px] font-semibold text-gray-600">Inactive</span>}
                             {row.has_receipt === false && <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-semibold text-amber-700">No receipt yet</span>}
                           </div>
@@ -491,81 +595,25 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
                           {TYPE_LABELS[row.recipient_type] || row.recipient_type}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <Chip value={row.delivery_status} />
-                          {sub && row.active_pause && row.delivery_status !== 'PAUSED' && (
-                            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">Paused</span>
-                          )}
-                          {sub && row.return_count > 0 && (
-                            <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">
-                              {row.return_count} returned
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 text-xs text-gray-600 max-w-[240px]">
+                      <td className="px-4 py-3.5 text-xs text-gray-600 max-w-[360px] break-words align-top">
                         {person && row.copy_kind === 'ONLINE' ? (
                           <span className="text-gray-400">Not required</span>
                         ) : row.address_override ? (
                           <span className="text-amber-700 font-medium">Override: {row.address_override}</span>
                         ) : row.address ? (
-                          <span className="truncate block" title={row.address}>{row.address}</span>
+                          <span className="block whitespace-normal break-words" title={row.address}>{row.address}</span>
                         ) : (
                           <span className="text-gray-400">Standard address</span>
                         )}
                       </td>
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                      <td className="px-4 py-3.5 whitespace-nowrap align-top">
+                        <div className="flex items-center justify-center gap-1.5 flex-nowrap">
                           {person && sub && (
                             <>
-                              {row.copy_kind !== 'ONLINE' && (
-                                <button type="button" onClick={() => setMonthlyFor(sub)} className="btn-act" title="Monthly physical-copy marks">
-                                  <Calendar className="w-3.5 h-3.5" /><span>Monthly</span>
-                                </button>
-                              )}
-                              {canWrite && sub.delivery_status !== 'ACTIVE' && (
-                                <button type="button" onClick={() => changeStatus(sub, 'ACTIVE')} className="btn-act" title="Start delivery">
-                                  <Play className="w-3.5 h-3.5" /><span>Start</span>
-                                </button>
-                              )}
-                              {canWrite && sub.delivery_status === 'ACTIVE' && (
-                                <button type="button" onClick={() => changeStatus(sub, 'STOPPED')} className="btn-act" title="Stop delivery">
-                                  <Pause className="w-3.5 h-3.5" /><span>Stop</span>
-                                </button>
-                              )}
-                              {row.copy_kind !== 'ONLINE' && canWrite && sub.delivery_status === 'ACTIVE' && (() => {
-                                const running = row.active_pause;
-                                return running ? (
-                                  <button type="button" onClick={() => resumeDelivery(running)} className="btn-act" title="Resume the paused delivery">
-                                    <Play className="w-3.5 h-3.5" /><span>Resume</span>
-                                  </button>
-                                ) : (
-                                  <button type="button" onClick={() => setPauseFor(sub)} className="btn-act" title="Pause delivery for a while">
-                                    <Pause className="w-3.5 h-3.5" /><span>Pause</span>
-                                  </button>
-                                );
-                              })()}
-                              {row.copy_kind !== 'ONLINE' && canWrite && (
-                                <button type="button" onClick={() => setReturnFor(sub)} className="btn-act" title="Mark a returned issue">
-                                  <Undo2 className="w-3.5 h-3.5" /><span>Return</span>
-                                </button>
-                              )}
-                              {row.copy_kind !== 'ONLINE' && (
-                                <button type="button" onClick={() => setHistoryFor(sub)} className="btn-act" title="Physical-copy pauses and returns">
-                                  <History className="w-3.5 h-3.5" /><span>History</span>
-                                </button>
-                              )}
-                              {canWrite && (
-                                <button type="button" onClick={() => { setEditing(sub); setFormOpen(true); }} className="btn-act" title="Edit">
-                                  <Pencil className="w-3.5 h-3.5" /><span>Edit</span>
-                                </button>
-                              )}
-                              {canDelete && (
-                                <button type="button" onClick={() => remove(sub)} className="btn-act btn-act-danger" title="Remove">
-                                  <Trash2 className="w-3.5 h-3.5" /><span>Remove</span>
-                                </button>
-                              )}
+                              {physical && canWrite && <button type="button" onClick={() => { const running = row.active_pause; running ? resumeDelivery(running) : setPauseFor(sub); }} className="btn-act" title={row.active_pause ? 'Resume delivery' : 'Pause delivery'}>{row.active_pause ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}<span>{row.active_pause ? 'Resume' : 'Pause'}</span></button>}
+                              {physical && canWrite && <button type="button" onClick={() => setReturnFor(sub)} className="btn-act" title="Return issue"><Undo2 className="w-3.5 h-3.5" /><span>Return</span></button>}
+                              {physical && <button type="button" onClick={() => setHistoryFor(sub)} className="btn-act" title="View delivery history"><History className="w-3.5 h-3.5" /><span>History</span></button>}
+                              {canDelete && <button type="button" onClick={() => remove(sub)} className="btn-act text-red-700" title="Cancel subscription"><Trash2 className="w-3.5 h-3.5" /><span>Cancel</span></button>}
                             </>
                           )}
                           {person && !sub && canWrite && row.member_status !== 'INACTIVE' && (
@@ -613,7 +661,27 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
           onSaved={() => { setFormOpen(false); refreshAll(); }}
         />
       )}
-      {monthlyFor && <MonthlyModal sub={monthlyFor} memberName={memberName} onClose={() => setMonthlyFor(null)} />}
+      {printPreviewOpen && (
+        <Modal isOpen onClose={() => { if (!printBusy) setPrintPreviewOpen(false); }}>
+          <div className="bg-white rounded-2xl max-w-4xl w-full border border-[#E8DFD8] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 h-16 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2]">
+              <div className="flex items-center gap-2.5"><div className="p-2 rounded-xl bg-[#510601]/10 text-[#510601]"><Printer className="w-5 h-5" /></div><div><h3 className="text-base font-bold text-[#180200]">Print-Oriented Address Label Preview</h3><p className="text-xs text-[#863221]">{selectedIds.size} address label{selectedIds.size !== 1 ? 's' : ''} ready for printing · {printMonth}</p></div></div>
+              <button type="button" onClick={() => { if (!printBusy) setPrintPreviewOpen(false); }} className="text-[#863221]/60 hover:text-[#180200] p-1.5 rounded-lg hover:bg-white" aria-label="Close preview"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 bg-stone-100/60">
+              <div className="mb-4 flex items-center gap-2.5 bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs text-amber-900"><AlertCircle className="w-4 h-4 shrink-0 text-amber-700" /><span>A4 sticker sheet, 3 columns x 7 rows: membership number, name and address on each label.</span></div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
+                {rows.filter((row) => row.subscription && selectedIds.has(row.subscription.member_id)).map((row) => (
+                  <div key={row.subscription.member_id} className="border border-stone-200 bg-white px-3 py-2.5 relative" style={{ minHeight: '42.4mm' }}>
+                    <div className="leading-tight text-black"><div className="text-[12px] mb-0.5">{row.code_or_reg || ''}</div><div className="font-bold text-[12px] mb-0.5 uppercase">{row.name}</div><div className="text-[13px] leading-snug">{row.address_override || row.address || ''}</div></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <ModalFooter kind="confirm" cancelLabel="Close" submitLabel="Print Labels" onCancel={() => { if (!printBusy) setPrintPreviewOpen(false); }} onSubmit={async () => { await printSelected(); setPrintPreviewOpen(false); }} busy={printBusy} left={<span className="text-xs text-[#863221]">Showing {selectedIds.size} printable label cards</span>} />
+          </div>
+        </Modal>
+      )}
       {pauseFor && (
         <PauseForm
           subOptions={[{ value: pauseFor.id, label: `${memberName(pauseFor.member_id)} — ${statusLabel(pauseFor.delivery_status)}` }]}
@@ -639,16 +707,12 @@ function SubscriptionsTab({ memberName, rememberName, reloadKey, onChanged, canW
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-8">
               <section className="space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#510601]">Monthly Summary</h4>
+                <MonthlySummary subscriptionId={historyFor.id} />
+              </section>
+              <section className="space-y-3">
                 <h4 className="text-xs font-bold uppercase tracking-wider text-[#510601]">Magazine delivery history</h4>
                 <IssueHistory subscriptionId={historyFor.id} />
-              </section>
-              <section className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#510601]">Delivery pauses</h4>
-                <PausesTab subscriptions={[historyFor]} memberName={memberName} canWrite={canWrite} canDelete={canDelete} subscriptionId={historyFor.id} onChanged={refreshAll} />
-              </section>
-              <section className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#510601]">Returns</h4>
-                <ReturnsTab subscriptions={[historyFor]} memberName={memberName} canWrite={canWrite} canDelete={canDelete} subscriptionId={historyFor.id} onChanged={refreshAll} />
               </section>
             </div>
             <ModalFooter kind="view" onCancel={() => setHistoryFor(null)} />
@@ -835,25 +899,30 @@ function MonthlyModal({ sub, memberName, onClose }) {
 
   return (
     <Modal isOpen onClose={onClose}>
-      <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col">
-        <div className="px-6 h-14 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl flex items-center justify-between">
+      <div className="relative w-full max-w-3xl rounded-2xl bg-white shadow-2xl border border-[#E8DFD8] overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="px-6 py-4 shrink-0 border-b border-[#E8DFD8] bg-[#FAF7F2] rounded-t-2xl flex items-center justify-between gap-4">
           <div>
-            <h3 className="text-lg font-bold text-[#180200]">Monthly marks</h3>
-            <p className="text-xs text-gray-500">{memberName(sub.member_id)}</p>
+            <div className="flex items-center gap-2">
+              <div className="rounded-lg bg-[#510601] p-2 text-white"><Calendar className="h-4 w-4" /></div>
+              <div>
+                <h3 className="text-lg font-bold text-[#180200]">Monthly delivery view</h3>
+                <p className="text-xs text-gray-500">{memberName(sub.member_id)} · {year}</p>
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-2">
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded-lg border border-[#E8DFD8] px-2 py-1 text-xs bg-white">
+            <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded-lg border border-[#E8DFD8] px-3 py-2 text-xs font-semibold bg-white text-[#510601]" aria-label="Year">
               {[year - 1, year, year + 1].filter((v, i, a) => a.indexOf(v) === i).sort().map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
-            <button type="button" onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:bg-[#FAF7F2] hover:text-gray-700"><X className="h-5 w-5" /></button>
+            <button type="button" onClick={onClose} className="rounded-lg p-2 text-gray-400 hover:bg-white hover:text-gray-700" aria-label="Close monthly delivery view"><X className="h-5 w-5" /></button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 bg-[#FFFCF9]">
           {error && <p className="text-sm text-red-600">{error}</p>}
           {!error && !grid && <p className="text-sm text-gray-500">Loading…</p>}
           {grid && (
             <>
-              <div className="grid grid-cols-6 gap-2">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                 {grid.months.map((m) => (
                   <div
                     key={m.issue_month_year}
@@ -868,10 +937,16 @@ function MonthlyModal({ sub, memberName, onClose }) {
                         : 'border-[#E8DFD8] bg-white text-[#863221]/50'
                     }`}
                   >
-                    <div className="text-[10px] font-semibold uppercase tracking-wide">{MONTH_LABELS[m.month - 1]}</div>
+                    <div className="text-xs font-black uppercase tracking-wide">{MONTH_LABELS[m.month - 1]}</div>
                     <div className="text-lg font-black leading-tight">{m.mark || '·'}</div>
                   </div>
                 ))}
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3"><div className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Sent</div><div className="mt-1 text-xl font-black text-emerald-800">{grid.months.filter((m) => m.mark === 'S').length}</div></div>
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3"><div className="text-[10px] font-bold uppercase tracking-wide text-red-700">Returned</div><div className="mt-1 text-xl font-black text-red-800">{grid.months.filter((m) => m.mark === 'R').length}</div></div>
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3"><div className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Paused</div><div className="mt-1 text-xl font-black text-amber-800">{grid.months.filter((m) => m.mark === 'P').length}</div></div>
+                <div className="rounded-xl border border-[#E8DFD8] bg-white px-3 py-3"><div className="text-[10px] font-bold uppercase tracking-wide text-gray-500">No record</div><div className="mt-1 text-xl font-black text-gray-700">{grid.months.filter((m) => !m.mark).length}</div></div>
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-gray-600">
                 <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded-sm border border-red-200 bg-red-50" /> R = returned issue</span>
@@ -902,6 +977,31 @@ const ISSUE_RESULTS = {
   LISTED: { label: 'On label list', cls: 'bg-[#FAF7F2] text-[#863221] border-[#E8DFD8]' },
 };
 
+function MonthlySummary({ subscriptionId }) {
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [grid, setGrid] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setGrid(null);
+    api.get(`/magazines/subscriptions/${subscriptionId}/monthly`, { params: { year } })
+      .then(({ data }) => { if (!cancelled) setGrid(data); })
+      .catch(() => { if (!cancelled) setGrid({ months: [] }); });
+    return () => { cancelled = true; };
+  }, [subscriptionId, year]);
+
+  if (!grid) return <div className="rounded-xl border border-[#E8DFD8] bg-white p-5 text-sm text-gray-500">Loading monthly summary...</div>;
+  const months = Array.isArray(grid.months) ? grid.months : [];
+  const summaries = [['Sent', 'S', 'text-emerald-800 bg-emerald-50 border-emerald-200'], ['Returned', 'R', 'text-red-800 bg-red-50 border-red-200'], ['Paused', 'P', 'text-amber-800 bg-amber-50 border-amber-200'], ['No record', '', 'text-gray-700 bg-white border-[#E8DFD8]']];
+  return (
+    <div className="rounded-xl border border-[#E8DFD8] bg-[#FFFCF9] p-4">
+      <div className="mb-4 flex items-center justify-between gap-3"><p className="text-xs text-gray-500">Read-only delivery status by issue month</p><select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded-lg border border-[#E8DFD8] bg-white px-3 py-2 text-xs font-semibold text-[#510601]" aria-label="Summary year">{[year - 1, year, year + 1].map((y) => <option key={y} value={y}>{y}</option>)}</select></div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{summaries.map(([label, mark, cls]) => <div key={label} className={`rounded-lg border px-3 py-2 ${cls}`}><div className="text-[10px] font-bold uppercase tracking-wide opacity-80">{label}</div><div className="text-lg font-black">{months.filter((m) => mark ? m.mark === mark : !m.mark).length}</div></div>)}</div>
+      <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">{months.map((m) => <div key={m.issue_month_year} className={`rounded-lg border px-2 py-2 text-center text-xs font-bold ${m.mark === 'R' ? 'border-red-200 bg-red-50 text-red-700' : m.mark === 'P' ? 'border-amber-200 bg-amber-50 text-amber-700' : m.mark === 'S' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-[#E8DFD8] bg-white text-gray-400'}`}><div>{MONTH_LABELS[m.month - 1]}</div><div className="mt-1 text-[10px]">{m.mark === 'R' ? 'Returned' : m.mark === 'P' ? 'Paused' : m.mark === 'S' ? 'Sent' : 'No record'}</div></div>)}</div>
+    </div>
+  );
+}
+
 function IssueHistory({ subscriptionId }) {
   const [issues, setIssues] = useState(null);
   useEffect(() => {
@@ -923,13 +1023,24 @@ function IssueHistory({ subscriptionId }) {
         <tbody className="divide-y divide-[#E8DFD8]">
           {issues.map((i) => {
             const r = ISSUE_RESULTS[i.result] || ISSUE_RESULTS.LISTED;
+            const wasSent = i.sent || i.result === 'SENT' || i.result === 'RETURNED';
+            const wasReturned = i.returned || i.result === 'RETURNED';
+            const wasPaused = i.paused || i.result === 'PAUSED';
             return (
               <tr key={i.issue_month_year}>
                 <td className="px-4 py-3 text-xs font-mono text-gray-800">{i.issue_month_year}</td>
                 <td className="px-4 py-3">
-                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${r.cls}`}>{r.label}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {wasSent && <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">Sent</span>}
+                    {wasReturned && <span className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">Returned</span>}
+                    {wasPaused && <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">Paused</span>}
+                    {!wasSent && !wasReturned && !wasPaused && <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${r.cls}`}>{r.label}</span>}
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-600">
+                  {i.paused && <div className="mt-1 text-amber-700">Paused from {formatDate(i.pause_start_date)}{i.pause_end_date ? ` to ${formatDate(i.pause_end_date)}` : ' until resumed'}{i.pause_reason ? ` · ${i.pause_reason}` : ''}</div>}
+                  {i.sent_date && <div>Sent on {formatDate(i.sent_date)}{i.sent_batch ? ` · ${i.sent_batch}` : ''}</div>}
+                  {i.returned && <div className="mt-1 text-red-700">Returned on {formatDate(i.return_date)}{i.return_reason ? ` · ${i.return_reason}` : ''}</div>}
                   {[i.date ? formatDate(i.date) : '', i.detail].filter(Boolean).join(' — ') || '—'}
                 </td>
               </tr>
@@ -1098,8 +1209,24 @@ function PauseForm({ editing, subOptions, presetSubscriptionId, onClose, onSaved
     pause_end_date: editing?.pause_end_date || '',
     reason: editing?.reason || '',
   });
+  const [endDateOption, setEndDateOption] = useState(editing?.pause_end_date ? 'CUSTOM' : 'UNTIL_RESUMED');
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
+
+  const presetEndDate = (startDate, months) => {
+    const [year, month, day] = startDate.split('-').map(Number);
+    const date = new Date(year, month - 1 + months, day);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  };
+
+  const selectEndDateOption = (option) => {
+    setEndDateOption(option);
+    setForm((current) => ({
+      ...current,
+      pause_end_date: option === 'UNTIL_RESUMED' ? '' : option === 'CUSTOM' ? current.pause_end_date : presetEndDate(current.pause_start_date, Number(option)),
+    }));
+    setErrors((current) => ({ ...current, pause_end_date: '' }));
+  };
 
   const save = async () => {
     const errs = {};
@@ -1160,17 +1287,31 @@ function PauseForm({ editing, subOptions, presetSubscriptionId, onClose, onSaved
               <label className={LABEL}>Start date <span className="text-[#ED4636]">*</span></label>
               <DateInput
                 value={form.pause_start_date}
-                onChange={(e) => setForm((f) => ({ ...f, pause_start_date: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, pause_start_date: e.target.value, pause_end_date: endDateOption === 'UNTIL_RESUMED' || endDateOption === 'CUSTOM' ? f.pause_end_date : presetEndDate(e.target.value, Number(endDateOption)) }))}
                 className="border border-[#E8DFD8] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
               />
             </div>
             <div>
               <label className={LABEL}>End date</label>
-              <DateInput
-                value={form.pause_end_date}
-                onChange={(e) => setForm((f) => ({ ...f, pause_end_date: e.target.value }))}
-                className="border border-[#E8DFD8] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
-              />
+              <select
+                value={endDateOption}
+                onChange={(e) => selectEndDateOption(e.target.value)}
+                className="w-full border border-[#E8DFD8] rounded-lg px-3.5 py-2.5 text-sm bg-white focus:outline-none focus:border-[#510601]"
+              >
+                <option value="UNTIL_RESUMED">Until resumed manually</option>
+                <option value="1">1 month</option>
+                <option value="3">3 months</option>
+                <option value="6">6 months</option>
+                <option value="CUSTOM">Custom date</option>
+              </select>
+              {endDateOption === 'CUSTOM' && (
+                <DateInput
+                  value={form.pause_end_date}
+                  onChange={(e) => setForm((f) => ({ ...f, pause_end_date: e.target.value }))}
+                  className="mt-2 border border-[#E8DFD8] rounded-lg px-3.5 py-2.5 pr-9 focus:outline-none focus:border-[#510601]"
+                />
+              )}
+              {endDateOption !== 'UNTIL_RESUMED' && endDateOption !== 'CUSTOM' && <p className="mt-1 text-[11px] text-gray-500">Ends on {formatDate(form.pause_end_date)}</p>}
               <FieldError>{errors.pause_end_date}</FieldError>
             </div>
           </div>
@@ -1394,7 +1535,6 @@ function ReturnForm({ subOptions, presetSubscriptionId, onClose, onSaved }) {
                 onChange={(e) => { setForm((f) => ({ ...f, issue_month_year: e.target.value })); setErrors((er) => ({ ...er, issue_month_year: '' })); }}
                 className={INPUT}
               />
-              <p className="mt-1 text-[11px] text-[#863221]/80">Only a Physical Copy issue whose labels were printed for this member can be marked returned.</p>
               <FieldError>{errors.issue_month_year}</FieldError>
             </div>
             <div>
@@ -1478,10 +1618,11 @@ function RepeatReturnsModal({ subToMember, memberName, onClose }) {
 }
 
 // ── Label Batches ────────────────────────────────────────────
-function LabelsTab({ locations, canWrite }) {
-  const [batches, setBatches] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [detail, setDetail] = useState(null);
+function LabelsTab({ canWrite }) {
+  return <PrintBatchHistory canWrite={canWrite} />;
+}
+
+function LegacyLabelsTab({ locations, canWrite }) {
   const [busy, setBusy] = useState(false);
 
   const [recipients, setRecipients] = useState([]);
@@ -1494,10 +1635,6 @@ function LabelsTab({ locations, canWrite }) {
   const [recipientPages, setRecipientPages] = useState(1);
 
   const [gen, setGen] = useState({ issue_month_year: thisMonth(), state_id: '', district_id: '', taluk_id: '' });
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(200);
-  const [total, setTotal] = useState(0);
-  const [pages, setPages] = useState(1);
 
   const loadRecipients = useCallback(async () => {
     setRecipientsLoading(true);
@@ -1526,23 +1663,6 @@ function LabelsTab({ locations, canWrite }) {
     }
   }, [recipientPage, recipientPageSize, debouncedRecipientSearch, gen.state_id, gen.district_id, gen.taluk_id]);
 
-  // a page of label batches: each one carries its own status (Generated, Sent, Cancelled)
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await api.get('/magazines/label-batches', { params: { page, limit: pageSize } });
-      setBatches(Array.isArray(data?.data) ? data.data : []);
-      setTotal(data?.total ?? 0);
-      setPages(Math.max(1, data?.pages ?? 1));
-    } catch (error) {
-      notify(error.response?.data?.detail || 'Could not load label batches.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, pageSize]);
-
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { setPage(1); }, [pageSize]);
   useEffect(() => { loadRecipients(); }, [loadRecipients]);
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedRecipientSearch(recipientSearch), 300);
@@ -1551,19 +1671,6 @@ function LabelsTab({ locations, canWrite }) {
   useEffect(() => {
     setRecipientPage(1);
   }, [debouncedRecipientSearch, gen.state_id, gen.district_id, gen.taluk_id, recipientPageSize]);
-
-  // step 2: the printed labels were posted. Step 3 (a return) is only possible after this.
-  const cancelBatch = async (batch) => {
-    const ok = await confirmYesNo({ title: 'Cancel this batch?', text: `${batch.batch_name} was printed wrongly. Cancelled batches stay in the list for the record. This is not possible once a return is marked for the issue.`, confirmText: 'Yes, cancel it', danger: true });
-    if (!ok) return;
-    try {
-      await api.post(`/magazines/label-batches/${batch.id}/cancel`);
-      notify(`${batch.batch_name} cancelled.`);
-      load();
-    } catch (error) {
-      notify(error.response?.data?.detail || 'Could not cancel the batch.', 'error');
-    }
-  };
 
   const stateOptions = locations.states.map((s) => ({ value: s.id, label: s.name }));
   const districtOptions = locations.districts
@@ -1604,7 +1711,6 @@ function LabelsTab({ locations, canWrite }) {
       }
       await downloadPdf(data.batch_id, gen.issue_month_year);
       notify(`Label batch generated (${data.total_labels ?? 0} labels${data.returned_count ? `, ${data.returned_count} returned` : ''}).`);
-      load();
     } catch (error) {
       let message = error.response?.data?.detail;
       if (!message && error.response?.data instanceof Blob) {
@@ -1619,14 +1725,6 @@ function LabelsTab({ locations, canWrite }) {
       notify(message || 'Could not generate labels.', 'error');
     } finally {
       setBusy(false);
-    }
-  };
-
-  const onDownload = async (b) => {
-    try {
-      await downloadPdf(b.id, b.issue_month_year);
-    } catch (error) {
-      notify(error.response?.data?.detail || 'Could not download the PDF.', 'error');
     }
   };
 
@@ -1723,66 +1821,108 @@ function LabelsTab({ locations, canWrite }) {
         {recipientTotal > 0 && <Pager page={recipientPage} pages={recipientPages} total={recipientTotal} pageSize={recipientPageSize} onPage={setRecipientPage} onPageSize={setRecipientPageSize} />}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-[#E8DFD8] bg-white shadow-sm">
-        <div className="border-b border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3">
-          <h3 className="text-sm font-bold text-[#180200]">Print Batch History</h3>
-          <p className="mt-0.5 text-xs text-[#863221]">Previously generated Physical Copy label PDFs.</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-gray-700">
-            <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
-              <tr>
-                <TH>Batch</TH>
-                <TH>Issue</TH>
-                <TH>Generated</TH>
-                <TH className="text-center">Labels</TH>
-                <TH>Status</TH>
-                <TH className="text-center">Actions</TH>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E8DFD8]">
-              {loading ? (
-                <EmptyRow colSpan={6} title="Loading…" />
-              ) : batches.length === 0 ? (
-                <EmptyRow colSpan={6} icon={FileText} title="No label batches yet" hint="Generate a batch above to print magazine labels." />
-              ) : (
-                batches.map((b) => (
-                  <tr key={b.id} className="hover:bg-amber-50/40 transition-colors">
-                    <td className="px-4 py-3.5 font-semibold text-gray-900">{b.batch_name}</td>
-                    <td className="px-4 py-3.5 text-xs font-mono">{b.issue_month_year}</td>
-                    <td className="px-4 py-3.5 text-xs text-gray-600">{formatDate(b.generation_date)}</td>
-                    <td className="px-4 py-3.5 text-center text-xs font-bold text-gray-800">{b.total_labels ?? 0}</td>
-                    <td className="px-4 py-3.5">
-                      {b.status === 'SENT' ? (
-                        <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
-                          Sent{b.sent_date ? ` on ${formatDate(b.sent_date)}` : ''}
-                        </span>
-                      ) : b.status === 'CANCELLED' ? (
-                        <span className="inline-flex items-center rounded-full border border-stone-300 bg-stone-100 px-2 py-0.5 text-[11px] font-bold text-stone-600">Cancelled</span>
-                      ) : (
-                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">Printed</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {canWrite && b.status !== 'CANCELLED' && (
-                          <button type="button" onClick={() => cancelBatch(b)} className="btn-act" title="Printed wrongly: cancel this batch"><X className="w-3.5 h-3.5" /><span>Cancel</span></button>
-                        )}
-                        <button type="button" onClick={() => setDetail(b)} className="btn-act" title="View labels"><Eye className="w-3.5 h-3.5" /><span>View</span></button>
-                        {canWrite && b.status !== 'CANCELLED' && (
-                          <button type="button" onClick={() => onDownload(b)} className="btn-act" title="Download PDF"><Download className="w-3.5 h-3.5" /><span>PDF</span></button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {total > 0 && <Pager page={page} pages={pages} total={total} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />}
-      </div>
+    </div>
+  );
+}
 
+function PrintBatchHistory({ canWrite }) {
+  const [batches, setBatches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [detail, setDetail] = useState(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(200);
+  const [total, setTotal] = useState(0);
+  const [pages, setPages] = useState(1);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get('/magazines/label-batches', { params: { page, limit: pageSize } });
+      setBatches(Array.isArray(data?.data) ? data.data : []);
+      setTotal(data?.total ?? 0);
+      setPages(Math.max(1, data?.pages ?? 1));
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Could not load print history.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, pageSize]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setPage(1); }, [pageSize]);
+
+  const cancelBatch = async (batch) => {
+    const ok = await confirmYesNo({ title: 'Cancel this batch?', text: `${batch.batch_name} was printed wrongly. Cancelled batches stay in the history. This is not possible once a return is marked for the issue.`, confirmText: 'Yes, cancel it', danger: true });
+    if (!ok) return;
+    try {
+      await api.post(`/magazines/label-batches/${batch.id}/cancel`);
+      notify(`${batch.batch_name} cancelled.`);
+      load();
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Could not cancel the batch.', 'error');
+    }
+  };
+
+  const downloadPdf = async (batch) => {
+    try {
+      const res = await api.get(`/magazines/label-batches/${batch.id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `labels-${batch.issue_month_year || batch.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      notify(error.response?.data?.detail || 'Could not download the PDF.', 'error');
+    }
+  };
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-[#E8DFD8] bg-white shadow-sm">
+      <div className="border-b border-[#E8DFD8] bg-[#FAF7F2] px-4 py-3">
+        <h3 className="text-sm font-bold text-[#180200]">Print History</h3>
+        <p className="mt-0.5 text-xs text-[#863221]">Previously generated Physical Copy label batches.</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm text-gray-700">
+          <thead className="bg-[#FAF7F2] border-b border-[#E8DFD8] text-[#863221] font-bold uppercase tracking-wider text-[11px]">
+            <tr><TH>Issue Month</TH><TH>Batch</TH><TH>Printed Date</TH><TH>Printed By</TH><TH className="text-center">Total Labels</TH><TH>Status</TH><TH className="text-center">Actions</TH></tr>
+          </thead>
+          <tbody className="divide-y divide-[#E8DFD8]">
+            {loading ? (
+                <EmptyRow colSpan={7} title="Loading…" />
+            ) : batches.length === 0 ? (
+                <EmptyRow colSpan={7} icon={FileText} title="No print batches yet" hint="Printed label batches will appear here." />
+            ) : batches.map((b) => (
+              <tr key={b.id} className="hover:bg-amber-50/40 transition-colors">
+                <td className="px-4 py-3.5 text-xs font-mono">{b.issue_month_year}</td>
+                <td className="px-4 py-3.5 font-semibold text-gray-900">{b.batch_name}</td>
+                <td className="px-4 py-3.5 text-xs text-gray-600">{formatDate(b.sent_date || b.generation_date)}</td>
+                <td className="px-4 py-3.5 text-xs text-gray-700">{b.printed_by || 'Unknown'}</td>
+                <td className="px-4 py-3.5 text-center text-xs font-bold text-gray-800">{b.total_labels ?? 0}</td>
+                <td className="px-4 py-3.5">
+                  {b.status === 'SENT' ? (
+                    <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">Sent{b.sent_date ? ` on ${formatDate(b.sent_date)}` : ''}</span>
+                  ) : b.status === 'CANCELLED' ? (
+                    <span className="inline-flex items-center rounded-full border border-stone-300 bg-stone-100 px-2 py-0.5 text-[11px] font-bold text-stone-600">Cancelled</span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">Printed</span>
+                  )}
+                </td>
+                <td className="px-4 py-3.5">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <button type="button" onClick={() => setDetail(b)} className="btn-act" title="View labels"><Eye className="w-3.5 h-3.5" /><span>View</span></button>
+                    {canWrite && b.status !== 'CANCELLED' && <button type="button" onClick={() => downloadPdf(b)} className="btn-act" title="Download PDF"><Download className="w-3.5 h-3.5" /><span>PDF</span></button>}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {total > 0 && <Pager page={page} pages={pages} total={total} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />}
       {detail && <LabelBatchModal batch={detail} onClose={() => setDetail(null)} />}
     </div>
   );

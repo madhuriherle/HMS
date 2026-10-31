@@ -64,12 +64,30 @@ export default function RecycleBin() {
     }
   };
 
+  const waitForEmptyJob = async (jobId) => {
+    for (let attempt = 0; attempt < 180; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const { data } = await api.get(`/system/recycle-bin/empty/${jobId}`);
+      if (data.status === 'completed' || data.status === 'failed') return data;
+    }
+    return { status: 'failed', error: 'Cleanup is still running on the server. Refresh the page shortly to see the result.' };
+  };
+
   const run = async ({ url, body, title, text, confirmText, danger, doneWord, countKey }) => {
     const reason = await askReason({ title, text, confirmText, danger });
     if (!reason) return;
     setBusy(true);
     try {
       const { data } = await api.post(url, body, { params: { reason } });
+      if (data.job_id) {
+        notify('Recycle Bin cleanup started. You can continue using the app.');
+        const result = await waitForEmptyJob(data.job_id);
+        if (result.status === 'completed') report(result, doneWord, result.deleted || 0);
+        else notify(result.error || 'Recycle Bin cleanup failed.', 'error');
+        setPicked(new Set());
+        await load();
+        return;
+      }
       report(data, doneWord, data[countKey] || 0);
       setPicked(new Set());
       await load();

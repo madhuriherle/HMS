@@ -1,5 +1,5 @@
 from typing import Any, Optional, List, Union
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from api import deps
@@ -350,7 +350,10 @@ def build_subscription_history(db: Session, sub: MagazineSubscription) -> list:
         issue = batch.issue_month_year
         extra = {"batch_id": batch.id, "batch_name": batch.batch_name, "label_address": item.label_address}
         if batch.status == "SENT":
-            issues[issue] = {"result": "SENT", "date": batch.sent_date, "detail": batch.batch_name, **extra}
+            existing = issues.get(issue, {})
+            issues[issue] = {**existing, "result": "RETURNED" if existing.get("returned") else "SENT",
+                             "date": existing.get("date") or batch.sent_date, "detail": existing.get("detail") or batch.batch_name,
+                             "sent_date": batch.sent_date, "sent_batch": batch.batch_name, "sent": True, **extra}
         elif issues.get(issue, {}).get("result") != "SENT":
             issues[issue] = {"result": "LISTED", "date": batch.generation_date, "detail": "labels generated, not marked sent", **extra}
 
@@ -364,15 +367,22 @@ def build_subscription_history(db: Session, sub: MagazineSubscription) -> list:
             if (y, m) > (end.year, end.month):
                 break
             key = f"{y}-{m:02d}"
-            if issues.get(key, {}).get("result") != "SENT":
-                issues[key] = {"result": "PAUSED", "date": p.pause_start_date, "detail": p.reason or "delivery paused"}
+            existing = issues.get(key, {})
+            issues[key] = {**existing,
+                           "result": existing.get("result") or "PAUSED",
+                           "date": existing.get("date") or p.pause_start_date,
+                           "detail": existing.get("detail") or p.reason or "delivery paused",
+                           "paused": True, "pause_start_date": p.pause_start_date,
+                           "pause_end_date": p.pause_end_date, "pause_reason": p.reason or "delivery paused"}
             y, m = (y + 1, 1) if m == 12 else (y, m + 1)
 
     for r in db.query(MagazineReturn).filter(
         MagazineReturn.subscription_id == sub.id, MagazineReturn.is_deleted == False,  # noqa: E712
     ).all():
-        issues[r.issue_month_year] = {**issues.get(r.issue_month_year, {}), "result": "RETURNED", "date": r.return_date,
-                                      "detail": r.return_reason or "returned"}
+        existing = issues.get(r.issue_month_year, {})
+        issues[r.issue_month_year] = {**existing, "result": "RETURNED", "date": existing.get("date") or r.return_date,
+                                      "detail": existing.get("detail") or r.return_reason or "returned", "returned": True,
+                                      "return_date": r.return_date, "return_reason": r.return_reason or "returned"}
 
     # months since the subscription began that never reached a label list or a pause
     if sub.created_at:
@@ -734,6 +744,7 @@ def generate_labels(
     taluk_id: Optional[int] = None,
     only_paid: bool = False,
     force: bool = False,
+    member_ids: Optional[List[int]] = Query(None),
 ) -> Any:
     """Generate (print) a magazine label batch (state/district/taluk-wise), in district, taluk and pincode order. Printing
     marks the batch SENT on today's date: a copy can be marked returned from then on.
@@ -755,7 +766,7 @@ def generate_labels(
 
     filters_text = str({
         "state_id": state_id, "district_id": district_id,
-        "taluk_id": taluk_id, "only_paid": only_paid,
+        "taluk_id": taluk_id, "only_paid": only_paid, "member_ids": member_ids or [],
     })
     twin = db.query(MagazineLabelBatch).filter(
         MagazineLabelBatch.issue_month_year == issue_month_year,
@@ -798,6 +809,7 @@ def generate_labels(
     if state_id: member_subs = member_subs.filter(Member.state_id == state_id)
     if district_id: member_subs = member_subs.filter(Member.district_id == district_id)
     if taluk_id: member_subs = member_subs.filter(Member.taluk_id == taluk_id)
+    if member_ids: member_subs = member_subs.filter(Member.id.in_(member_ids))
 
     rows = member_subs.all()
     rows = _in_postal_order(db, rows)
@@ -847,7 +859,7 @@ def generate_labels(
 
     from models.engagements import AffiliationMagazineSetting, AssociateMagazineSetting, PressMediaMagazineSetting
 
-    filtered_by_place = bool(state_id or district_id or taluk_id)   # affiliations, associates and press have no place filter: they join a full run only
+    filtered_by_place = bool(state_id or district_id or taluk_id or member_ids)   # selected member batches exclude non-member recipients
 
     def _override(model, fk, owner):
         r = db.query(model).filter(getattr(model, fk) == owner.id, model.is_deleted == False).first()
@@ -1028,7 +1040,12 @@ def read_label_batches(
 ) -> Any:
     """Generated label batches (the 'generated' side of the labels report)."""
     q = db.query(MagazineLabelBatch).filter(MagazineLabelBatch.is_deleted == False)
-    return paginate(q.order_by(MagazineLabelBatch.id.desc()), page, _page_limit(limit))
+    result = paginate(q.order_by(MagazineLabelBatch.id.desc()), page, _page_limit(limit))
+    creator_ids = {row.get("created_by") for row in result["data"] if row.get("created_by")}
+    creators = {u.id: u.name for u in db.query(User).filter(User.id.in_(creator_ids)).all()} if creator_ids else {}
+    for row in result["data"]:
+        row["printed_by"] = creators.get(row.get("created_by"), "Unknown")
+    return result
 
 
 def _batch_row(batch: MagazineLabelBatch) -> dict:
@@ -1397,10 +1414,11 @@ def read_all_recipients(
     recipient_type: Optional[str] = None,
     delivery_status: Optional[str] = None,
     search: Optional[str] = None,
+    pincode_id: Optional[int] = None,
 ) -> Any:
     """Combined list of magazine recipients: members with subscriptions, affiliations, associates, and press.
     LEGACY: at most the first 200; the Subscriptions screen reads the paged GET /magazines/recipients."""
-    items = _collect_recipients(db, recipient_type, delivery_status, search)[:LIST_PAGE_MAX]
+    items = _collect_recipients(db, recipient_type, delivery_status, search, pincode_id=pincode_id)[:LIST_PAGE_MAX]
     unresolved_mids = [r["recipient_id"] for r in items if r["recipient_type"] in ("MEMBER", "APPLICANT") and r.get("has_receipt") is None]
     if unresolved_mids:
         from models.receipts import Receipt, ReceiptAllocation
@@ -1422,13 +1440,14 @@ def read_all_recipients(
 
 def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_status: Optional[str], search: Optional[str], *,
                         copy: Optional[str] = None, state_id: Optional[int] = None, district_id: Optional[int] = None,
-                        taluk_id: Optional[int] = None, receipt: Optional[str] = None) -> list:
+                        taluk_id: Optional[int] = None, pincode_id: Optional[int] = None, receipt: Optional[str] = None,
+                        subscribed_only: bool = False) -> list:
     """Every recipient matching the type, status, search and the other filters (not paged).
 
     Recipient types: MEMBER = approved members, APPLICANT = members not approved yet (rejected ones are left out),
     AFFILIATION, ASSOCIATE and PRESS. A person is listed when they said Yes to the magazine or already have a subscription;
     with no subscription their status is NOT_STARTED. copy = PRINTED | ONLINE. A place filter (state, district, taluk) lists
-    people only (an affiliation, associate or press has no place). receipt = PAID | NO_RECEIPT (people only)."""
+    people only (an affiliation, associate or press has no place). pincode_id filters people by PIN. receipt = PAID | NO_RECEIPT (people only)."""
     from sqlalchemy import and_, exists
     from models.receipts import Receipt, ReceiptAllocation
     from models.engagements import Affiliation, AffiliationMagazineSetting, Associate, AssociateMagazineSetting, PressMedia, PressMediaMagazineSetting
@@ -1437,7 +1456,7 @@ def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_sta
 
     kind = (recipient_type or "ALL").upper()
     wanted_copy = (copy or "").upper()
-    place_filtered = bool(state_id or district_id or taluk_id)
+    place_filtered = bool(state_id or district_id or taluk_id or pincode_id)
     non_member_filtered = bool(wanted_copy == "ONLINE" or place_filtered or receipt)   # these filters describe people only
 
     # 1. PEOPLE: approved members and applicants
@@ -1457,6 +1476,8 @@ def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_sta
                 or_(MagazineSubscription.id.isnot(None), Member.magazine_needed == True),  # noqa: E712
             )
         )
+        if subscribed_only:
+            q = q.filter(MagazineSubscription.id.isnot(None))
         if delivery_status and delivery_status.upper() != "ALL":
             if delivery_status.upper() == "NOT_STARTED":
                 q = q.filter(MagazineSubscription.id.is_(None))
@@ -1469,6 +1490,7 @@ def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_sta
         if state_id: q = q.filter(Member.state_id == state_id)
         if district_id: q = q.filter(Member.district_id == district_id)
         if taluk_id: q = q.filter(Member.taluk_id == taluk_id)
+        if pincode_id: q = q.filter(Member.pincode_id == pincode_id)
         receipt_filter = (receipt or "").upper()
         if receipt_filter == "PAID":
             q = q.filter(paid_exists)
@@ -1484,7 +1506,14 @@ def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_sta
                 (Member.mobile.ilike(s))
             )
         has_receipt_default = True if receipt_filter == "PAID" else (False if receipt_filter == "NO_RECEIPT" else None)
-        for sub, m in q.all():
+        member_rows = q.all()
+        from models.masters import PostalCode
+        pincode_ids = {m.pincode_id for _sub, m in member_rows if m.pincode_id}
+        pincode_values = {
+            pc.id: pc.pincode
+            for pc in db.query(PostalCode).filter(PostalCode.id.in_(pincode_ids)).all()
+        } if pincode_ids else {}
+        for sub, m in member_rows:
             name = m.display_name or m.full_name_kn or f"Member {m.id}"
             recipients.append({
                 "recipient_type": "MEMBER" if m.approval_status == "APPROVED" else "APPLICANT",
@@ -1501,10 +1530,12 @@ def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_sta
                 "state_id": m.state_id,
                 "district_id": m.district_id,
                 "taluk_id": m.taluk_id,
+                "pincode_id": m.pincode_id,
+                "pincode": pincode_values.get(m.pincode_id),
             })
 
     # 2. AFFILIATIONS
-    if kind in ("ALL", "AFFILIATION") and not non_member_filtered:
+    if kind in ("ALL", "AFFILIATION") and not non_member_filtered and not subscribed_only:
         q_aff = db.query(Affiliation).filter(Affiliation.is_deleted == False)  # noqa: E712
         if search:
             s = f"%{search}%"
@@ -1536,7 +1567,7 @@ def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_sta
             })
 
     # 3. ASSOCIATES
-    if kind in ("ALL", "ASSOCIATE") and not non_member_filtered:
+    if kind in ("ALL", "ASSOCIATE") and not non_member_filtered and not subscribed_only:
         q_asc = db.query(Associate).filter(Associate.is_deleted == False)  # noqa: E712
         if search:
             s = f"%{search}%"
@@ -1569,7 +1600,7 @@ def _collect_recipients(db: Session, recipient_type: Optional[str], delivery_sta
             })
 
     # 4. PRESS & MEDIA
-    if kind in ("ALL", "PRESS") and not non_member_filtered:
+    if kind in ("ALL", "PRESS") and not non_member_filtered and not subscribed_only:
         q_prs = db.query(PressMedia).filter(PressMedia.is_deleted == False)  # noqa: E712
         if search:
             s = f"%{search}%"
@@ -1617,7 +1648,10 @@ def read_recipients_page(
     state_id: Optional[int] = None,
     district_id: Optional[int] = None,
     taluk_id: Optional[int] = None,
+    pincode_id: Optional[int] = None,
     receipt: Optional[str] = None,    # PAID | NO_RECEIPT
+    subscribed_only: bool = False,
+    member_ids: Optional[List[int]] = None,
 ) -> Any:
     """One page of the combined recipients (approved members, applicants, affiliations, associates, press). The search
     and the filters run on all of them; `summary` counts the whole set matching the type, the search and the other filters,
@@ -1625,7 +1659,11 @@ def read_recipients_page(
     from models.magazines import MagazineReturn
 
     everything = _collect_recipients(db, recipient_type, None, search, copy=copy, state_id=state_id, district_id=district_id,
-                                     taluk_id=taluk_id, receipt=receipt)
+                                     taluk_id=taluk_id, pincode_id=pincode_id, receipt=receipt,
+                                     subscribed_only=subscribed_only)
+    if member_ids:
+        allowed = {int(mid) for mid in member_ids}
+        everything = [r for r in everything if r["recipient_type"] in ("MEMBER", "APPLICANT") and r["recipient_id"] in allowed]
     summary = {"total": len(everything), "active": 0, "paused": 0, "stopped": 0, "not_started": 0}
     for r in everything:
         key = {"ACTIVE": "active", "PAUSED": "paused", "NOT_STARTED": "not_started"}.get(r["delivery_status"], "stopped")

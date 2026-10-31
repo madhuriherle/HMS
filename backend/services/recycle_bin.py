@@ -22,6 +22,7 @@ from models.receipts import (
     PaymentTransaction, Receipt, ReceiptAllocation, ReceiptCancellation, ReceiptItem, RefundTransaction,
 )
 from models.users import User
+from models.activity import UserActivityLog, MemberActivityLog
 
 
 def _join(*parts) -> str:
@@ -228,6 +229,12 @@ def _purge_dependents(db: Session, row) -> None:
         for (did,) in db.query(District.id).filter(*_gone(District, District.state_id == row.id)).all():
             _purge_dependents(db, db.get(District, did))
         drop(District, *_gone(District, District.state_id == row.id))
+    elif isinstance(row, User):
+        # A permanently deleted account cannot retain audit rows that have a
+        # non-cascading FK back to it. These are the account's own activity
+        # records; business records and member data are left untouched.
+        drop(UserActivityLog, UserActivityLog.user_id == row.id)
+        drop(MemberActivityLog, MemberActivityLog.user_id == row.id)
 
 
 def purge(db: Session, items: list, viewer=None) -> dict:

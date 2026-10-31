@@ -14,7 +14,7 @@ import ModulesManagement from './pages/ModulesManagement';
 import ReceiptEntry from './pages/ReceiptEntry';
 import ReceiptTracking from './pages/ReceiptTracking';
 import LabelList from './pages/LabelList';
-import MagazineManagement from './pages/MagazineManagement';
+import MagazineManagement, { MagazinePrintHistory } from './pages/MagazineManagement';
 import MembershipList from './pages/MembershipList';
 import UnapprovedMembership from './pages/UnapprovedMembership';
 import AssignedApprovals from './pages/AssignedApprovals';
@@ -160,6 +160,7 @@ function App() {
           <Route path="magazine/management" element={<Navigate to="/dashboard/magazine/subscriptions" replace />} />
           <Route path="magazine/subscriptions" element={<MagazineManagement />} />
           <Route path="magazine/pauses-returns" element={<Navigate to="/dashboard/magazine/subscriptions" replace />} />
+          <Route path="magazine/labels-delivery/history" element={<MagazinePrintHistory />} />
           <Route path="magazine/labels-delivery" element={<MagazineManagement />} />
           <Route path="magazines" element={<Navigate to="/dashboard/magazine" replace />} />
           {/* Legacy magazine label route now uses the single Print & Delivery workflow. */}
